@@ -47,7 +47,16 @@ func (u *unit) markOf() (*vega.Mark, error) {
 	if u.mark == "circle" || u.mark == "square" {
 		style = u.mark
 	}
-	m.Style = vega.List(style)
+	styles := []string{style}
+	switch st := u.props["style"].(type) {
+	case string:
+		styles = append(styles, st)
+	case []any:
+		for _, x := range st {
+			styles = append(styles, expr.String(x))
+		}
+	}
+	m.Style = vega.List(styles...)
 	if c, ok := u.props["clip"].(bool); ok && c {
 		m.Clip = lit(true)
 	}
@@ -237,6 +246,12 @@ func (u *unit) axis(e enc, ch, size string) {
 		}
 		return
 	}
+	if d.units != nil && d.typ == temporal && u.spans(d) {
+		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
+		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out, "offset": 0.5})
+		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.outEnd, "offset": -0.5})
+		return
+	}
 	if u.stack == ch {
 		u.v.addScale(u, ch, d, []string{d.out + "_start", d.out + "_end"})
 		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_end"})
@@ -258,12 +273,20 @@ func (u *unit) axis(e enc, ch, size string) {
 		ref = func(string) map[string]any { return map[string]any{"scale": u.v.sn(ch), "value": d.datum} }
 	}
 	switch {
-	case discrete && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" && false):
-		if sz := u.ch["size"]; sz != nil && sz.hasValue && u.mark == "bar" {
+	case discrete && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick"):
+		var sz any
+		if c := u.ch["size"]; c != nil && c.hasValue {
+			sz = c.value
+		} else if v, ok := u.props["size"]; ok {
+			sz = v
+		} else if u.mark == "tick" {
+			sz = 5.0
+		}
+		if sz != nil && u.mark != "rect" {
 			r := ref(d.out)
 			r["band"] = 0.5
 			e.set(pc, r)
-			e.set(size, map[string]any{"value": sz.value})
+			e.set(size, map[string]any{"value": sz})
 			return
 		}
 		e.set(p, ref(d.out))
@@ -271,10 +294,15 @@ func (u *unit) axis(e enc, ch, size string) {
 	case discrete && u.v.scaleType(ch) == "band":
 		r := ref(d.out)
 		r["band"] = 0.5
-		e.set(pc, r)
-		if u.mark == "tick" {
-			e.set(size, map[string]any{"value": 1})
+		e.set(p, r)
+	case u.mark == "tick" && u.measure() == ch:
+		e.set(pc, ref(d.out))
+		thick := 1.0
+		if v, ok := u.props["thickness"].(float64); ok {
+			thick = v
 		}
+		e.set(size, map[string]any{"value": thick})
+		return
 	default:
 		e.set(p, ref(d.out))
 		switch {
@@ -413,17 +441,6 @@ func (u *unit) others(e enc) {
 	}
 	if d := u.ch["url"]; d != nil && d.isField() {
 		e.set("url", map[string]any{"field": d.out})
-	}
-	if u.mark == "tick" {
-		thick := 1.0
-		if v, ok := u.props["thickness"].(float64); ok {
-			thick = v
-		}
-		if u.orient == "vertical" || u.ch["x"] != nil && u.ch["x"].continuous() {
-			if _, ok := e["width"]; !ok {
-				e.set("width", map[string]any{"value": thick})
-			}
-		}
 	}
 	_ = expr.String
 }

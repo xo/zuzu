@@ -96,6 +96,14 @@ type scaleComp struct {
 	noGuide bool
 	sortVal any
 	hasSort bool
+	// listSorted says that the domain sorts by a field of indexes, which
+	// the sort of the channel must not override.
+	listSorted bool
+	// dimension says that the scale is the dimension of a bar or an area,
+	// which does not include zero.
+	dimension bool
+	// binned says that the field of the scale is binned already.
+	binned bool
 }
 
 // dataField is a field of a dataset.
@@ -134,10 +142,27 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 		v.order = append(v.order, name)
 	}
 	maps.Copy(s.props, props)
+	if s.typ == "point" && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick") {
+		// A discrete scale that a bar draws on has bands, whatever drew
+		// on it first.
+		s.typ = "band"
+	}
 	if d.bin != nil {
 		s.bins = binPrefix(d.bin) + "_" + varName(d.field) + "_bins"
 	}
 	data := u.c.name(u.data)
+	if idx := u.listSort[name]; idx != "" && u.raw != nil {
+		data = u.c.name(u.raw)
+		s.sortVal, s.hasSort = map[string]any{"op": "min", "field": idx}, true
+		s.listSorted = true
+	} else if u.raw != nil && s.discrete && d.def != nil && !d.def.Sort.IsZero() && !d.isAggregate() {
+		// A domain sorted by an aggregate of another field reads the rows
+		// before the aggregate.
+		data = u.c.name(u.raw)
+		if by := sortByChannel(u, d); by != nil {
+			s.sortVal, s.hasSort = by, true
+		}
+	}
 	for _, f := range fields {
 		ref := dataField{data, f}
 		dup := false
@@ -150,7 +175,16 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 			s.refs = append(s.refs, ref)
 		}
 	}
-	if d.def != nil && !d.def.Sort.IsZero() && !s.hasSort {
+	if d.binned {
+		s.binned = true
+	}
+	switch u.mark {
+	case "bar", "area", "rect", "rule", "tick", "trail", "line":
+		if (name == "x" || name == "y") && name == u.dimension() && u.mark != "line" && u.mark != "trail" {
+			s.dimension = true
+		}
+	}
+	if d.def != nil && !d.def.Sort.IsZero() && !s.hasSort && !s.listSorted {
 		s.sortVal, s.hasSort = valueOf(d.def.Sort), true
 	}
 	if t := titleOf(d); t != "" && !contains(s.titles, t) {
@@ -478,7 +512,7 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		}
 	}
 	if quant && (positional || s.channel == "size" || s.channel == "theta" || s.channel == "radius") && s.typ != "log" {
-		zero := s.bins == "" && s.props["domain"] == nil
+		zero := s.bins == "" && !s.binned && s.props["domain"] == nil && !s.dimension
 		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: zero}
 	}
 	if quant && (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") {
@@ -567,6 +601,32 @@ func (v *view) dataDomain(s *scaleComp) vega.ScaleDomain {
 		}
 	}
 	return vega.ScaleDomain{Data: ref}
+}
+
+// sortByChannel returns the sort of a domain by another channel, such as
+// "-x": the op and the field of that channel, and the order.
+func sortByChannel(u *unit, d *channelDef) map[string]any {
+	name, ok := valueOf(d.def.Sort).(string)
+	if !ok {
+		return nil
+	}
+	order := "ascending"
+	if strings.HasPrefix(name, "-") {
+		order, name = "descending", name[1:]
+	}
+	o := u.ch[name]
+	if o == nil {
+		return nil
+	}
+	op := o.aggregate
+	if op == "" {
+		op = "sum"
+	}
+	out := map[string]any{"op": op, "field": o.field, "order": order}
+	if op == "count" {
+		delete(out, "field")
+	}
+	return out
 }
 
 // sortOf turns the sort of a channel into the sort of the domain of its

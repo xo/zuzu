@@ -567,16 +567,18 @@ lays out the cells of a facet and of a concatenation in a grid. `go run
 
 | Check | Match | Of |
 | --- | --- | --- |
-| specs, in all three checks | 158 (33.6%) | 470 |
-| datasets | 459 (42.8%) | 1072 |
-| scales | 850 (71.2%) | 1193 |
-| marks that draw data | 1577 (60.5%) | 2607 |
-| the structure of the compiled spec | 259 (55.1%) | 470 |
+| specs, in all three checks | 184 (39.1%) | 470 |
+| datasets | 541 (50.5%) | 1072 |
+| scales | 926 (77.6%) | 1193 |
+| marks that draw data | 1648 (63.2%) | 2607 |
+| the structure of the compiled spec | 276 (58.7%) | 470 |
 
-The structure meets its share. The composite marks `boxplot`, `errorbar`
-and `errorband`, a facet that wraps, and the names that vega-lite.js gives
-the datasets of a layer are the largest part of what fails, with the maps
-of phase 5.
+The composite marks `boxplot`, `errorbar` and `errorband` expand into
+layers over the aggregated fields that Vega-Lite names, such as
+`lower_box_x` and `mid_box_x`. The structure meets its share. A facet that
+wraps, the groups that clip the corners of a stack of bars, the names that
+vega-lite.js gives the datasets of a layer, and the config of a spec are
+the largest part of what fails, with the maps of phase 5.
 
 ### Phase 5. Tier 1 and tier 2
 

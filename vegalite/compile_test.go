@@ -152,3 +152,38 @@ func TestTimeUnits(t *testing.T) {
 		}
 	}
 }
+
+func TestCompileComposite(t *testing.T) {
+	t.Parallel()
+	s := compile(t, `{
+		"data": {"url": "data/penguins.json"},
+		"mark": {"type": "boxplot", "extent": "min-max"},
+		"encoding": {
+			"x": {"field": "Species", "type": "nominal"},
+			"y": {"field": "Body Mass (g)", "type": "quantitative"}
+		}
+	}`)
+	_, scales, marks := names(s)
+	want := []string{"layer_0_marks:rule", "layer_1_marks:rule", "layer_2_marks:rect", "layer_3_marks:rect"}
+	if !slices.Equal(marks, want) {
+		t.Errorf("marks = %v, want %v", marks, want)
+	}
+	if !slices.Equal(scales, []string{"x:band", "y:linear"}) {
+		t.Errorf("scales = %v", scales)
+	}
+	var as []string
+	if err := json.Unmarshal(s.Data[0].Transform[0].Params["as"], &as); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"lower_box_Body Mass (g)", "upper_box_Body Mass (g)", "mid_box_Body Mass (g)", "lower_whisker_Body Mass (g)", "upper_whisker_Body Mass (g)"}; !slices.Equal(as, want) {
+		t.Errorf("the aggregate gives %v, want %v", as, want)
+	}
+	e := compile(t, `{
+		"data": {"url": "data/barley.json"},
+		"mark": {"type": "errorbar", "ticks": true},
+		"encoding": {"x": {"field": "yield", "type": "quantitative"}, "y": {"field": "variety", "type": "ordinal"}}
+	}`)
+	if _, _, marks := names(e); !slices.Equal(marks, []string{"layer_0_marks:rule", "layer_1_marks:rect", "layer_2_marks:rect"}) {
+		t.Errorf("errorbar marks = %v, want a rule and two ticks", marks)
+	}
+}

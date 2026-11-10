@@ -31,6 +31,9 @@ type channelDef struct {
 	typ   string
 	// aggregate is the op of an aggregate, such as sum or count.
 	aggregate string
+	// argField is the field whose least or greatest value an argmin or an
+	// argmax finds. The channel reads its field of that row.
+	argField string
 	// bin holds the parameters of a bin, and binned says that the data is
 	// already binned.
 	bin    map[string]any
@@ -61,6 +64,11 @@ type condition struct {
 	value    any
 	hasValue bool
 	field    string
+}
+
+// isAggregate reports whether the channel aggregates its field.
+func (c *channelDef) isAggregate() bool {
+	return c.aggregate != ""
 }
 
 // isField reports whether the channel reads a field of the data.
@@ -110,9 +118,7 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 			for _, op := range []string{"argmin", "argmax"} {
 				if v, ok := x[op]; ok {
 					c.aggregate = op
-					if c.field == "" {
-						c.field = expr.String(v)
-					}
+					c.argField = expr.String(v)
 				}
 			}
 		}
@@ -254,6 +260,8 @@ func (c *channelDef) outputField() string {
 	switch {
 	case c.aggregate == "count":
 		return "__count"
+	case c.argField != "":
+		return c.aggregate + "_" + c.argField + "[" + strconv.Quote(c.field) + "]"
 	case c.aggregate != "":
 		return c.aggregate + "_" + c.field
 	case c.bin != nil:

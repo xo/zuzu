@@ -39,6 +39,12 @@ type unit struct {
 	sortIndex map[string]string
 	// dates holds the fields of the view that are dates.
 	dates map[string]bool
+	// listSort names, for each channel that sorts by a list of values, the
+	// field that holds the index of each value in the list.
+	listSort map[string]string
+	// raw is the dataset before the aggregate, which a scale sorted by an
+	// aggregate of another field reads.
+	raw *dataNode
 	// orient is vertical when the bars run up, and horizontal when they run
 	// across.
 	orient string
@@ -53,9 +59,8 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 			u.props[k] = x
 		}
 	}
-	switch u.mark {
-	case "boxplot", "errorbar", "errorband", "geoshape":
-		return c.issue(path+"/mark", "the mark %s", u.mark)
+	if u.mark == "geoshape" {
+		return c.issue(path+"/mark", "the mark %s, which comes in phase 5", u.mark)
 	}
 	for _, name := range channelOrder {
 		ch, ok := s.Encoding[name]
@@ -251,6 +256,17 @@ func (u *unit) dataflow(s *Spec) error {
 	if err := c.transforms(n, s.Transform, u.path+"/transform"); err != nil {
 		return err
 	}
+	if u.addListSort(n) {
+		u.raw = n
+		n.open = false
+		n = c.derive(n)
+	} else if u.aggregated() && u.sortsByField() {
+		// The domain sorts over the rows before the aggregate, so the
+		// aggregate goes in a dataset of its own.
+		u.raw = n
+		n.open = false
+		n = c.derive(n)
+	}
 	u.addSortIndex(n)
 	for _, d := range u.allChannels() {
 		if d.bin != nil {
@@ -285,6 +301,63 @@ func (u *unit) dataflow(s *Spec) error {
 	}
 	u.data = n
 	return nil
+}
+
+// addListSort adds, for a channel that sorts by a list of values, a field
+// with the index of each value in the list, which the domain sorts by. It
+// reports whether it added one.
+func (u *unit) addListSort(n *dataNode) bool {
+	added := false
+	for _, name := range channelOrder {
+		d := u.ch[name]
+		if d == nil || d.def == nil || d.def.Sort.IsZero() {
+			continue
+		}
+		list, ok := valueOf(d.def.Sort).([]any)
+		if !ok {
+			continue
+		}
+		var b strings.Builder
+		for i, v := range list {
+			fmt.Fprintf(&b, "%s===%s ? %d : ", fieldRef(d.field), string(mustJSON(v)), i)
+		}
+		fmt.Fprintf(&b, "%d", len(list))
+		index := name + "_" + d.field + "_sort_index"
+		u.c.add(n, transform("formula", map[string]any{"expr": b.String(), "as": index}))
+		if u.listSort == nil {
+			u.listSort = map[string]string{}
+		}
+		u.listSort[name] = index
+		added = true
+	}
+	return added
+}
+
+// spans reports whether the marks of the view span the interval of a time
+// unit on a channel, as a bar does.
+func (u *unit) spans(d *channelDef) bool {
+	return (u.mark == "bar" || u.mark == "rect") && (d.channel == "x" || d.channel == "y")
+}
+
+// sortsByField reports whether a channel sorts its domain by an aggregate
+// of a field, as "sort": "-x" or {"op": "sum", "field": "people"} does.
+func (u *unit) sortsByField() bool {
+	for _, d := range u.ch {
+		if d.def == nil || d.def.Sort.IsZero() {
+			continue
+		}
+		switch x := valueOf(d.def.Sort).(type) {
+		case string:
+			if u.ch[strings.TrimPrefix(x, "-")] != nil {
+				return true
+			}
+		case map[string]any:
+			if x["field"] != nil || x["op"] != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // allChannels returns the channels of the view, in order, with the detail
@@ -354,6 +427,9 @@ func (u *unit) addAggregate(n *dataNode) {
 		case d.bin != nil:
 			group(d.out)
 			group(d.outEnd)
+		case d.units != nil && d.typ == temporal && u.spans(d):
+			group(d.out)
+			group(d.outEnd)
 		default:
 			group(d.out)
 		}
@@ -366,12 +442,23 @@ func (u *unit) addAggregate(n *dataNode) {
 		}
 		measured[d.out] = true
 		ops = append(ops, d.aggregate)
-		if d.aggregate == "count" {
+		switch {
+		case d.aggregate == "count":
 			fields = append(fields, nil)
-		} else {
+			as = append(as, d.out)
+		case d.argField != "":
+			name := d.aggregate + "_" + d.argField
+			if measured[name] {
+				ops = ops[:len(ops)-1]
+				continue
+			}
+			measured[name] = true
+			fields = append(fields, d.argField)
+			as = append(as, name)
+		default:
 			fields = append(fields, d.field)
+			as = append(as, d.out)
 		}
-		as = append(as, d.out)
 	}
 	if groupby == nil {
 		groupby = []any{}

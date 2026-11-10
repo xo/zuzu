@@ -34,7 +34,7 @@ func WithStrict(strict bool) CompileOption {
 // Compile turns a Vega-Lite spec into a Vega spec. The report names each
 // part that zuzu did not compile, in the loose mode.
 func Compile(s *Spec, opts ...CompileOption) (*vega.Spec, vega.Report, error) {
-	c := &compiler{datasets: map[string]bool{}}
+	c := &compiler{datasets: map[string]bool{}, parsed: map[int]map[string]bool{}}
 	for _, o := range opts {
 		o(c)
 	}
@@ -51,8 +51,11 @@ type compiler struct {
 	report   vega.Report
 	data     []vega.Data
 	datasets map[string]bool
-	nData    int
-	nSource  int
+	// parsed holds, for each dataset of inline values that derives, the
+	// fields that a formula already parsed.
+	parsed  map[int]map[string]bool
+	nData   int
+	nSource int
 	// top is the spec being compiled.
 	top *Spec
 }
@@ -142,6 +145,16 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 		v.size(s)
 		return nil
 	case s.Mark != nil:
+		expanded, err := composite(s)
+		if err != nil {
+			return c.issue(path+"/mark", "%v", err)
+		}
+		if expanded != nil {
+			if s.Data != nil {
+				expanded.Data = nil
+			}
+			return c.view(expanded, v, src, path, repeat)
+		}
 		if layered := overlay(s); layered != nil {
 			return c.view(layered, v, src, path, repeat)
 		}
@@ -341,6 +354,24 @@ func (c *compiler) parseFields(n *dataNode, fields []string, typ string) {
 	if d.URL.IsZero() && d.Values.IsZero() {
 		return
 	}
+	if !d.Values.IsZero() && root.index != n.index {
+		// Inline values parse in the dataset that derives from them, with
+		// a formula for each field, and the values stay as they are.
+		fn := map[string]string{"date": "toDate", "number": "toNumber"}[typ]
+		parsed := c.parsed[n.index]
+		if parsed == nil {
+			parsed = map[string]bool{}
+			c.parsed[n.index] = parsed
+		}
+		for _, f := range fields {
+			if f == "" || parsed[f] {
+				continue
+			}
+			parsed[f] = true
+			c.add(n, transform("formula", map[string]any{"expr": fn + "(" + fieldRef(f) + ")", "as": f}))
+		}
+		return
+	}
 	parse := map[string]any{}
 	if d.Format != nil && !d.Format.Parse.IsZero() {
 		_ = d.Format.Parse.Decode(&parse)
@@ -415,7 +446,8 @@ func overlay(s *Spec) *Spec {
 		}
 	}
 	out := *s
-	out.Mark = nil
+	// The caller already read the data of the spec.
+	out.Mark, out.Data = nil, nil
 	out.Layer = []Spec{{Mark: base}}
 	if line {
 		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line"}})
