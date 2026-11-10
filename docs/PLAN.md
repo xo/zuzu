@@ -651,10 +651,12 @@ zuzu chose these rules where the documents of Vega say nothing (D6):
 
 D30 named the transforms and the scale that zuzu adds. `zuzu.sankey`,
 `zuzu.sankeylinks`, `zuzu.chord`, `zuzu.chordribbons`, `zuzu.hexbin` and the
-scale `zuzu.trading` exist, and the specs in `test/testdata/targets` draw the
-sankey, the chord diagram, the hex bins and the candlestick from them in the
-strict mode. The transform `label` is not done, and the other targets of
-tiers 1 and 2 have no spec yet.
+scale `zuzu.trading` exist. Each of the 22 targets of tiers 1 and 2 has a
+Vega spec in `test/testdata/targets`, which zuzu draws in the strict mode
+with no issue, and a test runs them. A spec follows its target where Vega
+has the means. The streamgraph stacks around the middle, because Vega has
+no offset that wiggles, and the violin estimates with the Gaussian kernel
+of `kde`. The transform `label` is not done.
 
 ### Phase 6. The direct okage renderer
 

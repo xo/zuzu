@@ -1,0 +1,107 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Body mass of penguins: grams, by species. Each dot is one penguin.",
+  "width": 560,
+  "height": 300,
+  "padding": 5,
+  "title": {"text": "Body mass of penguins", "subtitle": "Grams, by species. Each dot is one penguin"},
+  "data": [
+    {
+      "name": "penguins",
+      "url": "data/penguins.json",
+      "transform": [
+        {"type": "filter", "expr": "isValid(datum['Body Mass (g)']) && isValid(datum['Flipper Length (mm)'])"},
+        {"type": "formula", "as": "mass", "expr": "datum['Body Mass (g)']"},
+        {"type": "formula", "as": "jitter", "expr": "random()"}
+      ]
+    },
+    {
+      "name": "fences",
+      "source": "penguins",
+      "transform": [
+        {"type": "joinaggregate", "groupby": ["Species"], "fields": ["mass", "mass"], "ops": ["q1", "q3"], "as": ["q1", "q3"]},
+        {"type": "filter", "expr": "datum.mass >= datum.q1 - 1.5 * (datum.q3 - datum.q1) && datum.mass <= datum.q3 + 1.5 * (datum.q3 - datum.q1)"}
+      ]
+    },
+    {
+      "name": "boxes",
+      "source": "penguins",
+      "transform": [
+        {"type": "aggregate", "groupby": ["Species"], "fields": ["mass", "mass", "mass"], "ops": ["q1", "median", "q3"], "as": ["q1", "median", "q3"]},
+        {"type": "lookup", "from": "whiskers", "key": "Species", "fields": ["Species"], "values": ["lo", "hi"]}
+      ]
+    },
+    {
+      "name": "whiskers",
+      "source": "fences",
+      "transform": [{"type": "aggregate", "groupby": ["Species"], "fields": ["mass", "mass"], "ops": ["min", "max"], "as": ["lo", "hi"]}]
+    }
+  ],
+  "scales": [
+    {"name": "y", "type": "band", "domain": ["Adelie", "Chinstrap", "Gentoo"], "range": "height", "padding": 0.22},
+    {"name": "x", "type": "linear", "domain": {"data": "penguins", "field": "mass"}, "range": "width", "nice": true, "zero": false},
+    {"name": "color", "type": "ordinal", "domain": ["Adelie", "Chinstrap", "Gentoo"], "range": "category"}
+  ],
+  "axes": [
+    {"orient": "bottom", "scale": "x", "grid": true, "tickCount": 6},
+    {"orient": "left", "scale": "y"}
+  ],
+  "marks": [
+    {
+      "type": "rule",
+      "from": {"data": "boxes"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "lo"},
+          "x2": {"scale": "x", "field": "hi"},
+          "y": {"scale": "y", "field": "Species", "band": 0.23},
+          "stroke": {"scale": "color", "field": "Species"},
+          "strokeWidth": {"value": 1.5}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "boxes"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "q1"},
+          "x2": {"scale": "x", "field": "q3"},
+          "y": {"scale": "y", "field": "Species"},
+          "height": {"scale": "y", "band": 0.46},
+          "cornerRadius": {"value": 5},
+          "fill": {"scale": "color", "field": "Species"},
+          "fillOpacity": {"value": 0.25},
+          "stroke": {"scale": "color", "field": "Species"},
+          "strokeWidth": {"value": 1.5}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "boxes"},
+      "encode": {
+        "enter": {
+          "xc": {"scale": "x", "field": "median"},
+          "width": {"value": 2.5},
+          "y": {"scale": "y", "field": "Species"},
+          "height": {"scale": "y", "band": 0.46},
+          "fill": {"scale": "color", "field": "Species"}
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "from": {"data": "penguins"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "mass"},
+          "y": {"scale": "y", "field": "Species", "band": 0.6, "offset": {"signal": "datum.jitter * bandwidth('y') * 0.35"}},
+          "size": {"value": 16},
+          "fill": {"scale": "color", "field": "Species"},
+          "fillOpacity": {"value": 0.5}
+        }
+      }
+    }
+  ]
+}

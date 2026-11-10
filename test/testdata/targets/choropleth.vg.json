@@ -1,0 +1,122 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Where the engineers live: engineers per 1,000 people, by state.",
+  "width": 600,
+  "height": 380,
+  "padding": 5,
+  "title": {
+    "text": "Where the engineers live",
+    "subtitle": "Engineers per 1,000 people, by state"
+  },
+  "data": [
+    {
+      "name": "people",
+      "url": "data/population_engineers_hurricanes.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "id": "number",
+          "engineers": "number"
+        }
+      },
+      "transform": [
+        {
+          "type": "formula",
+          "as": "rate",
+          "expr": "datum.engineers * 1000"
+        }
+      ]
+    },
+    {
+      "name": "states",
+      "url": "data/us-10m.json",
+      "format": {
+        "type": "topojson",
+        "feature": "states"
+      },
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "people",
+          "key": "id",
+          "fields": [
+            "id"
+          ],
+          "values": [
+            "rate"
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {
+        "data": "people",
+        "field": "rate"
+      },
+      "range": "ramp",
+      "zero": false
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "bottom-right",
+      "direction": "horizontal",
+      "title": "per 1,000 people",
+      "format": ".1f"
+    }
+  ],
+  "projections": [
+    {
+      "name": "projection",
+      "type": "albersUsa",
+      "fit": {
+        "signal": "data('states')"
+      },
+      "size": {
+        "signal": "[width, height]"
+      }
+    }
+  ],
+  "marks": [
+    {
+      "type": "shape",
+      "from": {
+        "data": "states"
+      },
+      "encode": {
+        "enter": {
+          "fill": [
+            {
+              "test": "isValid(datum.rate)",
+              "scale": "color",
+              "field": "rate"
+            },
+            {
+              "value": "#f3f5f8"
+            }
+          ],
+          "stroke": {
+            "value": "#ffffff"
+          },
+          "strokeWidth": {
+            "value": 0.8
+          },
+          "strokeJoin": {
+            "value": "round"
+          }
+        }
+      },
+      "transform": [
+        {
+          "type": "geoshape",
+          "projection": "projection"
+        }
+      ]
+    }
+  ]
+}

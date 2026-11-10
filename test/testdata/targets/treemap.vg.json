@@ -1,0 +1,270 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The Flare toolkit by size: each box is a package of the toolkit, sized by the bytes of its source.",
+  "width": 620,
+  "height": 400,
+  "padding": 5,
+  "title": {
+    "text": "The Flare toolkit by size",
+    "subtitle": "Each box is a package of the toolkit, sized by the bytes of its source"
+  },
+  "data": [
+    {
+      "name": "tree",
+      "url": "data/flare.json"
+    },
+    {
+      "name": "flare",
+      "url": "data/flare.json",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "parent"
+          ],
+          "as": [
+            "p1"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p1.parent"
+          ],
+          "as": [
+            "p2"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p2.parent"
+          ],
+          "as": [
+            "p3"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p3.parent"
+          ],
+          "as": [
+            "p4"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "top",
+          "expr": "datum.parent === 1 ? datum.name : datum.p1 && datum.p1.parent === 1 ? datum.p1.name : datum.p2 && datum.p2.parent === 1 ? datum.p2.name : datum.p3 && datum.p3.parent === 1 ? datum.p3.name : datum.p4 && datum.p4.parent === 1 ? datum.p4.name : null"
+        },
+        {
+          "type": "formula",
+          "as": "level",
+          "expr": "!isValid(datum.parent) ? 0 : !datum.p1 || !isValid(datum.p1.parent) ? 1 : !datum.p2 || !isValid(datum.p2.parent) ? 2 : !datum.p3 || !isValid(datum.p3.parent) ? 3 : !datum.p4 || !isValid(datum.p4.parent) ? 4 : 5"
+        }
+      ]
+    },
+    {
+      "name": "tops",
+      "source": "flare",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum.top)"
+        }
+      ]
+    },
+    {
+      "name": "layout",
+      "source": "flare",
+      "transform": [
+        {
+          "type": "stratify",
+          "key": "id",
+          "parentKey": "parent"
+        },
+        {
+          "type": "treemap",
+          "field": "size",
+          "sort": {
+            "field": "value",
+            "order": "descending"
+          },
+          "round": true,
+          "paddingTop": 18,
+          "paddingOuter": 2,
+          "paddingInner": 2,
+          "size": [
+            {
+              "signal": "width"
+            },
+            {
+              "signal": "height"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "packages",
+      "source": "layout",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.depth === 1"
+        }
+      ]
+    },
+    {
+      "name": "boxes",
+      "source": "layout",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.depth === 2"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "tops",
+        "field": "top",
+        "sort": {
+          "op": "sum",
+          "field": "size",
+          "order": "descending"
+        }
+      },
+      "range": "category"
+    }
+  ],
+  "marks": [
+    {
+      "type": "rect",
+      "from": {
+        "data": "packages"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "field": "x0"
+          },
+          "x2": {
+            "field": "x1"
+          },
+          "y": {
+            "field": "y0"
+          },
+          "y2": {
+            "field": "y1"
+          },
+          "cornerRadius": {
+            "value": 6
+          },
+          "fill": {
+            "scale": "color",
+            "field": "top"
+          },
+          "fillOpacity": {
+            "value": 0.14
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "packages"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "datum.x0 + 6"
+          },
+          "y": {
+            "signal": "datum.y0 + 13"
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "text": {
+            "signal": "datum.x1 - datum.x0 > 40 ? datum.name : ''"
+          }
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {
+        "data": "boxes"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "field": "x0"
+          },
+          "x2": {
+            "field": "x1"
+          },
+          "y": {
+            "field": "y0"
+          },
+          "y2": {
+            "field": "y1"
+          },
+          "cornerRadius": {
+            "value": 3
+          },
+          "fill": {
+            "scale": "color",
+            "field": "top"
+          },
+          "fillOpacity": {
+            "value": 0.85
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "boxes"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "datum.x0 + 5"
+          },
+          "y": {
+            "signal": "datum.y0 + 13"
+          },
+          "fontSize": {
+            "value": 10
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "fill": {
+            "value": "#ffffff"
+          },
+          "text": {
+            "signal": "datum.x1 - datum.x0 > length(datum.name) * 6 + 10 && datum.y1 - datum.y0 > 18 ? datum.name : ''"
+          }
+        }
+      }
+    }
+  ]
+}

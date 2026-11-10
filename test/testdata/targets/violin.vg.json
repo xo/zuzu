@@ -1,0 +1,256 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Flipper length of penguins: millimeters, by species. The width shows how many penguins share a length.",
+  "width": 580,
+  "height": 320,
+  "padding": 5,
+  "title": {
+    "text": "Flipper length of penguins",
+    "subtitle": "Millimeters, by species. The width shows how many penguins share a length"
+  },
+  "data": [
+    {
+      "name": "penguins",
+      "url": "data/penguins.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum['Body Mass (g)']) && isValid(datum['Flipper Length (mm)'])"
+        },
+        {
+          "type": "formula",
+          "as": "flipper",
+          "expr": "datum['Flipper Length (mm)']"
+        }
+      ]
+    },
+    {
+      "name": "density",
+      "source": "penguins",
+      "transform": [
+        {
+          "type": "kde",
+          "groupby": [
+            "Species"
+          ],
+          "field": "flipper",
+          "bandwidth": 3,
+          "extent": [
+            170,
+            235
+          ],
+          "steps": 66
+        }
+      ]
+    },
+    {
+      "name": "stats",
+      "source": "penguins",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Species"
+          ],
+          "fields": [
+            "flipper",
+            "flipper",
+            "flipper"
+          ],
+          "ops": [
+            "q1",
+            "median",
+            "q3"
+          ],
+          "as": [
+            "q1",
+            "median",
+            "q3"
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": [
+        "Adelie",
+        "Chinstrap",
+        "Gentoo"
+      ],
+      "range": "width",
+      "padding": 0.18
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        170,
+        235
+      ],
+      "range": "height",
+      "zero": false
+    },
+    {
+      "name": "w",
+      "type": "linear",
+      "domain": {
+        "data": "density",
+        "field": "density"
+      },
+      "range": [
+        0,
+        {
+          "signal": "bandwidth('x') / 2"
+        }
+      ]
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [
+        "Adelie",
+        "Chinstrap",
+        "Gentoo"
+      ],
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "orient": "left",
+      "scale": "y",
+      "grid": true,
+      "values": [
+        170,
+        180,
+        190,
+        200,
+        210,
+        220,
+        230
+      ]
+    },
+    {
+      "orient": "bottom",
+      "scale": "x"
+    }
+  ],
+  "marks": [
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "curve",
+          "data": "density",
+          "groupby": "Species"
+        }
+      },
+      "marks": [
+        {
+          "type": "area",
+          "from": {
+            "data": "curve"
+          },
+          "encode": {
+            "enter": {
+              "orient": {
+                "value": "horizontal"
+              },
+              "y": {
+                "scale": "y",
+                "field": "value"
+              },
+              "x": {
+                "signal": "scale('x', datum.Species) + bandwidth('x') / 2 - scale('w', datum.density)"
+              },
+              "x2": {
+                "signal": "scale('x', datum.Species) + bandwidth('x') / 2 + scale('w', datum.density)"
+              },
+              "interpolate": {
+                "value": "basis"
+              },
+              "fill": {
+                "scale": "color",
+                "field": "Species"
+              },
+              "fillOpacity": {
+                "value": 0.75
+              },
+              "stroke": {
+                "scale": "color",
+                "field": "Species"
+              },
+              "strokeWidth": {
+                "value": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "rect",
+      "from": {
+        "data": "stats"
+      },
+      "encode": {
+        "enter": {
+          "xc": {
+            "scale": "x",
+            "field": "Species",
+            "band": 0.5
+          },
+          "width": {
+            "value": 8
+          },
+          "y": {
+            "scale": "y",
+            "field": "q3"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "q1"
+          },
+          "cornerRadius": {
+            "value": 4
+          },
+          "fill": {
+            "value": "#ffffff"
+          },
+          "fillOpacity": {
+            "value": 0.85
+          }
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "from": {
+        "data": "stats"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "Species",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "median"
+          },
+          "size": {
+            "value": 36
+          },
+          "fill": {
+            "scale": "color",
+            "field": "Species"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -51,8 +51,12 @@ func TestTargetSpecsDraw(t *testing.T) {
 			for _, is := range report {
 				t.Errorf("issue: %v", is)
 			}
-			if !bytes.Contains(b.Bytes(), []byte("<path")) {
-				t.Error("the chart draws no path")
+			shapes := 0
+			for _, tag := range []string{"<path", "<rect", "<circle", "<line", "<image", "<text"} {
+				shapes += bytes.Count(b.Bytes(), []byte(tag))
+			}
+			if shapes < 5 {
+				t.Errorf("the chart draws %d shapes, want at least 5", shapes)
 			}
 			if out != "" {
 				if err := os.WriteFile(filepath.Join(out, name+".svg"), b.Bytes(), 0o644); err != nil {

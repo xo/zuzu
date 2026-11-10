@@ -1,0 +1,105 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Each stock on its own scale: monthly closing price in US dollars, 2000 to 2010.",
+  "padding": 5,
+  "title": {"text": "Each stock on its own scale", "subtitle": "Monthly closing price in US dollars, 2000 to 2010"},
+  "signals": [
+    {"name": "cellWidth", "value": 200},
+    {"name": "cellHeight", "value": 150}
+  ],
+  "data": [
+    {
+      "name": "stocks",
+      "url": "data/stocks.csv",
+      "format": {"type": "csv", "parse": {"date": "date", "price": "number"}}
+    }
+  ],
+  "scales": [
+    {"name": "x", "type": "time", "domain": {"data": "stocks", "field": "date"}, "range": [0, {"signal": "cellWidth"}]},
+    {"name": "color", "type": "ordinal", "domain": {"data": "stocks", "field": "symbol", "sort": true}, "range": "category"}
+  ],
+  "layout": {"columns": 3, "padding": {"row": 20, "column": 14}},
+  "marks": [
+    {
+      "type": "group",
+      "from": {"facet": {"name": "series", "data": "stocks", "groupby": "symbol"}},
+      "sort": {"field": "datum.symbol"},
+      "encode": {
+        "enter": {
+          "width": {"signal": "cellWidth"},
+          "height": {"signal": "cellHeight"},
+          "cornerRadius": {"value": 10},
+          "fill": {"value": "#f3f5f8"}
+        }
+      },
+      "data": [
+        {
+          "name": "last",
+          "source": "series",
+          "transform": [
+            {"type": "window", "sort": {"field": "date", "order": "descending"}, "ops": ["row_number"], "as": ["k"]},
+            {"type": "filter", "expr": "datum.k === 1"}
+          ]
+        }
+      ],
+      "scales": [
+        {"name": "y", "type": "linear", "domain": {"data": "series", "field": "price"}, "range": [{"signal": "cellHeight - 16"}, 34], "nice": true, "zero": true}
+      ],
+      "marks": [
+        {
+          "type": "area",
+          "from": {"data": "series"},
+          "encode": {
+            "enter": {
+              "x": {"scale": "x", "field": "date"},
+              "y": {"scale": "y", "field": "price"},
+              "y2": {"scale": "y", "value": 0},
+              "interpolate": {"value": "monotone"},
+              "fill": {"scale": "color", "field": "symbol"},
+              "fillOpacity": {"value": 0.15}
+            }
+          }
+        },
+        {
+          "type": "line",
+          "from": {"data": "series"},
+          "encode": {
+            "enter": {
+              "x": {"scale": "x", "field": "date"},
+              "y": {"scale": "y", "field": "price"},
+              "interpolate": {"value": "monotone"},
+              "stroke": {"scale": "color", "field": "symbol"},
+              "strokeWidth": {"value": 1.75}
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": {"data": "last"},
+          "encode": {
+            "enter": {
+              "x": {"value": 12},
+              "y": {"value": 20},
+              "fontWeight": {"value": 600},
+              "text": {"field": "symbol"}
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": {"data": "last"},
+          "encode": {
+            "enter": {
+              "x": {"signal": "cellWidth - 12"},
+              "y": {"value": 20},
+              "align": {"value": "right"},
+              "fontWeight": {"value": 600},
+              "fill": {"scale": "color", "field": "symbol"},
+              "text": {"signal": "format(datum.price, '$,.0f')"}
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

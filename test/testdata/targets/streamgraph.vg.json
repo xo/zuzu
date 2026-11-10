@@ -1,0 +1,205 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Five stocks as a stream: monthly price, stacked around the middle.",
+  "width": 620,
+  "height": 320,
+  "padding": 5,
+  "title": {
+    "text": "Five stocks as a stream",
+    "subtitle": "Monthly price, stacked around the middle"
+  },
+  "data": [
+    {
+      "name": "stocks",
+      "url": "data/stocks.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date",
+          "price": "number"
+        }
+      },
+      "transform": [
+        {
+          "type": "impute",
+          "field": "price",
+          "key": "date",
+          "groupby": [
+            "symbol"
+          ],
+          "method": "value",
+          "value": 0
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "date"
+          ],
+          "field": "price",
+          "sort": {
+            "field": "symbol"
+          },
+          "offset": "center",
+          "as": [
+            "y0",
+            "y1"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "thick",
+          "expr": "datum.y1 - datum.y0"
+        },
+        {
+          "type": "joinaggregate",
+          "groupby": [
+            "symbol"
+          ],
+          "fields": [
+            "thick"
+          ],
+          "ops": [
+            "max"
+          ],
+          "as": [
+            "thickest"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "labels",
+      "source": "stocks",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.thick === datum.thickest"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": {
+        "data": "stocks",
+        "field": "date"
+      },
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "stocks",
+        "fields": [
+          "y0",
+          "y1"
+        ]
+      },
+      "range": "height",
+      "zero": false
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "stocks",
+        "field": "symbol",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "format": "%Y",
+      "grid": true
+    }
+  ],
+  "marks": [
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "series",
+          "data": "stocks",
+          "groupby": "symbol"
+        }
+      },
+      "marks": [
+        {
+          "type": "area",
+          "from": {
+            "data": "series"
+          },
+          "encode": {
+            "enter": {
+              "x": {
+                "scale": "x",
+                "field": "date"
+              },
+              "y": {
+                "scale": "y",
+                "field": "y0"
+              },
+              "y2": {
+                "scale": "y",
+                "field": "y1"
+              },
+              "interpolate": {
+                "value": "basis"
+              },
+              "fill": {
+                "scale": "color",
+                "field": "symbol"
+              },
+              "fillOpacity": {
+                "value": 0.9
+              }
+            }
+          },
+          "sort": {
+            "field": "datum.date"
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "labels"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "date"
+          },
+          "y": {
+            "scale": "y",
+            "signal": "(datum.y0 + datum.y1) / 2"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "fill": {
+            "value": "#ffffff"
+          },
+          "text": {
+            "field": "symbol"
+          }
+        }
+      }
+    }
+  ]
+}

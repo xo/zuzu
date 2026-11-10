@@ -1,0 +1,274 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Four measures of each penguin: each line is one penguin, and each axis has its own scale.",
+  "width": 600,
+  "height": 320,
+  "padding": 5,
+  "title": {
+    "text": "Four measures of each penguin",
+    "subtitle": "Each line is one penguin. Each axis has its own scale"
+  },
+  "data": [
+    {
+      "name": "penguins",
+      "url": "data/penguins.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum['Beak Length (mm)']) && isValid(datum['Beak Depth (mm)']) && isValid(datum['Flipper Length (mm)']) && isValid(datum['Body Mass (g)'])"
+        },
+        {
+          "type": "window",
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "id"
+          ]
+        },
+        {
+          "type": "fold",
+          "fields": [
+            "Beak Length (mm)",
+            "Beak Depth (mm)",
+            "Flipper Length (mm)",
+            "Body Mass (g)"
+          ]
+        },
+        {
+          "type": "joinaggregate",
+          "groupby": [
+            "key"
+          ],
+          "fields": [
+            "value",
+            "value"
+          ],
+          "ops": [
+            "min",
+            "max"
+          ],
+          "as": [
+            "lo",
+            "hi"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "t",
+          "expr": "(datum.value - datum.lo) / (datum.hi - datum.lo)"
+        },
+        {
+          "type": "formula",
+          "as": "order",
+          "expr": "indexof(['Beak Length (mm)', 'Beak Depth (mm)', 'Flipper Length (mm)', 'Body Mass (g)'], datum.key)"
+        }
+      ]
+    },
+    {
+      "name": "axes",
+      "source": "penguins",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "key",
+            "lo",
+            "hi",
+            "order"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "name",
+          "expr": "['Beak length', 'Beak depth', 'Flipper length', 'Body mass'][datum.order]"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "domain": [
+        "Beak Length (mm)",
+        "Beak Depth (mm)",
+        "Flipper Length (mm)",
+        "Body Mass (g)"
+      ],
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": "height"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [
+        "Adelie",
+        "Chinstrap",
+        "Gentoo"
+      ],
+      "range": "category"
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "orient": "top",
+      "direction": "horizontal",
+      "symbolType": "stroke"
+    }
+  ],
+  "marks": [
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "one",
+          "data": "penguins",
+          "groupby": [
+            "id",
+            "Species"
+          ]
+        }
+      },
+      "marks": [
+        {
+          "type": "line",
+          "from": {
+            "data": "one"
+          },
+          "sort": {
+            "field": "datum.order"
+          },
+          "encode": {
+            "enter": {
+              "x": {
+                "scale": "x",
+                "field": "key"
+              },
+              "y": {
+                "scale": "y",
+                "field": "t"
+              },
+              "stroke": {
+                "scale": "color",
+                "field": "Species"
+              },
+              "strokeOpacity": {
+                "value": 0.32
+              },
+              "strokeWidth": {
+                "value": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "rule",
+      "from": {
+        "data": "axes"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "key"
+          },
+          "y": {
+            "value": 0
+          },
+          "y2": {
+            "signal": "height"
+          },
+          "stroke": {
+            "value": "#8b94a3"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "axes"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "key"
+          },
+          "y": {
+            "value": -12
+          },
+          "align": {
+            "value": "center"
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "text": {
+            "field": "name"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "axes"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "key",
+            "offset": 5
+          },
+          "y": {
+            "value": 8
+          },
+          "fontSize": {
+            "value": 10
+          },
+          "text": {
+            "signal": "format(datum.hi, ',')"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "axes"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "key",
+            "offset": 5
+          },
+          "y": {
+            "signal": "height - 4"
+          },
+          "fontSize": {
+            "value": 10
+          },
+          "text": {
+            "signal": "format(datum.lo, ',')"
+          }
+        }
+      }
+    }
+  ]
+}

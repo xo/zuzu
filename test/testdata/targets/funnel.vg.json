@@ -1,0 +1,284 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Narrowing down the cars: how many of 406 cars pass each filter in turn.",
+  "width": 520,
+  "height": 300,
+  "padding": 5,
+  "title": {
+    "text": "Narrowing down the cars",
+    "subtitle": "How many of 406 cars pass each filter in turn"
+  },
+  "signals": [
+    {
+      "name": "cx",
+      "update": "130 + (width - 220) / 2"
+    }
+  ],
+  "data": [
+    {
+      "name": "steps",
+      "url": "data/cars.json",
+      "transform": [
+        {
+          "type": "formula",
+          "as": "s2",
+          "expr": "datum.Miles_per_Gallon >= 25 ? 1 : 0"
+        },
+        {
+          "type": "formula",
+          "as": "s3",
+          "expr": "datum.s2 && isValid(datum.Horsepower) && datum.Horsepower < 90 ? 1 : 0"
+        },
+        {
+          "type": "formula",
+          "as": "s4",
+          "expr": "datum.s3 && datum.Origin === 'Japan' ? 1 : 0"
+        },
+        {
+          "type": "aggregate",
+          "fields": [
+            null,
+            "Miles_per_Gallon",
+            "s2",
+            "s3",
+            "s4"
+          ],
+          "ops": [
+            "count",
+            "valid",
+            "sum",
+            "sum",
+            "sum"
+          ],
+          "as": [
+            "n0",
+            "n1",
+            "n2",
+            "n3",
+            "n4"
+          ]
+        },
+        {
+          "type": "fold",
+          "fields": [
+            "n0",
+            "n1",
+            "n2",
+            "n3",
+            "n4"
+          ],
+          "as": [
+            "key",
+            "n"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "i",
+          "expr": "indexof(['n0', 'n1', 'n2', 'n3', 'n4'], datum.key)"
+        },
+        {
+          "type": "formula",
+          "as": "label",
+          "expr": "['All cars', 'Mileage known', '25 mpg or more', 'Under 90 horsepower', 'Made in Japan'][datum.i]"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "i"
+          },
+          "ops": [
+            "lag",
+            "lead",
+            "lead"
+          ],
+          "fields": [
+            "n",
+            "n",
+            "label"
+          ],
+          "as": [
+            "prev",
+            "next",
+            "nextLabel"
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "data": "steps",
+        "field": "label",
+        "sort": {
+          "field": "i",
+          "op": "min"
+        }
+      },
+      "range": "height",
+      "paddingInner": 0.32
+    },
+    {
+      "name": "w",
+      "type": "linear",
+      "domain": [
+        0,
+        {
+          "signal": "data('steps')[0].n"
+        }
+      ],
+      "range": [
+        0,
+        {
+          "signal": "width - 220"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "type": "path",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "path": {
+            "signal": "isValid(datum.next) ? 'M' + (cx - scale('w', datum.n) / 2) + ',' + (scale('y', datum.label) + bandwidth('y')) + 'L' + (cx + scale('w', datum.n) / 2) + ',' + (scale('y', datum.label) + bandwidth('y')) + 'L' + (cx + scale('w', datum.next) / 2) + ',' + scale('y', datum.nextLabel) + 'L' + (cx - scale('w', datum.next) / 2) + ',' + scale('y', datum.nextLabel) + 'Z' : ''"
+          },
+          "fill": {
+            "value": "#4c6ef5"
+          },
+          "fillOpacity": {
+            "value": 0.12
+          }
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "xc": {
+            "signal": "cx"
+          },
+          "width": {
+            "signal": "max(2, scale('w', datum.n))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "label"
+          },
+          "height": {
+            "scale": "y",
+            "band": 1
+          },
+          "cornerRadius": {
+            "value": 6
+          },
+          "fill": {
+            "value": "#4c6ef5"
+          },
+          "fillOpacity": {
+            "signal": "1 - datum.i * 0.14"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "value": 0
+          },
+          "y": {
+            "scale": "y",
+            "field": "label",
+            "band": 0.5
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "text": {
+            "field": "label"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "width"
+          },
+          "y": {
+            "scale": "y",
+            "field": "label",
+            "band": 0.5,
+            "offset": -6
+          },
+          "align": {
+            "value": "right"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "fontSize": {
+            "value": 13
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "text": {
+            "signal": "format(datum.n, ',')"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "width"
+          },
+          "y": {
+            "scale": "y",
+            "field": "label",
+            "band": 0.5,
+            "offset": 9
+          },
+          "align": {
+            "value": "right"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "fontSize": {
+            "value": 10
+          },
+          "text": {
+            "signal": "datum.i === 0 ? 'start' : format(datum.n / datum.prev, '.0%') + ' kept'"
+          }
+        }
+      }
+    }
+  ]
+}

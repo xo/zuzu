@@ -1,0 +1,211 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Seattle in 2015: the share of the 365 days of each kind.",
+  "width": 600,
+  "height": 170,
+  "padding": 5,
+  "title": {
+    "text": "Seattle in 2015",
+    "subtitle": "Share of the 365 days of each kind"
+  },
+  "signals": [
+    {
+      "name": "cell",
+      "update": "width / 3"
+    },
+    {
+      "name": "radius",
+      "update": "min(cell / 2 - 22, height - 34)"
+    }
+  ],
+  "data": [
+    {
+      "name": "days",
+      "url": "data/seattle-weather.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date"
+        }
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "utcyear(datum.date) === 2015"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "weather"
+          ]
+        },
+        {
+          "type": "joinaggregate",
+          "fields": [
+            "count"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "as": [
+            "total"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "indexof(['sun', 'rain', 'fog'], datum.weather) >= 0"
+        },
+        {
+          "type": "formula",
+          "as": "i",
+          "expr": "indexof(['sun', 'rain', 'fog'], datum.weather)"
+        },
+        {
+          "type": "formula",
+          "as": "share",
+          "expr": "datum.count / datum.total"
+        },
+        {
+          "type": "formula",
+          "as": "label",
+          "expr": "['Sunny days', 'Rainy days', 'Foggy days'][datum.i]"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [
+        "sun",
+        "fog",
+        "drizzle",
+        "snow",
+        "rain"
+      ],
+      "range": "category"
+    }
+  ],
+  "marks": [
+    {
+      "type": "arc",
+      "from": {
+        "data": "days"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "cell * datum.i + cell / 2"
+          },
+          "y": {
+            "signal": "radius + 10"
+          },
+          "startAngle": {
+            "signal": "-PI / 2"
+          },
+          "endAngle": {
+            "signal": "PI / 2"
+          },
+          "innerRadius": {
+            "signal": "radius * 0.78"
+          },
+          "outerRadius": {
+            "signal": "radius"
+          },
+          "cornerRadius": {
+            "signal": "radius"
+          },
+          "fill": {
+            "value": "#e3e7ee"
+          }
+        }
+      }
+    },
+    {
+      "type": "arc",
+      "from": {
+        "data": "days"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "cell * datum.i + cell / 2"
+          },
+          "y": {
+            "signal": "radius + 10"
+          },
+          "startAngle": {
+            "signal": "-PI / 2"
+          },
+          "endAngle": {
+            "signal": "-PI / 2 + datum.share * PI"
+          },
+          "innerRadius": {
+            "signal": "radius * 0.78"
+          },
+          "outerRadius": {
+            "signal": "radius"
+          },
+          "cornerRadius": {
+            "signal": "radius"
+          },
+          "fill": {
+            "scale": "color",
+            "field": "weather"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "days"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "cell * datum.i + cell / 2"
+          },
+          "y": {
+            "signal": "radius + 4"
+          },
+          "align": {
+            "value": "center"
+          },
+          "fontSize": {
+            "value": 30
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "text": {
+            "signal": "format(datum.share, '.0%')"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "days"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "cell * datum.i + cell / 2"
+          },
+          "y": {
+            "signal": "radius + 32"
+          },
+          "align": {
+            "value": "center"
+          },
+          "text": {
+            "field": "label"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -6,9 +6,11 @@
 package svg
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -152,7 +154,14 @@ func (w *writer) group(it *scene.Item) error {
 		fmt.Fprintf(&w.defs, `<clipPath id="%s"><rect width="%s" height="%s"/></clipPath>`, id, num(it.Width), num(it.Height))
 		fmt.Fprintf(w.out, `<g clip-path="url(#%s)">`, id)
 	}
-	for i := range it.Items {
+	// The marks draw in the order of their zindex, and in the order of the
+	// spec for an equal zindex, as Vega draws them.
+	order := make([]int, len(it.Items))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(it.Items[a].ZIndex, it.Items[b].ZIndex) })
+	for _, i := range order {
 		if err := w.mark(&it.Items[i]); err != nil {
 			return err
 		}

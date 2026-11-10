@@ -1,0 +1,308 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Apple in 2008, month by month: the price on the first trading day of January, each monthly change, and the price in December.",
+  "width": 580,
+  "height": 320,
+  "padding": 5,
+  "title": {
+    "text": "Apple in 2008, month by month",
+    "subtitle": "The price on the first trading day of January, each monthly change, and the price in December"
+  },
+  "data": [
+    {
+      "name": "months",
+      "url": "data/stocks.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date",
+          "price": "number"
+        }
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.symbol === 'AAPL' && year(datum.date) === 2008"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "date"
+          },
+          "ops": [
+            "row_number",
+            "lag"
+          ],
+          "fields": [
+            null,
+            "price"
+          ],
+          "as": [
+            "idx",
+            "prev"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "kind",
+          "expr": "datum.idx === 1 ? 'Price' : datum.price >= datum.prev ? 'Rose' : 'Fell'"
+        },
+        {
+          "type": "formula",
+          "as": "a",
+          "expr": "datum.idx === 1 ? 0 : datum.prev"
+        },
+        {
+          "type": "formula",
+          "as": "b",
+          "expr": "datum.price"
+        },
+        {
+          "type": "formula",
+          "as": "label",
+          "expr": "timeFormat(datum.date, '%b')"
+        },
+        {
+          "type": "formula",
+          "as": "text",
+          "expr": "datum.idx === 1 ? format(datum.price, '$,.0f') : (datum.price >= datum.prev ? '+' : '\u2212') + format(abs(datum.price - datum.prev), '.0f')"
+        }
+      ]
+    },
+    {
+      "name": "close",
+      "source": "months",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.idx === 12"
+        },
+        {
+          "type": "formula",
+          "as": "idx",
+          "expr": "13"
+        },
+        {
+          "type": "formula",
+          "as": "kind",
+          "expr": "'Price'"
+        },
+        {
+          "type": "formula",
+          "as": "a",
+          "expr": "0"
+        },
+        {
+          "type": "formula",
+          "as": "label",
+          "expr": "'Dec'"
+        },
+        {
+          "type": "formula",
+          "as": "text",
+          "expr": "format(datum.price, '$,.0f')"
+        }
+      ]
+    },
+    {
+      "name": "steps",
+      "source": [
+        "months",
+        "close"
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "steps",
+        "field": "idx",
+        "sort": true
+      },
+      "range": "width",
+      "padding": 0.28
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "steps",
+        "fields": [
+          "a",
+          "b"
+        ]
+      },
+      "range": "height",
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [
+        "Rose",
+        "Fell",
+        "Price"
+      ],
+      "range": [
+        "#2a9d8f",
+        "#e76f51",
+        "#4c6ef5"
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "orient": "left",
+      "scale": "y",
+      "grid": true,
+      "tickCount": 5,
+      "format": "$,.0f"
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "top",
+      "direction": "horizontal"
+    }
+  ],
+  "marks": [
+    {
+      "type": "rect",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "idx"
+          },
+          "width": {
+            "scale": "x",
+            "band": 1
+          },
+          "y": {
+            "scale": "y",
+            "signal": "max(datum.a, datum.b)"
+          },
+          "y2": {
+            "scale": "y",
+            "signal": "min(datum.a, datum.b)"
+          },
+          "cornerRadius": {
+            "value": 3
+          },
+          "fill": {
+            "scale": "color",
+            "field": "kind"
+          }
+        }
+      }
+    },
+    {
+      "type": "rule",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "idx",
+            "band": 1
+          },
+          "x2": {
+            "scale": "x",
+            "signal": "datum.idx + 1"
+          },
+          "y": {
+            "scale": "y",
+            "field": "b"
+          },
+          "stroke": {
+            "value": "#a0a7b4"
+          },
+          "strokeDash": {
+            "value": [
+              2,
+              2
+            ]
+          },
+          "strokeOpacity": {
+            "signal": "datum.idx < 13 ? 1 : 0"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "idx",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "signal": "max(datum.a, datum.b)",
+            "offset": -5
+          },
+          "align": {
+            "value": "center"
+          },
+          "fontSize": {
+            "value": 10
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "fill": [
+            {
+              "test": "datum.kind === 'Price'",
+              "value": "#1b2230"
+            },
+            {
+              "scale": "color",
+              "field": "kind"
+            }
+          ],
+          "text": {
+            "field": "text"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "idx",
+            "band": 0.5
+          },
+          "y": {
+            "signal": "height + 16"
+          },
+          "align": {
+            "value": "center"
+          },
+          "text": {
+            "field": "label"
+          }
+        }
+      }
+    }
+  ]
+}

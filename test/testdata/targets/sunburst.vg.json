@@ -1,0 +1,215 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The Flare toolkit as rings: packages from the center out. The angle is the size of the source.",
+  "width": 600,
+  "height": 420,
+  "padding": 5,
+  "title": {
+    "text": "The Flare toolkit as rings",
+    "subtitle": "Packages from the center out. The angle is the size of the source"
+  },
+  "signals": [
+    {
+      "name": "radius",
+      "update": "min(width, height) / 2"
+    }
+  ],
+  "data": [
+    {
+      "name": "tree",
+      "url": "data/flare.json"
+    },
+    {
+      "name": "flare",
+      "url": "data/flare.json",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "parent"
+          ],
+          "as": [
+            "p1"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p1.parent"
+          ],
+          "as": [
+            "p2"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p2.parent"
+          ],
+          "as": [
+            "p3"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p3.parent"
+          ],
+          "as": [
+            "p4"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "top",
+          "expr": "datum.parent === 1 ? datum.name : datum.p1 && datum.p1.parent === 1 ? datum.p1.name : datum.p2 && datum.p2.parent === 1 ? datum.p2.name : datum.p3 && datum.p3.parent === 1 ? datum.p3.name : datum.p4 && datum.p4.parent === 1 ? datum.p4.name : null"
+        },
+        {
+          "type": "formula",
+          "as": "level",
+          "expr": "!isValid(datum.parent) ? 0 : !datum.p1 || !isValid(datum.p1.parent) ? 1 : !datum.p2 || !isValid(datum.p2.parent) ? 2 : !datum.p3 || !isValid(datum.p3.parent) ? 3 : !datum.p4 || !isValid(datum.p4.parent) ? 4 : 5"
+        }
+      ]
+    },
+    {
+      "name": "tops",
+      "source": "flare",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum.top)"
+        }
+      ]
+    },
+    {
+      "name": "layout",
+      "source": "flare",
+      "transform": [
+        {
+          "type": "stratify",
+          "key": "id",
+          "parentKey": "parent"
+        },
+        {
+          "type": "partition",
+          "field": "size",
+          "sort": {
+            "field": "value",
+            "order": "descending"
+          },
+          "size": [
+            {
+              "signal": "2 * PI"
+            },
+            1
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "datum.depth >= 1 && datum.depth <= 3"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "tops",
+        "field": "top",
+        "sort": {
+          "op": "sum",
+          "field": "size",
+          "order": "descending"
+        }
+      },
+      "range": "category"
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "right"
+    }
+  ],
+  "marks": [
+    {
+      "type": "arc",
+      "from": {
+        "data": "layout"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "width / 2"
+          },
+          "y": {
+            "signal": "height / 2"
+          },
+          "startAngle": {
+            "field": "x0"
+          },
+          "endAngle": {
+            "field": "x1"
+          },
+          "innerRadius": {
+            "signal": "datum.depth * radius / 4 + 1"
+          },
+          "outerRadius": {
+            "signal": "(datum.depth + 1) * radius / 4 - 1"
+          },
+          "padAngle": {
+            "signal": "datum.x1 - datum.x0 > 0.012 ? 0.004 : 0"
+          },
+          "cornerRadius": {
+            "signal": "datum.x1 - datum.x0 > 0.03 ? 2 : 0"
+          },
+          "fill": {
+            "scale": "color",
+            "field": "top"
+          },
+          "fillOpacity": {
+            "signal": "datum.depth === 1 ? 1 : datum.depth === 2 ? 0.7 : 0.42"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "width / 2"
+          },
+          "y": {
+            "signal": "height / 2"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "fontSize": {
+            "value": 15
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "text": {
+            "value": "flare"
+          }
+        }
+      }
+    }
+  ]
+}

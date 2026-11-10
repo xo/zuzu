@@ -1,0 +1,122 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Fuel economy by origin: each dot is one car. Dots pile up where many cars share a value.",
+  "width": 560,
+  "height": 300,
+  "padding": 5,
+  "title": {
+    "text": "Fuel economy by origin",
+    "subtitle": "Each dot is one car. Dots pile up where many cars share a value"
+  },
+  "data": [
+    {
+      "name": "cars",
+      "url": "data/cars.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum.Miles_per_Gallon)"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": [
+        8,
+        48
+      ],
+      "range": "width",
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": [
+        "USA",
+        "Europe",
+        "Japan"
+      ],
+      "range": "height"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [
+        "USA",
+        "Europe",
+        "Japan"
+      ],
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "grid": true,
+      "title": "Miles per gallon"
+    },
+    {
+      "orient": "left",
+      "scale": "y"
+    }
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {
+        "data": "cars"
+      },
+      "encode": {
+        "enter": {
+          "xfocus": {
+            "scale": "x",
+            "field": "Miles_per_Gallon"
+          },
+          "yfocus": {
+            "scale": "y",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "size": {
+            "value": 27
+          },
+          "fill": {
+            "scale": "color",
+            "field": "Origin"
+          },
+          "fillOpacity": {
+            "value": 0.9
+          }
+        }
+      },
+      "transform": [
+        {
+          "type": "force",
+          "static": true,
+          "iterations": 300,
+          "forces": [
+            {
+              "force": "collide",
+              "radius": 2.9,
+              "iterations": 2
+            },
+            {
+              "force": "x",
+              "x": "xfocus",
+              "strength": 0.5
+            },
+            {
+              "force": "y",
+              "y": "yfocus",
+              "strength": 0.05
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

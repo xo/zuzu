@@ -1,0 +1,171 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Where the penguins cluster: beak length against beak depth in millimeters. The rings show the density of each species.",
+  "width": 560,
+  "height": 340,
+  "padding": 5,
+  "title": {
+    "text": "Where the penguins cluster",
+    "subtitle": "Beak length against beak depth in millimeters. The rings show the density of each species"
+  },
+  "data": [
+    {
+      "name": "penguins",
+      "url": "data/penguins.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum['Beak Length (mm)']) && isValid(datum['Beak Depth (mm)'])"
+        }
+      ]
+    },
+    {
+      "name": "density",
+      "source": "penguins",
+      "transform": [
+        {
+          "type": "kde2d",
+          "groupby": [
+            "Species"
+          ],
+          "size": [
+            {
+              "signal": "width"
+            },
+            {
+              "signal": "height"
+            }
+          ],
+          "x": {
+            "expr": "scale('x', datum['Beak Length (mm)'])"
+          },
+          "y": {
+            "expr": "scale('y', datum['Beak Depth (mm)'])"
+          },
+          "bandwidth": [
+            16,
+            16
+          ]
+        },
+        {
+          "type": "isocontour",
+          "field": "grid",
+          "levels": 6
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": [
+        30,
+        61
+      ],
+      "range": "width",
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        13,
+        22
+      ],
+      "range": "height",
+      "zero": false
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [
+        "Adelie",
+        "Chinstrap",
+        "Gentoo"
+      ],
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "x"
+    },
+    {
+      "orient": "left",
+      "scale": "y",
+      "grid": true
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "top",
+      "direction": "horizontal"
+    }
+  ],
+  "marks": [
+    {
+      "type": "path",
+      "from": {
+        "data": "density"
+      },
+      "encode": {
+        "enter": {
+          "fill": {
+            "scale": "color",
+            "field": "Species"
+          },
+          "fillOpacity": {
+            "value": 0.08
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "Species"
+          },
+          "strokeWidth": {
+            "value": 1
+          },
+          "strokeOpacity": {
+            "value": 0.8
+          }
+        }
+      },
+      "transform": [
+        {
+          "type": "geopath",
+          "field": "datum.contour"
+        }
+      ]
+    },
+    {
+      "type": "symbol",
+      "from": {
+        "data": "penguins"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "Beak Length (mm)"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Beak Depth (mm)"
+          },
+          "size": {
+            "value": 10
+          },
+          "fill": {
+            "scale": "color",
+            "field": "Species"
+          },
+          "fillOpacity": {
+            "value": 0.7
+          }
+        }
+      }
+    }
+  ]
+}

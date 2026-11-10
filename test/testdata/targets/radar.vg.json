@@ -1,0 +1,134 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Penguins compared: the mean of each measure, as a share of the largest mean.",
+  "width": 440,
+  "height": 380,
+  "padding": 5,
+  "title": {"text": "Penguins compared", "subtitle": "Mean of each measure, as a share of the largest mean"},
+  "signals": [
+    {"name": "cx", "update": "width / 2"},
+    {"name": "cy", "update": "height / 2 + 4"},
+    {"name": "radius", "update": "height / 2 - 24"},
+    {"name": "measures", "value": ["Beak Length (mm)", "Beak Depth (mm)", "Flipper Length (mm)", "Body Mass (g)"]},
+    {"name": "names", "value": ["Beak length", "Beak depth", "Flipper length", "Body mass"]}
+  ],
+  "data": [
+    {
+      "name": "means",
+      "url": "data/penguins.json",
+      "transform": [
+        {"type": "filter", "expr": "isValid(datum['Body Mass (g)']) && isValid(datum['Flipper Length (mm)'])"},
+        {"type": "fold", "fields": ["Beak Length (mm)", "Beak Depth (mm)", "Flipper Length (mm)", "Body Mass (g)"]},
+        {"type": "aggregate", "groupby": ["Species", "key"], "fields": ["value"], "ops": ["mean"], "as": ["mean"]},
+        {"type": "joinaggregate", "groupby": ["key"], "fields": ["mean"], "ops": ["max"], "as": ["top"]},
+        {"type": "formula", "as": "share", "expr": "0.25 + 0.75 * (datum.mean / datum.top - 0.6) / 0.4"},
+        {"type": "formula", "as": "angle", "expr": "-PI / 2 + indexof(measures, datum.key) * 2 * PI / 4"},
+        {"type": "formula", "as": "order", "expr": "indexof(measures, datum.key)"}
+      ]
+    },
+    {
+      "name": "rings",
+      "values": [{"r": 0.25}, {"r": 0.5}, {"r": 0.75}, {"r": 1}],
+      "transform": [
+        {"type": "formula", "as": "spokes", "expr": "[0, 1, 2, 3]"},
+        {"type": "flatten", "fields": ["spokes"], "as": ["i"]},
+        {"type": "formula", "as": "angle", "expr": "-PI / 2 + datum.i * 2 * PI / 4"}
+      ]
+    },
+    {
+      "name": "spokes",
+      "values": [{"i": 0}, {"i": 1}, {"i": 2}, {"i": 3}],
+      "transform": [
+        {"type": "formula", "as": "angle", "expr": "-PI / 2 + datum.i * 2 * PI / 4"},
+        {"type": "formula", "as": "name", "expr": "names[datum.i]"}
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "color", "type": "ordinal", "domain": ["Adelie", "Chinstrap", "Gentoo"], "range": "category"}
+  ],
+  "legends": [{"fill": "color", "orient": "top", "direction": "horizontal"}],
+  "marks": [
+    {
+      "type": "group",
+      "from": {"facet": {"name": "ring", "data": "rings", "groupby": "r"}},
+      "marks": [
+        {
+          "type": "line",
+          "from": {"data": "ring"},
+          "sort": {"field": "datum.i"},
+          "encode": {
+            "enter": {
+              "x": {"signal": "cx + cos(datum.angle) * radius * datum.r"},
+              "y": {"signal": "cy + sin(datum.angle) * radius * datum.r"},
+              "interpolate": {"value": "linear-closed"},
+              "stroke": {"value": "#e3e7ee"}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "rule",
+      "from": {"data": "spokes"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "cx"},
+          "y": {"signal": "cy"},
+          "x2": {"signal": "cx + cos(datum.angle) * radius"},
+          "y2": {"signal": "cy + sin(datum.angle) * radius"},
+          "stroke": {"value": "#e3e7ee"}
+        }
+      }
+    },
+    {
+      "type": "group",
+      "from": {"facet": {"name": "species", "data": "means", "groupby": "Species"}},
+      "marks": [
+        {
+          "type": "line",
+          "from": {"data": "species"},
+          "sort": {"field": "datum.order"},
+          "encode": {
+            "enter": {
+              "x": {"signal": "cx + cos(datum.angle) * radius * datum.share"},
+              "y": {"signal": "cy + sin(datum.angle) * radius * datum.share"},
+              "interpolate": {"value": "linear-closed"},
+              "stroke": {"scale": "color", "field": "Species"},
+              "strokeWidth": {"value": 2},
+              "fill": {"scale": "color", "field": "Species"},
+              "fillOpacity": {"value": 0.14}
+            }
+          }
+        },
+        {
+          "type": "symbol",
+          "from": {"data": "species"},
+          "encode": {
+            "enter": {
+              "x": {"signal": "cx + cos(datum.angle) * radius * datum.share"},
+              "y": {"signal": "cy + sin(datum.angle) * radius * datum.share"},
+              "size": {"value": 40},
+              "fill": {"scale": "color", "field": "Species"},
+              "stroke": {"value": "#ffffff"},
+              "strokeWidth": {"value": 1.5}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "from": {"data": "spokes"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "cx + cos(datum.angle) * radius * 1.12"},
+          "y": {"signal": "cy + sin(datum.angle) * radius * 1.12 + 4"},
+          "align": {"signal": "abs(cos(datum.angle)) < 0.01 ? 'center' : cos(datum.angle) > 0 ? 'left' : 'right'"},
+          "fontWeight": {"value": 600},
+          "text": {"field": "name"}
+        }
+      }
+    }
+  ]
+}

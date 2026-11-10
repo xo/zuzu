@@ -1,0 +1,237 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Who meets whom in Les Mis\u00e9rables: characters who appear in the same chapter. The size is how often.",
+  "width": 600,
+  "height": 420,
+  "padding": 5,
+  "title": {
+    "text": "Who meets whom in Les Mis\u00e9rables",
+    "subtitle": "Characters who appear in the same chapter. The size is how often"
+  },
+  "data": [
+    {
+      "name": "links",
+      "url": "data/miserables.json",
+      "format": {
+        "type": "json",
+        "property": "links"
+      }
+    },
+    {
+      "name": "ends",
+      "source": "links",
+      "transform": [
+        {
+          "type": "fold",
+          "fields": [
+            "source",
+            "target"
+          ],
+          "as": [
+            "end",
+            "node"
+          ]
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "node"
+          ],
+          "fields": [
+            "value"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "as": [
+            "degree"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nodes",
+      "url": "data/miserables.json",
+      "format": {
+        "type": "json",
+        "property": "nodes"
+      },
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "ends",
+          "key": "node",
+          "fields": [
+            "index"
+          ],
+          "values": [
+            "degree"
+          ],
+          "default": 0
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "degree",
+            "order": "descending"
+          },
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "rank"
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "nodes",
+        "field": "group",
+        "sort": true
+      },
+      "range": "category"
+    },
+    {
+      "name": "size",
+      "type": "sqrt",
+      "domain": [
+        0,
+        {
+          "signal": "extent(pluck(data('nodes'), 'degree'))[1]"
+        }
+      ],
+      "range": [
+        25,
+        484
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "people",
+      "type": "symbol",
+      "zindex": 1,
+      "from": {
+        "data": "nodes"
+      },
+      "encode": {
+        "enter": {
+          "size": {
+            "scale": "size",
+            "field": "degree"
+          },
+          "fill": {
+            "scale": "color",
+            "field": "group"
+          },
+          "stroke": {
+            "value": "#ffffff"
+          },
+          "strokeWidth": {
+            "value": 1.5
+          }
+        }
+      },
+      "transform": [
+        {
+          "type": "force",
+          "iterations": 400,
+          "static": true,
+          "signal": "force",
+          "forces": [
+            {
+              "force": "link",
+              "links": "links",
+              "distance": 42,
+              "strength": 0.6
+            },
+            {
+              "force": "nbody",
+              "strength": -140
+            },
+            {
+              "force": "x",
+              "x": {
+                "expr": "width / 2"
+              },
+              "strength": 0.05
+            },
+            {
+              "force": "y",
+              "y": {
+                "expr": "height / 2"
+              },
+              "strength": 0.08
+            },
+            {
+              "force": "collide",
+              "radius": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "path",
+      "from": {
+        "data": "links"
+      },
+      "zindex": 0,
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "#c8ced8"
+          },
+          "strokeWidth": {
+            "signal": "min(3, 0.6 + datum.value * 0.15)"
+          }
+        }
+      },
+      "transform": [
+        {
+          "type": "linkpath",
+          "require": {
+            "signal": "force"
+          },
+          "shape": "line",
+          "sourceX": "datum.source.x",
+          "sourceY": "datum.source.y",
+          "targetX": "datum.target.x",
+          "targetY": "datum.target.y"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "zindex": 2,
+      "from": {
+        "data": "people"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "field": "x"
+          },
+          "y": {
+            "field": "y",
+            "offset": -12
+          },
+          "align": {
+            "value": "center"
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "text": {
+            "signal": "datum.datum.rank <= 6 ? datum.datum.name : ''"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,207 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Flare as nested circles: packages inside packages, sized by source.",
+  "width": 480,
+  "height": 480,
+  "padding": 5,
+  "title": {
+    "text": "Flare as nested circles",
+    "subtitle": "Packages inside packages, sized by source"
+  },
+  "data": [
+    {
+      "name": "tree",
+      "url": "data/flare.json"
+    },
+    {
+      "name": "flare",
+      "url": "data/flare.json",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "parent"
+          ],
+          "as": [
+            "p1"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p1.parent"
+          ],
+          "as": [
+            "p2"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p2.parent"
+          ],
+          "as": [
+            "p3"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "tree",
+          "key": "id",
+          "fields": [
+            "p3.parent"
+          ],
+          "as": [
+            "p4"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "top",
+          "expr": "datum.parent === 1 ? datum.name : datum.p1 && datum.p1.parent === 1 ? datum.p1.name : datum.p2 && datum.p2.parent === 1 ? datum.p2.name : datum.p3 && datum.p3.parent === 1 ? datum.p3.name : datum.p4 && datum.p4.parent === 1 ? datum.p4.name : null"
+        },
+        {
+          "type": "formula",
+          "as": "level",
+          "expr": "!isValid(datum.parent) ? 0 : !datum.p1 || !isValid(datum.p1.parent) ? 1 : !datum.p2 || !isValid(datum.p2.parent) ? 2 : !datum.p3 || !isValid(datum.p3.parent) ? 3 : !datum.p4 || !isValid(datum.p4.parent) ? 4 : 5"
+        }
+      ]
+    },
+    {
+      "name": "tops",
+      "source": "flare",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum.top)"
+        }
+      ]
+    },
+    {
+      "name": "circles",
+      "source": "flare",
+      "transform": [
+        {
+          "type": "stratify",
+          "key": "id",
+          "parentKey": "parent"
+        },
+        {
+          "type": "pack",
+          "field": "size",
+          "sort": {
+            "field": "value",
+            "order": "descending"
+          },
+          "padding": 3,
+          "size": [
+            {
+              "signal": "width"
+            },
+            {
+              "signal": "height"
+            }
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "datum.depth <= 3"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "tops",
+        "field": "top",
+        "sort": {
+          "op": "sum",
+          "field": "size",
+          "order": "descending"
+        }
+      },
+      "range": "category"
+    }
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {
+        "data": "circles"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "field": "x"
+          },
+          "y": {
+            "field": "y"
+          },
+          "size": {
+            "signal": "4 * datum.r * datum.r"
+          },
+          "fill": [
+            {
+              "test": "datum.depth === 0",
+              "value": "#f3f5f8"
+            },
+            {
+              "scale": "color",
+              "field": "top"
+            }
+          ],
+          "fillOpacity": {
+            "signal": "datum.depth === 0 ? 1 : datum.depth === 1 ? 0.16 : datum.depth === 2 ? 0.45 : 0.85"
+          },
+          "stroke": [
+            {
+              "test": "datum.depth === 1",
+              "scale": "color",
+              "field": "top"
+            },
+            {
+              "value": null
+            }
+          ],
+          "strokeWidth": {
+            "value": 1
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "circles"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "field": "x"
+          },
+          "y": {
+            "signal": "datum.y - datum.r + 14"
+          },
+          "align": {
+            "value": "center"
+          },
+          "fontWeight": {
+            "value": 600
+          },
+          "text": {
+            "signal": "datum.depth === 1 && datum.r > 24 ? datum.name : ''"
+          }
+        }
+      }
+    }
+  ]
+}
