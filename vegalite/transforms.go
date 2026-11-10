@@ -3,6 +3,7 @@ package vegalite
 import (
 	"encoding/json/v2"
 	"fmt"
+	"strings"
 
 	"github.com/xo/zuzu/expr"
 )
@@ -151,13 +152,8 @@ func (c *compiler) transformOne(n *dataNode, t Transform, path string) error {
 		}
 		c.add(n, transform("pivot", params))
 	case t.Has("impute"):
-		params := map[string]any{"field": f["impute"], "key": f["key"]}
-		for _, k := range []string{"groupby", "keyvals", "method", "value"} {
-			if v, ok := f[k]; ok {
-				params[k] = v
-			}
-		}
-		c.add(n, transform("impute", params))
+		groupby, _ := f["groupby"].([]any)
+		c.addImpute(n, expr.String(f["impute"]), expr.String(f["key"]), groupby, f)
 	case t.Has("sample"):
 		c.add(n, transform("sample", map[string]any{"size": f["sample"]}))
 	case t.Has("stack"):
@@ -276,4 +272,44 @@ func jsonOf(v any) ([]byte, error) {
 // unmarshal reads JSON into a value.
 func unmarshal(b []byte, out any) error {
 	return json.Unmarshal(b, out)
+}
+
+// addImpute adds the rows that a series lacks for a value of the key. A
+// method of value fills them with the value. Another method, such as mean,
+// fills them with that aggregate over a window of the series, which the
+// frame bounds.
+func (c *compiler) addImpute(n *dataNode, field, key string, groupby []any, spec map[string]any) {
+	if groupby == nil {
+		groupby = []any{}
+	}
+	params := map[string]any{"field": field, "key": key, "method": "value", "groupby": groupby, "value": spec["value"]}
+	switch kv := spec["keyvals"].(type) {
+	case []any:
+		params["keyvals"] = kv
+	case map[string]any:
+		args := []string{expr.String(kv["start"]), expr.String(kv["stop"])}
+		if st, ok := kv["step"]; ok {
+			args = append(args, expr.String(st))
+		}
+		params["keyvals"] = map[string]any{"signal": "sequence(" + strings.Join(args, ",") + ")"}
+	}
+	method, _ := spec["method"].(string)
+	if method == "" || method == "value" {
+		c.add(n, transform("impute", params))
+		return
+	}
+	params["value"] = nil
+	c.add(n, transform("impute", params))
+	frame, ok := spec["frame"]
+	if !ok {
+		frame = []any{nil, nil}
+	}
+	as := "imputed_" + field + "_value"
+	c.add(n, transform("window", map[string]any{
+		"as": []any{as}, "ops": []any{method}, "fields": []any{field},
+		"frame": frame, "ignorePeers": false, "groupby": groupby,
+	}))
+	c.add(n, transform("formula", map[string]any{
+		"expr": fieldRef(field) + " === null ? " + fieldRef(as) + " : " + fieldRef(field), "as": field,
+	}))
 }

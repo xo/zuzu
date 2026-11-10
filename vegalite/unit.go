@@ -295,6 +295,9 @@ func (u *unit) dataflow(s *Spec) error {
 			if _, ok := valueOf(d.def.Sort).([]any); ok {
 				needs = true
 			}
+			if len(d.def.Impute) > 0 {
+				needs = true
+			}
 		}
 	}
 	if u.stack != "" || len(u.invalidFields()) > 0 {
@@ -376,6 +379,9 @@ func (u *unit) dataflow(s *Spec) error {
 	}
 	if u.aggregated() {
 		u.addAggregate(n)
+	}
+	if err := u.addEncodingImpute(n); err != nil {
+		return err
 	}
 	if u.stack != "" {
 		u.addStack(n)
@@ -595,6 +601,35 @@ func (u *unit) addAggregate(n *dataNode) {
 	u.c.add(n, transform("aggregate", map[string]any{"groupby": groupby, "ops": ops, "fields": fields, "as": as}))
 }
 
+// addEncodingImpute adds the impute of a channel of the measure, keyed by
+// the dimension and grouped by the series.
+func (u *unit) addEncodingImpute(n *dataNode) error {
+	for _, ch := range []string{"x", "y"} {
+		d := u.ch[ch]
+		if d == nil || d.def == nil || len(d.def.Impute) == 0 {
+			continue
+		}
+		var spec map[string]any
+		if err := json.Unmarshal(d.def.Impute, &spec); err != nil {
+			return err
+		}
+		other := "x"
+		if ch == "x" {
+			other = "y"
+		}
+		key := u.ch[other]
+		if key == nil || !key.isField() {
+			return u.c.issue(u.path+"/encoding/"+ch+"/impute", "an impute with no field of the other position")
+		}
+		var groupby []any
+		for _, f := range u.seriesFields() {
+			groupby = append(groupby, f)
+		}
+		u.c.addImpute(n, d.out, key.out, groupby, spec)
+	}
+	return nil
+}
+
 // isPath reports whether a mark draws a path through its points.
 func isPath(mark string) bool {
 	return mark == "area" || mark == "line" || mark == "trail"
@@ -735,19 +770,7 @@ func (u *unit) pathGroup(m *vega.Mark) *vega.Mark {
 	default:
 		return nil
 	}
-	var by []string
-	for _, name := range []string{"color", "fill", "stroke", "opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "strokeDash", "size"} {
-		if name == "size" && u.mark == "trail" {
-			// The size of a trail changes along it.
-			continue
-		}
-		if d := u.ch[name]; d != nil && d.isField() && d.aggregate == "" {
-			by = append(by, d.out)
-		}
-	}
-	for _, d := range u.detail {
-		by = append(by, d.out)
-	}
+	by := u.seriesFields()
 	if len(by) == 0 {
 		return nil
 	}
@@ -768,6 +791,25 @@ func (u *unit) pathGroup(m *vega.Mark) *vega.Mark {
 		From: &vega.From{Facet: &vega.Facet{Name: facet, Data: u.c.name(u.data), GroupBy: vega.List(by...)}},
 	}
 	return &group
+}
+
+// seriesFields returns the fields that split the marks into series: the
+// fields of the channels that are not aggregates, such as color, and of
+// detail. The size of a trail changes along it, and does not split it.
+func (u *unit) seriesFields() []string {
+	var by []string
+	for _, name := range []string{"color", "fill", "stroke", "opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "strokeDash", "size"} {
+		if name == "size" && u.mark == "trail" {
+			continue
+		}
+		if d := u.ch[name]; d != nil && d.isField() && d.aggregate == "" {
+			by = append(by, d.out)
+		}
+	}
+	for _, d := range u.detail {
+		by = append(by, d.out)
+	}
+	return by
 }
 
 // prod makes a production of one value reference, written as JSON. A
