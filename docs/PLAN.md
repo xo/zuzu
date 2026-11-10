@@ -627,9 +627,9 @@ still differ in the Vega check:
   numbers and strings together. JavaScript compares them in a way that is
   not transitive, so the order follows the sort of V8.
 
-The 13 specs that differ in the Vega-Lite check are those two, four facets
+The 13 specs that differ in the Vega-Lite check are those two, three facets
 of facets and a facet with an independent scale inside a layer, which the
-compiler does not support yet, and six whose datasets vega-lite.js numbers
+compiler does not support yet, and seven whose datasets vega-lite.js numbers
 or merges by rules that no document of Vega-Lite describes and that zuzu
 does not find yet: `bar_heatlane`, `concat_population_pyramid`,
 `facet_bullet`, `repeat_child_layer`, `repeat_histogram_flights`,
