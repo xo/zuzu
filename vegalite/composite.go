@@ -81,7 +81,8 @@ func composite(s *Spec) (*Spec, error) {
 			continue
 		}
 		f, ok := m["field"].(string)
-		if !ok || m["aggregate"] != nil {
+		if !ok || m["aggregate"] != nil || f == field && s.Mark.Type == "boxplot" {
+			// The field of a box does not split it, even in a tooltip.
 			continue
 		}
 		if tu, ok := m["timeUnit"]; ok {
@@ -352,6 +353,30 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 	if cont == "x" {
 		other = "y"
 	}
+	// A channel that aggregates, such as a tooltip of a mean, joins the
+	// aggregates of the whiskers and the box, which then read its result.
+	// The outliers are rows, so they leave it out.
+	var extra []any
+	plain := map[string]any{}
+	others = maps.Clone(others)
+	for _, k := range sortedChannels(others) {
+		v := others[k]
+		m, ok := v.(map[string]any)
+		if f, isField := m["field"].(string); ok && isField && m["aggregate"] != nil {
+			op := expr.String(m["aggregate"])
+			as := op + "_" + f
+			extra = append(extra, map[string]any{"op": op, "field": f, "as": as})
+			nd := maps.Clone(m)
+			delete(nd, "aggregate")
+			nd["field"], nd["type"] = as, quantitative
+			if _, ok := nd["title"]; !ok {
+				nd["title"] = titleOf(&channelDef{aggregate: op, field: f})
+			}
+			others[k] = nd
+			continue
+		}
+		plain[k] = v
+	}
 	agg := func(ops, as []string, fields ...string) map[string]any {
 		var list []any
 		for i, op := range ops {
@@ -361,6 +386,7 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 			}
 			list = append(list, map[string]any{"op": op, "field": f, "as": as[i]})
 		}
+		list = append(list, extra...)
 		return map[string]any{"aggregate": list, "groupby": groupby}
 	}
 	rule := func(from, to string) map[string]any {
@@ -414,7 +440,7 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 		map[string]any{"op": "q1", "field": field, "as": lb},
 		map[string]any{"op": "q3", "field": field, "as": ub},
 	}, "groupby": groupby}
-	outliers := layerOf(map[string]any{"type": "point", "style": "boxplot-outliers"}, others, map[string]any{
+	outliers := layerOf(map[string]any{"type": "point", "style": "boxplot-outliers"}, plain, map[string]any{
 		cont: channelWith(def, field, title),
 	})
 	outliers["transform"] = []any{map[string]any{"filter": "(" + f + " < " + lowFence + ") || (" + f + " > " + highFence + ")"}}

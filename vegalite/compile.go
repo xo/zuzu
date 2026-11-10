@@ -254,7 +254,7 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			maps.Copy(c.produced, producedFields(s.Transform))
 			defer func() { c.produced = prev }()
 		}
-		if src != nil && (src.values || len(c.data[src.index].Source.List) > 0) && !src.open && !s.expanded && len(s.Layer) > 1 && len(s.Transform) == 0 {
+		if src != nil && (src.values || len(c.data[src.index].Source.List) > 0) && !src.open && (!s.expanded || s.composite) && len(s.Layer) > 1 && len(s.Transform) == 0 {
 			// A layer over inline values has a dataset of its own, which
 			// vega-lite.js names and later removes, so its number is
 			// taken, unless the layers end up with one dataset.
@@ -327,6 +327,7 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			if s.Data != nil {
 				expanded.Data = nil
 			}
+			expanded.composite = true
 			return c.view(expanded, v, src, path, repeat)
 		}
 		if layered := overlay(s, c.cfg); layered != nil {

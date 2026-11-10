@@ -144,6 +144,9 @@ type scaleComp struct {
 	// dimension says that the scale is the dimension of a bar or an area,
 	// which does not include zero.
 	dimension bool
+	// zeroKept says that a rule or a tick draws on the scale, which keeps
+	// zero in a dimension.
+	zeroKept bool
 	// binned says that the field of the scale is binned already.
 	binned bool
 	// padded says that a bar is placed along the scale, which keeps it
@@ -243,6 +246,11 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 		if (name == "x" || name == "y") && name == u.dimension() {
 			s.dimension = true
 		}
+	}
+	if (u.mark == "rule" || u.mark == "tick") && (name == "x" || name == "y") {
+		// A rule or a tick on the scale, as a box plot draws, keeps zero
+		// in the domain, as vega-lite.js merges it.
+		s.zeroKept = true
 	}
 	if d.sortBy != "" && !s.hasSort {
 		s.sortVal, s.hasSort = map[string]any{"field": d.sortBy, "op": "min"}, true
@@ -626,7 +634,7 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	case s.channel == "size" && s.typ == "quantize", quant && (s.channel == "opacity" || s.channel == "fillOpacity" || s.channel == "strokeOpacity"):
 		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: false}
 	case quant && (positional || s.channel == "size" || s.channel == "theta" || s.channel == "radius") && s.typ != "log" && !discretizing(s.typ):
-		zero := (s.bins == "" || s.channel == "size") && !s.binned && s.props["domain"] == nil && !s.dimension
+		zero := (s.bins == "" || s.channel == "size") && !s.binned && s.props["domain"] == nil && (!s.dimension || s.zeroKept)
 		if v.cfg != nil && v.cfg.zero != nil && positional {
 			zero = zero && *v.cfg.zero
 		}

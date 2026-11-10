@@ -62,6 +62,10 @@ type Spec struct {
 	// expanded says that the compiler made the layer of the spec from a
 	// composite mark or an overlay.
 	expanded bool
+	// composite says that the spec is the layers of a composite mark,
+	// such as a box plot, which vega-lite.js numbers as a layer over its
+	// data.
+	composite bool
 	// stackAs is the mark whose rules of stacking a layer follows: the
 	// area that a line or points overlay.
 	stackAs string
