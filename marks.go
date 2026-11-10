@@ -54,11 +54,6 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 	if !markTypes[m.Type] {
 		return nil, vega.Issue{Err: vega.ErrUnsupportedMark, Path: path, Message: m.Type}
 	}
-	for i, t := range m.Transform {
-		if err := s.rt.issue(vega.ErrUnsupportedTransform, fmt.Sprintf("%s/transform/%d", path, i), "%s", t.Type); err != nil {
-			return nil, err
-		}
-	}
 	role := m.Role
 	if role == "" {
 		role = "mark"
@@ -90,6 +85,11 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 		}
 		geometry(m.Type, st)
 		states[i] = st
+	}
+	if len(m.Transform) > 0 {
+		if states, err = s.transformItems(m, states, path); err != nil {
+			return nil, err
+		}
 	}
 	if m.Sort != nil && !m.Sort.Field.IsZero() {
 		if err := s.sortItems(m.Sort, states, facets); err != nil {
@@ -503,4 +503,81 @@ func span(st *itemState, x, x2, w, xc float64, nx, nx2, nxc, nw string) (float64
 		return x + w, -w
 	}
 	return x, w
+}
+
+// itemKey is the field of the row of an item that holds the index of the
+// item, so that the items follow the rows through a transform.
+const itemKey = "zuzu:item"
+
+// transformItems runs the transforms of a mark on its items, after the
+// encoding, as Vega does. Each item is a row with its datum and its
+// properties of place and shape, and the transforms write those properties
+// back. A transform that zuzu does not support goes in the report.
+func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) ([]*itemState, error) {
+	rows := make([]dataflow.Row, len(states))
+	for i, st := range states {
+		r := itemRow(st.it)
+		r[itemKey] = i
+		rows[i] = r
+	}
+	env := &dataEnv{s: s}
+	for i, t := range m.Transform {
+		p := fmt.Sprintf("%s/transform/%d", path, i)
+		if !dataflow.Supported(t.Type) {
+			if err := s.rt.issue(vega.ErrUnsupportedTransform, p, "%s", t.Type); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		out, err := dataflow.Run(env, rows, m.Transform[i:i+1], path+"/transform")
+		if err != nil {
+			if _, ok := errors.AsType[vega.Issue](err); ok {
+				if err := s.rt.issue(err, p, ""); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			return nil, err
+		}
+		rows = out
+	}
+	out := make([]*itemState, 0, len(rows))
+	for _, r := range rows {
+		i, ok := r[itemKey].(int)
+		if !ok || i < 0 || i >= len(states) {
+			continue
+		}
+		st := states[i]
+		setItem(st.it, r)
+		out = append(out, st)
+	}
+	return out, nil
+}
+
+// itemRow returns the properties of an item that a transform of a mark
+// reads, with its datum.
+func itemRow(it *scene.Item) dataflow.Row {
+	return dataflow.Row{
+		"datum": it.Datum, "x": it.X, "y": it.Y, "x2": it.X2, "y2": it.Y2,
+		"width": it.Width, "height": it.Height, "path": it.Path,
+		"angle": it.Angle, "startAngle": it.StartAngle, "endAngle": it.EndAngle,
+		"innerRadius": it.InnerRadius, "outerRadius": it.OuterRadius,
+	}
+}
+
+// setItem writes the properties of a row back to its item.
+func setItem(it *scene.Item, r dataflow.Row) {
+	for k, f := range map[string]*float64{
+		"x": &it.X, "y": &it.Y, "x2": &it.X2, "y2": &it.Y2,
+		"width": &it.Width, "height": &it.Height, "angle": &it.Angle,
+		"startAngle": &it.StartAngle, "endAngle": &it.EndAngle,
+		"innerRadius": &it.InnerRadius, "outerRadius": &it.OuterRadius,
+	} {
+		if v, ok := r[k].(float64); ok && !math.IsNaN(v) && !math.IsInf(v, 0) {
+			*f = v
+		}
+	}
+	if v, ok := r["path"].(string); ok {
+		it.Path = v
+	}
 }

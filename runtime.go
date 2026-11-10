@@ -27,16 +27,19 @@ import (
 type runtime struct {
 	// ctx is the context of the render, which the loader takes. The runtime
 	// lives only as long as the call that gave it.
-	ctx    context.Context //nolint:containedctx // The runtime is one call, which owns the context.
-	chart  *Chart
-	opts   renderOptions
-	loc    *time.Location
-	locale *format.Locale
-	rand   *rand.Rand
-	theme  theme.Theme
-	report Report
-	progs  map[string]*expr.Program
-	root   *scope
+	ctx   context.Context //nolint:containedctx // The runtime is one call, which owns the context.
+	chart *Chart
+	opts  renderOptions
+	// hierarchy is the tree that a stratify transform built, which the
+	// hierarchy transforms of every dataset read.
+	hierarchy dataflow.Hierarchy
+	loc       *time.Location
+	locale    *format.Locale
+	rand      *rand.Rand
+	theme     theme.Theme
+	report    Report
+	progs     map[string]*expr.Program
+	root      *scope
 	// measure measures the width of text, for the guides and the bounds.
 	measure *text.Estimate
 	// err is the first error of a signal that an expression read, which
@@ -570,10 +573,11 @@ type dataEnv struct {
 
 func (e *dataEnv) Compile(src string) (*expr.Program, error) { return e.s.rt.compile(src) }
 func (e *dataEnv) Scope(datum any) *expr.Scope               { return e.s.exprScope(datum) }
-func (e *dataEnv) Data(name string) ([]dataflow.Row, error)  { return e.s.dataset(name) }
+func (e *dataEnv) Data(name string) ([]dataflow.Row, error)  { return e.s.datasetOrItems(name) }
 func (e *dataEnv) SetSignal(name string, v any)              { e.s.setSignal(name, v) }
 func (e *dataEnv) Location() *time.Location                  { return e.s.rt.loc }
 func (e *dataEnv) Random() float64                           { return e.s.rt.rand.Float64() }
+func (e *dataEnv) Hierarchy() *dataflow.Hierarchy            { return &e.s.rt.hierarchy }
 
 // number reads a value as a number, with def for null or undefined.
 func number(v any, def float64) float64 {
@@ -599,4 +603,23 @@ func rawMarshal(v any) jsontext.Value {
 		return jsontext.Value("null")
 	}
 	return b
+}
+
+// datasetOrItems returns the rows of a dataset or, where no dataset has the
+// name, the items of a mark with the name, as Vega does for the data that a
+// transform reads.
+func (s *scope) datasetOrItems(name string) ([]dataflow.Row, error) {
+	rows, err := s.dataset(name)
+	if err == nil || !errors.Is(err, ErrUnknownName) {
+		return rows, err
+	}
+	items, ok := s.findMarkItems(name)
+	if !ok {
+		return nil, err
+	}
+	out := make([]dataflow.Row, len(items))
+	for i := range items {
+		out[i] = itemDatum(&items[i])
+	}
+	return out, nil
 }

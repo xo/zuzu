@@ -69,12 +69,15 @@ func Supported(typ string) bool {
 // vega.ErrUnsupportedTransform. path is the JSON pointer of the list of
 // transforms in the spec, for the errors.
 func Run(env Env, rows []Row, ts []vega.Transform, path string) ([]Row, error) {
+	var local *Hierarchy
 	for i, t := range ts {
 		fn, ok := transforms[t.Type]
 		if !ok {
 			return nil, vega.Issue{Err: vega.ErrUnsupportedTransform, Path: fmt.Sprintf("%s/%d", path, i), Message: t.Type}
 		}
-		out, err := fn(&params{env: env, t: t}, rows)
+		pr := &params{env: env, t: t, local: local}
+		out, err := fn(pr, rows)
+		local = pr.local
 		if err != nil {
 			return nil, fmt.Errorf("%s/%d: transform %s: %w", path, i, t.Type, err)
 		}
@@ -88,6 +91,8 @@ func Run(env Env, rows []Row, ts []vega.Transform, path string) ([]Row, error) {
 type params struct {
 	env Env
 	t   vega.Transform
+	// local is the hierarchy of a run, when the Env keeps none.
+	local *Hierarchy
 }
 
 // raw returns a parameter as a value, with a signal evaluated, and whether

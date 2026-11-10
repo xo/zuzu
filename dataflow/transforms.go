@@ -27,13 +27,20 @@ var transforms = map[string]transformFunc{
 	"identifier":    identifier,
 	"impute":        impute,
 	"joinaggregate": joinAggregate,
+	"linkpath":      linkpath,
 	"lookup":        lookup,
+	"pack":          pack,
+	"partition":     partition,
 	"pie":           pie,
 	"pivot":         pivot,
 	"project":       project,
 	"sample":        sample,
 	"sequence":      sequence,
 	"stack":         stack,
+	"stratify":      stratify,
+	"tree":          tree,
+	"treemap":       treemap,
+	"treelinks":     treelinks,
 	"timeunit":      timeUnit,
 	"window":        window,
 }
@@ -85,7 +92,7 @@ func formula(p *params, rows []Row) ([]Row, error) {
 
 // collect sorts the rows.
 func collect(p *params, rows []Row) ([]Row, error) {
-	cmp, err := p.sort("sort")
+	cmp, err := p.sort()
 	if err != nil || cmp == nil {
 		return rows, err
 	}
@@ -477,10 +484,10 @@ func compareValues(a, b any) int {
 	return expr.Ascending(a, b)
 }
 
-// sort reads a sort parameter, {"field": ..., "order": ...}, as a function
+// sort reads the sort parameter, {"field": ..., "order": ...}, as a function
 // that compares rows. It returns nil if the transform has none.
-func (p *params) sort(name string) (func(a, b Row) int, error) {
-	v, ok, err := p.raw(name)
+func (p *params) sort() (func(a, b Row) int, error) {
+	v, ok, err := p.raw("sort")
 	if err != nil || !ok || v == nil {
 		return nil, err
 	}

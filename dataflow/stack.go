@@ -24,7 +24,7 @@ func stack(p *params, rows []Row) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmp, err := p.sort("sort")
+	cmp, err := p.sort()
 	if err != nil {
 		return nil, err
 	}

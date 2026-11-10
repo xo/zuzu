@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -450,6 +451,13 @@ func pointer(v any) uintptr {
 // canonical writes a value as JSON with sorted keys, and numbers with 8
 // significant digits, so that two sums in a different order match. A
 // number nearer zero than 1e-9 is zero.
+// pathString matches the path of a link or a shape, and pathNumber each
+// number in it.
+var (
+	pathString = regexp.MustCompile(`^M[-0-9.eE,]+[MLHVCSQTAZmlhvcsqtaz][-0-9.eE, MLHVCSQTAZmlhvcsqtaz]*$`)
+	pathNumber = regexp.MustCompile(`-?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?`)
+)
+
 func canonical(v any) string {
 	var b strings.Builder
 	write(&b, v)
@@ -470,6 +478,18 @@ func write(b *strings.Builder, v any) {
 		}
 		b.WriteString(strconv.FormatFloat(x, 'g', 8, 64))
 	case string:
+		if pathString.MatchString(x) {
+			// The numbers of an SVG path compare as numbers do.
+			x = pathNumber.ReplaceAllStringFunc(x, func(n string) string {
+				f, err := strconv.ParseFloat(n, 64)
+				if err != nil {
+					return n
+				}
+				var nb strings.Builder
+				write(&nb, f)
+				return nb.String()
+			})
+		}
 		q, _ := json.Marshal(x)
 		b.Write(q)
 	case bool:
