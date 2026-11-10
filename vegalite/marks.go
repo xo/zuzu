@@ -1,6 +1,7 @@
 package vegalite
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -153,6 +154,9 @@ func (u *unit) channelRef(name string) map[string]any {
 		}
 	case d.hasDatum:
 		if u.v.addScale(u, scaleName, d, nil) {
+			if sc := u.v.scales[u.v.key(scaleName)]; sc != nil && !slices.Contains(sc.datums, d.datum) {
+				sc.datums = append(sc.datums, d.datum)
+			}
 			base = map[string]any{"scale": u.v.sn(scaleName), "value": d.datum}
 		} else {
 			base = map[string]any{"value": d.datum}
@@ -352,12 +356,10 @@ func (u *unit) axis(e enc, ch, size string) {
 		}
 		r := ref(d.out)
 		band := u.v.sn(ch)
-		if o := u.ch[ch+"Offset"]; o != nil && o.isField() {
+		if o := u.offsetRef(ch, false); o != nil {
 			// An offset places the bar in a sub-band of the band.
-			if u.v.addScale(u, ch+"Offset", o, []string{o.out}) {
-				r["offset"] = map[string]any{"scale": u.v.sn(ch + "Offset"), "field": o.out}
-				band = u.v.sn(ch + "Offset")
-			}
+			r["offset"] = o
+			band = u.v.sn(ch + "Offset")
 		}
 		e.set(p, r)
 		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + band + "'))"})
@@ -540,21 +542,33 @@ func (u *unit) others(e enc) {
 // band is true. It returns nil when the channel has no offset.
 func (u *unit) offsetRef(ch string, band bool) map[string]any {
 	o := u.ch[ch+"Offset"]
-	if o == nil || !o.isField() {
+	if o == nil || !o.isField() && !o.hasDatum {
 		return nil
 	}
-	if !u.v.addScale(u, ch+"Offset", o, []string{o.out}) {
+	var fields []string
+	if o.isField() {
+		fields = []string{o.out}
+	}
+	if !u.v.addScale(u, ch+"Offset", o, fields) {
 		return nil
 	}
-	if s := u.v.scales[u.v.key(ch+"Offset")]; s != nil && s.offset == "" {
-		switch {
-		case u.ch[ch] == nil:
-			s.offset = "center"
-		case u.mark != "bar" && u.mark != "rect":
-			s.offset = "step"
+	if s := u.v.scales[u.v.key(ch+"Offset")]; s != nil {
+		if o.hasDatum && !slices.Contains(s.datums, o.datum) {
+			s.datums = append(s.datums, o.datum)
+		}
+		if s.offset == "" {
+			switch {
+			case u.ch[ch] == nil:
+				s.offset = "center"
+			case u.mark != "bar" && u.mark != "rect" || o.hasDatum:
+				s.offset = "step"
+			}
 		}
 	}
 	r := map[string]any{"scale": u.v.sn(ch + "Offset"), "field": o.out}
+	if o.hasDatum {
+		r = map[string]any{"scale": u.v.sn(ch + "Offset"), "value": o.datum}
+	}
 	if band {
 		r["band"] = 0.5
 	}

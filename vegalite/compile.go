@@ -162,6 +162,9 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		t.Anchor = lit("start")
 		out.Title = &t
 	}
+	if l := layerRepeat(s); l != nil {
+		s = l
+	}
 	if isConcat(s) {
 		if err := c.concat(s, out, nil, "", map[string]string{}); err != nil {
 			return nil, err
@@ -249,12 +252,21 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			if l.Mark == nil && len(l.Layer) == 0 {
 				continue
 			}
-			sub := v.layer(fmt.Sprintf("layer_%d_", i), v.prefix)
+			name := fmt.Sprintf("layer_%d_", i)
+			if l.layerPrefix != "" {
+				name = l.layerPrefix
+			}
+			sub := v.layer(name, v.prefix)
 			if len(independent) > 0 {
 				// The layer has its own scale of each independent channel.
 				sub.independent, sub.layerIndex, sub.indepPrefix = independent, i, sub.prefix
 			}
-			if err := c.view(l, sub, src, fmt.Sprintf("%s/layer/%d", path, i), repeat); err != nil {
+			lr := repeat
+			if l.repeatWith != nil {
+				lr = maps.Clone(repeat)
+				maps.Copy(lr, l.repeatWith)
+			}
+			if err := c.view(l, sub, src, fmt.Sprintf("%s/layer/%d", path, i), lr); err != nil {
 				return err
 			}
 		}
@@ -584,7 +596,7 @@ func str(v vega.Value) string {
 // it into a layer of the marks, as Vega-Lite does. It returns nil for any
 // other spec.
 func overlay(s *Spec) *Spec {
-	if s.Mark.Type != "area" && s.Mark.Type != "line" {
+	if s.overlaid || s.Mark.Type != "area" && s.Mark.Type != "line" {
 		return nil
 	}
 	want := func(k string) bool {
@@ -605,6 +617,10 @@ func overlay(s *Spec) *Spec {
 		return false
 	}
 	line, point := s.Mark.Type == "area" && want("line"), want("point")
+	if _, ok := s.Encoding["shape"]; ok && s.Mark.Type == "line" {
+		// A shape on a line draws points along it.
+		point = true
+	}
 	if !line && !point {
 		return nil
 	}
@@ -618,7 +634,7 @@ func overlay(s *Spec) *Spec {
 	// The caller already read the data of the spec.
 	out.Mark, out.Data = nil, nil
 	out.expanded = true
-	out.Layer = []Spec{{Mark: base}}
+	out.Layer = []Spec{{Mark: base, overlaid: true}}
 	if line {
 		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line"}, stackAs: s.Mark.Type})
 	}
@@ -833,4 +849,26 @@ func marksData(ms []vega.Mark) map[string]bool {
 	}
 	walk(ms)
 	return out
+}
+
+// layerRepeat turns a repeat of layers, {"repeat": {"layer": [...]}}, into
+// a layer of copies of its spec, one for each value. It returns nil for any
+// other spec.
+func layerRepeat(s *Spec) *Spec {
+	if len(s.Repeat) == 0 || s.Spec == nil {
+		return nil
+	}
+	var r map[string][]string
+	if json.Unmarshal(s.Repeat, &r) != nil || len(r) != 1 || r["layer"] == nil {
+		return nil
+	}
+	out := *s
+	out.Repeat, out.Spec = nil, nil
+	for _, v := range r["layer"] {
+		l := *s.Spec
+		l.layerPrefix = "child__layer_" + varName(v) + "_"
+		l.repeatWith = map[string]string{"layer": v}
+		out.Layer = append(out.Layer, l)
+	}
+	return &out
 }

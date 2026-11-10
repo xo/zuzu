@@ -196,6 +196,12 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 		if err := def.Datum.Decode(&c.datum); err != nil {
 			return nil, err
 		}
+		if m, ok := c.datum.(map[string]any); ok {
+			if r, ok := m["repeat"].(string); ok {
+				// The datum of a repeat is the value of the repeat.
+				c.datum = repeat[r]
+			}
+		}
 	}
 	if len(def.Condition) > 0 {
 		conds, err := readConditions(def.Condition)

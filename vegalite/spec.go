@@ -65,6 +65,13 @@ type Spec struct {
 	// stackAs is the mark whose rules of stacking a layer follows: the
 	// area that a line or points overlay.
 	stackAs string
+	// layerPrefix names the marks of a layer that a repeat of layers
+	// makes, and repeatWith gives the value of its repeat.
+	layerPrefix string
+	repeatWith  map[string]string
+	// overlaid says that the spec is the mark under an overlay, which
+	// draws no overlay of its own.
+	overlaid bool
 }
 
 // Data is the data of a view: inline values, a url, a named dataset, or a

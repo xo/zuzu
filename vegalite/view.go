@@ -117,6 +117,9 @@ type scaleComp struct {
 	// the scale of its position, "step" for steps of 20 pixels, and
 	// "center" around the middle of the view when there is no position.
 	offset string
+	// datums are the constants of the data that channels put through the
+	// scale, which its domain holds.
+	datums []any
 	// normalized says that the scale draws a stack normalized to one.
 	normalized bool
 	// second says that the scale is the own scale of a layer after the
@@ -184,7 +187,7 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 	}
 	maps.Copy(s.props, props)
 	if s.typ == "point" && (name == "x" || name == "y") {
-		if o := u.ch[name+"Offset"]; o != nil && o.isField() {
+		if o := u.ch[name+"Offset"]; o != nil && (o.isField() || o.hasDatum) {
 			// A position split by an offset has bands.
 			s.typ = "band"
 		}
@@ -669,6 +672,14 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 // dataDomain returns the domain of a scale from the fields of its datasets.
 func (v *view) dataDomain(s *scaleComp) vega.ScaleDomain {
 	if len(s.refs) == 0 {
+		if len(s.datums) > 0 {
+			// The constants alone make the domain.
+			ref := &vega.DataRef{}
+			for _, x := range s.datums {
+				ref.Fields = append(ref.Fields, []any{x})
+			}
+			return vega.ScaleDomain{Data: ref}
+		}
 		return vega.ScaleDomain{}
 	}
 	ref := &vega.DataRef{}
