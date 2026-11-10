@@ -281,6 +281,16 @@ func (u *unit) dataflow(s *Spec) error {
 			dates = append(dates, d.field)
 		}
 	}
+	dates = slices.DeleteFunc(dates, func(f string) bool { return u.c.produced[f] })
+	numbers = slices.DeleteFunc(numbers, func(f string) bool { return u.c.produced[f] })
+	for _, t := range s.Transform {
+		// A time unit transform reads its field as dates.
+		if f := t.fields(); t.Has("timeUnit") {
+			if name, ok := f["field"].(string); ok && !slices.Contains(dates, name) {
+				dates = append(dates, name)
+			}
+		}
+	}
 	if f := u.pathSortField(); f != "" && u.data != nil && u.data.values {
 		// A path through inline values reads the field it is sorted by as
 		// numbers.

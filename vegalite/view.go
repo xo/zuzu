@@ -31,6 +31,9 @@ type shared struct {
 	// own holds the channels other than positions whose scales a view of
 	// a concatenation keeps for itself, as an independent resolve asks.
 	own map[string]bool
+	// sharedPos holds the channels of position whose scales the views of
+	// a concatenation share, as a shared resolve asks.
+	sharedPos map[string]bool
 	// common holds the scales that the views of a concatenation share, such
 	// as color, and nil when the view shares none.
 	common *shared
@@ -83,7 +86,7 @@ func (v *view) sn(ch string) string {
 	if v.independent[ch] {
 		return v.indepPrefix + ch
 	}
-	if v.scalePrefix != "" && (isPositional(ch) || v.prefixAll || v.own[ch]) {
+	if v.scalePrefix != "" && (isPositional(ch) && !v.sharedPos[ch] || v.prefixAll || v.own[ch]) {
 		return v.scalePrefix + ch
 	}
 	return ch
@@ -165,7 +168,7 @@ func (v *view) scaleType(ch string) string {
 // its domain. It reports false when the spec turns the scale off with
 // "scale": null.
 func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bool {
-	if v.common != nil && !isPositional(name) && !v.own[name] {
+	if v.common != nil && (!isPositional(name) || v.sharedPos[name]) && !v.own[name] {
 		return (&view{shared: v.common}).addScale(u, name, d, fields)
 	}
 	var props map[string]any

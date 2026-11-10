@@ -75,6 +75,9 @@ type compiler struct {
 	shareSources bool
 	// shared holds the sources that several views share after a merge.
 	shared map[string]bool
+	// produced holds the fields that the transforms of a layer make, which
+	// its views do not parse.
+	produced map[string]bool
 	// flattens are the expressions that flatten the fields inside objects
 	// before the transforms of a view.
 	flattens []string
@@ -220,11 +223,29 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 	case len(s.Layer) > 0:
 		if len(s.Transform) > 0 {
 			src = c.derive(src)
+			// A time unit transform reads its field as dates.
+			var dates []string
+			for _, t := range s.Transform {
+				if f := t.fields(); t.Has("timeUnit") {
+					if name, ok := f["field"].(string); ok {
+						dates = append(dates, name)
+					}
+				}
+			}
+			c.parseFields(src, dates, "date")
 			if err := c.transforms(src, s.Transform, path+"/transform"); err != nil {
 				return err
 			}
+			// The layers do not parse the fields that the transforms make.
+			prev := c.produced
+			c.produced = maps.Clone(prev)
+			if c.produced == nil {
+				c.produced = map[string]bool{}
+			}
+			maps.Copy(c.produced, producedFields(s.Transform))
+			defer func() { c.produced = prev }()
 		}
-		if src != nil && !src.open && !s.expanded && len(s.Layer) > 1 && len(s.Transform) == 0 {
+		if src != nil && (src.values || len(c.data[src.index].Source.List) > 0) && !src.open && !s.expanded && len(s.Layer) > 1 && len(s.Transform) == 0 {
 			// A layer over inline values has a dataset of its own, which
 			// vega-lite.js names and later removes, so its number is
 			// taken, unless the layers end up with one dataset.

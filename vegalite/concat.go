@@ -77,15 +77,18 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		}
 	}
 	c.shareSources = true
-	own := map[string]bool{}
+	own, sharedPos := map[string]bool{}, map[string]bool{}
 	if len(s.Resolve) > 0 {
 		var r struct {
 			Scale map[string]string `json:"scale"`
 		}
 		if json.Unmarshal(s.Resolve, &r) == nil {
 			for ch, mode := range r.Scale {
-				if mode == "independent" && !isPositional(ch) {
+				switch {
+				case mode == "independent" && !isPositional(ch):
 					own[ch] = true
+				case mode == "shared" && isPositional(ch):
+					sharedPos[ch] = true
 				}
 			}
 		}
@@ -101,7 +104,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		}
 		v := newView(cell.prefix, c.cfg)
 		v.scalePrefix = cell.prefix
-		v.own = own
+		v.own, v.sharedPos = own, sharedPos
 		v.common = common.shared
 		v.sizeNames = [2]string{cell.prefix + "width", cell.prefix + "height"}
 		if err := c.view(cell.spec, v, src, p, cell.repeat); err != nil {
