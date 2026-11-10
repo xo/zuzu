@@ -87,7 +87,11 @@ type scaleComp struct {
 	props map[string]any
 	// bins is the signal of the bins of a binned field.
 	bins string
-	mark string
+	// offset is the range of a scale of an offset: "band" for the band of
+	// the scale of its position, "step" for steps of 20 pixels, and
+	// "center" around the middle of the view when there is no position.
+	offset string
+	mark   string
 	// titles are the titles of the fields that the scale draws, for its
 	// guide.
 	titles []string
@@ -146,6 +150,12 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 		v.order = append(v.order, name)
 	}
 	maps.Copy(s.props, props)
+	if s.typ == "point" && (name == "x" || name == "y") {
+		if o := u.ch[name+"Offset"]; o != nil && o.isField() {
+			// A position split by an offset has bands.
+			s.typ = "band"
+		}
+	}
 	if s.typ == "point" && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" || u.mark == "rule") {
 		// A discrete scale that a bar draws on has bands, whatever drew
 		// on it first.
@@ -187,7 +197,7 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 	}
 	switch u.mark {
 	case "bar", "area", "rect", "rule", "tick", "trail", "line":
-		if (name == "x" || name == "y") && name == u.dimension() && u.mark != "line" && u.mark != "trail" {
+		if (name == "x" || name == "y") && name == u.dimension() {
 			s.dimension = true
 		}
 	}
@@ -283,7 +293,7 @@ func scaleTypeOf(ch string, d *channelDef, mark string, props map[string]any) (s
 	switch {
 	case ch == "x" || ch == "y" || ch == "xOffset" || ch == "yOffset":
 		switch {
-		case discrete && (mark == "bar" || mark == "rect" || mark == "tick" || mark == "rule" || ch == "xOffset" || ch == "yOffset"):
+		case discrete && (mark == "bar" || mark == "rect" || mark == "tick" || mark == "rule"):
 			typ = "band"
 		case discrete:
 			typ = "point"
@@ -517,7 +527,7 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	// The other properties.
 	positional := s.channel == "x" || s.channel == "y"
 	quant := !s.discrete && s.typ != "time" && s.typ != "utc"
-	if positional && quant && s.bins == "" {
+	if positional && quant && s.bins == "" && s.props["domain"] == nil {
 		vs.Nice = lit(true)
 	}
 	if positional && !s.discrete && s.padded && s.props["padding"] == nil {
@@ -709,7 +719,7 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 			return vega.ScaleRange{Step: vega.Value{Signal: v.sn("x") + "_step"}}
 		}
 		if s.channel == "xOffset" {
-			return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "bandwidth('" + v.sn("x") + "')"}}}
+			return offsetRange(s, "bandwidth('"+v.sn("x")+"')", "width")
 		}
 		return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: v.sizeName(0)}}}
 	case "y", "yOffset":
@@ -717,7 +727,7 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 			return vega.ScaleRange{Step: vega.Value{Signal: v.sn("y") + "_step"}}
 		}
 		if s.channel == "yOffset" {
-			return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "bandwidth('" + v.sn("y") + "')"}}}
+			return offsetRange(s, "bandwidth('"+v.sn("y")+"')", "height")
 		}
 		return vega.ScaleRange{Values: []vega.Value{{Signal: v.sizeName(1)}, lit(0)}}
 	case "color", "fill", "stroke":
@@ -984,4 +994,16 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 // discrete values.
 func discretizing(typ string) bool {
 	return typ == "quantize" || typ == "quantile" || typ == "threshold"
+}
+
+// offsetRange returns the range of the scale of an offset: the band of the
+// position, steps, or the size of the view around its middle.
+func offsetRange(s *scaleComp, band, size string) vega.ScaleRange {
+	switch s.offset {
+	case "step":
+		return vega.ScaleRange{Step: lit(20)}
+	case "center":
+		return vega.ScaleRange{Values: []vega.Value{{Signal: "-" + size + "/2"}, {Signal: size + "/2"}}}
+	}
+	return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: band}}}
 }

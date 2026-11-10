@@ -276,16 +276,26 @@ func (u *unit) dataflow(s *Spec) error {
 			dates = append(dates, d.field)
 		}
 	}
+	if f := u.pathSortField(); f != "" && u.data != nil && u.data.values {
+		// A path through inline values reads the field it is sorted by as
+		// numbers.
+		numbers = append(numbers, f)
+	}
 	needs := len(s.Transform) > 0
 	for _, d := range u.allChannels() {
 		if d.bin != nil || d.units != nil || d.aggregate != "" {
 			needs = true
 		}
+		if d.def != nil {
+			if _, ok := valueOf(d.def.Sort).([]any); ok {
+				needs = true
+			}
+		}
 	}
 	if u.stack != "" || len(u.invalidFields()) > 0 {
 		needs = true
 	}
-	if u.data != nil && u.data.values && len(dates) > 0 {
+	if u.data != nil && u.data.values && len(dates)+len(numbers) > 0 {
 		// Inline values parse their dates with formulas, in a dataset that
 		// derives from them.
 		needs = true
@@ -837,4 +847,25 @@ func propRef(v any) map[string]any {
 		}
 	}
 	return map[string]any{"value": v}
+}
+
+// pathSortField returns the field that sorts the points of a line, an area
+// or a trail: the quantitative field of x, or of y for a horizontal area,
+// when no order channel sorts them.
+func (u *unit) pathSortField() string {
+	if !isPath(u.mark) {
+		return ""
+	}
+	if o := u.ch["order"]; o != nil {
+		return ""
+	}
+	ch := "x"
+	if u.mark == "area" && u.orient == "horizontal" {
+		ch = "y"
+	}
+	d := u.ch[ch]
+	if d == nil || !d.isField() || d.typ != quantitative || d.aggregate != "" || d.bin != nil {
+		return ""
+	}
+	return d.field
 }

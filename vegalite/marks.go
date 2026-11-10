@@ -204,6 +204,18 @@ func (u *unit) axis(e enc, ch, size string) {
 	d2 := u.ch[ch+"2"]
 	p, p2, pc := ch, ch+"2", ch+"c"
 	if d == nil {
+		if r := u.offsetRef(ch, false); r != nil {
+			// The offset places the marks around the middle of the view.
+			mid := "width"
+			if ch == "y" {
+				mid = "height"
+			}
+			e.set(p, map[string]any{"signal": mid, "mult": 0.5, "offset": r})
+			if u.mark == "bar" || u.mark == "rect" || u.mark == "tick" {
+				e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + u.v.sn(ch+"Offset") + "'))"})
+			}
+			return
+		}
 		switch {
 		case ch == "x" && (u.mark == "bar" || u.mark == "rect" || u.mark == "rule" && u.ch["y"] != nil && u.ch["x2"] == nil):
 			if u.mark == "rule" {
@@ -297,7 +309,20 @@ func (u *unit) axis(e enc, ch, size string) {
 		}
 		if sz != nil && u.mark != "rect" {
 			r := ref(d.out)
-			r["band"] = 0.5
+			if u.mark == "tick" {
+				if o := u.offsetRef(ch, false); o != nil {
+					// Ticks fill the band of their offset.
+					r["offset"] = o
+					e.set(p, r)
+					e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + u.v.sn(ch+"Offset") + "'))"})
+					return
+				}
+			}
+			if o := u.offsetRef(ch, true); o != nil {
+				r["offset"] = o
+			} else {
+				r["band"] = 0.5
+			}
 			e.set(pc, r)
 			e.set(size, map[string]any{"value": sz})
 			return
@@ -315,7 +340,11 @@ func (u *unit) axis(e enc, ch, size string) {
 		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + band + "'))"})
 	case discrete && u.v.scaleType(ch) == "band":
 		r := ref(d.out)
-		r["band"] = 0.5
+		if o := u.offsetRef(ch, u.v.scaleType(ch+"Offset") != "point"); o != nil {
+			r["offset"] = o
+		} else {
+			r["band"] = 0.5
+		}
 		e.set(p, r)
 	case u.mark == "tick" && u.measure() == ch:
 		e.set(pc, ref(d.out))
@@ -465,4 +494,30 @@ func (u *unit) others(e enc) {
 		e.set("url", map[string]any{"field": d.out})
 	}
 	_ = expr.String
+}
+
+// offsetRef adds the scale of the offset of a channel of position, and returns
+// the reference that moves a mark by it, in the middle of its band when
+// band is true. It returns nil when the channel has no offset.
+func (u *unit) offsetRef(ch string, band bool) map[string]any {
+	o := u.ch[ch+"Offset"]
+	if o == nil || !o.isField() {
+		return nil
+	}
+	if !u.v.addScale(u, ch+"Offset", o, []string{o.out}) {
+		return nil
+	}
+	if s := u.v.scales[ch+"Offset"]; s != nil && s.offset == "" {
+		switch {
+		case u.ch[ch] == nil:
+			s.offset = "center"
+		case u.mark != "bar" && u.mark != "rect":
+			s.offset = "step"
+		}
+	}
+	r := map[string]any{"scale": u.v.sn(ch + "Offset"), "field": o.out}
+	if band {
+		r["band"] = 0.5
+	}
+	return r
 }
