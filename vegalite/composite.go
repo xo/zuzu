@@ -452,8 +452,15 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 		"layer": append([]any{rule(lw, lb), rule(ub, uw)}, ticks...),
 	}
 	_ = other
+	first := map[string]any{"transform": []any{join}, "layer": []any{outliers, whiskers}}
+	if o, ok := props["outliers"].(bool); ok && !o {
+		// The spec asks for no outliers, so the whiskers alone follow the
+		// quartiles, in one layer.
+		ts, _ := whiskers["transform"].([]any)
+		first = map[string]any{"transform": append([]any{join}, ts...), "layer": whiskers["layer"]}
+	}
 	return map[string]any{"layer": []any{
-		map[string]any{"transform": []any{join}, "layer": []any{outliers, whiskers}},
+		first,
 		map[string]any{
 			"transform": []any{agg([]string{"q1", "q3", "median", "min", "max"}, []string{lb, ub, mb, "min_" + field, "max_" + field})},
 			"layer":     []any{boxLayer, median},

@@ -26,6 +26,7 @@ func (c *compiler) mergeIdentical(out *vega.Spec, read map[string]bool) bool {
 
 // mergeOnce makes one merge, and reports whether it made one.
 func (c *compiler) mergeOnce(out *vega.Spec, read map[string]bool) bool {
+	ticks := boxplotTicks(out.Marks)
 	children := map[string][]int{}
 	for i, d := range c.data {
 		if len(d.Source.List) == 1 {
@@ -36,7 +37,7 @@ func (c *compiler) mergeOnce(out *vega.Spec, read map[string]bool) bool {
 		kids := children[p.Name]
 		seen := map[string]int{}
 		for _, k := range kids {
-			if invalidFilter(c.data[k].Transform) && !c.shared[p.Name] {
+			if invalidFilter(c.data[k].Transform) && !c.shared[p.Name] && !ticks[c.data[k].Name] {
 				// Only the views that share a source share their filters
 				// of invalid values.
 				continue
@@ -514,4 +515,22 @@ func shiftedUnits(ts []vega.Transform) bool {
 	}
 	var as string
 	return json.Unmarshal(ts[1].Params["as"], &as) == nil && strings.HasSuffix(as, "_offsetted_rect_start")
+}
+
+// boxplotTicks returns the datasets that the whiskers of a box plot and
+// their ticks read. vega-lite.js merges the filter of a tick with the same
+// filter of its whisker.
+func boxplotTicks(ms []vega.Mark) map[string]bool {
+	out := map[string]bool{}
+	var walk func(ms []vega.Mark)
+	walk = func(ms []vega.Mark) {
+		for _, m := range ms {
+			if m.From != nil && (slices.Contains(m.Style.List, "boxplot-ticks") || slices.Contains(m.Style.List, "boxplot-rule")) {
+				out[m.From.Data] = true
+			}
+			walk(m.Marks)
+		}
+	}
+	walk(ms)
+	return out
 }
