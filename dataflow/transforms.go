@@ -30,6 +30,7 @@ var transforms = map[string]transformFunc{
 	"countpattern":      countpattern,
 	"dotbin":            dotbin,
 	"force":             force,
+	"label":             label,
 	"geojson":           geojson,
 	"geopath":           geopath,
 	"geopoint":          geopoint,

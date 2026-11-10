@@ -49,7 +49,8 @@ On the 540 specs of the first target, its datasets, scales and marks match
 those of vega.js for 99 percent of the specs. zuzu compiles a Vega-Lite spec
 itself (phase 4), and its result matches for 98 percent of the 470
 Vega-Lite specs. Phase 5 added the transforms of statistics, hierarchies,
-maps and contours.
+maps, contours and labels, and the transforms and the scale of zuzu for
+sankeys, chord diagrams, hex bins and trading days.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.
 

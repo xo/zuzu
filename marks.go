@@ -44,6 +44,7 @@ func (s *scope) buildMarks(path string) ([]scene.Mark, error) {
 		out = append(out, *sm)
 		if m.Name != "" {
 			s.markItems[m.Name] = sm.Items
+			s.markTypes[m.Name] = sm.Type
 		}
 	}
 	return out, nil
@@ -84,6 +85,7 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			return nil, err
 		}
 		geometry(m.Type, st)
+		s.rt.defaultPaint(m.Type, st)
 		states[i] = st
 	}
 	if len(m.Transform) > 0 {
@@ -185,7 +187,7 @@ func (s *scope) markData(m *vega.Mark) ([]any, [][]dataflow.Row, error) {
 		if items, ok := s.findMarkItems(m.From.Data); ok && errors.Is(err, ErrUnknownName) {
 			out := make([]any, len(items))
 			for i := range items {
-				out[i] = itemDatum(&items[i])
+				out[i] = s.itemDatum(s.findMarkType(m.From.Data), &items[i])
 			}
 			return out, nil, nil
 		}
@@ -199,12 +201,27 @@ func (s *scope) markData(m *vega.Mark) ([]any, [][]dataflow.Row, error) {
 }
 
 // itemDatum returns an item as a datum, for a mark whose data is another
-// mark.
-func itemDatum(it *scene.Item) map[string]any {
-	return map[string]any{
+// mark, with its bounds, as Vega gives them.
+func (s *scope) itemDatum(typ string, it *scene.Item) map[string]any {
+	d := map[string]any{
 		"datum": it.Datum, "x": it.X, "y": it.Y, "x2": it.X2, "y2": it.Y2,
 		"width": it.Width, "height": it.Height, "text": textValue(it.Text),
 	}
+	if b := s.rt.style().ItemBounds(typ, it); !b.IsEmpty() {
+		d["bounds"] = map[string]any{"x1": b.X1, "y1": b.Y1, "x2": b.X2, "y2": b.Y2}
+	}
+	return d
+}
+
+// findMarkType returns the kind of a named mark of this scope or a scope
+// above.
+func (s *scope) findMarkType(name string) string {
+	for sc := s; sc != nil; sc = sc.parent {
+		if t, ok := sc.markTypes[name]; ok {
+			return t
+		}
+	}
+	return ""
 }
 
 // textValue returns the text of an item as a value.
@@ -660,10 +677,44 @@ func setItem(it *scene.Item, r dataflow.Row) {
 	if v, ok := r["font"].(string); ok {
 		it.Font = v
 	}
+	if v, ok := r["opacity"].(float64); ok && !math.IsNaN(v) {
+		it.Opacity = &v
+	}
+	if v, ok := r["align"].(string); ok {
+		it.Align = v
+	}
+	if v, ok := r["baseline"].(string); ok {
+		it.Baseline = v
+	}
 	if v, ok := r["fontStyle"].(string); ok {
 		it.FontStyle = v
 	}
 	if v, ok := r["fontWeight"]; ok && v != nil {
 		it.FontWeight = scene.Weight(expr.String(v))
+	}
+}
+
+// defaultPaint paints an item whose encodings set neither a fill nor a
+// stroke, as the config of Vega does, in the colors of the theme: the first
+// color of the series fills an arc, an area, a rect, a symbol and a trail,
+// and strokes a line, a path and a shape. The text color strokes a rule and
+// fills a text.
+func (rt *runtime) defaultPaint(typ string, st *itemState) {
+	if st.set["fill"] || st.set["stroke"] {
+		return
+	}
+	color := ""
+	if len(rt.theme.Category) > 0 {
+		color = rt.theme.Category[0]
+	}
+	switch typ {
+	case scene.Arc, scene.Area, scene.Rect, scene.Symbol, scene.Trail:
+		st.it.Fill = scene.Paint{Color: color}
+	case scene.Line, scene.Path, scene.Shape:
+		st.it.Stroke = scene.Paint{Color: color}
+	case scene.Rule:
+		st.it.Stroke = scene.Paint{Color: rt.theme.Text}
+	case scene.Text:
+		st.it.Fill = scene.Paint{Color: rt.theme.Text}
 	}
 }

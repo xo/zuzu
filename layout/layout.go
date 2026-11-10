@@ -93,6 +93,24 @@ func (s Style) MarkBounds(m *scene.Mark) Bounds {
 	return b
 }
 
+// ItemBounds returns the bounds of an item of a kind of mark, in the
+// coordinates of the group that holds it.
+func (s Style) ItemBounds(typ string, it *scene.Item) Bounds {
+	return s.itemBounds(typ, it)
+}
+
+// TextSize returns the width and the height of the text of an item, as the
+// writer draws it.
+func (s Style) TextSize(it *scene.Item) (float64, float64) {
+	t := *it
+	t.X, t.Y, t.Dx, t.Dy, t.Angle, t.Align, t.Baseline = 0, 0, 0, 0, 0, "left", "top"
+	b := s.textBounds(&t)
+	if b.IsEmpty() {
+		return 0, 0
+	}
+	return b.X2 - b.X1, b.Y2 - b.Y1
+}
+
 // font returns the font of a label at a size and a weight.
 func (s Style) font(size float64, weight int) text.Font {
 	return text.Font{Family: text.Family, Size: size, Weight: weight}

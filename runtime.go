@@ -139,6 +139,8 @@ type scope struct {
 	// markItems holds the items of each named mark, for a mark whose data
 	// is another mark.
 	markItems map[string][]scene.Item
+	// markTypes holds the kind of each named mark.
+	markTypes map[string]string
 	// projections holds the projections of the scope, which are made when
 	// first used.
 	projections map[string]*projState
@@ -178,6 +180,7 @@ func (rt *runtime) newScope(parent *scope, spec *vega.Scope, path string, datum 
 		scales:    map[string]*scaleState{},
 		producers: map[string]string{},
 		markItems: map[string][]scene.Item{},
+		markTypes: map[string]string{},
 
 		projections: map[string]*projState{},
 	}
@@ -626,6 +629,36 @@ func (e *dataEnv) Projection(name string) (*geo.Projection, error) {
 	return e.s.projection(name)
 }
 
+// TextSize returns the width and the height of a text as the writer draws
+// it, for the transform label.
+func (e *dataEnv) TextSize(txt any, font string, size float64, weight string) (float64, float64) {
+	it := &scene.Item{Font: font, FontSize: size, FontWeight: scene.Weight(weight)}
+	switch t := txt.(type) {
+	case []any:
+		for _, l := range t {
+			it.Text = append(it.Text, expr.String(l))
+		}
+	default:
+		it.Text = scene.Lines{expr.String(t)}
+	}
+	return e.s.rt.style().TextSize(it)
+}
+
+// MarkShapes returns the kind of a named mark and its items, each with its
+// place and its bounds, for the transform label to avoid.
+func (e *dataEnv) MarkShapes(name string) (string, []dataflow.Row, bool) {
+	items, ok := e.s.findMarkItems(name)
+	if !ok {
+		return "", nil, false
+	}
+	typ := e.s.findMarkType(name)
+	out := make([]dataflow.Row, len(items))
+	for i := range items {
+		out[i] = e.s.itemDatum(typ, &items[i])
+	}
+	return typ, out, true
+}
+
 // number reads a value as a number, with def for null or undefined.
 func number(v any, def float64) float64 {
 	if v == nil || expr.IsUndefined(v) {
@@ -666,7 +699,7 @@ func (s *scope) datasetOrItems(name string) ([]dataflow.Row, error) {
 	}
 	out := make([]dataflow.Row, len(items))
 	for i := range items {
-		out[i] = itemDatum(&items[i])
+		out[i] = s.itemDatum(s.findMarkType(name), &items[i])
 	}
 	return out, nil
 }

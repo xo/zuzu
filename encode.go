@@ -369,8 +369,10 @@ func setProp(st *itemState, name string, v any) {
 		st.set[name] = true
 	case "fill":
 		it.Fill = paint(v)
+		st.set[name] = true
 	case "stroke":
 		it.Stroke = paint(v)
+		st.set[name] = true
 	case "opacity":
 		it.Opacity = ptr()
 	case "fillOpacity":

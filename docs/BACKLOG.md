@@ -19,27 +19,9 @@ name to it.
 
 ## Phase 1
 
-### Review the writer against the targets
-
-`go run ./cmd/targets` in the test module rebuilds each target as a scene
-graph, writes it with `svg`, and writes `docs/targets/compare.html`, which
-shows each target beside the output of zuzu. On 2026-11-10, 104 of the 106
-targets differed by at most 0.04 percent of their pixels. The flowchart, in
-both modes, scales a group, which a scene graph does not hold. The exit of
-phase 1 is that a maintainer accepts the page.
-
-The targets were drawn with d3, so a curve, an area or an arc of a target is
-a path in its scene graph. The comparison checks the paint, the text, the
-groups, the gradients, the symbols, the rects and the rules of the writer.
-The curves, the arcs and the trails of the writer have their own tests
-against d3, in `svg/shapes_test.go`.
-
 ### Draw what the writer does not draw yet
 
-1. The mark `shape` returns an error. Vega draws it with a function that the
-   JSON of a scene graph cannot hold, so the runtime of zuzu writes a path
-   mark in its place.
-2. The interpolations `basis-open`, `basis-closed`, `cardinal-open`,
+1. The interpolations `basis-open`, `basis-closed`, `cardinal-open`,
    `cardinal-closed`, `catmull-rom-open` and `catmull-rom-closed` return an
    error.
 
@@ -51,7 +33,9 @@ it yet. The runtime reads the colors of `theme.Theme` directly: the guides,
 the background, and the ranges `category`, `ordinal`, `ramp`, `heatmap` and
 `diverging`. A scheme that a spec names, such as `blues`, takes a ramp of the
 theme, and a scheme of categories, such as `tableau10`, takes the colors of
-the categories of the theme.
+the categories of the theme. A mark of a Vega spec that sets neither a
+fill nor a stroke takes the first color of the categories of the theme, or
+its text color.
 
 ## Phase 3
 

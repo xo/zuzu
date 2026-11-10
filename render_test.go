@@ -209,3 +209,81 @@ func TestRenderVegaLite(t *testing.T) {
 		t.Errorf("SVG = %v", err)
 	}
 }
+
+// findMark returns the first mark of a name in a scene.
+func findMark(m *scene.Mark, name string) *scene.Mark {
+	if m.Name == name {
+		return m
+	}
+	for i := range m.Items {
+		for j := range m.Items[i].Items {
+			if f := findMark(&m.Items[i].Items[j], name); f != nil {
+				return f
+			}
+		}
+	}
+	return nil
+}
+
+// TestLabelMarks runs the transform label on the text of the items of a
+// mark, and checks the places that it writes back, and the default paint of
+// a mark that sets none.
+func TestLabelMarks(t *testing.T) {
+	t.Parallel()
+	src := []byte(`{"$schema": "https://vega.github.io/schema/vega/v5.json",
+		"width": 200, "height": 100,
+		"data": [{"name": "d", "values": [{"x": 50, "y": 50, "t": "first"}, {"x": 190, "y": 50, "t": "second"}, {"x": 100, "y": 4, "t": "a text too long to fit anywhere at all"}]}],
+		"marks": [
+			{"name": "points", "type": "symbol", "from": {"data": "d"},
+				"encode": {"enter": {"x": {"field": "x"}, "y": {"field": "y"}, "size": {"value": 16}}}},
+			{"name": "base", "type": "rule",
+				"encode": {"enter": {"x": {"value": 0}, "x2": {"value": 200}, "y": {"value": 90}}}},
+			{"name": "labels", "type": "text", "from": {"data": "points"},
+				"encode": {"enter": {"text": {"field": "datum.t"}}},
+				"transform": [{"type": "label", "size": {"signal": "[width, height]"}, "anchor": ["right", "left"], "avoidMarks": ["base"]}]}
+		]}`)
+	c, _, err := Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _, err := c.NewView(t.Context(), WithLocation(time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := &v.Scene().Root
+	labels := findMark(root, "labels")
+	if labels == nil || len(labels.Items) != 3 {
+		t.Fatalf("labels = %v, want a mark of 3 items", labels)
+	}
+	// The first label goes to the right of its point, which has a radius
+	// of 2, and the second, at the right edge, goes to the left.
+	for i, want := range []struct {
+		x       float64
+		align   string
+		opacity float64
+	}{{53, "left", 1}, {187, "right", 1}, {0, "", 0}} {
+		it := labels.Items[i]
+		if it.Opacity == nil || *it.Opacity != want.opacity {
+			t.Errorf("label %d: the opacity is %v, want %v", i, it.Opacity, want.opacity)
+		}
+		if want.opacity == 0 {
+			continue
+		}
+		if it.X != want.x || it.Align != want.align || it.Baseline != "middle" {
+			t.Errorf("label %d: x %v, align %q, baseline %q, want %v, %q, middle", i, it.X, it.Align, it.Baseline, want.x, want.align)
+		}
+	}
+	points, base := findMark(root, "points"), findMark(root, "base")
+	if points == nil || base == nil {
+		t.Fatal("no points or no base")
+	}
+	if p := points.Items[0].Fill.Color; p == "" {
+		t.Error("a symbol with no fill and no stroke has no default fill")
+	}
+	if s := base.Items[0].Stroke.Color; s == "" {
+		t.Error("a rule with no stroke has no default stroke")
+	}
+	if s := points.Items[0].Stroke; !s.IsZero() {
+		t.Errorf("the symbol has the stroke %v, want none", s)
+	}
+}

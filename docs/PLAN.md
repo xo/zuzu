@@ -447,8 +447,8 @@ draws every kind of mark of Vega but `shape`, with the curves, the symbols
 and the arcs of d3-shape, and its golden files render in okage. The tier 0
 targets are golden tests as scene graphs, and `docs/targets/compare.html`,
 which the test module writes, shows each target beside the output of zuzu.
-The exit waits for a maintainer to accept that page. "Phase 1" in
-[`BACKLOG.md`](BACKLOG.md) says how to make it.
+A maintainer accepted that page on 2026-11-11, so phase 1 is done. The
+writer draws the mark `shape` as a path, since phase 5.
 
 ### Phase 2. Text
 
@@ -655,7 +655,27 @@ Vega spec in `test/testdata/targets`, which zuzu draws in the strict mode
 with no issue, and a test runs them. A spec follows its target where Vega
 has the means. The streamgraph stacks around the middle, because Vega has
 no offset that wiggles, and the violin estimates with the Gaussian kernel
-of `kde`. The transform `label` is not done.
+of `kde`.
+
+On 2026-11-11 the transform `label` exists, and phase 5 is done. vega.js
+needs a canvas for `label`, so Node.js gives no reference for the places,
+and a test of the package `dataflow` checks them instead. zuzu chose these
+rules where the documents of Vega say nothing (D6):
+
+- A label covers no pixel that a mark to avoid or an earlier label covers.
+  A bitmap with one cell for each pixel holds them. The bounds of an item
+  mark it, a line and a trail mark the cells along their path, and an area
+  marks the cells inside its shape.
+- zuzu measures a label as the writer draws it, with the fonts of zuzu.
+- Each offset tries each anchor in order, and a label takes the first place
+  that is free and inside the size. A label in the middle needs only to fit
+  inside its item and to cover no earlier label.
+- The methods `floodfill` and `reduced-search`, and the parameters
+  `lineAnchor` and `markIndex`, are issues in the loose mode.
+
+A mark of a Vega spec that sets neither a fill nor a stroke takes the paint
+that the config of Vega gives it, in the colors of the theme: the first
+color of the categories, or the text color for a rule and a text.
 
 ### Phase 6. The direct okage renderer
 
