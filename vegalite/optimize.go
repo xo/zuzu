@@ -82,7 +82,7 @@ func (c *compiler) mergePrefix(out *vega.Spec, read map[string]bool, kids []int)
 	var group []int
 	for _, k := range kids {
 		ts := c.data[k].Transform
-		if len(ts) == 0 || invalidFilter(ts[:1]) || ts[0].Type == "lookup" {
+		if len(ts) == 0 || invalidFilter(ts[:1]) || ts[0].Type == "lookup" || shiftedUnits(ts) {
 			// vega-lite.js keeps a lookup in each view that has one.
 			continue
 		}
@@ -472,4 +472,15 @@ func renameDomain(d *vega.DataRef, rename func(string) string) {
 			d.Fields[i] = m
 		}
 	}
+}
+
+// shiftedUnits reports whether a list of transforms starts with the end of
+// a time unit that the shift of a bar follows. vega-lite.js makes the two
+// in one step, which does not merge with the end of a time unit alone.
+func shiftedUnits(ts []vega.Transform) bool {
+	if len(ts) < 2 || ts[1].Type != "formula" {
+		return false
+	}
+	var as string
+	return json.Unmarshal(ts[1].Params["as"], &as) == nil && strings.HasSuffix(as, "_offsetted_rect_start")
 }

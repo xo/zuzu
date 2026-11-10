@@ -415,6 +415,9 @@ type dataNode struct {
 	values bool
 	// graticule says that the source is the lines of a graticule.
 	graticule bool
+	// explicit holds the parse of the format of inline values, which the
+	// datasets that derive from them run as formulas.
+	explicit map[string]any
 }
 
 // name returns the name of the dataset.
@@ -518,6 +521,18 @@ func (c *compiler) source(d *Data, path string) (*dataNode, error) {
 			vd.Format.Delimiter = d.Format.Delimiter
 		}
 		vd.Format.Parse = d.Format.Parse
+		if n.values && !d.Format.Parse.IsZero() {
+			// Inline values keep their text, and the datasets that derive
+			// from them parse it with formulas, as vega-lite.js does.
+			var parse map[string]any
+			if d.Format.Parse.Decode(&parse) == nil {
+				n.explicit = parse
+				vd.Format.Parse = vega.Value{}
+				if vd.Format.Type == "" && vd.Format.Property == "" && vd.Format.Feature == "" && vd.Format.Mesh == "" {
+					vd.Format = nil
+				}
+			}
+		}
 	}
 	n.index = len(c.data)
 	n.open = !n.values && !c.shareSources
@@ -556,6 +571,7 @@ func (c *compiler) derive(src *dataNode) *dataNode {
 	c.nData++
 	n := &dataNode{index: len(c.data), parse: src.parse}
 	c.data = append(c.data, vd)
+	c.parseExplicit(src, n)
 	return n
 }
 
@@ -1006,4 +1022,47 @@ func conflictingChannels(layers []Spec) []string {
 		}
 	}
 	return out
+}
+
+// parseExplicit adds to a dataset that derives from inline values the
+// formulas that parse the fields that the format of the values names: a
+// date, a date of a format of d3-time-format in local time or in UTC, a
+// number, a boolean or a string.
+func (c *compiler) parseExplicit(src, n *dataNode) {
+	if len(src.explicit) == 0 {
+		return
+	}
+	names := make([]string, 0, len(src.explicit))
+	for f := range src.explicit {
+		names = append(names, f)
+	}
+	slices.Sort(names)
+	parsed := c.parsed[n.index]
+	if parsed == nil {
+		parsed = map[string]bool{}
+		c.parsed[n.index] = parsed
+	}
+	for _, f := range names {
+		typ, _ := src.explicit[f].(string)
+		ref := fieldRef(f)
+		var e string
+		switch {
+		case typ == "date":
+			e = "toDate(" + ref + ")"
+		case typ == "number":
+			e = "toNumber(" + ref + ")"
+		case typ == "boolean":
+			e = "toBoolean(" + ref + ")"
+		case typ == "string":
+			e = "toString(" + ref + ")"
+		case strings.HasPrefix(typ, "date:"):
+			e = "timeParse(" + ref + "," + strings.TrimPrefix(typ, "date:") + ")"
+		case strings.HasPrefix(typ, "utc:"):
+			e = "utcParse(" + ref + "," + strings.TrimPrefix(typ, "utc:") + ")"
+		default:
+			continue
+		}
+		parsed[f] = true
+		c.add(n, transform("formula", map[string]any{"expr": e, "as": f}))
+	}
 }

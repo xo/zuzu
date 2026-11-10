@@ -331,7 +331,7 @@ func (u *unit) dataflow(s *Spec) error {
 	if u.stack != "" || len(u.invalidFields()) > 0 || len(u.geo) > 0 || u.geoShape != nil {
 		needs = true
 	}
-	if u.data != nil && u.data.values && len(dates)+len(numbers) > 0 {
+	if u.data != nil && u.data.values && (len(dates)+len(numbers) > 0 || len(u.data.explicit) > 0) {
 		// Inline values parse their dates with formulas, in a dataset that
 		// derives from them.
 		needs = true
@@ -493,8 +493,10 @@ func (u *unit) spans(d *channelDef) bool {
 	case pos && (u.mark == "bar" || u.mark == "rect"):
 		return true
 	case pos && d.def != nil && !d.def.BandPosition.IsZero():
-		// A band position places the mark within the interval.
-		return true
+		// A band position places the mark within the interval. At 0 the
+		// mark sits at the start, which needs no end.
+		b, ok := valueOf(d.def.BandPosition).(float64)
+		return !ok || b != 0
 	case u.c.cfg != nil && u.c.cfg.marks[u.mark]["timeUnitBandPosition"] != nil:
 		return true
 	}
@@ -688,6 +690,10 @@ func (u *unit) addEncodingImpute(n *dataNode) error {
 func (u *unit) addTimeUnits(n *dataNode) {
 	for _, d := range u.allChannels() {
 		if d.binnedUnit {
+			if !u.spans(d) && (d.channel == "x" || d.channel == "y") {
+				// A mark at the start of the interval needs no end.
+				continue
+			}
 			unit := d.units[len(d.units)-1]
 			fn := "timeOffset"
 			if d.utc {
@@ -814,7 +820,9 @@ func (u *unit) invalidFields() []string {
 		if !isPositional(name) && (d.typ != quantitative || d.def != nil && valueOf(d.def.Scale) == nil && !d.def.Scale.IsZero()) {
 			continue
 		}
-		if d.typ == temporal && (d.units != nil || d.aggregate != "") {
+		if d.typ == temporal && (d.units != nil && !d.binnedUnit || d.aggregate != "") {
+			// A binned time unit reads the dates as they are, so the filter
+			// keeps the valid ones.
 			continue
 		}
 		if !slices.Contains(out, d.out) {

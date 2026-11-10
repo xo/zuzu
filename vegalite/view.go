@@ -195,7 +195,7 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 			s.typ = "band"
 		}
 	}
-	if s.typ == "point" && props["type"] == nil && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" || u.mark == "rule") {
+	if s.typ == "point" && props["type"] == nil && isPositional(name) && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" || u.mark == "rule") {
 		// A discrete scale that a bar draws on has bands, whatever drew
 		// on it first.
 		s.typ = "band"
@@ -604,6 +604,10 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	if positional && !s.discrete && s.padded && s.props["padding"] == nil {
 		// A bar on a continuous dimension keeps clear of the ends.
 		vs.Padding = lit(5)
+	}
+	if p, ok := s.props["padding"]; ok && !s.discrete {
+		// The padding of a continuous scale is in pixels.
+		vs.Padding = lit(p)
 	}
 	if s.discrete && (s.typ == "band" || s.typ == "point") {
 		inner, outer := s.paddings()

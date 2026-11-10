@@ -274,8 +274,14 @@ func (u *unit) axis(e enc, ch, size string) {
 		return
 	}
 	if o := u.ch[ch+"Offset"]; o != nil && o.isField() && d.units != nil && d.typ == temporal && u.spans(d) {
-		// Bars side by side within the interval of a time unit.
-		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
+		// Bars side by side within the interval of a time unit. A bar at
+		// the start of its interval reads the domain from the shifted
+		// interval.
+		fields := []string{d.out, d.outEnd}
+		if u.shifted(d) {
+			fields = []string{d.out + "_offsetted_rect_start", d.out + "_offsetted_rect_end"}
+		}
+		u.v.addScale(u, ch, d, fields)
 		r := map[string]any{"scale": u.v.sn(ch), "field": d.out}
 		band := u.v.sn(ch)
 		if u.v.addScale(u, ch+"Offset", o, []string{o.out}) {
