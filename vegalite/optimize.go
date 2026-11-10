@@ -36,7 +36,9 @@ func (c *compiler) mergeOnce(out *vega.Spec, read map[string]bool) bool {
 		kids := children[p.Name]
 		seen := map[string]int{}
 		for _, k := range kids {
-			if invalidFilter(c.data[k].Transform) {
+			if invalidFilter(c.data[k].Transform) && !c.shared[p.Name] {
+				// Only the views that share a source share their filters
+				// of invalid values.
 				continue
 			}
 			key, err := canonical(c.data[k].Transform)
@@ -208,6 +210,15 @@ func (c *compiler) renameAll(out *vega.Spec, read map[string]bool, names map[str
 		for k := range c.data[j].Source.List {
 			c.data[j].Source.List[k] = rename(c.data[j].Source.List[k])
 		}
+		for k, t := range c.data[j].Transform {
+			if t.Type != "lookup" {
+				continue
+			}
+			var from string
+			if json.Unmarshal(t.Params["from"], &from) == nil && rename(from) != from {
+				c.data[j].Transform[k].Params["from"] = mustJSON(rename(from))
+			}
+		}
 	}
 	for j := range out.Marks {
 		renameMarkData(&out.Marks[j], rename)
@@ -221,6 +232,114 @@ func (c *compiler) renameAll(out *vega.Spec, read map[string]bool, names map[str
 	}
 	clear(read)
 	maps.Copy(read, next)
+}
+
+// mergeSources merges the sources that read the same url with the same
+// format, and that take no transforms, into the first of them. The
+// sources after a merged one take the numbers one less.
+func (c *compiler) mergeSources(out *vega.Spec, read map[string]bool) {
+	for {
+		merged := false
+		seen := map[string]int{}
+		for i, d := range c.data {
+			if d.URL.IsZero() || len(d.Transform) > 0 || !strings.HasPrefix(d.Name, "source_") {
+				continue
+			}
+			format := ""
+			if d.Format != nil {
+				f := *d.Format
+				f.Parse = vega.Value{}
+				format, _ = canonical(f)
+			}
+			key, _ := canonical(d.URL)
+			key += format
+			first, ok := seen[key]
+			if !ok {
+				seen[key] = i
+				continue
+			}
+			// The parse of the merged source joins the parse of the first.
+			if d.Format != nil && !d.Format.Parse.IsZero() {
+				parse := map[string]any{}
+				if f := c.data[first].Format; f != nil && !f.Parse.IsZero() {
+					_ = f.Parse.Decode(&parse)
+				}
+				var more map[string]any
+				_ = d.Format.Parse.Decode(&more)
+				maps.Copy(parse, more)
+				c.data[first].Format.Parse = vega.Lit(parse)
+			}
+			gone := d.Name
+			n, _ := strconv.Atoi(strings.TrimPrefix(gone, "source_"))
+			c.data = append(c.data[:i], c.data[i+1:]...)
+			names := map[string]string{gone: c.data[first].Name}
+			for _, other := range c.data {
+				if m, err := strconv.Atoi(strings.TrimPrefix(other.Name, "source_")); err == nil && strings.HasPrefix(other.Name, "source_") && m > n {
+					names[other.Name] = "source_" + strconv.Itoa(m-1)
+				}
+			}
+			c.nSource--
+			c.renameAll(out, read, names)
+			if c.shared == nil {
+				c.shared = map[string]bool{}
+			}
+			c.shared[c.data[first].Name] = true
+			merged = true
+			break
+		}
+		if !merged {
+			return
+		}
+	}
+}
+
+// liftBins moves the extents and the bins that start the datasets derived
+// from a dataset into that dataset, when two or more of them start so, as
+// vega-lite.js does: those of the last dataset first.
+func (c *compiler) liftBins(out *vega.Spec, read map[string]bool) {
+	children := map[string][]int{}
+	for i, d := range c.data {
+		if len(d.Source.List) == 1 {
+			children[d.Source.List[0]] = append(children[d.Source.List[0]], i)
+		}
+	}
+	startsWithBin := func(ts []vega.Transform) bool {
+		return len(ts) >= 2 && ts[0].Type == "extent" && ts[1].Type == "bin"
+	}
+	for pi, p := range c.data {
+		var kids []int
+		for _, k := range children[p.Name] {
+			if startsWithBin(c.data[k].Transform) {
+				kids = append(kids, k)
+			}
+		}
+		if len(kids) < 2 || len(kids) != len(children[p.Name]) {
+			continue
+		}
+		order := append([]int{kids[len(kids)-1]}, kids[:len(kids)-1]...)
+		for _, k := range order {
+			for startsWithBin(c.data[k].Transform) {
+				c.data[pi].Transform = append(c.data[pi].Transform, c.data[k].Transform[:2]...)
+				c.data[k].Transform = c.data[k].Transform[2:]
+			}
+		}
+		// The datasets take their numbers in the same order.
+		var numbers []int
+		for _, k := range kids {
+			if n, ok := dataNumber(c.data[k].Name); ok {
+				numbers = append(numbers, n)
+			}
+		}
+		if len(numbers) == len(kids) {
+			slices.Sort(numbers)
+			names := map[string]string{}
+			for i, k := range order {
+				names[c.data[k].Name] = "data_" + strconv.Itoa(numbers[i])
+			}
+			c.renameAll(out, read, names)
+		}
+	}
+	c.removeEmpty(read)
 }
 
 // release frees the number that a layer over a dataset took when the

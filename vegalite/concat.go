@@ -58,10 +58,36 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		}
 		src = d
 	}
+	readers := 0
+	for _, cell := range cells {
+		if cell.spec.Data == nil {
+			readers++
+		}
+	}
+	if src != nil && src.values && readers > 1 && len(s.Transform) == 0 {
+		// Views over inline values have a dataset of their own, which
+		// vega-lite.js names and later removes, so its number is taken.
+		c.reserved = append(c.reserved, reservation{data: c.name(src), number: c.nData})
+		c.nData++
+	}
 	if len(s.Transform) > 0 {
 		src = c.derive(src)
 		if err := c.transforms(src, s.Transform, path+"/transform"); err != nil {
 			return err
+		}
+	}
+	c.shareSources = true
+	own := map[string]bool{}
+	if len(s.Resolve) > 0 {
+		var r struct {
+			Scale map[string]string `json:"scale"`
+		}
+		if json.Unmarshal(s.Resolve, &r) == nil {
+			for ch, mode := range r.Scale {
+				if mode == "independent" && !isPositional(ch) {
+					own[ch] = true
+				}
+			}
 		}
 	}
 	common := newView("", c.cfg)
@@ -75,6 +101,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		}
 		v := newView(cell.prefix, c.cfg)
 		v.scalePrefix = cell.prefix
+		v.own = own
 		v.common = common.shared
 		v.sizeNames = [2]string{cell.prefix + "width", cell.prefix + "height"}
 		if err := c.view(cell.spec, v, src, p, cell.repeat); err != nil {

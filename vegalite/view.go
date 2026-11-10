@@ -28,6 +28,9 @@ type shared struct {
 	// prefixAll says that the prefix names every scale, as the name of a
 	// facet does, and not only the scales of position.
 	prefixAll bool
+	// own holds the channels other than positions whose scales a view of
+	// a concatenation keeps for itself, as an independent resolve asks.
+	own map[string]bool
 	// common holds the scales that the views of a concatenation share, such
 	// as color, and nil when the view shares none.
 	common *shared
@@ -80,7 +83,7 @@ func (v *view) sn(ch string) string {
 	if v.independent[ch] {
 		return v.indepPrefix + ch
 	}
-	if v.scalePrefix != "" && (isPositional(ch) || v.prefixAll) {
+	if v.scalePrefix != "" && (isPositional(ch) || v.prefixAll || v.own[ch]) {
 		return v.scalePrefix + ch
 	}
 	return ch
@@ -159,7 +162,7 @@ func (v *view) scaleType(ch string) string {
 // its domain. It reports false when the spec turns the scale off with
 // "scale": null.
 func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bool {
-	if v.common != nil && !isPositional(name) {
+	if v.common != nil && !isPositional(name) && !v.own[name] {
 		return (&view{shared: v.common}).addScale(u, name, d, fields)
 	}
 	var props map[string]any

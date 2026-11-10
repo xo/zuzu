@@ -70,6 +70,11 @@ type compiler struct {
 	// reserved holds the numbers of datasets that layers over inline
 	// values take.
 	reserved []reservation
+	// shareSources says that the views of a concatenation can read the
+	// same source, so a source takes no transforms of one view.
+	shareSources bool
+	// shared holds the sources that several views share after a merge.
+	shared map[string]bool
 }
 
 // reservation is a number of a dataset that a layer over a dataset takes.
@@ -440,7 +445,7 @@ func (c *compiler) source(d *Data, path string) (*dataNode, error) {
 		vd.Format.Parse = d.Format.Parse
 	}
 	n.index = len(c.data)
-	n.open = !n.values
+	n.open = !n.values && !c.shareSources
 	c.data = append(c.data, vd)
 	return n, nil
 }
@@ -642,7 +647,9 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 	}
 	// A merge of datasets can bring aggregates side by side, and a merge
 	// of aggregates can leave datasets that match.
+	c.mergeSources(out, read)
 	for range 10 {
+		c.liftBins(out, read)
 		a := c.mergeSiblingAggregates(out, read)
 		c.removeEmpty(read)
 		if m := c.mergeIdentical(out, read); !a && !m {
