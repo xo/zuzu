@@ -20,6 +20,9 @@ type cellSpec struct {
 // its own scales of position, which share the other scales, such as
 // color, and the legends.
 func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, repeat map[string]string) error {
+	if err := c.params(s, path); err != nil {
+		return err
+	}
 	var cells []cellSpec
 	columns := 0
 	switch {

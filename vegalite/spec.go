@@ -62,6 +62,9 @@ type Spec struct {
 	// expanded says that the compiler made the layer of the spec from a
 	// composite mark or an overlay.
 	expanded bool
+	// stackAs is the mark whose rules of stacking a layer follows: the
+	// area that a line or points overlay.
+	stackAs string
 }
 
 // Data is the data of a view: inline values, a url, a named dataset, or a

@@ -19,6 +19,52 @@ type facetDef struct {
 	channel string
 	def     *channelDef
 	sort    string
+	// header is the header of the facet, and hidden says that the spec
+	// sets it to null, which draws no title and no labels.
+	header map[string]any
+	hidden bool
+}
+
+// title returns the title of the facet, or "" for none.
+func (f *facetDef) title() string {
+	if f.hidden {
+		return ""
+	}
+	if t, ok := f.header["title"]; ok {
+		if t == nil {
+			return ""
+		}
+		return titleString(t)
+	}
+	if f.def.def != nil && !f.def.def.Title.IsZero() {
+		t := valueOf(f.def.def.Title)
+		if t == nil {
+			return ""
+		}
+		return titleString(t)
+	}
+	return titleOf(f.def)
+}
+
+// labels reports whether the header draws the values of the facet.
+func (f *facetDef) labels() bool {
+	return !f.hidden && f.header["labels"] != false
+}
+
+// orient returns the side of the header for its labels, with the key
+// labelOrient, or for its title, with the key titleOrient. The key orient
+// sets both.
+func (f *facetDef) orient(key string) string {
+	if o, ok := f.header[key].(string); ok {
+		return o
+	}
+	if o, ok := f.header["orient"].(string); ok {
+		return o
+	}
+	if f.channel == "row" {
+		return "left"
+	}
+	return "top"
 }
 
 // readFacet reads the facet of a spec: the operator facet, with a row and
@@ -32,6 +78,14 @@ func readFacet(s *Spec, repeat map[string]string) (row, column, wrap *facetDef, 
 			return nil, err
 		}
 		f := &facetDef{channel: ch, def: d, sort: "ascending"}
+		if !def.Header.IsZero() {
+			switch h := valueOf(def.Header).(type) {
+			case nil:
+				f.hidden = true
+			case map[string]any:
+				f.header = h
+			}
+		}
 		if !def.Sort.IsZero() {
 			if o, ok := valueOf(def.Sort).(string); ok {
 				f.sort = o
@@ -117,6 +171,9 @@ func hasKey(m map[string]FieldDef, k string) bool {
 // and the column, each drawing the spec of a cell from its own part of the
 // data, with headers that name the values and hold the axes.
 func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, repeat map[string]string) error {
+	if err := c.params(s, path); err != nil {
+		return err
+	}
 	row, column, wrap, cell, columns, _, err := readFacet(s, repeat)
 	if err != nil {
 		return err
@@ -214,13 +271,10 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		}
 		return t
 	}
-	groupTitle := func(f *facetDef, orient string) *vega.Title {
-		t := &vega.Title{Text: lit(titleOf(f.def)), Style: vega.Strings{List: []string{"guide-title"}}, Offset: lit(10)}
-		if f.def.def != nil && !f.def.def.Title.IsZero() {
-			t.Text = lit(titleString(valueOf(f.def.def.Title)))
-		}
-		if orient != "" {
-			t.Orient = lit(orient)
+	groupTitle := func(f *facetDef) *vega.Title {
+		t := &vega.Title{Text: lit(f.title()), Style: vega.Strings{List: []string{"guide-title"}}, Offset: lit(10)}
+		if o := f.orient("titleOrient"); o != "top" {
+			t.Orient = lit(o)
 		}
 		return t
 	}
@@ -231,36 +285,55 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	var rowDomain, colDomain string
 	if row != nil {
 		rowDomain = domain(row)
-		marks = append(marks, vega.Mark{Type: "group", Name: "row-title", Role: "row-title", Title: groupTitle(row, "left")})
+		if row.title() != "" {
+			marks = append(marks, vega.Mark{Type: "group", Name: "row-title", Role: "row-title", Title: groupTitle(row)})
+		}
 	}
 	if column != nil {
 		colDomain = domain(column)
-		marks = append(marks, vega.Mark{Type: "group", Name: "column-title", Role: "column-title", Title: groupTitle(column, "")})
+		if column.title() != "" {
+			marks = append(marks, vega.Mark{Type: "group", Name: "column-title", Role: "column-title", Title: groupTitle(column)})
+		}
 	}
-	if row != nil {
-		marks = append(marks, vega.Mark{
+	switch {
+	case row != nil:
+		m := vega.Mark{
 			Type: "group", Name: "row_header", Role: "row-header", From: &vega.From{Data: rowDomain}, Sort: headerSort(row),
-			Title: headerTitle(row, "left"), Axes: yAxes, Encode: vega.Encode{"update": vega.Props{"height": height}},
-		})
-	} else {
+			Axes: yAxes, Encode: vega.Encode{"update": vega.Props{"height": height}},
+		}
+		if row.labels() {
+			m.Title = headerTitle(row, row.orient("labelOrient"))
+		}
+		marks = append(marks, m)
+	case len(yAxes) > 0:
 		marks = append(marks, vega.Mark{
 			Type: "group", Name: "row_header", Role: "row-header",
 			Axes: yAxes, Encode: vega.Encode{"update": vega.Props{"height": height}},
 		})
 	}
+	footer := xAxes
 	if column != nil {
-		marks = append(marks, vega.Mark{
-			Type: "group", Name: "column_header", Role: "column-header", From: &vega.From{Data: colDomain}, Sort: headerSort(column),
-			Title: headerTitle(column, ""), Encode: vega.Encode{"update": vega.Props{"width": width}},
-		})
-		marks = append(marks, vega.Mark{
-			Type: "group", Name: "column_footer", Role: "column-footer", From: &vega.From{Data: colDomain}, Sort: headerSort(column),
-			Axes: xAxes, Encode: vega.Encode{"update": vega.Props{"width": width}},
-		})
-	} else {
+		bottom := column.orient("labelOrient") == "bottom"
+		if column.labels() && !bottom {
+			marks = append(marks, vega.Mark{
+				Type: "group", Name: "column_header", Role: "column-header", From: &vega.From{Data: colDomain}, Sort: headerSort(column),
+				Title: headerTitle(column, ""), Encode: vega.Encode{"update": vega.Props{"width": width}},
+			})
+		}
+		if len(footer) > 0 || column.labels() && bottom {
+			m := vega.Mark{
+				Type: "group", Name: "column_footer", Role: "column-footer", From: &vega.From{Data: colDomain}, Sort: headerSort(column),
+				Axes: footer, Encode: vega.Encode{"update": vega.Props{"width": width}},
+			}
+			if column.labels() && bottom {
+				m.Title = headerTitle(column, "bottom")
+			}
+			marks = append(marks, m)
+		}
+	} else if len(footer) > 0 {
 		marks = append(marks, vega.Mark{
 			Type: "group", Name: "column_footer", Role: "column-footer",
-			Axes: xAxes, Encode: vega.Encode{"update": vega.Props{"width": width}},
+			Axes: footer, Encode: vega.Encode{"update": vega.Props{"width": width}},
 		})
 	}
 	var groupby []string

@@ -63,6 +63,15 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 	if u.mark == "geoshape" {
 		return c.issue(path+"/mark", "the mark %s, which comes in phase 5", u.mark)
 	}
+	if c.cfg != nil {
+		// The corners of the config of the mark are drawn as the corners
+		// of the mark.
+		for k, x := range c.cfg.marks[u.mark] {
+			if _, ok := u.props[k]; !ok && strings.HasPrefix(k, "cornerRadius") {
+				u.props[k] = x
+			}
+		}
+	}
 	for _, name := range channelOrder {
 		ch, ok := s.Encoding[name]
 		if !ok || len(ch.Defs) == 0 {
@@ -174,7 +183,11 @@ func (u *unit) stacking(s *Spec) {
 	}
 	m := u.ch[measure]
 	explicit := m != nil && m.def != nil && !m.def.Stack.IsZero()
-	switch u.mark {
+	mark := u.mark
+	if s.stackAs != "" {
+		mark = s.stackAs
+	}
+	switch mark {
 	case "bar", "area", "arc":
 	case "rule", "point", "circle", "square", "line", "text", "tick":
 		// These stack only when the channel asks.
@@ -227,7 +240,6 @@ func (u *unit) stacking(s *Spec) {
 		return
 	}
 	u.stack, u.offset, u.stackBy = measure, offset, by
-	_ = s
 }
 
 // dataflow adds the transforms of the view and of its encodings: the bins,
@@ -375,7 +387,7 @@ func (u *unit) sortsByField() bool {
 		}
 		switch x := valueOf(d.def.Sort).(type) {
 		case string:
-			if u.ch[strings.TrimPrefix(x, "-")] != nil {
+			if x == "descending" || u.ch[strings.TrimPrefix(x, "-")] != nil {
 				return true
 			}
 		case map[string]any:
@@ -498,12 +510,17 @@ func (u *unit) addAggregate(n *dataNode) {
 	u.c.add(n, transform("aggregate", map[string]any{"groupby": groupby, "ops": ops, "fields": fields, "as": as}))
 }
 
+// isPath reports whether a mark draws a path through its points.
+func isPath(mark string) bool {
+	return mark == "area" || mark == "line" || mark == "trail"
+}
+
 // addStack adds the stack of the measure, grouped by the dimension. A
 // stacked area first fills each series with zero where it has no value, so
 // that the layers meet.
 func (u *unit) addStack(n *dataNode) {
 	m := u.ch[u.stack]
-	if dim := u.ch[u.dimension()]; u.mark == "area" && len(u.stackBy) > 0 && dim != nil && dim.isField() {
+	if dim := u.ch[u.dimension()]; isPath(u.mark) && dim != nil && dim.isField() {
 		var by []any
 		for _, d := range u.stackBy {
 			by = append(by, d.out)
@@ -612,6 +629,8 @@ func (u *unit) marks() error {
 	}
 	if group := u.pathGroup(m); group != nil {
 		u.v.marks = append(u.v.marks, *group)
+	} else if group := u.stackGroup(m); group != nil {
+		u.v.marks = append(u.v.marks, *group)
 	} else {
 		u.v.marks = append(u.v.marks, *m)
 	}
@@ -668,4 +687,126 @@ func prod(v any) vega.Production {
 		panic(fmt.Sprintf("vegalite: %v", err))
 	}
 	return p
+}
+
+// stackGroup puts a stacked bar with round corners in a group for each
+// stack, which clips the bars, so that the corners round the stack and not
+// each bar. The group draws the corners and the stroke of the mark.
+func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
+	if u.mark != "bar" || u.stack == "" {
+		return nil
+	}
+	var corners []string
+	for k, x := range u.props {
+		if strings.HasPrefix(k, "cornerRadius") && x != 0.0 {
+			corners = append(corners, k)
+		}
+	}
+	if len(corners) == 0 {
+		return nil
+	}
+	slices.Sort(corners)
+	measure := u.ch[u.stack]
+	dim := u.ch[u.dimension()]
+	if measure == nil || dim == nil || !dim.isField() {
+		return nil
+	}
+	// The axis of the stack, and the axis of the bars.
+	along, across, size := "y", "x", "width"
+	if u.stack == "x" {
+		along, across, size = "x", "y", "height"
+	}
+	start, end := measure.out+"_start", measure.out+"_end"
+	groupby := []string{dim.out}
+	if dim.units != nil || dim.bin != nil {
+		groupby = append(groupby, dim.outEnd)
+	}
+	fields := []any{start, start, end, end}
+	ops := []any{"min", "max", "min", "max"}
+	var scaled []string
+	for i := range fields {
+		scaled = append(scaled, "scale('"+u.v.sn(along)+"',datum[\""+fmt.Sprint(ops[i])+"_"+fmt.Sprint(fields[i])+"\"])")
+	}
+	list := strings.Join(scaled, ",")
+	scale := u.v.sn(across)
+	outer := vega.Props{
+		across:      prod(map[string]any{"scale": scale, "field": dim.out}),
+		size:        prod(map[string]any{"signal": "max(0.25, bandwidth('" + scale + "'))"}),
+		along:       prod(map[string]any{"signal": "min(" + list + ")"}),
+		along + "2": prod(map[string]any{"signal": "max(" + list + ")"}),
+		"clip":      prod(map[string]any{"value": true}),
+	}
+	update := m.Encode["update"]
+	for _, k := range corners {
+		if k == "cornerRadiusEnd" {
+			continue
+		}
+		outer[k] = prod(propRef(u.props[k]))
+		if _, ok := u.c.cfg.marks[u.mark][k]; !ok || u.props[k] != u.c.cfg.marks[u.mark][k] {
+			delete(update, k)
+		}
+	}
+	if r, ok := u.props["cornerRadiusEnd"]; ok {
+		// The end of a stack is the end that is away from zero, which a
+		// test of the scaled bounds of the stack finds.
+		sa := u.v.sn(along)
+		ref := func(f string) string { return "scale(\"" + sa + "\", datum[\"" + f + "\"])" }
+		top := ref("max_"+end) + " < " + ref("max_"+start)
+		bottom := ref("min_"+end) + " > " + ref("min_"+start)
+		names := [2][2]string{{"cornerRadiusTopLeft", "cornerRadiusTopRight"}, {"cornerRadiusBottomLeft", "cornerRadiusBottomRight"}}
+		tests := [2]string{top, bottom}
+		if along == "x" {
+			ref := func(f string) string { return "scale(\"" + sa + "\", datum[\"" + f + "\"])" }
+			tests = [2]string{ref("max_"+end) + " > " + ref("max_"+start), ref("min_"+end) + " < " + ref("min_"+start)}
+			names = [2][2]string{{"cornerRadiusTopRight", "cornerRadiusBottomRight"}, {"cornerRadiusTopLeft", "cornerRadiusBottomLeft"}}
+		}
+		for i, pair := range names {
+			for _, k := range pair {
+				outer[k] = prod(map[string]any{"__rules": []any{map[string]any{"test": tests[i], "value": r}, map[string]any{"value": 0}}})
+			}
+		}
+	}
+	if st, ok := u.props["stroke"]; ok {
+		outer["stroke"] = prod(map[string]any{"value": st})
+		if w, ok := u.props["strokeWidth"]; ok {
+			outer["strokeWidth"] = prod(map[string]any{"value": w})
+		} else if w, ok := u.c.cfg.marks[u.mark]["strokeWidth"]; ok {
+			outer["strokeWidth"] = prod(map[string]any{"value": w})
+		}
+		outer["strokeForeground"] = prod(map[string]any{"value": true})
+		outer["strokeOffset"] = prod(map[string]any{"value": 0})
+	}
+	inner := *m
+	inner.From = &vega.From{Data: "stack_group_main"}
+	delete(update, across)
+	delete(update, across+"2")
+	delete(update, size)
+	update[size] = prod(map[string]any{"field": map[string]any{"group": size}})
+	return &vega.Mark{
+		Type: "group",
+		From: &vega.From{Facet: &vega.Facet{
+			Name: "stack_group_main", Data: u.c.name(u.data), GroupBy: vega.List(groupby...),
+			Aggregate: mustJSON(map[string]any{"fields": fields, "ops": ops}),
+		}},
+		Encode: vega.Encode{"update": outer},
+		Marks: []vega.Mark{{
+			Type: "group",
+			Encode: vega.Encode{"update": vega.Props{
+				along: prod(map[string]any{"field": map[string]any{"group": along}, "mult": -1}),
+				size:  prod(map[string]any{"field": map[string]any{"group": size}}),
+			}},
+			Marks: []vega.Mark{inner},
+		}},
+	}
+}
+
+// propRef returns the value reference of a property of a mark: a signal
+// for an expression, {"expr": "..."}, or else the value.
+func propRef(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok && len(m) == 1 {
+		if e, ok := m["expr"].(string); ok {
+			return map[string]any{"signal": e}
+		}
+	}
+	return map[string]any{"value": v}
 }

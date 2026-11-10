@@ -650,7 +650,7 @@ func sortOf(v any) any {
 		case "ascending":
 			return true
 		case "descending":
-			return map[string]any{"order": "descending"}
+			return map[string]any{"order": "descending", "field": "key"}
 		case "x", "y", "-x", "-y", "color", "-color":
 			// A sort by another channel needs its field, which the
 			// compiler does not read here.

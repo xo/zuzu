@@ -39,7 +39,7 @@ func (u *unit) markOf() (*vega.Mark, error) {
 			continue
 		}
 		if _, set := e[k]; !set {
-			e.set(k, map[string]any{"value": v})
+			e.set(k, propRef(v))
 		}
 	}
 	m := &vega.Mark{Type: typ, Name: u.v.prefix + "marks", From: &vega.From{Data: u.c.name(u.data)}}

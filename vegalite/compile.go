@@ -60,6 +60,10 @@ type compiler struct {
 	cfg *config
 	// top is the spec being compiled.
 	top *Spec
+	// signals are the signals of the parameters of the spec, and
+	// signalNames their names.
+	signals     []vega.Signal
+	signalNames map[string]bool
 }
 
 // issue handles a feature that the compiler does not support.
@@ -83,6 +87,8 @@ type config struct {
 	zero *bool
 	// step is the default step of a discrete scale of position.
 	step float64
+	// marks holds the config of each type of mark, such as "bar".
+	marks map[string]map[string]any
 }
 
 // readConfig reads the parts of the config that the compiler follows.
@@ -98,6 +104,15 @@ func readConfig(raw []byte) *config {
 	}
 	if json.Unmarshal(raw, &m) != nil {
 		return cfg
+	}
+	var all map[string]any
+	if json.Unmarshal(raw, &all) == nil {
+		cfg.marks = map[string]map[string]any{}
+		for k := range vegaMark {
+			if x, ok := all[k].(map[string]any); ok {
+				cfg.marks[k] = x
+			}
+		}
 	}
 	if v, ok := m.Mark["invalid"]; ok && v == nil {
 		cfg.keepInvalid = true
@@ -134,6 +149,7 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		if err := c.concat(s, out, nil, "", map[string]string{}); err != nil {
 			return nil, err
 		}
+		out.Signals = append(out.Signals, c.signals...)
 		out.Data = c.data
 		return out, nil
 	}
@@ -143,6 +159,7 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		if err := c.facet(s, out, nil, "", map[string]string{}); err != nil {
 			return nil, err
 		}
+		out.Signals = append(out.Signals, c.signals...)
 		out.Data = c.data
 		return out, nil
 	}
@@ -152,6 +169,7 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	}
 	v.finish(out)
 	c.mergeAggregates(out)
+	out.Signals = append(out.Signals, c.signals...)
 	out.Data = c.data
 	return out, nil
 }
@@ -159,6 +177,9 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 // view compiles a spec into a view: a single view or a layer. Facets,
 // repeats and concatenations come in their own functions.
 func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map[string]string) error {
+	if err := c.params(s, path); err != nil {
+		return err
+	}
 	if s.Data != nil {
 		d, err := c.source(s.Data, path+"/data")
 		if err != nil {
@@ -505,10 +526,10 @@ func overlay(s *Spec) *Spec {
 	out.expanded = true
 	out.Layer = []Spec{{Mark: base}}
 	if line {
-		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line"}})
+		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line"}, stackAs: s.Mark.Type})
 	}
 	if point {
-		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "point", Props: Extra{"filled": []byte("true")}, object: true}})
+		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "point", Props: Extra{"filled": []byte("true")}, object: true}, stackAs: s.Mark.Type})
 	}
 	return &out
 }
@@ -586,6 +607,7 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 		}))
 	}
 	c.removeEmpty(read)
+	c.mergeIdentical(out, read)
 }
 
 // removeEmpty removes each dataset that derives from one other dataset

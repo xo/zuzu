@@ -4,6 +4,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 
 	"github.com/xo/zuzu/expr"
@@ -69,7 +70,8 @@ func composite(s *Spec) (*Spec, error) {
 	// The group by fields are the fields of the other channels.
 	var groupby []any
 	others := map[string]any{}
-	for k, v := range enc {
+	for _, k := range sortedChannels(enc) {
+		v := enc[k]
 		if k == cont || k == cont+"2" || k == cont+"Error" || k == cont+"Error2" {
 			continue
 		}
@@ -122,6 +124,23 @@ func composite(s *Spec) (*Spec, error) {
 	spec.Width, spec.Height = s.Width, s.Height
 	spec.expanded = true
 	return &spec, nil
+}
+
+// sortedChannels returns the channels of an encoding in the order of
+// channelOrder, then any others in the order of their names.
+func sortedChannels(enc map[string]any) []string {
+	var out []string
+	for _, k := range channelOrder {
+		if _, ok := enc[k]; ok {
+			out = append(out, k)
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(enc)) {
+		if !slices.Contains(channelOrder, k) {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // channelWith returns a copy of the definition of the continuous channel
