@@ -203,6 +203,10 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 			c.typ = nominal
 		}
 	}
+	if c.bin != nil && !isPositional(channel) && c.bin["maxbins"] == nil && c.bin["step"] == nil {
+		// A bin of a channel other than a position has 6 bins by default.
+		c.bin["maxbins"] = 6.0
+	}
 	c.out = c.outputField()
 	switch {
 	case c.bin != nil:
@@ -284,7 +288,7 @@ func binPrefix(b map[string]any) string {
 	for _, k := range keys {
 		parts = append(parts, k+"_"+binValue(b[k]))
 	}
-	if _, ok := b["maxbins"]; !ok && b["step"] == nil && b["steps"] == nil {
+	if _, ok := b["maxbins"]; !ok && b["step"] == nil && b["steps"] == nil && b["extent"] == nil {
 		parts = append([]string{"maxbins_10"}, parts...)
 	}
 	return "bin_" + strings.Join(parts, "_")

@@ -181,3 +181,22 @@ func TestBounds(t *testing.T) {
 		t.Error("Empty is not empty")
 	}
 }
+
+// TestLegendThresholds checks that a discretizing scale with fewer
+// thresholds than colors draws one entry for each piece, and no more.
+func TestLegendThresholds(t *testing.T) {
+	t.Parallel()
+	st := style()
+	o := scale.Defaults("threshold")
+	o.Domain = []any{10.0}
+	o.Range = []any{"#000000", "#888888", "#ffffff"}
+	sc, err := scale.New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := st.Legend(&Legend{Fill: sc, Format: expr.String})
+	symbols := find(m, "legend-entry").Items[0].Items[0]
+	if len(symbols.Items) != 2 {
+		t.Errorf("%d entries, want 2", len(symbols.Items))
+	}
+}

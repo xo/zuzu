@@ -76,7 +76,9 @@ func (l *Legend) values() []any {
 		if t := scale.Thresholds(sc); t != nil {
 			// A discretizing scale has one entry for each value of its range,
 			// named by the threshold where it starts.
-			vals := make([]any, len(sc.Range()))
+			// The thresholds cut the range into one entry more than they are.
+			n := min(len(sc.Range()), len(t)+1)
+			vals := make([]any, n)
 			for i := range vals {
 				if i == 0 {
 					vals[i] = math.Inf(-1)

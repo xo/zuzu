@@ -334,7 +334,8 @@ func impute(p *params, rows []Row) ([]Row, error) {
 			if have[key([]any{kv})] {
 				continue
 			}
-			r := Row{f.Name: v, k.Name: kv}
+			// An imputed row says so in the field _impute, as in Vega.
+			r := Row{f.Name: v, k.Name: kv, "_impute": true}
 			for i, gb := range groupby {
 				r[gb.Name] = gkeys[g][i]
 			}
@@ -404,6 +405,10 @@ func pivot(p *params, rows []Row) ([]Row, error) {
 		}
 		for _, n := range names {
 			grp := byName[n]
+			if len(grp) == 0 {
+				// A value that the group does not have is no field.
+				continue
+			}
 			vals := make([]any, len(grp))
 			for i, row := range grp {
 				vals[i] = v.Get(row)

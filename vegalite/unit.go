@@ -466,9 +466,20 @@ func (u *unit) addAggregate(n *dataNode) {
 	u.c.add(n, transform("aggregate", map[string]any{"groupby": groupby, "ops": ops, "fields": fields, "as": as}))
 }
 
-// addStack adds the stack of the measure, grouped by the dimension.
+// addStack adds the stack of the measure, grouped by the dimension. A
+// stacked area first fills each series with zero where it has no value, so
+// that the layers meet.
 func (u *unit) addStack(n *dataNode) {
 	m := u.ch[u.stack]
+	if dim := u.ch[u.dimension()]; u.mark == "area" && len(u.stackBy) > 0 && dim != nil && dim.isField() {
+		var by []any
+		for _, d := range u.stackBy {
+			by = append(by, d.out)
+		}
+		u.c.add(n, transform("impute", map[string]any{
+			"field": m.out, "groupby": by, "key": dim.out, "method": "value", "value": 0,
+		}))
+	}
 	var groupby []any
 	if u.mark != "arc" {
 		dim := u.dimension()
@@ -525,9 +536,12 @@ func (u *unit) invalidFields() []string {
 		return nil
 	}
 	var out []string
-	for _, name := range []string{"x", "y", "theta", "radius"} {
+	for _, name := range []string{"x", "y", "theta", "radius", "color", "fill", "stroke", "opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "size", "angle"} {
 		d := u.ch[name]
 		if d == nil || !d.isField() || !d.continuous() || d.aggregate == "count" {
+			continue
+		}
+		if !isPositional(name) && (d.typ != quantitative || d.def != nil && valueOf(d.def.Scale) == nil && !d.def.Scale.IsZero()) {
 			continue
 		}
 		if d.typ == temporal && d.units == nil && d.aggregate == "" {
@@ -573,7 +587,7 @@ func (u *unit) pathGroup(m *vega.Mark) *vega.Mark {
 	}
 	var by []string
 	for _, name := range []string{"color", "fill", "stroke", "opacity", "size", "strokeDash", "shape"} {
-		if d := u.ch[name]; d != nil && d.isField() && d.aggregate == "" && d.typ != quantitative {
+		if d := u.ch[name]; d != nil && d.isField() && d.aggregate == "" && (d.typ != quantitative || d.bin != nil) {
 			by = append(by, d.out)
 		}
 	}

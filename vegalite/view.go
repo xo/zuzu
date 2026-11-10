@@ -293,6 +293,8 @@ func scaleTypeOf(ch string, d *channelDef, mark string, props map[string]any) (s
 		}
 	case discrete:
 		typ = "ordinal"
+	case d.bin != nil && (ch == "color" || ch == "fill" || ch == "stroke" || ch == "opacity" || ch == "size"):
+		typ, discrete = "bin-ordinal", true
 	case d.typ == temporal:
 		typ = "time"
 	case ch == "radius":

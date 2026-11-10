@@ -289,8 +289,17 @@ func (u *unit) axis(e enc, ch, size string) {
 			e.set(size, map[string]any{"value": sz})
 			return
 		}
-		e.set(p, ref(d.out))
-		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + u.v.sn(ch) + "'))"})
+		r := ref(d.out)
+		band := u.v.sn(ch)
+		if o := u.ch[ch+"Offset"]; o != nil && o.isField() {
+			// An offset places the bar in a sub-band of the band.
+			if u.v.addScale(u, ch+"Offset", o, []string{o.out}) {
+				r["offset"] = map[string]any{"scale": u.v.sn(ch + "Offset"), "field": o.out}
+				band = u.v.sn(ch + "Offset")
+			}
+		}
+		e.set(p, r)
+		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + band + "'))"})
 	case discrete && u.v.scaleType(ch) == "band":
 		r := ref(d.out)
 		r["band"] = 0.5

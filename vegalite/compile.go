@@ -131,6 +131,11 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 				return err
 			}
 		}
+		if src != nil && len(s.Layer) > 1 {
+			// The layers share the data, so each adds its transforms to a
+			// dataset of its own.
+			src.open = false
+		}
 		for i := range s.Layer {
 			l := &s.Layer[i]
 			inheritEncoding(l, s.Encoding)
@@ -354,7 +359,7 @@ func (c *compiler) parseFields(n *dataNode, fields []string, typ string) {
 	if d.URL.IsZero() && d.Values.IsZero() {
 		return
 	}
-	if !d.Values.IsZero() && root.index != n.index {
+	if (!d.Values.IsZero() || typ == "number") && root.index != n.index {
 		// Inline values parse in the dataset that derives from them, with
 		// a formula for each field, and the values stay as they are.
 		fn := map[string]string{"date": "toDate", "number": "toNumber"}[typ]

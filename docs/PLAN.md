@@ -493,14 +493,14 @@ datasets, 90 percent of the scales and 90 percent of the marks that draw
 data match.
 
 On 2026-11-10 the code of phase 3 exists, and `go run ./cmd/conform` in the
-test module measures it:
+test module measures it, with the fixes that phase 4 brought:
 
 | Check | Match | Of |
 | --- | --- | --- |
-| specs, in all three checks | 450 (83.3%) | 540 |
-| datasets | 1103 (89.8%) | 1228 |
+| specs, in all three checks | 462 (85.6%) | 540 |
+| datasets | 1113 (90.6%) | 1228 |
 | scales, by type and domain | 1329 (97.2%) | 1367 |
-| marks that draw data, by the data of their items | 3671 (94.3%) | 3893 |
+| marks that draw data, by the data of their items | 3707 (95.2%) | 3893 |
 
 Every spec runs. In the loose mode, the report names each feature that zuzu
 skipped. The most common are the mark `shape` with its geographic
@@ -567,11 +567,11 @@ lays out the cells of a facet and of a concatenation in a grid. `go run
 
 | Check | Match | Of |
 | --- | --- | --- |
-| specs, in all three checks | 184 (39.1%) | 470 |
-| datasets | 541 (50.5%) | 1072 |
-| scales | 926 (77.6%) | 1193 |
-| marks that draw data | 1648 (63.2%) | 2607 |
-| the structure of the compiled spec | 276 (58.7%) | 470 |
+| specs, in all three checks | 214 (45.5%) | 470 |
+| datasets | 634 (59.1%) | 1072 |
+| scales | 953 (79.9%) | 1193 |
+| marks that draw data | 1707 (65.3%) | 2616 |
+| the structure of the compiled spec | 309 (65.7%) | 470 |
 
 The composite marks `boxplot`, `errorbar` and `errorband` expand into
 layers over the aggregated fields that Vega-Lite names, such as

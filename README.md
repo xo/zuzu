@@ -46,7 +46,9 @@ documents, CI, the corpus and the oracle, is done. The scene graph, the
 themes, the SVG writer and the measurement of text with the bundled IBM Plex
 Sans exist (phases 1 and 2). zuzu reads a Vega spec and draws it (phase 3).
 On the 540 specs of the first target, its datasets, scales and marks match
-those of vega.js for 83 percent of the specs. Vega-Lite comes in phase 4.
+those of vega.js for 85 percent of the specs. zuzu compiles a Vega-Lite spec
+itself (phase 4), and its result matches for 45 percent of the 470
+Vega-Lite specs so far.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.
 
