@@ -623,8 +623,6 @@ still differ:
   fails and the reference holds no rows.
 - `flight-passengers`: the autosize `fit` shrinks the width around a long
   title, which follows the measure of text and the layout of zuzu (D12).
-- `probability-density`: the adaptive sampling of a density takes a few
-  points other than those of vega.js. The rule of zuzu is below.
 - `bar_grouped_thin` and `bar_grouped_thin_minBandSize`: a domain sorts
   numbers and strings together. JavaScript compares them in a way that is
   not transitive, so the order follows the sort of V8.
@@ -633,9 +631,6 @@ still differ:
 
 zuzu chose these rules where the documents of Vega say nothing (D6):
 
-- `density` without `steps` samples the curve adaptively: 25 steps first,
-  then the middle of each step whose turn exceeds half a degree, down to a
-  step of 1/200 of the span.
 - `kde`, `density` and `regression` read a missing value as 0, as the
   arithmetic of JavaScript does, in the estimate and in the counts.
 - `wordcloud` does not measure text. A word is a box 0.6 of its size wide

@@ -156,7 +156,15 @@ for (const r of rows) {
     // through random() or through a transform such as a bootstrap or a
     // word cloud (D28).
     const b = await run(spec, 2);
-    if (signature(a) !== signature(b)) ref.random = true;
+    if (signature(a) !== signature(b)) {
+      ref.random = true;
+      // The counts that change with the seed, such as the rows after a
+      // random sample, are named, so that the check accepts any count.
+      const runs = [a, b, await run(spec, 3), await run(spec, 4)];
+      const count = (v) => (Array.isArray(v) ? v.length : -1);
+      ref.randomCounts = Object.keys(a.datasets).filter((n) => new Set(runs.map((r) => count(r.datasets[n]))).size > 1);
+      ref.randomMarks = a.marks.map((m) => m.path).filter((p, i) => new Set(runs.map((r) => (r.marks[i] || {}).count)).size > 1);
+    }
     Object.assign(ref, a);
     ok++;
   } catch (err) {

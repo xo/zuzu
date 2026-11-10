@@ -30,11 +30,15 @@ import (
 
 // Reference is a reference that the oracle wrote.
 type Reference struct {
-	Spec     string                    `json:"spec"`
-	Random   bool                      `json:"random"`
-	Compiled jsontext.Value            `json:"compiled"`
-	Datasets map[string]jsontext.Value `json:"datasets"`
-	Scales   map[string]struct {
+	Spec   string `json:"spec"`
+	Random bool   `json:"random"`
+	// RandomCounts names the datasets, and RandomMarks the paths of the
+	// marks, whose counts change with the seed of a random spec.
+	RandomCounts []string                  `json:"randomCounts"`
+	RandomMarks  []string                  `json:"randomMarks"`
+	Compiled     jsontext.Value            `json:"compiled"`
+	Datasets     map[string]jsontext.Value `json:"datasets"`
+	Scales       map[string]struct {
 		Type   string         `json:"type"`
 		Domain jsontext.Value `json:"domain"`
 	} `json:"scales"`
@@ -166,7 +170,7 @@ func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Res
 			// The rows differ on each run, so only their number counts.
 			var w []any
 			_ = json.Unmarshal(want, &w)
-			if len(w) == len(rows) {
+			if len(w) == len(rows) || slices.Contains(ref.RandomCounts, name) {
 				res.DatasetsOK++
 			} else {
 				res.Diffs = append(res.Diffs, fmt.Sprintf("data %s: %d rows, want %d", name, len(rows), len(w)))
@@ -222,6 +226,8 @@ func guide(role string) bool {
 type markEntry struct {
 	label string
 	data  []string
+	// randomCount says that the count of the items changes with the seed.
+	randomCount bool
 }
 
 // sceneMarks walks a scene graph in the order of the oracle and returns the
@@ -258,7 +264,7 @@ func compareMarks(res *Result, ref *Reference, s *scene.Scene) {
 			inGuide = m.Path
 			continue
 		}
-		e := markEntry{label: fmt.Sprintf("%s %s %s", m.MarkType, m.Role, m.Name)}
+		e := markEntry{label: fmt.Sprintf("%s %s %s", m.MarkType, m.Role, m.Name), randomCount: slices.Contains(ref.RandomMarks, m.Path)}
 		for _, d := range m.Data {
 			var v any
 			_ = json.Unmarshal(d, &v)
@@ -278,7 +284,7 @@ func compareMarks(res *Result, ref *Reference, s *scene.Scene) {
 			res.Diffs = append(res.Diffs, fmt.Sprintf("mark %d: %s, want %s", i, g.label, w.label))
 			continue
 		}
-		if len(g.data) != len(w.data) {
+		if len(g.data) != len(w.data) && !w.randomCount {
 			res.Diffs = append(res.Diffs, fmt.Sprintf("mark %d %s: %d items, want %d%s", i, w.label, len(g.data), len(w.data), firstMissing(g.data, w.data)))
 			continue
 		}

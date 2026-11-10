@@ -109,7 +109,12 @@ func sampleUniform(f func(float64) float64, lo, hi float64, steps int) [][2]floa
 	steps = max(steps, 1)
 	out := make([][2]float64, steps+1)
 	for i := range out {
-		x := lo + (hi-lo)*float64(i)/float64(steps)
+		// The places are those of vega.js, to the last bit: the share of
+		// the span first, and the end of the extent itself.
+		x := lo + (float64(i)/float64(steps))*(hi-lo)
+		if i == steps {
+			x = hi
+		}
 		out[i] = [2]float64{x, f(x)}
 	}
 	return out
@@ -149,7 +154,7 @@ func sampleCurve(f func(float64) float64, lo, hi float64, minSteps, maxSteps int
 	split = func(a, b [2]float64) {
 		x := (a[0] + b[0]) / 2
 		m := [2]float64{x, f(x)}
-		if (b[0]-a[0])/2 >= stop*(1-1e-9) && math.Abs(angle(a, m)-angle(a, b)) > minRadians {
+		if m[0]-a[0] >= stop && math.Abs(angle(a, b)-angle(a, m)) > minRadians {
 			split(a, m)
 			out = append(out, m)
 			split(m, b)
