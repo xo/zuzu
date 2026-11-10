@@ -88,6 +88,9 @@ type compiler struct {
 	// concatPrefix is the prefix of the names of the views of a
 	// concatenation inside another.
 	concatPrefix string
+	// nested says that the view being compiled lies inside another, so
+	// the optimizations wait for the whole spec.
+	nested bool
 }
 
 // reservation is a number of a dataset that a layer over a dataset takes.
@@ -776,6 +779,7 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 	c.liftFlattens(read)
 	for range 10 {
 		c.liftBins(out, read)
+		c.liftTimeUnits(out, read)
 		a := c.mergeSiblingAggregates(out, read)
 		c.removeEmpty(read)
 		if m := c.mergeIdentical(out, read); !a && !m {

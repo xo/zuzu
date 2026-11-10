@@ -4,6 +4,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/xo/zuzu/vega"
 )
@@ -123,9 +124,25 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 			continue
 		}
 		if _, _, _, _, _, ok, _ := readFacet(cell.spec, cell.repeat); ok {
-			if err := c.issue(p, "a facet inside a concatenation"); err != nil {
+			// A facet inside a concatenation compiles as a facet named
+			// after its view, in a group with the layout of the facet.
+			named := *cell.spec
+			named.Name = strings.TrimSuffix(cell.prefix, "_")
+			nested := &vega.Spec{}
+			outer := c.nested
+			c.nested = true
+			err := c.facet(&named, nested, src, p, cell.repeat)
+			c.nested = outer
+			if err != nil {
 				return err
 			}
+			out.Scales = append(out.Scales, nested.Scales...)
+			out.Signals = append(out.Signals, nested.Signals...)
+			out.Legends = append(out.Legends, nested.Legends...)
+			out.Marks = append(out.Marks, vega.Mark{
+				Type: "group", Name: cell.prefix + "group",
+				Layout: nested.Layout, Marks: nested.Marks, Title: nested.Title,
+			})
 			continue
 		}
 		v := newView(cell.prefix, c.cfg)
@@ -179,7 +196,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		delete(layout, "columns")
 	}
 	out.Layout = lit(layout)
-	if c.concatPrefix == "" {
+	if c.concatPrefix == "" && !c.nested {
 		c.mergeAggregates(out)
 	}
 	return nil

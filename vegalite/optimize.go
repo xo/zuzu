@@ -559,3 +559,70 @@ func boxplotTicks(ms []vega.Mark) map[string]bool {
 	walk(ms)
 	return out
 }
+
+// liftTimeUnits moves the time units at the start of the datasets that
+// derive from one dataset into it, when each of them starts with one, and
+// keeps one of each output, as vega-lite.js merges them.
+func (c *compiler) liftTimeUnits(out *vega.Spec, read map[string]bool) {
+	children := map[string][]int{}
+	for i, d := range c.data {
+		if len(d.Source.List) == 1 {
+			children[d.Source.List[0]] = append(children[d.Source.List[0]], i)
+		}
+	}
+	asOf := func(t vega.Transform) string {
+		var as []any
+		_ = json.Unmarshal(t.Params["as"], &as)
+		return fmt.Sprint(as)
+	}
+	for pi, p := range c.data {
+		kids := children[p.Name]
+		if len(kids) < 2 || read[p.Name] && len(p.Transform) == 0 && !p.Values.IsZero() {
+			continue
+		}
+		all := true
+		for _, k := range kids {
+			if ts := c.data[k].Transform; len(ts) == 0 || ts[0].Type != "timeunit" {
+				all = false
+			}
+		}
+		if !all {
+			continue
+		}
+		have := map[string]bool{}
+		for _, t := range c.data[pi].Transform {
+			if t.Type == "timeunit" {
+				have[asOf(t)] = true
+			}
+		}
+		for _, k := range kids {
+			ts := c.data[k].Transform
+			for len(ts) > 0 && ts[0].Type == "timeunit" {
+				if !have[asOf(ts[0])] {
+					have[asOf(ts[0])] = true
+					c.data[pi].Transform = append(c.data[pi].Transform, ts[0])
+				}
+				ts = ts[1:]
+			}
+			c.data[k].Transform = ts
+		}
+		// The datasets take their numbers last first, as when the bins
+		// move up.
+		var numbers []int
+		for _, k := range kids {
+			if n, ok := dataNumber(c.data[k].Name); ok {
+				numbers = append(numbers, n)
+			}
+		}
+		if len(numbers) == len(kids) {
+			slices.Sort(numbers)
+			order := append([]int{kids[len(kids)-1]}, kids[:len(kids)-1]...)
+			names := map[string]string{}
+			for i, k := range order {
+				names[c.data[k].Name] = "data_" + strconv.Itoa(numbers[i])
+			}
+			c.renameAll(out, read, names)
+		}
+	}
+	c.removeEmpty(read)
+}

@@ -644,7 +644,9 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		cols = map[string]any{"signal": "length(data('" + colDomain + "'))"}
 	}
 	out.Layout = lit(map[string]any{"padding": 20, "columns": cols, "bounds": "full", "align": "all"})
-	c.mergeAggregates(out)
+	if !c.nested {
+		c.mergeAggregates(out)
+	}
 	return nil
 }
 
