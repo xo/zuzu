@@ -112,6 +112,32 @@ func (c *compiler) drop(out *vega.Spec, read map[string]bool, i int, to string) 
 			names[gone] = "data_" + strconv.Itoa(m-1)
 		}
 	}
+	c.renameAll(out, read, names)
+}
+
+// reverseNames gives the datasets of a list the names of the list in the
+// other order, as vega-lite.js names the children of a merged aggregate.
+func (c *compiler) reverseNames(out *vega.Spec, read map[string]bool, list []int) {
+	names := map[string]string{}
+	for i, k := range list {
+		if _, ok := dataNumber(c.data[k].Name); !ok {
+			return
+		}
+		names[c.data[k].Name] = c.data[list[len(list)-1-i]].Name
+	}
+	moved := make([]vega.Data, len(list))
+	for i, k := range list {
+		moved[len(list)-1-i] = c.data[k]
+	}
+	for i, k := range list {
+		c.data[k] = moved[i]
+	}
+	c.renameAll(out, read, names)
+}
+
+// renameAll renames datasets everywhere that reads them: the datasets, the
+// marks, the domains of the scales and the set of datasets that are read.
+func (c *compiler) renameAll(out *vega.Spec, read map[string]bool, names map[string]string) {
 	rename := func(s string) string {
 		if r, ok := names[s]; ok {
 			return r

@@ -183,7 +183,7 @@ func TestCompileComposite(t *testing.T) {
 		"mark": {"type": "errorbar", "ticks": true},
 		"encoding": {"x": {"field": "yield", "type": "quantitative"}, "y": {"field": "variety", "type": "ordinal"}}
 	}`)
-	if _, _, marks := names(e); !slices.Equal(marks, []string{"layer_0_marks:rule", "layer_1_marks:rect", "layer_2_marks:rect"}) {
-		t.Errorf("errorbar marks = %v, want a rule and two ticks", marks)
+	if _, _, marks := names(e); !slices.Equal(marks, []string{"layer_0_marks:rect", "layer_1_marks:rect", "layer_2_marks:rule"}) {
+		t.Errorf("errorbar marks = %v, want two ticks and a rule", marks)
 	}
 }

@@ -558,27 +558,34 @@ in phase 3.
 
 On 2026-11-10 the package `vegalite` reads every Vega-Lite spec of the
 corpus and writes it back with the same JSON. Its compiler handles a single
-view, a layer, a facet by row and column, a repeat and a concatenation: the
-data, the transforms of Vega-Lite, the bins, the time units, the
-aggregate, the stack, the marks, the scales, the axes, the legends and the
-headers, with the names of the fields that Vega-Lite gives. The runtime
-lays out the cells of a facet and of a concatenation in a grid. `go run
-./cmd/conform -vl` in the test module measures it:
+view, a layer, a facet by row and column, a wrapped facet, a repeat and a
+concatenation: the data, the transforms of Vega-Lite, the bins, the time
+units, the aggregate, the stack, the marks, the scales, the axes, the
+legends, the headers and the parameters with a value, with the names of the
+fields that Vega-Lite gives. The runtime lays out the cells of a facet and
+of a concatenation in a grid. `go run ./cmd/conform -vl` in the test module
+measures it:
 
-| Check | Match | Of |
-| --- | --- | --- |
-| specs, in all three checks | 214 (45.5%) | 470 |
-| datasets | 634 (59.1%) | 1072 |
-| scales | 953 (79.9%) | 1193 |
-| marks that draw data | 1707 (65.3%) | 2616 |
-| the structure of the compiled spec | 309 (65.7%) | 470 |
+| Check | Match | Of | Exit |
+| --- | --- | --- | --- |
+| specs, in all three checks | 292 (62.1%) | 470 | 60% |
+| datasets | 753 (70.2%) | 1072 | 70% |
+| scales | 1009 (84.6%) | 1193 | 80% |
+| marks that draw data | 2084 (77.1%) | 2702 | 75% |
+| the structure of the compiled spec | 359 (76.4%) | 470 | 50% |
+
+Each check meets its exit. Phase 4 is done when the maintainers accept the
+share. `TestPhase4Share` in the test module fails when a share falls below
+its exit, and the conformance job of CI runs it.
 
 The composite marks `boxplot`, `errorbar` and `errorband` expand into
 layers over the aggregated fields that Vega-Lite names, such as
-`lower_box_x` and `mid_box_x`. The structure meets its share. A facet that
-wraps, the groups that clip the corners of a stack of bars, the names that
-vega-lite.js gives the datasets of a layer, and the config of a spec are
-the largest part of what fails, with the maps of phase 5.
+`lower_box_x` and `mid_box_x`. Like vega-lite.js, the compiler merges the
+datasets of sibling views that have the same transforms, and the
+aggregates of sibling views that have the same group by fields. The
+largest parts of what fails are the maps and the transforms of phase 5, a
+facet sorted across both rows and columns, the names that a named spec
+gives its scales and marks, and some names of the datasets of a layer.
 
 ### Phase 5. Tier 1 and tier 2
 

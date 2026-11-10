@@ -34,7 +34,7 @@ func WithStrict(strict bool) CompileOption {
 // Compile turns a Vega-Lite spec into a Vega spec. The report names each
 // part that zuzu did not compile, in the loose mode.
 func Compile(s *Spec, opts ...CompileOption) (*vega.Spec, vega.Report, error) {
-	c := &compiler{datasets: map[string]bool{}, parsed: map[int]map[string]bool{}}
+	c := &compiler{datasets: map[string]*dataNode{}, parsed: map[int]map[string]bool{}}
 	for _, o := range opts {
 		o(c)
 	}
@@ -47,10 +47,12 @@ func Compile(s *Spec, opts ...CompileOption) (*vega.Spec, vega.Report, error) {
 
 // compiler holds the state of one compile.
 type compiler struct {
-	strict   bool
-	report   vega.Report
-	data     []vega.Data
-	datasets map[string]bool
+	strict bool
+	report vega.Report
+	data   []vega.Data
+	// datasets holds the dataset of each named dataset of the spec that a
+	// view reads.
+	datasets map[string]*dataNode
 	// parsed holds, for each dataset of inline values that derives, the
 	// fields that a formula already parsed.
 	parsed  map[int]map[string]bool
@@ -282,14 +284,23 @@ func (c *compiler) source(d *Data, path string) (*dataNode, error) {
 	if d == nil {
 		return nil, nil
 	}
-	if d.Name != "" && len(c.top.Datasets) > 0 {
-		if raw, ok := c.top.Datasets[d.Name]; ok {
-			d = &Data{Values: vega.Value{JSON: raw}, Format: d.Format}
+	vd := vega.Data{}
+	if raw, ok := c.top.Datasets[d.Name]; ok && d.Name != "" {
+		// A named dataset of the spec keeps its name, and each view that
+		// reads it shares it.
+		if n, ok := c.datasets[d.Name]; ok {
+			return n, nil
 		}
+		vd.Name = d.Name
+		d = &Data{Values: vega.Value{JSON: raw}, Format: d.Format}
+	} else {
+		vd.Name = fmt.Sprintf("source_%d", c.nSource)
+		c.nSource++
 	}
-	vd := vega.Data{Name: fmt.Sprintf("source_%d", c.nSource)}
-	c.nSource++
 	n := &dataNode{parse: map[string]bool{}}
+	if _, named := c.top.Datasets[vd.Name]; named {
+		c.datasets[vd.Name] = n
+	}
 	switch {
 	case !d.Values.IsZero():
 		vd.Values = d.Values
@@ -582,29 +593,59 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 		if !ok {
 			continue
 		}
-		var ops, fields, as []any
+		// The last child takes in the aggregates of the others, from the
+		// last to the first. The ops group by field, then by op.
+		type measure struct {
+			field, op any
+			as        []any
+		}
+		var measures []*measure
 		seen := map[string]bool{}
-		for _, k := range kids {
+		for _, k := range slices.Backward(kids) {
 			t := c.data[k].Transform[0]
 			var o, f, a []any
 			_ = json.Unmarshal(t.Params["ops"], &o)
 			_ = json.Unmarshal(t.Params["fields"], &f)
 			_ = json.Unmarshal(t.Params["as"], &a)
-			for i := range a {
-				name := fmt.Sprint(a[i])
+			for j := range a {
+				name := fmt.Sprint(a[j])
 				if seen[name] {
 					continue
 				}
 				seen[name] = true
-				ops, fields, as = append(ops, o[i]), append(fields, f[i]), append(as, a[i])
+				var m *measure
+				for _, x := range measures {
+					if fmt.Sprint(x.field) == fmt.Sprint(f[j]) && fmt.Sprint(x.op) == fmt.Sprint(o[j]) {
+						m = x
+					}
+				}
+				if m == nil {
+					at := len(measures)
+					for x, other := range slices.Backward(measures) {
+						if fmt.Sprint(other.field) == fmt.Sprint(f[j]) {
+							at = x + 1
+							break
+						}
+					}
+					m = &measure{field: f[j], op: o[j]}
+					measures = slices.Insert(measures, at, m)
+				}
+				m.as = append(m.as, a[j])
 			}
 			c.data[k].Transform = c.data[k].Transform[1:]
+		}
+		var ops, fields, as []any
+		for _, m := range measures {
+			for _, a := range m.as {
+				ops, fields, as = append(ops, m.op), append(fields, m.field), append(as, a)
+			}
 		}
 		var g []any
 		_ = json.Unmarshal(groupby, &g)
 		parent.Transform = append(parent.Transform, transform("aggregate", map[string]any{
 			"groupby": g, "ops": ops, "fields": fields, "as": as,
 		}))
+		c.reverseNames(out, read, kids)
 	}
 	c.removeEmpty(read)
 	c.mergeIdentical(out, read)

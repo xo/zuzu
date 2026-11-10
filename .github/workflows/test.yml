@@ -116,7 +116,7 @@ jobs:
 
       - name: Compare zuzu with the references
         working-directory: test
-        run: go run ./cmd/conform && go test -count=1 -run TestPhase3Share ./conform
+        run: go run ./cmd/conform && go run ./cmd/conform -vl && go test -count=1 -run 'TestPhase[34]Share' ./conform
 
   tinygo:
     name: TinyGo

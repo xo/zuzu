@@ -196,7 +196,7 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 	case "iqr":
 		ops, as = []any{"q1", "q3", "median"}, []any{lower, upper, "center_" + field}
 	default:
-		ops, as = []any{"mean", extent}, []any{"center_" + field, "extent_" + field}
+		ops, as = []any{extent, "mean"}, []any{"extent_" + field, "center_" + field}
 		calcs = []any{
 			map[string]any{"calculate": "datum['center_" + field + "'] + datum['extent_" + field + "']", "as": upper},
 			map[string]any{"calculate": "datum['center_" + field + "'] - datum['extent_" + field + "']", "as": lower},
@@ -228,15 +228,19 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 			color = "black"
 		}
 		rule["color"] = color
-		layers = append(layers, withCalcs(layerOf(rule, others, map[string]any{
-			cont: channelWith(def, lower, title), cont + "2": map[string]any{"field": upper},
-		})))
+		// The ticks at the ends come before the rule between them.
 		if t, ok := props["ticks"]; ok && t != false {
 			for _, f := range []string{lower, upper} {
 				tick := map[string]any{"type": "tick", "style": "errorbar-ticks", "color": color}
+				if m, ok := t.(map[string]any); ok {
+					maps.Copy(tick, m)
+				}
 				layers = append(layers, withCalcs(layerOf(tick, others, map[string]any{cont: channelWith(def, f, title)})))
 			}
 		}
+		layers = append(layers, withCalcs(layerOf(rule, others, map[string]any{
+			cont: channelWith(def, lower, title), cont + "2": map[string]any{"field": upper},
+		})))
 	} else {
 		band := map[string]any{"type": "area", "style": "errorband-band", "opacity": 0.3}
 		if color != nil {
