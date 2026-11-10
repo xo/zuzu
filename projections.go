@@ -67,7 +67,9 @@ func (s *scope) makeProjection(st *projState) (*geo.Projection, error) {
 	typ, _ := t.(string)
 	p, err := geo.New(typ)
 	if err != nil {
-		return nil, fmt.Errorf("%s/type: %w", st.path, err)
+		// A type of d3-geo-projection that Vega does not have is
+		// unsupported, as the transforms that read the projection.
+		return nil, vega.Issue{Err: vega.ErrUnsupported, Path: st.path + "/type", Message: fmt.Sprintf("the projection type %q", typ)}
 	}
 	param := func(name string) (any, error) {
 		raw, ok := d.Params[name]
