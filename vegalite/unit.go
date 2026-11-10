@@ -273,7 +273,7 @@ func (u *unit) dataflow(s *Spec) error {
 		}
 		if d.typ == temporal && d.field != "" && d.aggregate == "" {
 			dates = append(dates, d.field)
-			if d.units == nil {
+			if d.units == nil || d.binnedUnit {
 				u.dates[d.out] = true
 			}
 		}

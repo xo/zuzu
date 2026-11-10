@@ -664,29 +664,37 @@ func (c *compiler) mergeSiblingAggregates(out *vega.Spec, read map[string]bool) 
 	merged := false
 	for pi := range c.data {
 		parent := &c.data[pi]
-		kids := children[parent.Name]
-		if len(kids) < 2 || read[parent.Name] {
+		all := children[parent.Name]
+		if len(all) < 2 {
 			continue
 		}
-		var groupby []byte
-		ok := true
-		for _, k := range kids {
+		// The children that start with an aggregate with the same group
+		// by fields merge.
+		byGroup := map[string][]int{}
+		var groupOrder []string
+		for _, k := range all {
 			ts := c.data[k].Transform
 			if len(ts) == 0 || ts[0].Type != "aggregate" {
-				ok = false
-				break
+				continue
 			}
-			g := ts[0].Params["groupby"]
-			if groupby == nil {
-				groupby = g
-			} else if string(g) != string(groupby) {
-				ok = false
+			g := string(ts[0].Params["groupby"])
+			if _, ok := byGroup[g]; !ok {
+				groupOrder = append(groupOrder, g)
+			}
+			byGroup[g] = append(byGroup[g], k)
+		}
+		var kids []int
+		var groupby []byte
+		for _, g := range groupOrder {
+			if len(byGroup[g]) >= 2 {
+				kids, groupby = byGroup[g], []byte(g)
 				break
 			}
 		}
-		if !ok {
+		if kids == nil {
 			continue
 		}
+		whole := len(kids) == len(all) && !read[parent.Name]
 		// The last child takes in the aggregates of the others, from the
 		// last to the first. The ops group by field, then by op.
 		type measure struct {
@@ -736,11 +744,32 @@ func (c *compiler) mergeSiblingAggregates(out *vega.Spec, read map[string]bool) 
 		}
 		var g []any
 		_ = json.Unmarshal(groupby, &g)
-		parent.Transform = append(parent.Transform, transform("aggregate", map[string]any{
-			"groupby": g, "ops": ops, "fields": fields, "as": as,
-		}))
-		c.reverseNames(out, read, kids)
-		merged = true
+		agg := transform("aggregate", map[string]any{"groupby": g, "ops": ops, "fields": fields, "as": as})
+		if whole {
+			parent.Transform = append(parent.Transform, agg)
+			c.reverseNames(out, read, kids)
+			return true
+		}
+		// The merged aggregate goes in a dataset of its own, which takes
+		// the name of the first child, and the children derive from it.
+		first := kids[0]
+		name := c.data[first].Name
+		renamed := fmt.Sprintf("data_%d", c.nData)
+		c.nData++
+		c.renameAll(out, read, map[string]string{name: renamed})
+		mid := vega.Data{Name: name, Source: vega.List(parent.Name), Transform: []vega.Transform{agg}}
+		for _, k := range kids {
+			c.data[k].Source = vega.List(name)
+		}
+		c.data = slices.Insert(c.data, first, mid)
+		var moved []int
+		for i, d := range c.data {
+			if len(d.Source.List) == 1 && d.Source.List[0] == name {
+				moved = append(moved, i)
+			}
+		}
+		c.reverseNames(out, read, moved)
+		return true
 	}
 	return merged
 }

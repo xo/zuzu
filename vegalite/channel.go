@@ -423,8 +423,14 @@ func predicate(p map[string]any) string {
 			name = expr.String(m["unit"])
 		}
 		var units []string
-		units, utc = timeUnits(name)
-		f = timeFloorExpr(units, utc, f)
+		if rest, ok := strings.CutPrefix(name, "binned"); ok {
+			// The field holds the start of each unit already.
+			units, utc = timeUnits(rest)
+			f = "time(" + f + ")"
+		} else {
+			units, utc = timeUnits(name)
+			f = timeFloorExpr(units, utc, f)
+		}
 		if len(units) == 1 {
 			unit = units[0]
 		}
