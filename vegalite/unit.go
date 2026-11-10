@@ -646,8 +646,12 @@ func (u *unit) pathGroup(m *vega.Mark) *vega.Mark {
 		return nil
 	}
 	var by []string
-	for _, name := range []string{"color", "fill", "stroke", "opacity", "size", "strokeDash", "shape"} {
-		if d := u.ch[name]; d != nil && d.isField() && d.aggregate == "" && (d.typ != quantitative || d.bin != nil) {
+	for _, name := range []string{"color", "fill", "stroke", "opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "strokeDash", "size"} {
+		if name == "size" && u.mark == "trail" {
+			// The size of a trail changes along it.
+			continue
+		}
+		if d := u.ch[name]; d != nil && d.isField() && d.aggregate == "" {
 			by = append(by, d.out)
 		}
 	}

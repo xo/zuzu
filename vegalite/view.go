@@ -105,6 +105,9 @@ type scaleComp struct {
 	dimension bool
 	// binned says that the field of the scale is binned already.
 	binned bool
+	// padded says that a bar is placed along the scale, which keeps it
+	// clear of the ends of a continuous range.
+	padded bool
 }
 
 // dataField is a field of a dataset.
@@ -178,6 +181,9 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 	}
 	if d.binned {
 		s.binned = true
+	}
+	if u.mark == "bar" && (name == "x" || name == "y") && d.bin == nil && !d.binned && d.units == nil && name == u.dimension() {
+		s.padded = true
 	}
 	switch u.mark {
 	case "bar", "area", "rect", "rule", "tick", "trail", "line":
@@ -294,7 +300,7 @@ func scaleTypeOf(ch string, d *channelDef, mark string, props map[string]any) (s
 		}
 	case discrete:
 		typ = "ordinal"
-	case d.bin != nil && (ch == "color" || ch == "fill" || ch == "stroke" || ch == "opacity" || ch == "size"):
+	case d.bin != nil && (ch == "color" || ch == "fill" || ch == "stroke"):
 		typ, discrete = "bin-ordinal", true
 	case d.typ == temporal:
 		typ = "time"
@@ -453,6 +459,9 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		default:
 			vs.Domain = v.dataDomain(s)
 		}
+	case s.bins != "" && s.typ == "bin-ordinal":
+		// The bins are the domain.
+		vs.Bins = vega.Value{Signal: s.bins}
 	case s.bins != "":
 		vs.Domain = vega.ScaleDomain{Signal: "[" + s.bins + ".start, " + s.bins + ".stop]"}
 		vs.Bins = vega.Value{Signal: s.bins}
@@ -505,8 +514,12 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	// The other properties.
 	positional := s.channel == "x" || s.channel == "y"
 	quant := !s.discrete && s.typ != "time" && s.typ != "utc"
-	if positional && quant && s.bins == "" && s.typ != "log" {
+	if positional && quant && s.bins == "" {
 		vs.Nice = lit(true)
+	}
+	if positional && !s.discrete && s.padded && s.props["padding"] == nil {
+		// A bar on a continuous dimension keeps clear of the ends.
+		vs.Padding = lit(5)
 	}
 	if s.discrete && (s.typ == "band" || s.typ == "point") {
 		inner, outer := s.paddings()
@@ -517,12 +530,18 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 			vs.Padding = lit(outer)
 		}
 	}
-	if quant && (positional || s.channel == "size" || s.channel == "theta" || s.channel == "radius") && s.typ != "log" {
-		zero := s.bins == "" && !s.binned && s.props["domain"] == nil && !s.dimension
+	switch {
+	case s.channel == "size" && s.typ == "quantize", quant && (s.channel == "opacity" || s.channel == "fillOpacity" || s.channel == "strokeOpacity"):
+		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: false}
+	case quant && (positional || s.channel == "size" || s.channel == "theta" || s.channel == "radius") && s.typ != "log" && !discretizing(s.typ):
+		zero := (s.bins == "" || s.channel == "size") && !s.binned && s.props["domain"] == nil && !s.dimension
 		if v.cfg != nil && v.cfg.zero != nil && positional {
 			zero = zero && *v.cfg.zero
 		}
 		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: zero}
+	}
+	if s.typ == "bin-ordinal" && s.props["range"] == nil && s.props["scheme"] == nil {
+		vs.Interpolate = lit("hcl")
 	}
 	if quant && (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") {
 		vs.Interpolate = lit("hcl")
@@ -700,6 +719,8 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 		return vega.ScaleRange{Values: []vega.Value{{Signal: v.sizeName(1)}, lit(0)}}
 	case "color", "fill", "stroke":
 		switch {
+		case s.typ == "bin-ordinal":
+			return vega.ScaleRange{Name: "ramp"}
 		case s.discrete && s.field != nil && s.field.typ == ordinal:
 			return vega.ScaleRange{Name: "ordinal"}
 		case s.discrete:
@@ -954,4 +975,10 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 		}
 	}
 	return grid, main
+}
+
+// discretizing reports whether a scale type maps a continuous domain to
+// discrete values.
+func discretizing(typ string) bool {
+	return typ == "quantize" || typ == "quantile" || typ == "threshold"
 }

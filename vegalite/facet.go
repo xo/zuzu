@@ -2,14 +2,19 @@ package vegalite
 
 import (
 	"encoding/json/v2"
+	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 
 	"github.com/xo/zuzu/vega"
 )
 
-// The names of the size of a cell of a facet.
+// The names of the size of a cell of a facet, and of its headers.
 const (
+	rowHeader    = "row_header"
+	columnFooter = "column_footer"
+
 	childWidth  = "child_width"
 	childHeight = "child_height"
 )
@@ -23,6 +28,27 @@ type facetDef struct {
 	// sets it to null, which draws no title and no labels.
 	header map[string]any
 	hidden bool
+	// sortField and sortOp sort the values of the facet by an aggregate of
+	// another field, with the op min when the sort names none.
+	sortField, sortOp string
+}
+
+// sortAs returns the name of the aggregate that sorts the facet.
+func (f *facetDef) sortAs() string {
+	if f.sortOp == "" {
+		return f.sortField
+	}
+	return f.sortOp + "_" + f.sortField
+}
+
+// sortAggregate returns the ops, the fields and the names of the aggregate
+// that sorts the facet, with a suffix on the names.
+func (f *facetDef) sortAggregate(suffix string) map[string][]any {
+	op := f.sortOp
+	if op == "" {
+		op = "min"
+	}
+	return map[string][]any{"fields": {f.sortField}, "ops": {op}, "as": {f.sortAs() + suffix}}
 }
 
 // title returns the title of the facet, or "" for none.
@@ -87,8 +113,15 @@ func readFacet(s *Spec, repeat map[string]string) (row, column, wrap *facetDef, 
 			}
 		}
 		if !def.Sort.IsZero() {
-			if o, ok := valueOf(def.Sort).(string); ok {
+			switch o := valueOf(def.Sort).(type) {
+			case string:
 				f.sort = o
+			case map[string]any:
+				if x, ok := o["order"].(string); ok {
+					f.sort = x
+				}
+				f.sortField, _ = o["field"].(string)
+				f.sortOp, _ = o["op"].(string)
 			}
 		}
 		return f, nil
@@ -178,14 +211,6 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	if err != nil {
 		return err
 	}
-	if wrap != nil {
-		// A wrapped facet lays its cells in rows of columns, which the
-		// grid of a column facet draws.
-		column = wrap
-		if columns == 0 {
-			columns = -1
-		}
-	}
 	if s.Data != nil {
 		if src, err = c.source(s.Data, path+"/data"); err != nil {
 			return err
@@ -199,7 +224,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		src = n
 	}
 	var extra []*channelDef
-	for _, f := range []*facetDef{row, column} {
+	for _, f := range []*facetDef{row, column, wrap} {
 		if f != nil {
 			extra = append(extra, f.def)
 		}
@@ -216,14 +241,25 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	if main == "" {
 		return c.issue(path+"/spec", "a facet whose cells draw no data, such as a facet of a facet")
 	}
-	// The child draws in each cell, from the data of the cell.
-	for i := range child.marks {
-		renameData(&child.marks[i], main, "facet")
-	}
 	// The child names its size child_width and child_height.
 	sizes := &vega.Spec{}
 	child.sizeNames = [2]string{childWidth, childHeight}
 	child.finish(sizes)
+	// The child draws in each cell, from the data of the cell. A facet
+	// sorted by an aggregate of a field facets the rows before the
+	// aggregate of the child, which each cell then makes from its own rows.
+	facetData, cellData := main, "facet"
+	var cellDatasets []vega.Data
+	for _, f := range []*facetDef{row, column, wrap} {
+		if f != nil && f.sortField != "" && cellDatasets == nil {
+			if fd, d, ok := c.splitFacet(main, extra, sizes); ok {
+				facetData, cellData, cellDatasets = fd, d.Name, []vega.Data{d}
+			}
+		}
+	}
+	for i := range child.marks {
+		renameData(&child.marks[i], main, cellData)
+	}
 	out.Scales = append(out.Scales, sizes.Scales...)
 	out.Signals = append(out.Signals, sizes.Signals...)
 	if !sizes.Width.IsZero() {
@@ -247,12 +283,19 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	// The datasets of the headers.
 	domain := func(f *facetDef) string {
 		name := f.channel + "_domain"
-		if f.channel == "facet" {
-			name = "column_domain"
+		groupby := []any{f.def.out}
+		if f.def.bin != nil {
+			groupby = append(groupby, f.def.outEnd)
+		}
+		params := map[string]any{"groupby": groupby}
+		if f.sortField != "" {
+			for k, v := range f.sortAggregate("") {
+				params[k] = v
+			}
 		}
 		c.data = append(c.data, vega.Data{
-			Name: name, Source: vega.Strings{List: []string{main}},
-			Transform: []vega.Transform{transform("aggregate", map[string]any{"groupby": []any{f.def.out}})},
+			Name: name, Source: vega.Strings{List: []string{facetData}},
+			Transform: []vega.Transform{transform("aggregate", params)},
 		})
 		return name
 	}
@@ -279,10 +322,18 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		return t
 	}
 	headerSort := func(f *facetDef) *vega.Sort {
-		return &vega.Sort{Field: lit("datum[" + strconv.Quote(f.def.out) + "]"), Order: vega.Strings{List: []string{f.sort}}}
+		field := f.def.out
+		if f.sortField != "" {
+			field = f.sortAs()
+		}
+		return &vega.Sort{Field: lit("datum[" + strconv.Quote(field) + "]"), Order: vega.Strings{List: []string{f.sort}}}
 	}
 	var marks []vega.Mark
 	var rowDomain, colDomain string
+	if wrap != nil {
+		marks = c.wrapHeaders(wrap, columns, domain(wrap), xAxes, yAxes, width, height)
+		row, column = nil, nil
+	}
 	if row != nil {
 		rowDomain = domain(row)
 		if row.title() != "" {
@@ -298,16 +349,16 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	switch {
 	case row != nil:
 		m := vega.Mark{
-			Type: "group", Name: "row_header", Role: "row-header", From: &vega.From{Data: rowDomain}, Sort: headerSort(row),
+			Type: "group", Name: rowHeader, Role: "row-header", From: &vega.From{Data: rowDomain}, Sort: headerSort(row),
 			Axes: yAxes, Encode: vega.Encode{"update": vega.Props{"height": height}},
 		}
 		if row.labels() {
 			m.Title = headerTitle(row, row.orient("labelOrient"))
 		}
 		marks = append(marks, m)
-	case len(yAxes) > 0:
+	case len(yAxes) > 0 && wrap == nil:
 		marks = append(marks, vega.Mark{
-			Type: "group", Name: "row_header", Role: "row-header",
+			Type: "group", Name: rowHeader, Role: "row-header",
 			Axes: yAxes, Encode: vega.Encode{"update": vega.Props{"height": height}},
 		})
 	}
@@ -322,7 +373,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		}
 		if len(footer) > 0 || column.labels() && bottom {
 			m := vega.Mark{
-				Type: "group", Name: "column_footer", Role: "column-footer", From: &vega.From{Data: colDomain}, Sort: headerSort(column),
+				Type: "group", Name: columnFooter, Role: "column-footer", From: &vega.From{Data: colDomain}, Sort: headerSort(column),
 				Axes: footer, Encode: vega.Encode{"update": vega.Props{"width": width}},
 			}
 			if column.labels() && bottom {
@@ -330,26 +381,37 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			}
 			marks = append(marks, m)
 		}
-	} else if len(footer) > 0 {
+	} else if len(footer) > 0 && wrap == nil {
 		marks = append(marks, vega.Mark{
-			Type: "group", Name: "column_footer", Role: "column-footer",
+			Type: "group", Name: columnFooter, Role: "column-footer",
 			Axes: footer, Encode: vega.Encode{"update": vega.Props{"width": width}},
 		})
 	}
 	var groupby []string
 	var sortFields []string
 	var orders []string
-	for _, f := range []*facetDef{row, column} {
+	agg := map[string][]any{}
+	for _, f := range []*facetDef{row, column, wrap} {
 		if f == nil {
 			continue
 		}
 		groupby = append(groupby, f.def.out)
-		sortFields = append(sortFields, "datum["+strconv.Quote(f.def.out)+"]")
+		field := f.def.out
+		if f.sortField != "" {
+			field = f.sortAs() + "_by_" + f.def.out
+			for k, v := range f.sortAggregate("_by_" + f.def.out) {
+				agg[k] = append(agg[k], v...)
+			}
+		}
+		sortFields = append(sortFields, "datum["+strconv.Quote(field)+"]")
 		orders = append(orders, f.sort)
 	}
-	facet := &vega.Facet{Name: "facet", Data: main, GroupBy: vega.List(groupby...)}
-	if row != nil && column != nil {
+	facet := &vega.Facet{Name: "facet", Data: facetData, GroupBy: vega.List(groupby...)}
+	switch {
+	case row != nil && column != nil:
 		facet.Aggregate = mustJSON(map[string]any{"cross": true})
+	case len(agg) > 0:
+		facet.Aggregate = mustJSON(agg)
 	}
 	sortList := make([]any, len(sortFields))
 	for i, f := range sortFields {
@@ -362,18 +424,155 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		Marks: child.marks, Axes: grids,
 		Encode: vega.Encode{"update": vega.Props{"width": width, "height": height}},
 	}
+	if wrap != nil && wrap.labels() {
+		cellMark.Title = headerTitle(wrap, "")
+	}
+	cellMark.Data = cellDatasets
 	marks = append(marks, cellMark)
 	out.Marks = marks
 	cols := any(1)
 	switch {
 	case columns > 0:
 		cols = columns
+	case wrap != nil:
+		cols = map[string]any{"signal": "length(data('facet_domain'))"}
 	case column != nil:
 		cols = map[string]any{"signal": "length(data('" + colDomain + "'))"}
 	}
 	out.Layout = lit(map[string]any{"padding": 20, "columns": cols, "bounds": "full", "align": "all"})
 	c.mergeAggregates(out)
 	return nil
+}
+
+// splitFacet finds the first aggregate of the data of a child of a facet
+// that groups by the fields of the facet. The facet then reads the rows
+// before that aggregate, and each cell makes its data from the aggregate
+// on, without the fields of the facet, from its own rows. The datasets of
+// the top level keep the aggregate for the domains of the scales. It
+// returns the dataset that the facet reads and the dataset of a cell.
+func (c *compiler) splitFacet(main string, fields []*channelDef, sizes *vega.Spec) (string, vega.Data, bool) {
+	facetFields := map[string]bool{}
+	for _, f := range fields {
+		facetFields[f.out] = true
+		facetFields[f.outEnd] = true
+	}
+	index := func(name string) int {
+		for i, d := range c.data {
+			if d.Name == name {
+				return i
+			}
+		}
+		return -1
+	}
+	var chain []int
+	for i := index(main); i >= 0; {
+		chain = append([]int{i}, chain...)
+		if len(c.data[i].Source.List) != 1 {
+			break
+		}
+		i = index(c.data[i].Source.List[0])
+	}
+	at, from := -1, 0
+	for k, i := range chain {
+		for j, t := range c.data[i].Transform {
+			if t.Type != "aggregate" || at >= 0 {
+				continue
+			}
+			var g []string
+			_ = json.Unmarshal(t.Params["groupby"], &g)
+			for _, f := range g {
+				if facetFields[f] {
+					at, from = k, j
+				}
+			}
+		}
+	}
+	if at < 0 {
+		return "", vega.Data{}, false
+	}
+	var rest []vega.Transform
+	rest = append(rest, c.data[chain[at]].Transform[from:]...)
+	for _, i := range chain[at+1:] {
+		rest = append(rest, c.data[i].Transform...)
+	}
+	cell := vega.Data{Name: fmt.Sprintf("data_%d", c.nData), Source: vega.List("facet")}
+	c.nData++
+	for _, t := range rest {
+		cp := vega.Transform{Type: t.Type, Params: vega.Extra{}}
+		maps.Copy(cp.Params, t.Params)
+		var g []string
+		if json.Unmarshal(t.Params["groupby"], &g) == nil && g != nil {
+			g = slices.DeleteFunc(slices.Clone(g), func(f string) bool { return facetFields[f] })
+			cp.Params["groupby"] = mustJSON(g)
+		}
+		cell.Transform = append(cell.Transform, cp)
+	}
+	facetData := c.data[chain[at]].Name
+	if from > 0 {
+		// The dataset splits before the aggregate: the rows before it stay
+		// in the dataset, and a new dataset derives the aggregate.
+		parent := chain[at]
+		split := vega.Data{
+			Name: fmt.Sprintf("data_%d", c.nData), Source: vega.List(c.data[parent].Name),
+			Transform: slices.Clone(c.data[parent].Transform[from:]),
+		}
+		c.nData++
+		c.data[parent].Transform = c.data[parent].Transform[:from]
+		if at+1 < len(chain) {
+			c.data[chain[at+1]].Source = vega.List(split.Name)
+		} else {
+			rename := func(s string) string {
+				if s == facetData {
+					return split.Name
+				}
+				return s
+			}
+			for i := range sizes.Scales {
+				renameDomain(sizes.Scales[i].Domain.Data, rename)
+			}
+		}
+		c.data = slices.Insert(c.data, parent+1, split)
+	}
+	return facetData, cell, true
+}
+
+// wrapHeaders adds the datasets of the rows and the columns of a wrapped
+// facet, and returns its title and the headers that hold its axes. The
+// cells draw the labels.
+func (c *compiler) wrapHeaders(wrap *facetDef, columns int, domain string, xAxes, yAxes []vega.Axis, width, height vega.Production) []vega.Mark {
+	n := "length(data(\"" + domain + "\"))"
+	rows, cols := n, n
+	if columns > 0 {
+		k := strconv.Itoa(columns)
+		rows = "ceil(" + n + " / " + k + ")"
+		cols = "min(" + n + ", " + k + ")"
+	}
+	sequence := func(name, stop string) {
+		c.data = append(c.data, vega.Data{Name: name, Transform: []vega.Transform{
+			transform("sequence", map[string]any{"start": 0, "stop": map[string]any{"signal": stop}}),
+		}})
+	}
+	var marks []vega.Mark
+	if t := wrap.title(); t != "" {
+		marks = append(marks, vega.Mark{Type: "group", Name: "facet-title", Role: "column-title", Title: &vega.Title{
+			Text: lit(t), Style: vega.Strings{List: []string{"guide-title"}}, Offset: lit(10),
+		}})
+	}
+	if len(yAxes) > 0 {
+		sequence(domain+"_row", rows)
+		marks = append(marks, vega.Mark{
+			Type: "group", Name: rowHeader, Role: "row-header", From: &vega.From{Data: domain + "_row"},
+			Axes: yAxes, Encode: vega.Encode{"update": vega.Props{"height": height}},
+		})
+	}
+	if len(xAxes) > 0 {
+		sequence(domain+"_column", cols)
+		marks = append(marks, vega.Mark{
+			Type: "group", Name: columnFooter, Role: "column-footer", From: &vega.From{Data: domain + "_column"},
+			Axes: xAxes, Encode: vega.Encode{"update": vega.Props{"width": width}},
+		})
+	}
+	return marks
 }
 
 // mainData returns the dataset that most marks of a view draw.

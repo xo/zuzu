@@ -163,6 +163,13 @@ func (s *scope) buildScale(st *scaleState) (scale.Scale, error) {
 			return nil, err
 		}
 		o.Bins = binEdges(v)
+		if typ == "bin-ordinal" && len(o.Domain) == 0 {
+			// The edges of the bins are the domain of a bin-ordinal scale
+			// that names none.
+			for _, e := range o.Bins {
+				o.Domain = append(o.Domain, e)
+			}
+		}
 		if o.Zero == nil {
 			// A scale with bins does not include zero by default.
 			z := false
