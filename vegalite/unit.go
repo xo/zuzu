@@ -379,18 +379,6 @@ func (u *unit) dataflow(s *Spec) error {
 			}
 		}
 	}
-	if u.addListSort(n) {
-		u.raw = n
-		n.open = false
-		n = c.derive(n)
-	} else if u.sortsByField() {
-		// The domain sorts over the rows before the aggregate, so the
-		// aggregate goes in a dataset of its own.
-		u.raw = n
-		n.open = false
-		n = c.derive(n)
-	}
-	u.addSortIndex(n)
 	for _, d := range u.allChannels() {
 		if d.bin != nil {
 			c.addBin(n, d.field, d.bin, []any{d.out, d.outEnd})
@@ -405,6 +393,18 @@ func (u *unit) dataflow(s *Spec) error {
 			}
 		}
 	}
+	if u.addListSort(n) {
+		u.raw = n
+		n.open = false
+		n = c.derive(n)
+	} else if u.sortsByField() {
+		// The domain sorts over the rows before the aggregate, so the
+		// aggregate goes in a dataset of its own.
+		u.raw = n
+		n.open = false
+		n = c.derive(n)
+	}
+	u.addSortIndex(n)
 	if !unitsDone {
 		u.addTimeUnits(n)
 	}

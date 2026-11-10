@@ -104,8 +104,39 @@ func (c *compiler) mergePrefix(out *vega.Spec, read map[string]bool, kids []int)
 	a := group[0]
 	name := c.data[a].Name
 	renamed := fmt.Sprintf("data_%d", c.nData)
-	c.nData++
-	c.renameAll(out, read, map[string]string{name: renamed})
+	// A merged step that its parent can take in leaves the children
+	// numbered last to first, and one that stays a dataset of its own,
+	// first to last, as vega-lite.js numbers them.
+	absorbed := false
+	if src := c.data[a].Source.List; len(src) == 1 {
+		for _, d := range c.data {
+			if d.Name == src[0] {
+				kids := 0
+				for _, e := range c.data {
+					if len(e.Source.List) == 1 && e.Source.List[0] == d.Name {
+						kids++
+					}
+				}
+				absorbed = kids == len(group) && d.Values.IsZero() && !read[d.Name] && c.derived(d.Name)
+			}
+		}
+	}
+	if n, ok := dataNumber(name); ok && !absorbed {
+		// The first takes the next number, and the datasets after it
+		// move up one, as vega-lite.js numbers them.
+		names := map[string]string{}
+		for _, d := range c.data {
+			if m, ok := dataNumber(d.Name); ok && m >= n {
+				names[d.Name] = fmt.Sprintf("data_%d", m+1)
+			}
+		}
+		renamed = names[name]
+		c.nData++
+		c.renameAll(out, read, names)
+	} else {
+		c.nData++
+		c.renameAll(out, read, map[string]string{name: renamed})
+	}
 	merged := vega.Data{Name: name, Source: c.data[a].Source, Transform: c.data[a].Transform[:1:1]}
 	c.data[a].Transform = c.data[a].Transform[1:]
 	c.data[a].Source = vega.List(name)

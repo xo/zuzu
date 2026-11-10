@@ -214,6 +214,10 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 		data = u.c.name(u.raw)
 		if by := sortByChannel(u, d); by != nil {
 			s.sortVal, s.hasSort = by, true
+		} else if m, ok := valueOf(d.def.Sort).(map[string]any); ok {
+			// An op over the rows, such as count, sorts the domain, and
+			// not the order of the bins.
+			s.sortVal, s.hasSort = m, true
 		}
 	}
 	for _, f := range fields {
