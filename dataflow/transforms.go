@@ -309,12 +309,10 @@ func lookup(p *params, rows []Row) ([]Row, error) {
 	if k == nil {
 		return nil, fmt.Errorf("lookup without a key: %w", ErrParam)
 	}
+	// The last row with a key wins, as in the index of Vega.
 	index := map[string]Row{}
 	for _, r := range other {
-		kv := key([]any{k.Get(r)})
-		if _, ok := index[kv]; !ok {
-			index[kv] = r
-		}
+		index[key([]any{k.Get(r)})] = r
 	}
 	fields, err := p.fields("fields")
 	if err != nil {

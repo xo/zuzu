@@ -175,6 +175,9 @@ func (s *scope) markData(m *vega.Mark) ([]any, [][]dataflow.Row, error) {
 		if err != nil {
 			return nil, nil, err
 		}
+		if m.From.Data != "" && f.Field == "" {
+			return s.preFaceted(m.From.Data, f, rows)
+		}
 		return s.facet(f, rows)
 	}
 	rows, err := s.dataset(m.From.Data)
@@ -292,6 +295,40 @@ func (s *scope) facet(f *vega.Facet, rows []dataflow.Row) ([]any, [][]dataflow.R
 		if err := s.facetAggregate(f, data, groups); err != nil {
 			return nil, nil, err
 		}
+	}
+	return data, groups, nil
+}
+
+// preFaceted returns the groups of a facet whose items come from another
+// dataset, as Vega makes them when a mark names both data and a facet: each
+// row of that dataset is an item, with the rows of the facet that share its
+// values of the group by fields.
+func (s *scope) preFaceted(name string, f *vega.Facet, rows []dataflow.Row) ([]any, [][]dataflow.Row, error) {
+	outer, err := s.dataset(name)
+	if err != nil {
+		return nil, nil, err
+	}
+	fields := make([]*dataflow.Accessor, len(f.GroupBy.List))
+	for i, g := range f.GroupBy.List {
+		fields[i] = dataflow.FieldAccessor(g)
+	}
+	key := func(r dataflow.Row) string {
+		vals := make([]any, len(fields))
+		for i, g := range fields {
+			vals[i] = g.Get(r)
+		}
+		return domainKey(vals)
+	}
+	byKey := map[string][]dataflow.Row{}
+	for _, r := range rows {
+		k := key(r)
+		byKey[k] = append(byKey[k], r)
+	}
+	data := make([]any, len(outer))
+	groups := make([][]dataflow.Row, len(outer))
+	for i, r := range outer {
+		data[i] = r
+		groups[i] = byKey[key(r)]
 	}
 	return data, groups, nil
 }

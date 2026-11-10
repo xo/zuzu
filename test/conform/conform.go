@@ -191,6 +191,12 @@ func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Res
 			res.Diffs = append(res.Diffs, fmt.Sprintf("scale %s: %v", name, err))
 			continue
 		}
+		if ref.Random && s.Type() == want.Type {
+			// The domain of a scale over random rows differs on each run,
+			// so only its type counts.
+			res.ScalesOK++
+			continue
+		}
 		if d := compareScale(s, want.Type, want.Domain); d != "" {
 			res.Diffs = append(res.Diffs, fmt.Sprintf("scale %s: %s", name, d))
 			continue
@@ -279,6 +285,12 @@ func compareMarks(res *Result, ref *Reference, s *scene.Scene) {
 		if len(w.data) > 0 && strings.Contains(w.data[0], `"bounds":`) && strings.Contains(w.data[0], `"mark":`) {
 			// The data of the mark is the items of another mark, which hold
 			// positions that zuzu does not share (D12). The count matches.
+			res.MarksOK++
+			continue
+		}
+		if ref.Random {
+			// The items of random rows differ on each run, so only their
+			// number counts.
 			res.MarksOK++
 			continue
 		}

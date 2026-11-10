@@ -10,8 +10,9 @@
 //	marks     each mark of the scene graph, with the data of each item
 //
 // zuzu does not draw as Vega draws (D12), so the references hold no position,
-// no size and no color. A spec that calls random() is marked, because its
-// rows differ on each run (D28).
+// no size and no color. A spec that reads random numbers is marked, because
+// its rows differ on each run (D28). The oracle runs each spec with two seeds
+// to find them.
 //
 // Run it from the test module after npm install in this folder:
 //
@@ -83,6 +84,60 @@ function marks(node, path, list) {
 }
 
 const loader = vega.loader({ baseURL: corpus + "/", mode: "file" });
+
+// seeded returns a generator of random numbers from a seed, by the method
+// mulberry32, so that two runs with two seeds can show whether a spec reads
+// random numbers.
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// run runs a Vega spec with the random numbers of a seed, and returns what
+// a reference holds.
+async function run(spec, seed) {
+  const rand = seeded(seed);
+  Math.random = rand;
+  vega.setRandom(rand);
+  // vega.js changes the inline values of a spec in place, so each run
+  // parses a copy.
+  const view = new vega.View(vega.parse(structuredClone(spec)), { loader, renderer: "none" });
+  await view.runAsync();
+  const res = { datasets: {}, scales: {} };
+  for (const d of spec.data || []) {
+    try {
+      res.datasets[d.name] = value(view.data(d.name));
+    } catch (err) {
+      res.datasets[d.name] = { error: String(err.message || err) };
+    }
+  }
+  for (const s of spec.scales || []) {
+    const sc = view.scale(s.name);
+    if (sc) res.scales[s.name] = { type: sc.type, domain: value(sc.domain()) };
+  }
+  res.marks = marks(view.scenegraph().root, "", []);
+  view.finalize();
+  return res;
+}
+
+// signature returns what a run gives, for the test of random numbers. The
+// items of a mark whose data is another mark hold the ids of the operators
+// of vega.js, which grow on each run, so only their count is kept.
+function signature(res) {
+  const marks = res.marks.map((m) => {
+    const d = m.data || [];
+    const items = d.length > 0 && d[0] && typeof d[0] === "object" && "bounds" in d[0] && "mark" in d[0];
+    return items ? { ...m, data: d.length } : m;
+  });
+  return JSON.stringify({ ...res, marks });
+}
+
 let ok = 0;
 let failed = 0;
 for (const r of rows) {
@@ -94,23 +149,13 @@ for (const r of rows) {
       spec = vegaLite.compile(src).spec;
       ref.compiled = spec;
     }
-    const view = new vega.View(vega.parse(spec), { loader, renderer: "none" });
-    await view.runAsync();
-    ref.datasets = {};
-    for (const d of spec.data || []) {
-      try {
-        ref.datasets[d.name] = value(view.data(d.name));
-      } catch (err) {
-        ref.datasets[d.name] = { error: String(err.message || err) };
-      }
-    }
-    ref.scales = {};
-    for (const s of spec.scales || []) {
-      const sc = view.scale(s.name);
-      if (sc) ref.scales[s.name] = { type: sc.type, domain: value(sc.domain()) };
-    }
-    ref.marks = marks(view.scenegraph().root, "", []);
-    view.finalize();
+    const a = await run(spec, 1);
+    // A spec whose results change with the seed reads random numbers,
+    // through random() or through a transform such as a bootstrap or a
+    // word cloud (D28).
+    const b = await run(spec, 2);
+    if (signature(a) !== signature(b)) ref.random = true;
+    Object.assign(ref, a);
     ok++;
   } catch (err) {
     ref.error = String(err.message || err);

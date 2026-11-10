@@ -46,10 +46,17 @@ TZ=UTC node oracle/oracle.mjs testdata
 ```
 
 The time zone is UTC, so that the references are the same on every machine.
-On 2026-11-10 it wrote 540 references in about 8 seconds, 174 MB in all, and
+On 2026-11-10 it wrote 540 references in about 10 seconds, 174 MB in all, and
 no spec failed in vega.js. Each reference holds what D17 compares: the
 compiled Vega spec, the rows of each dataset, the type and the domain of each
 scale, and the data of each item of each mark.
+
+The oracle runs each spec twice, with two seeds of the random numbers. If the
+two runs differ, the spec reads random numbers, through `random()` or through
+a transform such as the bootstrap of a confidence interval or a word cloud,
+and the reference is marked random (D28). On 2026-11-10, 13 specs were. For
+such a spec, the check compares only the count of the rows and the items and
+the type of each scale.
 
 ## Compare the writer with the targets
 

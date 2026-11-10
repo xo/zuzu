@@ -94,17 +94,14 @@ func stack(p *params, rows []Row) ([]Row, error) {
 	return out, nil
 }
 
-// value reads a field as a number, with zero for a value that is not one,
-// or 1 when the field is nil.
+// value reads a field as a number, as JavaScript does: null is 0, and a
+// missing field is NaN, which makes the ends of the rows after it NaN too,
+// as in Vega. It is 1 when the field is nil.
 func value(f *Accessor, r Row) float64 {
 	if f == nil {
 		return 1
 	}
-	v := expr.Number(f.Get(r))
-	if math.IsNaN(v) {
-		return 0
-	}
-	return v
+	return expr.Number(f.Get(r))
 }
 
 // bin puts the values of a field into bins of an even width, with nice
