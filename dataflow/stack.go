@@ -285,6 +285,10 @@ func readBins(p *params) (bins, error) {
 		start = v
 		stop = math.Ceil(hi/step) * step
 	}
+	// The stop is a whole number of steps after the start, as the bin
+	// transform of Vega makes it, which keeps the greatest value inside
+	// the last bin when the division of the span rounds down.
+	stop = start + math.Ceil((stop-start)/step)*step
 	if !math.IsNaN(anchor) {
 		d := math.Mod(anchor-start, step)
 		if d != 0 {
