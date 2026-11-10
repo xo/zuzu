@@ -104,6 +104,8 @@ func (w *writer) mark(m *scene.Mark) error {
 		err = w.line(m.Items)
 	case scene.Area:
 		err = w.area(m.Items)
+	case scene.Trail:
+		w.trail(m.Items)
 	case scene.Symbol:
 		for i := range m.Items {
 			if err = w.symbol(&m.Items[i]); err != nil {
@@ -254,7 +256,7 @@ func (w *writer) line(items []scene.Item) error {
 		for i, it := range run {
 			pts[i] = [2]float64{it.X, it.Y}
 		}
-		seg, err := curve(first.Interpolate, pts, true)
+		seg, err := curve(first.Interpolate, pts, true, first.Tension)
 		if err != nil {
 			return err
 		}
@@ -283,11 +285,11 @@ func (w *writer) area(items []scene.Item) error {
 				base[len(run)-1-i] = [2]float64{it.X, it.Y2}
 			}
 		}
-		a, err := curve(first.Interpolate, top, true)
+		a, err := curve(first.Interpolate, top, true, first.Tension)
 		if err != nil {
 			return err
 		}
-		b, err := curve(first.Interpolate, base, false)
+		b, err := curve(first.Interpolate, base, false, first.Tension)
 		if err != nil {
 			return err
 		}
@@ -297,6 +299,26 @@ func (w *writer) area(items []scene.Item) error {
 	w.style(first, "#000")
 	w.out.WriteString("/>")
 	return nil
+}
+
+// trail writes a trail mark: a line through its items whose width is the size
+// of each item, filled with the paint of the first item.
+func (w *writer) trail(items []scene.Item) {
+	var d strings.Builder
+	for _, run := range runs(items) {
+		pts := make([][3]float64, len(run))
+		for i, it := range run {
+			size := 2.0
+			if it.Size != nil {
+				size = *it.Size
+			}
+			pts[i] = [3]float64{it.X, it.Y, size}
+		}
+		d.WriteString(trail(pts))
+	}
+	fmt.Fprintf(w.out, `<path d="%s"`, d.String())
+	w.style(&items[0], "#000")
+	w.out.WriteString("/>")
 }
 
 // runs splits the items of a line or an area where an item is not defined.
@@ -350,7 +372,7 @@ func transform(x, y, angle float64) string {
 // arc writes an arc item, a slice of a ring, at its position.
 func (w *writer) arc(it *scene.Item) {
 	fmt.Fprintf(w.out, `<path transform="translate(%s,%s)" d="%s"`, num(it.X), num(it.Y),
-		arcPath(it.InnerRadius, it.OuterRadius, it.StartAngle, it.EndAngle, it.PadAngle))
+		arcPath(it.InnerRadius, it.OuterRadius, it.StartAngle, it.EndAngle, it.PadAngle, it.CornerRadius))
 	w.style(it, "none")
 	w.out.WriteString("/>")
 }

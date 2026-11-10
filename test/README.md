@@ -9,6 +9,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `testdata/corpus/inventory.tsv` | the features that each spec uses, which `cmd/inventory` writes |
 | `testdata/references/` | the references of vega.js, which the oracle writes and git ignores |
 | `cmd/inventory/` | the tool that writes the inventory |
+| `cmd/targets/` | the tool that compares the SVG writer with the targets and writes `docs/targets/compare.html` (D13) |
 | `cmd/wasm/` | a program that imports zuzu, so that CI can build it with TinyGo (D29) |
 | `oracle/` | the oracle, which runs vega.js and vega-lite.js in Node.js |
 
@@ -45,3 +46,19 @@ On 2026-11-10 it wrote 540 references in about 8 seconds, 174 MB in all, and
 no spec failed in vega.js. Each reference holds what D17 compares: the
 compiled Vega spec, the rows of each dataset, the type and the domain of each
 scale, and the data of each item of each mark.
+
+## Compare the writer with the targets
+
+Draw the targets first, as `docs/targets/README.md` says. Then run this in
+this folder:
+
+```bash
+go run ./cmd/targets
+```
+
+It writes the scene graph of each target and the SVG that zuzu writes from
+it, prints the share of pixels that differ, and writes
+`docs/targets/compare.html`, which shows each pair. Add
+`-testdata ../svg/testdata/targets` to copy the scene graphs of tier 0 into
+the golden tests of `svg`.
+

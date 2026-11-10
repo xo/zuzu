@@ -28,3 +28,8 @@
 /test/testdata/references/
 /test/oracle/node_modules/
 /test/oracle/package-lock.json
+
+# The output of test/cmd/targets, which compares the writer with the targets.
+/docs/targets/scene/
+/docs/targets/zuzu/
+/docs/targets/compare.html

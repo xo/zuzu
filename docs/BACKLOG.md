@@ -27,28 +27,31 @@ name to it.
 
 ## Phase 1
 
-### Write the tier 0 targets as scene graphs
+### Review the writer against the targets
 
-The exit of phase 1 needs a scene graph for each tier 0 target, rendered by
-`svg` and compared with the target in a gallery, in both modes and every
-scheme. `docs/targets/gen-targets.mjs` holds the layout of each target, so it
-can write the scene graph of each one as JSON, in the form that `scene`
-reads, beside its SVG. A test in `svg` then renders each scene graph, and a
-page shows each target beside the output of zuzu.
+`go run ./cmd/targets` in the test module rebuilds each target as a scene
+graph, writes it with `svg`, and writes `docs/targets/compare.html`, which
+shows each target beside the output of zuzu. On 2026-11-10, 104 of the 106
+targets differed by at most 0.04 percent of their pixels. The flowchart, in
+both modes, scales a group, which a scene graph does not hold. The exit of
+phase 1 is that a maintainer accepts the page.
+
+The targets were drawn with d3, so a curve, an area or an arc of a target is
+a path in its scene graph. The comparison checks the paint, the text, the
+groups, the gradients, the symbols, the rects and the rules of the writer.
+The curves, the arcs and the trails of the writer have their own tests
+against d3, in `svg/shapes_test.go`.
 
 ### Draw what the writer does not draw yet
 
-`svg` returns an error for each of these:
-
-1. The interpolations `cardinal`, `catmull-rom`, `natural` and `bundle` of a
-   line or an area.
-2. The symbol shapes `wedge`, `arrow` and `stroke`, and a shape given as the
-   path of an SVG.
-3. The marks `shape` and `trail`.
-
-It also draws an arc without round corners, where the arc of Vega has a
-`cornerRadius`, and it does not cut a text to its `limit`, which needs the
-measurement of text (D11).
+1. The writer does not cut a text to its `limit`, which needs the
+   measurement of text (D11).
+2. The mark `shape` returns an error. Vega draws it with a function that the
+   JSON of a scene graph cannot hold, so the runtime of zuzu writes a path
+   mark in its place.
+3. The interpolations `basis-open`, `basis-closed`, `cardinal-open`,
+   `cardinal-closed`, `catmull-rom-open` and `catmull-rom-closed` return an
+   error.
 
 ### Make the Vega config of a theme
 

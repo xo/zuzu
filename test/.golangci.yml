@@ -83,10 +83,13 @@ linters:
     gosec:
       excludes:
         # The tools of the test module read the files that a person names on
-        # the command line, and write files that are committed and read by
-        # everybody. Neither is the attack surface that gosec looks for.
+        # the command line, and make folders and write files there, which are
+        # committed or read by everybody. None of it is the attack surface
+        # that gosec looks for.
+        - G301
         - G304
         - G306
+        - G703
     forbidigo:
       analyze-types: true
       forbid:

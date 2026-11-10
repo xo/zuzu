@@ -19,18 +19,28 @@ import (
 // person reviews the change before it is committed.
 var update = flag.Bool("update", false, "write the golden files again")
 
-// scenes returns the names of the test scenes, without .json.
+// scenes returns the names of the test scenes, without .json, relative to
+// testdata. The scenes in testdata/targets are the tier 0 targets of D13,
+// which test/cmd/targets rebuilds as scene graphs.
 func scenes(t *testing.T) []string {
 	t.Helper()
-	files, err := filepath.Glob(filepath.Join("testdata", "*.json"))
-	if err != nil {
-		t.Fatal(err)
+	var files []string
+	for _, pattern := range []string{"*.json", filepath.Join("targets", "*.json")} {
+		m, err := filepath.Glob(filepath.Join("testdata", pattern))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, m...)
 	}
 	if len(files) == 0 {
 		t.Fatal("found no test scene in testdata")
 	}
 	for i, f := range files {
-		files[i] = strings.TrimSuffix(filepath.Base(f), ".json")
+		rel, err := filepath.Rel("testdata", f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[i] = strings.TrimSuffix(rel, ".json")
 	}
 	return files
 }
@@ -111,9 +121,9 @@ func TestWriteRefusesWhatItCannotDraw(t *testing.T) {
 		mark scene.Mark
 		want error
 	}{
-		{scene.Mark{Type: scene.Trail, Items: []scene.Item{{}}}, ErrUnsupportedMark},
-		{scene.Mark{Type: scene.Line, Items: []scene.Item{{Interpolate: "cardinal"}, {X: 1}}}, ErrUnsupportedCurve},
-		{scene.Mark{Type: scene.Symbol, Items: []scene.Item{{Shape: "wedge"}}}, ErrUnsupportedShape},
+		{scene.Mark{Type: scene.Shape, Items: []scene.Item{{}}}, ErrUnsupportedMark},
+		{scene.Mark{Type: scene.Line, Items: []scene.Item{{Interpolate: "basis-closed"}, {X: 1}}}, ErrUnsupportedCurve},
+		{scene.Mark{Type: scene.Symbol, Items: []scene.Item{{Shape: "not a path"}}}, ErrUnsupportedShape},
 	} {
 		err := Write(&bytes.Buffer{}, &scene.Scene{Width: 1, Height: 1, Root: c.mark})
 		if !errors.Is(err, c.want) {

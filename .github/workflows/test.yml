@@ -41,18 +41,19 @@ jobs:
             go.sum
             test/go.sum
 
-      - name: Lint
+      - name: Install golangci-lint
         # Pinned. The configuration is `default: all`, so an unpinned upgrade
-        # enables a new linter and fails a build that changed nothing.
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.13.1
+        # enables a new linter and fails a build that changed nothing. It is
+        # built with go install, because a prebuilt release older than
+        # v2.15.0 cannot read the export data of Go 1.27.3, as okage found.
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+
+      - name: Lint
+        run: golangci-lint run ./...
 
       - name: Lint the test module
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.13.1
-          working-directory: test
+        working-directory: test
+        run: golangci-lint run ./...
 
       - name: Check formatting
         run: |

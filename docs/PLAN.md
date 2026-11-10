@@ -442,10 +442,12 @@ Do not start the runtime yet.
 On 2026-11-10 the packages `scene`, `theme` and `svg` exist. `scene` reads
 and writes the scene graph of vega.js. `theme` holds the two modes and the
 four schemes, and a test checks them against [`STYLE.md`](STYLE.md). `svg`
-draws every kind of mark that the targets use, and its golden files render in
-okage. The exit is not met yet: the tier 0 targets do not exist as scene
-graphs, and no gallery compares them. "Phase 1" in
-[`BACKLOG.md`](BACKLOG.md) lists what is left.
+draws every kind of mark of Vega but `shape`, with the curves, the symbols
+and the arcs of d3-shape, and its golden files render in okage. The tier 0
+targets are golden tests as scene graphs, and `docs/targets/compare.html`,
+which the test module writes, shows each target beside the output of zuzu.
+The exit waits for a maintainer to accept that page. "Phase 1" in
+[`BACKLOG.md`](BACKLOG.md) says how to make it.
 
 ### Phase 2. Text
 
