@@ -116,11 +116,10 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 			out.Scales = append(out.Scales, nested.Scales...)
 			out.Signals = append(out.Signals, nested.Signals...)
 			out.Legends = append(out.Legends, nested.Legends...)
-			group := vega.Mark{Type: "group", Name: cell.prefix + "group"}
-			group.Layout = nested.Layout
-			group.Marks = nested.Marks
-			group.Title = cell.spec.Title
-			out.Marks = append(out.Marks, group)
+			out.Marks = append(out.Marks, vega.Mark{
+				Type: "group", Name: cell.prefix + "group",
+				Layout: nested.Layout, Marks: nested.Marks, Title: cell.spec.Title,
+			})
 			continue
 		}
 		if _, _, _, _, _, ok, _ := readFacet(cell.spec, cell.repeat); ok {
