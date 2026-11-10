@@ -35,12 +35,24 @@ func (t Transform) fields() map[string]any {
 func (c *compiler) transformOne(n *dataNode, t Transform, path string) error {
 	f := t.fields()
 	switch {
-	case t.Has("density"), t.Has("loess"), t.Has("regression"), t.Has("quantile"):
-		for _, k := range []string{"density", "loess", "regression", "quantile"} {
-			if t.Has(k) {
-				return c.issue(path, "the transform %s, which comes in phase 5", k)
-			}
+	case t.Has("density"):
+		// A density is a kde whose densities share their steps, so that
+		// they stack.
+		params := map[string]any{"field": f["density"], "as": []any{"value", "density"}, "resolve": "shared"}
+		copyParams(params, f, "groupby", "cumulative", "counts", "bandwidth", "extent", "minsteps", "maxsteps", "steps", "as")
+		c.add(n, transform("kde", params))
+	case t.Has("regression"), t.Has("loess"):
+		kind := "regression"
+		if t.Has("loess") {
+			kind = "loess"
 		}
+		params := map[string]any{"x": f["on"], "y": f[kind], "as": []any{f["on"], f[kind]}}
+		copyParams(params, f, "groupby", "method", "order", "extent", "params", "bandwidth", "as")
+		c.add(n, transform(kind, params))
+	case t.Has("quantile"):
+		params := map[string]any{"field": f["quantile"], "as": []any{"prob", "value"}}
+		copyParams(params, f, "groupby", "probs", "step", "as")
+		c.add(n, transform("quantile", params))
 	case t.Has("filter"):
 		test := predicateOf(f["filter"])
 		c.add(n, transform("filter", map[string]any{"expr": test}))
@@ -312,4 +324,14 @@ func (c *compiler) addImpute(n *dataNode, field, key string, groupby []any, spec
 	c.add(n, transform("formula", map[string]any{
 		"expr": fieldRef(field) + " === null ? " + fieldRef(as) + " : " + fieldRef(field), "as": field,
 	}))
+}
+
+// copyParams copies the parameters of a transform of Vega-Lite that a
+// transform of Vega takes with the same names.
+func copyParams(params, f map[string]any, names ...string) {
+	for _, k := range names {
+		if v, ok := f[k]; ok {
+			params[k] = v
+		}
+	}
 }
