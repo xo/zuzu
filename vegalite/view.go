@@ -91,7 +91,9 @@ type scaleComp struct {
 	// the scale of its position, "step" for steps of 20 pixels, and
 	// "center" around the middle of the view when there is no position.
 	offset string
-	mark   string
+	// normalized says that the scale draws a stack normalized to one.
+	normalized bool
+	mark       string
 	// titles are the titles of the fields that the scale draws, for its
 	// guide.
 	titles []string
@@ -156,7 +158,7 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 			s.typ = "band"
 		}
 	}
-	if s.typ == "point" && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" || u.mark == "rule") {
+	if s.typ == "point" && props["type"] == nil && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" || u.mark == "rule") {
 		// A discrete scale that a bar draws on has bands, whatever drew
 		// on it first.
 		s.typ = "band"
@@ -206,6 +208,9 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 	}
 	if d.def != nil && !d.def.Sort.IsZero() && !s.hasSort && !s.listSorted {
 		s.sortVal, s.hasSort = valueOf(d.def.Sort), true
+		if by := sortByChannel(u, d); by != nil && s.discrete {
+			s.sortVal = by
+		}
 	}
 	if t := titleOf(d); t != "" && !contains(s.titles, t) {
 		s.titles = append(s.titles, t)
@@ -306,6 +311,9 @@ func scaleTypeOf(ch string, d *channelDef, mark string, props map[string]any) (s
 		}
 	case ch == "shape" || ch == "strokeDash":
 		typ = "ordinal"
+	case ch == "size" && discrete:
+		// Sizes spread over their range in the order of the values.
+		typ = "point"
 	case ch == "theta":
 		typ = "linear"
 		if discrete {
@@ -451,6 +459,9 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	}
 	// The domain.
 	switch {
+	case s.normalized && s.props["domain"] == nil:
+		// A stack normalized to one fills the scale.
+		vs.Domain = vega.ScaleDomain{Values: []vega.Value{lit(0), lit(1)}}
 	case s.props["domain"] != nil:
 		switch d := s.props["domain"].(type) {
 		case []any:
@@ -554,6 +565,9 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: zero}
 	}
 	if s.typ == "bin-ordinal" && s.props["range"] == nil && s.props["scheme"] == nil {
+		vs.Interpolate = lit("hcl")
+	}
+	if (s.typ == "time" || s.typ == "utc") && (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") && s.props["interpolate"] == nil {
 		vs.Interpolate = lit("hcl")
 	}
 	if quant && (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") {
@@ -660,8 +674,13 @@ func sortByChannel(u *unit, d *channelDef) map[string]any {
 		return nil
 	}
 	op := o.aggregate
-	if op == "" {
+	switch {
+	case op != "":
+	case u.aggregated():
 		op = "sum"
+	default:
+		// Rows that are not aggregated sort by the least value.
+		op = "min"
 	}
 	out := map[string]any{"op": op, "field": o.field, "order": order}
 	if op == "count" {

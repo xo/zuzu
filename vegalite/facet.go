@@ -396,6 +396,9 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			continue
 		}
 		groupby = append(groupby, f.def.out)
+		if f.def.bin != nil {
+			groupby = append(groupby, f.def.outEnd)
+		}
 		field := f.def.out
 		if f.sortField != "" {
 			field = f.sortAs() + "_by_" + f.def.out

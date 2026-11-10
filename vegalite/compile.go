@@ -1,6 +1,7 @@
 package vegalite
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
 	"maps"
@@ -265,10 +266,54 @@ func inheritEncoding(l *Spec, parent Encoding) {
 		l.Encoding = Encoding{}
 	}
 	for k, ch := range parent {
-		if _, ok := l.Encoding[k]; !ok {
+		own, ok := l.Encoding[k]
+		if !ok {
 			l.Encoding[k] = ch
+			continue
+		}
+		// A channel that both define takes the properties of the parent
+		// that the layer does not give.
+		if len(own.Defs) == 1 && len(ch.Defs) == 1 && !own.Array && !ch.Array {
+			if merged, ok := mergeDefs(own.Defs[0], ch.Defs[0]); ok {
+				l.Encoding[k] = Channel{Defs: []FieldDef{merged}}
+			}
 		}
 	}
+}
+
+// mergeDefs gives a definition of a channel the properties of another that
+// it does not have. It reports false when either has a value, which stands
+// alone.
+func mergeDefs(own, parent FieldDef) (FieldDef, bool) {
+	if !own.Value.IsZero() || !parent.Value.IsZero() || !own.Datum.IsZero() || !parent.Datum.IsZero() {
+		return own, false
+	}
+	a, err := json.Marshal(own)
+	if err != nil {
+		return own, false
+	}
+	b, err := json.Marshal(parent)
+	if err != nil {
+		return own, false
+	}
+	var am, bm map[string]jsontext.Value
+	if json.Unmarshal(a, &am) != nil || json.Unmarshal(b, &bm) != nil {
+		return own, false
+	}
+	for k, v := range bm {
+		if _, ok := am[k]; !ok {
+			am[k] = v
+		}
+	}
+	c, err := json.Marshal(am)
+	if err != nil {
+		return own, false
+	}
+	var out FieldDef
+	if json.Unmarshal(c, &out) != nil {
+		return own, false
+	}
+	return out, true
 }
 
 // dataNode is a dataset of the compiled spec, which transforms can still be

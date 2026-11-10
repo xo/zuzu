@@ -352,6 +352,20 @@ func (u *unit) dataflow(s *Spec) error {
 			c.add(n, transform("timeunit", params))
 		}
 	}
+	for _, d := range u.allChannels() {
+		if u.shifted(d) {
+			// A bar at the start of its interval spans from the middle of
+			// the interval before to the middle of its own.
+			unit := d.units[len(d.units)-1]
+			start, end := "datum['"+d.out+"']", "datum['"+d.outEnd+"']"
+			c.add(n, transform("formula", map[string]any{
+				"expr": "0.5 * timeOffset('" + unit + "', " + start + ", -1) + 0.5 * " + start, "as": d.out + "_offsetted_rect_start",
+			}))
+			c.add(n, transform("formula", map[string]any{
+				"expr": "0.5 * " + start + " + 0.5 * " + end, "as": d.out + "_offsetted_rect_end",
+			}))
+		}
+	}
 	if u.aggregated() {
 		u.addAggregate(n)
 	}
@@ -406,7 +420,32 @@ func (u *unit) addListSort(n *dataNode) bool {
 // spans reports whether the marks of the view span the interval of a time
 // unit on a channel, as a bar does.
 func (u *unit) spans(d *channelDef) bool {
-	return (u.mark == "bar" || u.mark == "rect") && (d.channel == "x" || d.channel == "y")
+	pos := d.channel == "x" || d.channel == "y"
+	switch {
+	case pos && (u.mark == "bar" || u.mark == "rect"):
+		return true
+	case pos && d.def != nil && !d.def.BandPosition.IsZero():
+		// A band position places the mark within the interval.
+		return true
+	case u.c.cfg != nil && u.c.cfg.marks[u.mark]["timeUnitBandPosition"] != nil:
+		return true
+	}
+	return false
+}
+
+// shifted reports whether a bar over a time unit starts at the start of
+// its interval, with a band position of 0, so that it is centered there.
+func (u *unit) shifted(d *channelDef) bool {
+	if (u.mark != "bar" && u.mark != "rect") || (d.channel != "x" && d.channel != "y") || d.units == nil || d.typ != temporal {
+		return false
+	}
+	var p any
+	if d.def != nil && !d.def.BandPosition.IsZero() {
+		p = valueOf(d.def.BandPosition)
+	} else if u.c.cfg != nil {
+		p = u.c.cfg.marks[u.mark]["timeUnitBandPosition"]
+	}
+	return p == 0.0
 }
 
 // sortsByField reports whether a channel sorts its domain by an aggregate
@@ -508,6 +547,10 @@ func (u *unit) addAggregate(n *dataNode) {
 		case d.units != nil && d.typ == temporal && u.spans(d):
 			group(d.out)
 			group(d.outEnd)
+			if u.shifted(d) {
+				group(d.out + "_offsetted_rect_start")
+				group(d.out + "_offsetted_rect_end")
+			}
 		default:
 			group(d.out)
 		}

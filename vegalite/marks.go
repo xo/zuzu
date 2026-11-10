@@ -158,7 +158,11 @@ func (u *unit) channelRef(name string) map[string]any {
 			base = map[string]any{"value": d.datum}
 		}
 	case d.isField():
-		if u.v.addScale(u, scaleName, d, []string{d.out}) {
+		fields := []string{d.out}
+		if d.units != nil && d.typ == temporal && u.spans(d) {
+			fields = append(fields, d.outEnd)
+		}
+		if u.v.addScale(u, scaleName, d, fields) {
 			base = map[string]any{"scale": u.v.sn(scaleName), "field": d.out}
 		} else {
 			base = map[string]any{"field": d.out}
@@ -271,14 +275,33 @@ func (u *unit) axis(e enc, ch, size string) {
 		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + band + "'))"})
 		return
 	}
-	if d.units != nil && d.typ == temporal && u.spans(d) {
+	if d.units != nil && d.typ == temporal && u.spans(d) && u.mark != "bar" && u.mark != "rect" {
+		// A band position places the mark at a share of the interval.
 		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
-		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out, "offset": 0.5})
-		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.outEnd, "offset": -0.5})
+		p0 := 0.5
+		if b, ok := valueOf(d.def.BandPosition).(float64); ok {
+			p0 = b
+		}
+		k := func(x float64) string { return strconv.FormatFloat(x, 'f', -1, 64) }
+		e.set(p, map[string]any{"signal": "scale(\"" + u.v.sn(ch) + "\", " + k(1-p0) + " * " + fieldRef(d.out) + " + " + k(p0) + " * " + fieldRef(d.outEnd) + ")"})
+		u.pathDefined(e)
+		return
+	}
+	if d.units != nil && d.typ == temporal && u.spans(d) {
+		start, end := d.out, d.outEnd
+		if u.shifted(d) {
+			start, end = d.out+"_offsetted_rect_start", d.out+"_offsetted_rect_end"
+		}
+		u.v.addScale(u, ch, d, []string{start, end})
+		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": start, "offset": 0.5})
+		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": end, "offset": -0.5})
 		return
 	}
 	if u.stack == ch {
 		u.v.addScale(u, ch, d, []string{d.out + "_start", d.out + "_end"})
+		if sc := u.v.scales[ch]; sc != nil && u.offset == "normalize" {
+			sc.normalized = true
+		}
 		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_end"})
 		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_start"})
 		return
@@ -366,6 +389,15 @@ func (u *unit) axis(e enc, ch, size string) {
 		case u.mark == "rule" && u.ch[ch+"2"] == nil:
 		}
 	}
+	u.pathDefined(e)
+	if u.mark == "area" && u.measure() == ch {
+		e.set("orient", map[string]any{"value": u.orient})
+	}
+}
+
+// pathDefined sets the property defined of a path to the test that its
+// continuous positions are valid numbers.
+func (u *unit) pathDefined(e enc) {
 	if u.mark == "line" || u.mark == "area" || u.mark == "trail" {
 		var parts []string
 		for _, name := range []string{"x", "y"} {
@@ -380,9 +412,6 @@ func (u *unit) axis(e enc, ch, size string) {
 		if len(parts) > 0 {
 			e.set("defined", map[string]any{"signal": joinAnd(parts)})
 		}
-	}
-	if u.mark == "area" && u.measure() == ch {
-		e.set("orient", map[string]any{"value": u.orient})
 	}
 }
 

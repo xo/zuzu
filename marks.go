@@ -107,7 +107,13 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			child.item = it
 			if m.From != nil && m.From.Facet != nil && facets != nil {
 				f := m.From.Facet
-				child.data[f.Name] = &dataState{def: &vega.Data{Name: f.Name}, path: path + "/from/facet", facet: facets[keyOfItem(i, states, sm)]}
+				rows := facets[keyOfItem(i, states, sm)]
+				if rows == nil && f.Field == "" {
+					// A group that the cross of a facet adds has no rows,
+					// and draws nothing inside, as in Vega.
+					continue
+				}
+				child.data[f.Name] = &dataState{def: &vega.Data{Name: f.Name}, path: path + "/from/facet", facet: rows}
 			}
 			marks, err := child.buildScope(path)
 			if err != nil {
@@ -267,7 +273,16 @@ func (s *scope) facet(f *vega.Facet, rows []dataflow.Row) ([]any, [][]dataflow.R
 		}
 		groups[j] = append(groups[j], r)
 	}
-	if len(f.Aggregate) == 0 {
+	var agg map[string]any
+	if len(f.Aggregate) > 0 {
+		if err := rawUnmarshal(f.Aggregate, &agg); err != nil {
+			return nil, nil, err
+		}
+	}
+	if cross, _ := agg["cross"].(bool); cross && len(fields) > 1 {
+		data, groups = crossGroups(f.GroupBy.List, data, groups, index)
+	}
+	if len(f.Aggregate) == 0 || len(agg) == 1 && agg["cross"] != nil {
 		for i, d := range data {
 			if m, ok := d.(map[string]any); ok {
 				m["count"] = float64(len(groups[i]))
@@ -279,6 +294,51 @@ func (s *scope) facet(f *vega.Facet, rows []dataflow.Row) ([]any, [][]dataflow.R
 		}
 	}
 	return data, groups, nil
+}
+
+// crossGroups adds an empty group for each combination of the values of
+// the group by fields that no row has, as the cross of an aggregate does.
+// The values of each field come in the order they first appear.
+func crossGroups(names []string, data []any, groups [][]dataflow.Row, index map[string]int) ([]any, [][]dataflow.Row) {
+	values := make([][]any, len(names))
+	seen := make([]map[string]bool, len(names))
+	for i := range names {
+		seen[i] = map[string]bool{}
+	}
+	for _, d := range data {
+		m, _ := d.(map[string]any)
+		for i, n := range names {
+			v := m[n]
+			if k := domainKey([]any{v}); !seen[i][k] {
+				seen[i][k] = true
+				values[i] = append(values[i], v)
+			}
+		}
+	}
+	combo := make([]any, len(names))
+	var walk func(i int)
+	walk = func(i int) {
+		if i == len(names) {
+			k := domainKey(combo)
+			if _, ok := index[k]; ok {
+				return
+			}
+			datum := map[string]any{}
+			for j, n := range names {
+				datum[n] = combo[j]
+			}
+			index[k] = len(data)
+			data = append(data, datum)
+			groups = append(groups, nil)
+			return
+		}
+		for _, v := range values[i] {
+			combo[i] = v
+			walk(i + 1)
+		}
+	}
+	walk(0)
+	return data, groups
 }
 
 // facetAggregate adds the measures of the aggregate of a facet to the datum
