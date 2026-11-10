@@ -118,7 +118,7 @@ func (w *writer) mark(m *scene.Mark) error {
 		for i := range m.Items {
 			w.arc(&m.Items[i])
 		}
-	case scene.Path:
+	case scene.Path, scene.Shape:
 		for i := range m.Items {
 			w.path(&m.Items[i])
 		}

@@ -82,7 +82,8 @@ func (c *compiler) mergePrefix(out *vega.Spec, read map[string]bool, kids []int)
 	var group []int
 	for _, k := range kids {
 		ts := c.data[k].Transform
-		if len(ts) == 0 || invalidFilter(ts[:1]) {
+		if len(ts) == 0 || invalidFilter(ts[:1]) || ts[0].Type == "lookup" {
+			// vega-lite.js keeps a lookup in each view that has one.
 			continue
 		}
 		key, err := canonical(ts[0])
@@ -222,6 +223,13 @@ func (c *compiler) renameAll(out *vega.Spec, read map[string]bool, names map[str
 	}
 	for j := range out.Marks {
 		renameMarkData(&out.Marks[j], rename)
+	}
+	if c.proj != nil {
+		for j := range c.proj.fit {
+			if f := &c.proj.fit[j]; f.data != "" {
+				f.data = rename(f.data)
+			}
+		}
 	}
 	for j := range out.Scales {
 		renameDomain(out.Scales[j].Domain.Data, rename)

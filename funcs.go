@@ -125,6 +125,7 @@ func (s *scope) viewFuncs() map[string]expr.Func {
 		"warn":    func(_ *expr.Scope, args []any) (any, error) { return arg(args, 0), nil },
 		"debug":   func(_ *expr.Scope, args []any) (any, error) { return arg(args, 0), nil },
 	}
+	s.geoFuncs(fns)
 	maps.Copy(fns, s.rt.chart.opts.funcs)
 	for _, name := range []string{
 		"copy", "gradient", "geoArea", "geoBounds", "geoCentroid", "geoShape",

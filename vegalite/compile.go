@@ -81,6 +81,10 @@ type compiler struct {
 	// flattens are the expressions that flatten the fields inside objects
 	// before the transforms of a view.
 	flattens []string
+	// projStack holds the projections of the specs around the view being
+	// compiled, and proj the projection that the views share.
+	projStack []jsontext.Value
+	proj      *projComp
 }
 
 // reservation is a number of a dataset that a layer over a dataset takes.
@@ -171,12 +175,14 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	if l := layerRepeat(s); l != nil {
 		s = l
 	}
+	defer c.pushProjection(s.Projection)()
 	if isConcat(s) {
 		if err := c.concat(s, out, nil, "", map[string]string{}); err != nil {
 			return nil, err
 		}
 		out.Signals = append(out.Signals, c.signals...)
 		out.Data = c.data
+		c.finishProjection(out)
 		return out, nil
 	}
 	if _, _, _, _, _, ok, err := readFacet(s, nil); err != nil {
@@ -187,6 +193,7 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		}
 		out.Signals = append(out.Signals, c.signals...)
 		out.Data = c.data
+		c.finishProjection(out)
 		return out, nil
 	}
 	prefix := ""
@@ -203,12 +210,14 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	c.mergeAggregates(out)
 	out.Signals = append(out.Signals, c.signals...)
 	out.Data = c.data
+	c.finishProjection(out)
 	return out, nil
 }
 
 // view compiles a spec into a view: a single view or a layer. Facets,
 // repeats and concatenations come in their own functions.
 func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map[string]string) error {
+	defer c.pushProjection(s.Projection)()
 	if err := c.params(s, path); err != nil {
 		return err
 	}
@@ -404,6 +413,8 @@ type dataNode struct {
 	parse map[string]bool
 	// values says that the source is inline values.
 	values bool
+	// graticule says that the source is the lines of a graticule.
+	graticule bool
 }
 
 // name returns the name of the dataset.
@@ -477,8 +488,20 @@ func (c *compiler) source(d *Data, path string) (*dataNode, error) {
 	case d.Name != "":
 		vd.Name = d.Name
 		n.values = true
+	case len(d.Sphere) > 0:
+		vd.Values = vega.Value{JSON: jsontext.Value(`[{"type":"Sphere"}]`)}
+		n.values = true
+	case len(d.Graticule) > 0:
+		params := vega.Extra{}
+		var g map[string]any
+		if json.Unmarshal(d.Graticule, &g) == nil {
+			for k, v := range g {
+				params[k] = mustJSON(v)
+			}
+		}
+		vd.Transform = append(vd.Transform, vega.Transform{Type: "graticule", Params: params})
+		n.graticule = true
 	default:
-		// A sphere or a graticule comes with the projections of phase 5.
 		return nil, c.issue(path, "this kind of data")
 	}
 	if d.Format != nil {
@@ -714,6 +737,16 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 				if m, ok := f.(map[string]any); ok {
 					read[fmt.Sprint(m["data"])] = true
 				}
+			}
+		}
+	}
+	for _, d := range c.data {
+		// A lookup reads its source as it is, so no transform of a view
+		// moves into that source.
+		for _, t := range d.Transform {
+			var from string
+			if t.Type == "lookup" && json.Unmarshal(t.Params["from"], &from) == nil {
+				read[from] = true
 			}
 		}
 	}

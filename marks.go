@@ -18,7 +18,7 @@ import (
 var markTypes = map[string]bool{
 	scene.Arc: true, scene.Area: true, scene.Group: true, scene.Image: true,
 	scene.Line: true, scene.Path: true, scene.Rect: true, scene.Rule: true,
-	scene.Symbol: true, scene.Text: true, scene.Trail: true,
+	scene.Shape: true, scene.Symbol: true, scene.Text: true, scene.Trail: true,
 }
 
 // buildMarks builds the marks of a scope, in the order of the spec.
@@ -549,6 +549,12 @@ func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) (
 		}
 		st := states[i]
 		setItem(st.it, r)
+		if m.Type == scene.Shape {
+			// The transform geoshape gives the path of a shape mark.
+			if v, ok := r["shape"].(string); ok {
+				st.it.Path = v
+			}
+		}
 		out = append(out, st)
 	}
 	return out, nil

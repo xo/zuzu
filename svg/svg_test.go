@@ -121,7 +121,7 @@ func TestWriteRefusesWhatItCannotDraw(t *testing.T) {
 		mark scene.Mark
 		want error
 	}{
-		{scene.Mark{Type: scene.Shape, Items: []scene.Item{{}}}, ErrUnsupportedMark},
+		{scene.Mark{Type: "unknown", Items: []scene.Item{{}}}, ErrUnsupportedMark},
 		{scene.Mark{Type: scene.Line, Items: []scene.Item{{Interpolate: "basis-closed"}, {X: 1}}}, ErrUnsupportedCurve},
 		{scene.Mark{Type: scene.Symbol, Items: []scene.Item{{Shape: "not a path"}}}, ErrUnsupportedShape},
 	} {

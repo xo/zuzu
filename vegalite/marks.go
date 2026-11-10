@@ -13,7 +13,7 @@ import (
 var vegaMark = map[string]string{
 	"bar": "rect", "rect": "rect", "tick": "rect", "point": "symbol", "circle": "symbol",
 	"square": "symbol", "line": "line", "area": "area", "rule": "rule", "text": "text",
-	"arc": "arc", "trail": "trail", "image": "image",
+	"arc": "arc", "trail": "trail", "image": "image", "geoshape": "shape",
 }
 
 // enc builds the encodings of a mark.
@@ -32,7 +32,9 @@ func (u *unit) markOf() (*vega.Mark, error) {
 	}
 	e := enc{}
 	u.color(e)
-	u.position(e)
+	if u.mark != "geoshape" {
+		u.position(e)
+	}
 	u.others(e)
 	for k, v := range u.props {
 		switch k {
@@ -82,6 +84,7 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		update[k] = prod(v)
 	}
 	m.Encode = vega.Encode{"update": update}
+	u.geoEncode(m)
 	return m, nil
 }
 
@@ -95,6 +98,10 @@ func (u *unit) color(e enc) {
 	}
 	if u.mark == "trail" {
 		filled = true
+	}
+	if u.mark == "geoshape" && u.source != nil && u.source.graticule {
+		// The lines of a graticule have no inside.
+		filled = false
 	}
 	if f, ok := u.props["filled"].(bool); ok {
 		filled = f
@@ -111,7 +118,7 @@ func (u *unit) color(e enc) {
 		ref = c
 	}
 	e.set(prop, ref)
-	if u.mark == "point" && !filled {
+	if (u.mark == "point" || u.mark == "geoshape") && !filled {
 		e.set("fill", map[string]any{"value": "transparent"})
 	}
 	if u.mark == "point" || u.mark == "circle" || u.mark == "square" {

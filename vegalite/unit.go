@@ -49,6 +49,15 @@ type unit struct {
 	// orient is vertical when the bars run up, and horizontal when they run
 	// across.
 	orient string
+	// geo holds the channels of longitude and latitude, and geoShape a
+	// shape of type geojson. proj is the projection that places them, and
+	// geoAs the fields of x and y that geopoint makes.
+	geo      map[string]*channelDef
+	geoShape *channelDef
+	proj     *projComp
+	geoAs    []string
+	// source is the dataset of the view before its transforms.
+	source *dataNode
 }
 
 // unit compiles a single view.
@@ -59,9 +68,6 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 		if err := json.Unmarshal(raw, &x); err == nil {
 			u.props[k] = x
 		}
-	}
-	if u.mark == "geoshape" {
-		return c.issue(path+"/mark", "the mark %s, which comes in phase 5", u.mark)
 	}
 	if c.cfg != nil {
 		// The corners of the config of the mark are drawn as the corners
@@ -109,7 +115,8 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 			}
 		}
 	}
-	for _, name := range []string{"row", "column", "facet", "longitude", "latitude", "xError", "yError"} {
+	u.readGeo()
+	for _, name := range []string{"row", "column", "facet", "xError", "yError"} {
 		if _, ok := u.ch[name]; ok {
 			if err := c.issue(path+"/encoding/"+name, "the channel %s", name); err != nil {
 				return err
@@ -120,12 +127,20 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 	if src == nil {
 		return c.issue(path, "a view with no data")
 	}
-	u.data = src
+	u.data, u.source = src, src
+	if u.usesGeo() {
+		p, err := c.projection(u)
+		if err != nil {
+			return err
+		}
+		u.proj = p
+	}
 	u.orientation()
 	u.stacking(s)
 	if err := u.dataflow(s); err != nil {
 		return err
 	}
+	u.fitData()
 	for _, d := range u.allChannels() {
 		if d.label != "" {
 			// The marks and the scale read the text of the range of each
@@ -313,7 +328,7 @@ func (u *unit) dataflow(s *Spec) error {
 			}
 		}
 	}
-	if u.stack != "" || len(u.invalidFields()) > 0 {
+	if u.stack != "" || len(u.invalidFields()) > 0 || len(u.geo) > 0 || u.geoShape != nil {
 		needs = true
 	}
 	if u.data != nil && u.data.values && len(dates)+len(numbers) > 0 {
@@ -349,6 +364,9 @@ func (u *unit) dataflow(s *Spec) error {
 		return err
 	}
 	flatten(true)
+	if err := u.addGeo(n); err != nil {
+		return err
+	}
 	unitsDone := false
 	for _, d := range u.allChannels() {
 		if d.def != nil && len(d.units) > 0 {

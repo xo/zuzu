@@ -83,8 +83,15 @@ first row or column.
 ### Add the expression functions that zuzu does not have
 
 An expression that calls one of these functions is an issue in the loose
-mode: `gradient`, `copy`, the functions `geo*` of phase 5, `treePath`, `treeAncestors`,
-`vlSelectionTest` and `vlSelectionResolve`.
+mode: `gradient`, `copy`, `geoShape`, `treePath`, `treeAncestors`,
+`vlSelectionTest` and `vlSelectionResolve`. The functions `geoArea`,
+`geoBounds` and `geoCentroid` measure in the plane of a projection. With no
+projection, Vega measures on the sphere, and zuzu does not.
+
+### Read the mesh of a TopoJSON topology
+
+The format topojson reads the geometries of an object as rows. A mesh, the
+borders of an object joined into lines, is an issue in the loose mode.
 
 ### Decide whether to share rows between datasets as Vega does
 

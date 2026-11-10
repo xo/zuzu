@@ -14,6 +14,7 @@ import (
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/geo"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text"
@@ -138,6 +139,9 @@ type scope struct {
 	// markItems holds the items of each named mark, for a mark whose data
 	// is another mark.
 	markItems map[string][]scene.Item
+	// projections holds the projections of the scope, which are made when
+	// first used.
+	projections map[string]*projState
 }
 
 type signalState struct {
@@ -174,6 +178,12 @@ func (rt *runtime) newScope(parent *scope, spec *vega.Scope, path string, datum 
 		scales:    map[string]*scaleState{},
 		producers: map[string]string{},
 		markItems: map[string][]scene.Item{},
+
+		projections: map[string]*projState{},
+	}
+	for i := range spec.Projections {
+		d := &spec.Projections[i]
+		s.projections[d.Name] = &projState{def: d, path: fmt.Sprintf("%s/projections/%d", path, i)}
 	}
 	for i := range spec.Signals {
 		d := &spec.Signals[i]
@@ -267,7 +277,7 @@ func (s *scope) signal(name string) (any, error) {
 			return sc.signalValue(name, st)
 		}
 		if ds, ok := sc.producers[name]; ok {
-			if _, err := sc.dataset(ds); err != nil {
+			if err := sc.produce(ds, name); err != nil {
 				return nil, err
 			}
 			if st, ok := sc.signals[name]; ok {
@@ -395,8 +405,45 @@ func (s *scope) dataset(name string) ([]dataflow.Row, error) {
 	return ds.rows, ds.err
 }
 
+// produce works out a signal that a transform of a dataset sets. If the
+// dataset is not loaded yet, it runs the transforms only up to that one, as
+// the dataflow of Vega does: a later transform of the dataset can need the
+// signal, through a projection that fits the data.
+func (s *scope) produce(name, signal string) error {
+	ds, ok := s.data[name]
+	if !ok {
+		return nil
+	}
+	if ds.state != todo {
+		_, err := s.dataset(name)
+		return err
+	}
+	end := -1
+	for i, t := range ds.def.Transform {
+		if v, ok := t.Param("signal"); ok && v.Signal == "" {
+			var n string
+			if v.Decode(&n) == nil && n == signal {
+				end = i + 1
+			}
+		}
+	}
+	if end < 0 {
+		_, err := s.dataset(name)
+		return err
+	}
+	ds.state = busy
+	defer func() { ds.state = todo }()
+	_, err := s.loadTo(ds, end)
+	return err
+}
+
 // load reads the rows of a dataset and runs its transforms.
 func (s *scope) load(ds *dataState) ([]dataflow.Row, error) {
+	return s.loadTo(ds, len(ds.def.Transform))
+}
+
+// loadTo reads the rows of a dataset and runs its first n transforms.
+func (s *scope) loadTo(ds *dataState, n int) ([]dataflow.Row, error) {
 	d := ds.def
 	rows, err := s.source(ds)
 	if err != nil {
@@ -409,7 +456,7 @@ func (s *scope) load(ds *dataState) ([]dataflow.Row, error) {
 		}
 	}
 	env := &dataEnv{s: s}
-	for i, t := range d.Transform {
+	for i, t := range d.Transform[:n] {
 		path := fmt.Sprintf("%s/transform/%d", ds.path, i)
 		if !dataflow.Supported(t.Type) {
 			if err := s.rt.issue(vega.ErrUnsupportedTransform, path, "%s", t.Type); err != nil {
@@ -460,7 +507,7 @@ func (s *scope) source(ds *dataState) ([]dataflow.Row, error) {
 			return dataflow.Read([]byte(text), f, s.rt.loc)
 		}
 		if f.Type == "topojson" {
-			return nil, vega.Issue{Err: vega.ErrUnsupported, Message: "the format topojson"}
+			return dataflow.ReadTopoJSON(v, f)
 		}
 		if f.Property != "" {
 			if m, ok := v.(map[string]any); ok {
@@ -478,9 +525,6 @@ func (s *scope) source(ds *dataState) ([]dataflow.Row, error) {
 			return nil, err
 		}
 		url := expr.String(v)
-		if f.Type == "topojson" {
-			return nil, vega.Issue{Err: vega.ErrUnsupported, Message: "the format topojson"}
-		}
 		if o.loader == nil {
 			return nil, fmt.Errorf("reading %q: %w", url, ErrNoLoader)
 		}
@@ -516,7 +560,7 @@ func (s *scope) format(f *vega.Format) (dataflow.Format, error) {
 	if f == nil {
 		return dataflow.Format{}, nil
 	}
-	out := dataflow.Format{Type: f.Type, Delimiter: f.Delimiter, Header: f.Header, Property: f.Property}
+	out := dataflow.Format{Type: f.Type, Delimiter: f.Delimiter, Header: f.Header, Property: f.Property, Feature: f.Feature, Mesh: f.Mesh}
 	if !f.Parse.IsZero() {
 		v, err := s.value(f.Parse)
 		if err != nil {
@@ -578,6 +622,9 @@ func (e *dataEnv) SetSignal(name string, v any)              { e.s.setSignal(nam
 func (e *dataEnv) Location() *time.Location                  { return e.s.rt.loc }
 func (e *dataEnv) Random() float64                           { return e.s.rt.rand.Float64() }
 func (e *dataEnv) Hierarchy() *dataflow.Hierarchy            { return &e.s.rt.hierarchy }
+func (e *dataEnv) Projection(name string) (*geo.Projection, error) {
+	return e.s.projection(name)
+}
 
 // number reads a value as a number, with def for null or undefined.
 func number(v any, def float64) float64 {

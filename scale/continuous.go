@@ -52,6 +52,16 @@ func newContinuous(o Options) (Scale, error) {
 	zero := o.Zero != nil && *o.Zero
 	if o.Zero == nil {
 		zero = s.typ == "linear" || s.typ == "pow" || s.typ == "sqrt"
+		// Vega makes a continuous scale of colors sequential or diverging
+		// from the count of its domain, before zero, and those types do
+		// not include zero.
+		n := len(o.Domain)
+		if !math.IsNaN(o.DomainMid) {
+			n++
+		}
+		if !s.isTime() && (o.Scheme || len(o.Range) > 0 && allStrings(o.Range)) && (n == 2 || n == 3) {
+			zero = false
+		}
 	}
 	d = includeZero(d, zero)
 	if !math.IsNaN(o.DomainMin) {
