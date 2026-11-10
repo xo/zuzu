@@ -29,6 +29,7 @@ var transforms = map[string]transformFunc{
 	"joinaggregate": joinAggregate,
 	"countpattern":  countpattern,
 	"dotbin":        dotbin,
+	"force":         force,
 	"geojson":       geojson,
 	"geopath":       geopath,
 	"geopoint":      geopoint,

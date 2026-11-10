@@ -554,6 +554,19 @@ func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) (
 	rows := make([]dataflow.Row, len(states))
 	for i, st := range states {
 		r := itemRow(st.it)
+		for k, v := range st.values {
+			if _, ok := r[k]; !ok {
+				r[k] = v
+			}
+		}
+		// A place that the encoding did not set is NaN, as in Vega, so
+		// that a force places the item itself.
+		if !st.set["x"] && !st.set["xc"] && !st.set["x2"] {
+			r["x"] = math.NaN()
+		}
+		if !st.set["y"] && !st.set["yc"] && !st.set["y2"] {
+			r["y"] = math.NaN()
+		}
 		r[itemKey] = i
 		rows[i] = r
 	}
@@ -600,14 +613,20 @@ func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) (
 // itemRow returns the properties of an item that a transform of a mark
 // reads, with its datum.
 func itemRow(it *scene.Item) dataflow.Row {
-	return dataflow.Row{
+	r := dataflow.Row{
 		"datum": it.Datum, "x": it.X, "y": it.Y, "x2": it.X2, "y2": it.Y2,
 		"width": it.Width, "height": it.Height, "path": it.Path,
 		"angle": it.Angle, "startAngle": it.StartAngle, "endAngle": it.EndAngle,
 		"innerRadius": it.InnerRadius, "outerRadius": it.OuterRadius,
-		"text": textValue(it.Text), "font": it.Font, "fontSize": it.FontSize,
+		"text": textValue(it.Text), "font": it.Font,
 		"fontStyle": it.FontStyle, "fontWeight": string(it.FontWeight),
 	}
+	if it.FontSize != 0 {
+		// A size of 0 means the size of the theme, and a transform that
+		// writes 0 hides the text.
+		r["fontSize"] = it.FontSize
+	}
+	return r
 }
 
 // setItem writes the properties of a row back to its item.
@@ -628,17 +647,15 @@ func setItem(it *scene.Item, r dataflow.Row) {
 	if v, ok := r["image"].(string); ok {
 		it.URL = v
 	}
-	x, xok := r["x"].(float64)
-	y, yok := r["y"].(float64)
-	if xok && yok && (math.IsNaN(x) || math.IsNaN(y)) {
-		// A transform that gives no place, as a word cloud does for a
-		// word that does not fit, hides the item, which Vega does not
-		// draw.
-		zero := 0.0
-		it.Opacity = &zero
-	}
 	if v, ok := r["fontSize"].(float64); ok && !math.IsNaN(v) {
 		it.FontSize = v
+		if v == 0 {
+			// A font size of 0, as a word cloud gives a word that does not
+			// fit, hides the text, as in Vega. The scene reads 0 as the
+			// size of the theme.
+			zero := 0.0
+			it.Opacity = &zero
+		}
 	}
 	if v, ok := r["font"].(string); ok {
 		it.Font = v

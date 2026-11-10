@@ -25,11 +25,15 @@ type itemState struct {
 	xc, yc float64
 	// facet is the index of the facet of a group item, which a sort keeps.
 	facet int
+	// values holds each property as the encoding set it, with the
+	// properties that zuzu does not draw, such as the xfocus that a
+	// force reads.
+	values map[string]any
 }
 
 // newItemState starts an item for a datum.
 func newItemState(datum any) *itemState {
-	return &itemState{it: &scene.Item{Datum: datum}, set: map[string]bool{}}
+	return &itemState{it: &scene.Item{Datum: datum}, set: map[string]bool{}, values: map[string]any{}}
 }
 
 // encodeItem applies the encodings of a mark to an item, for a datum.
@@ -313,6 +317,10 @@ func itemField(it *scene.Item, name string) any {
 
 // setProp sets a property of an item to a value.
 func setProp(st *itemState, name string, v any) {
+	if st.values == nil {
+		st.values = map[string]any{}
+	}
+	st.values[name] = v
 	it := st.it
 	num := func() float64 {
 		f := expr.Number(v)

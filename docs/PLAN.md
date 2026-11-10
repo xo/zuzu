@@ -645,8 +645,12 @@ zuzu chose these rules where the documents of Vega say nothing (D6):
 - The oracle finds the specs that read random numbers by two runs with two
   seeds, and the check compares only their counts (D28).
 
-The transforms `force` and `label`, the sankey of zuzu and the time scale
-that skips days are not done.
+- `force` runs its iterations at once, as the static mode of Vega does,
+  since zuzu draws a still image. Its nbody force sums over every pair,
+  the exact form of the approximation of Barnes and Hut.
+
+The transform `label`, the sankey of zuzu and the time scale that skips
+days are not done.
 
 ### Phase 6. The direct okage renderer
 
