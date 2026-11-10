@@ -109,6 +109,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		align = "all"
 	}
 	out.Layout = lit(map[string]any{"padding": 20, "columns": columns, "bounds": "full", "align": align})
+	c.mergeAggregates(out)
 	return nil
 }
 

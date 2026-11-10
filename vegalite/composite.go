@@ -87,6 +87,19 @@ func composite(s *Spec) (*Spec, error) {
 	default:
 		out = errorMark(s.Mark.Type, cont, field, title, def, props, others, groupby)
 	}
+	if layers, ok := out["layer"].([]any); ok && len(layers) == 1 {
+		// A composite mark of one part is a single view, with the
+		// transforms of the layer before its own.
+		one, _ := layers[0].(map[string]any)
+		ts, _ := out["transform"].([]any)
+		if own, ok := one["transform"].([]any); ok {
+			ts = append(ts, own...)
+		}
+		if len(ts) > 0 {
+			one["transform"] = ts
+		}
+		out = one
+	}
 	var transforms []any
 	for _, t := range s.Transform {
 		transforms = append(transforms, t.fields())
@@ -107,6 +120,7 @@ func composite(s *Spec) (*Spec, error) {
 	}
 	spec.Data = s.Data
 	spec.Width, spec.Height = s.Width, s.Height
+	spec.expanded = true
 	return &spec, nil
 }
 
@@ -178,7 +192,15 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 	if groupby == nil {
 		groupby = []any{}
 	}
-	transform := append([]any{map[string]any{"aggregate": agg, "groupby": groupby}}, calcs...)
+	transform := []any{map[string]any{"aggregate": agg, "groupby": groupby}}
+	// The bounds that the formulas work out belong to the layers that
+	// draw them.
+	withCalcs := func(l map[string]any) map[string]any {
+		if len(calcs) > 0 {
+			l["transform"] = calcs
+		}
+		return l
+	}
 	color := props["color"]
 	var layers []any
 	if typ == "errorbar" {
@@ -187,13 +209,13 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 			color = "black"
 		}
 		rule["color"] = color
-		layers = append(layers, layerOf(rule, others, map[string]any{
+		layers = append(layers, withCalcs(layerOf(rule, others, map[string]any{
 			cont: channelWith(def, lower, title), cont + "2": map[string]any{"field": upper},
-		}))
+		})))
 		if t, ok := props["ticks"]; ok && t != false {
 			for _, f := range []string{lower, upper} {
 				tick := map[string]any{"type": "tick", "style": "errorbar-ticks", "color": color}
-				layers = append(layers, layerOf(tick, others, map[string]any{cont: channelWith(def, f, title)}))
+				layers = append(layers, withCalcs(layerOf(tick, others, map[string]any{cont: channelWith(def, f, title)})))
 			}
 		}
 	} else {
@@ -201,16 +223,16 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 		if color != nil {
 			band["color"] = color
 		}
-		layers = append(layers, layerOf(band, others, map[string]any{
+		layers = append(layers, withCalcs(layerOf(band, others, map[string]any{
 			cont: channelWith(def, lower, title), cont + "2": map[string]any{"field": upper},
-		}))
+		})))
 		if b, ok := props["borders"]; ok && b != false {
 			for _, f := range []string{lower, upper} {
 				line := map[string]any{"type": "line", "style": "errorband-borders"}
 				if color != nil {
 					line["color"] = color
 				}
-				layers = append(layers, layerOf(line, others, map[string]any{cont: channelWith(def, f, title)}))
+				layers = append(layers, withCalcs(layerOf(line, others, map[string]any{cont: channelWith(def, f, title)})))
 			}
 		}
 	}

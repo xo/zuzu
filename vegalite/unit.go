@@ -168,17 +168,27 @@ func (u *unit) dimension() string {
 // stacking works out whether the marks stack, as a bar, an area or an arc
 // does by default when its measure is quantitative.
 func (u *unit) stacking(s *Spec) {
+	measure := u.measure()
+	if _, ok := u.ch["theta"]; ok {
+		measure = "theta"
+	}
+	m := u.ch[measure]
+	explicit := m != nil && m.def != nil && !m.def.Stack.IsZero()
 	switch u.mark {
 	case "bar", "area", "arc":
+	case "rule", "point", "circle", "square", "line", "text", "tick":
+		// These stack only when the channel asks.
+		if !explicit {
+			return
+		}
 	default:
 		return
 	}
-	m := u.ch[u.measure()]
 	if m == nil || m.typ != quantitative || m.bin != nil || m.binned || !m.isField() {
 		return
 	}
-	if u.mark != "arc" {
-		if _, ok := u.ch[u.measure()+"2"]; ok {
+	if measure != "theta" {
+		if _, ok := u.ch[measure+"2"]; ok {
 			return
 		}
 	}
@@ -193,11 +203,6 @@ func (u *unit) stacking(s *Spec) {
 			}
 		case string:
 			offset = x
-		}
-	}
-	if d := u.ch[u.dimension()]; d != nil && d.continuous() && d.bin == nil && !d.binned && d.units == nil && u.mark == "bar" {
-		if m.def == nil || m.def.Stack.IsZero() {
-			return
 		}
 	}
 	var by []*channelDef
@@ -218,11 +223,10 @@ func (u *unit) stacking(s *Spec) {
 	by = slices.DeleteFunc(by, func(d *channelDef) bool { return placed[d.out] })
 	// An aggregate gives one row for each value of the dimension, which
 	// has nothing to stack on, unless a channel such as color splits it.
-	explicit := m.def != nil && !m.def.Stack.IsZero()
 	if len(by) == 0 && m.aggregate != "" && !explicit {
 		return
 	}
-	u.stack, u.offset, u.stackBy = u.measure(), offset, by
+	u.stack, u.offset, u.stackBy = measure, offset, by
 	_ = s
 }
 
@@ -236,8 +240,7 @@ func (u *unit) dataflow(s *Spec) error {
 	u.dates = map[string]bool{}
 	for _, d := range u.allChannels() {
 		switch d.aggregate {
-		case "", "count", "sum", "valid", "missing", "distinct", "values":
-		default:
+		case "min", "max":
 			// An op that compares values reads them as numbers, as
 			// Vega-Lite parses them.
 			if d.field != "" {
@@ -588,18 +591,12 @@ func (u *unit) invalidFields() []string {
 		if !isPositional(name) && (d.typ != quantitative || d.def != nil && valueOf(d.def.Scale) == nil && !d.def.Scale.IsZero()) {
 			continue
 		}
-		if d.typ == temporal && d.units == nil && d.aggregate == "" {
+		if d.typ == temporal && (d.units != nil || d.aggregate != "") {
+			continue
+		}
+		if !slices.Contains(out, d.out) {
 			out = append(out, d.out)
-			continue
 		}
-		if d.typ == temporal {
-			continue
-		}
-		if name == u.stack {
-			out = append(out, d.out)
-			continue
-		}
-		out = append(out, d.out)
 	}
 	return out
 }

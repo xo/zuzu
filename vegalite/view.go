@@ -143,7 +143,7 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 		v.order = append(v.order, name)
 	}
 	maps.Copy(s.props, props)
-	if s.typ == "point" && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick") {
+	if s.typ == "point" && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" || u.mark == "rule") {
 		// A discrete scale that a bar draws on has bands, whatever drew
 		// on it first.
 		s.typ = "band"
@@ -274,7 +274,7 @@ func scaleTypeOf(ch string, d *channelDef, mark string, props map[string]any) (s
 	switch {
 	case ch == "x" || ch == "y" || ch == "xOffset" || ch == "yOffset":
 		switch {
-		case discrete && (mark == "bar" || mark == "rect" || mark == "tick" || ch == "xOffset" || ch == "yOffset"):
+		case discrete && (mark == "bar" || mark == "rect" || mark == "tick" || mark == "rule" || ch == "xOffset" || ch == "yOffset"):
 			typ = "band"
 		case discrete:
 			typ = "point"

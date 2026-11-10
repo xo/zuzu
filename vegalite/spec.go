@@ -58,6 +58,10 @@ type Spec struct {
 	Config     jsontext.Value `json:"config,omitzero"`
 
 	Extra Extra `json:",embed"`
+
+	// expanded says that the compiler made the layer of the spec from a
+	// composite mark or an overlay.
+	expanded bool
 }
 
 // Data is the data of a view: inline values, a url, a named dataset, or a

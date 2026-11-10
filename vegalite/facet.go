@@ -156,6 +156,9 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		return err
 	}
 	main := child.mainData()
+	if main == "" {
+		return c.issue(path+"/spec", "a facet whose cells draw no data, such as a facet of a facet")
+	}
 	// The child draws in each cell, from the data of the cell.
 	for i := range child.marks {
 		renameData(&child.marks[i], main, "facet")
@@ -296,6 +299,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		cols = map[string]any{"signal": "length(data('" + colDomain + "'))"}
 	}
 	out.Layout = lit(map[string]any{"padding": 20, "columns": cols, "bounds": "full", "align": "all"})
+	c.mergeAggregates(out)
 	return nil
 }
 

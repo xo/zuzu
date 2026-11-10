@@ -150,8 +150,9 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	if err := c.view(s, v, nil, "", map[string]string{}); err != nil {
 		return nil, err
 	}
-	out.Data = c.data
 	v.finish(out)
+	c.mergeAggregates(out)
+	out.Data = c.data
 	return out, nil
 }
 
@@ -172,6 +173,12 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			if err := c.transforms(src, s.Transform, path+"/transform"); err != nil {
 				return err
 			}
+		}
+		if src != nil && !src.open && !s.expanded && len(s.Layer) > 1 && len(s.Transform) == 0 {
+			// A layer over inline values has a dataset of its own, which
+			// vega-lite.js names and later removes, so its number is
+			// taken.
+			c.nData++
 		}
 		if src != nil && len(s.Layer) > 1 {
 			// The layers share the data, so each adds its transforms to a
@@ -401,7 +408,7 @@ func (c *compiler) parseFields(n *dataNode, fields []string, typ string) {
 	if d.URL.IsZero() && d.Values.IsZero() {
 		return
 	}
-	if (!d.Values.IsZero() || typ == "number") && root.index != n.index {
+	if !d.Values.IsZero() && root.index != n.index {
 		// Inline values parse in the dataset that derives from them, with
 		// a formula for each field, and the values stay as they are.
 		fn := map[string]string{"date": "toDate", "number": "toNumber"}[typ]
@@ -495,6 +502,7 @@ func overlay(s *Spec) *Spec {
 	out := *s
 	// The caller already read the data of the spec.
 	out.Mark, out.Data = nil, nil
+	out.expanded = true
 	out.Layer = []Spec{{Mark: base}}
 	if line {
 		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line"}})
@@ -503,4 +511,133 @@ func overlay(s *Spec) *Spec {
 		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "point", Props: Extra{"filled": []byte("true")}, object: true}})
 	}
 	return &out
+}
+
+// mergeAggregates moves the aggregates of datasets that derive from the
+// same dataset, with the same group by fields, into that dataset as one
+// aggregate, as vega-lite.js does. It does so only when every dataset that
+// derives from the parent starts with such an aggregate and no mark reads
+// the parent.
+func (c *compiler) mergeAggregates(out *vega.Spec) {
+	children := map[string][]int{}
+	for i, d := range c.data {
+		if len(d.Source.List) == 1 {
+			children[d.Source.List[0]] = append(children[d.Source.List[0]], i)
+		}
+	}
+	read := marksData(out.Marks)
+	for _, s := range out.Scales {
+		if s.Domain.Data != nil {
+			read[s.Domain.Data.Data] = true
+			for _, f := range s.Domain.Data.Fields {
+				if m, ok := f.(map[string]any); ok {
+					read[fmt.Sprint(m["data"])] = true
+				}
+			}
+		}
+	}
+	for pi := range c.data {
+		parent := &c.data[pi]
+		kids := children[parent.Name]
+		if len(kids) < 2 || read[parent.Name] {
+			continue
+		}
+		var groupby []byte
+		ok := true
+		for _, k := range kids {
+			ts := c.data[k].Transform
+			if len(ts) == 0 || ts[0].Type != "aggregate" {
+				ok = false
+				break
+			}
+			g := ts[0].Params["groupby"]
+			if groupby == nil {
+				groupby = g
+			} else if string(g) != string(groupby) {
+				ok = false
+				break
+			}
+		}
+		if !ok {
+			continue
+		}
+		var ops, fields, as []any
+		seen := map[string]bool{}
+		for _, k := range kids {
+			t := c.data[k].Transform[0]
+			var o, f, a []any
+			_ = json.Unmarshal(t.Params["ops"], &o)
+			_ = json.Unmarshal(t.Params["fields"], &f)
+			_ = json.Unmarshal(t.Params["as"], &a)
+			for i := range a {
+				name := fmt.Sprint(a[i])
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				ops, fields, as = append(ops, o[i]), append(fields, f[i]), append(as, a[i])
+			}
+			c.data[k].Transform = c.data[k].Transform[1:]
+		}
+		var g []any
+		_ = json.Unmarshal(groupby, &g)
+		parent.Transform = append(parent.Transform, transform("aggregate", map[string]any{
+			"groupby": g, "ops": ops, "fields": fields, "as": as,
+		}))
+	}
+	c.removeEmpty(read)
+}
+
+// removeEmpty removes each dataset that derives from one other dataset
+// with no transforms of its own, and that no mark reads: its datasets then
+// derive from its source.
+func (c *compiler) removeEmpty(read map[string]bool) {
+	for {
+		removed := false
+		for i, d := range c.data {
+			if len(d.Source.List) != 1 || len(d.Transform) > 0 || read[d.Name] || !strings.HasPrefix(d.Name, "data_") {
+				continue
+			}
+			used := false
+			for _, other := range c.data {
+				if len(other.Source.List) == 1 && other.Source.List[0] == d.Name {
+					used = true
+				}
+			}
+			if !used {
+				continue
+			}
+			for j := range c.data {
+				if len(c.data[j].Source.List) == 1 && c.data[j].Source.List[0] == d.Name {
+					c.data[j].Source = d.Source
+				}
+			}
+			c.data = append(c.data[:i], c.data[i+1:]...)
+			removed = true
+			break
+		}
+		if !removed {
+			return
+		}
+	}
+}
+
+// marksData returns the datasets that marks read, with the marks of
+// groups.
+func marksData(ms []vega.Mark) map[string]bool {
+	out := map[string]bool{}
+	var walk func(ms []vega.Mark)
+	walk = func(ms []vega.Mark) {
+		for _, m := range ms {
+			if m.From != nil {
+				out[m.From.Data] = true
+				if m.From.Facet != nil {
+					out[m.From.Facet.Data] = true
+				}
+			}
+			walk(m.Marks)
+		}
+	}
+	walk(ms)
+	return out
 }
