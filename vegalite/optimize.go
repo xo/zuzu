@@ -383,13 +383,28 @@ func (c *compiler) liftBins(out *vega.Spec, read map[string]bool) {
 			children[d.Source.List[0]] = append(children[d.Source.List[0]], i)
 		}
 	}
-	startsWithBin := func(ts []vega.Transform) bool {
-		return len(ts) >= 2 && ts[0].Type == "extent" && ts[1].Type == "bin"
+	// binAt returns where a bin starts in a list of transforms, after the
+	// filters of the view, or -1. vega-lite.js moves a bin up past them.
+	binAt := func(ts []vega.Transform) int {
+		for i := 0; i+1 < len(ts); i++ {
+			if ts[i].Type == "extent" && ts[i+1].Type == "bin" {
+				return i
+			}
+			if ts[i].Type != "filter" || invalidFilter(ts[i:i+1]) {
+				return -1
+			}
+		}
+		return -1
+	}
+	binAs := func(t vega.Transform) string {
+		var as []any
+		_ = json.Unmarshal(t.Params["as"], &as)
+		return fmt.Sprint(as)
 	}
 	for pi, p := range c.data {
 		var kids []int
 		for _, k := range children[p.Name] {
-			if startsWithBin(c.data[k].Transform) {
+			if binAt(c.data[k].Transform) >= 0 {
 				kids = append(kids, k)
 			}
 		}
@@ -398,9 +413,19 @@ func (c *compiler) liftBins(out *vega.Spec, read map[string]bool) {
 		}
 		order := append([]int{kids[len(kids)-1]}, kids[:len(kids)-1]...)
 		for _, k := range order {
-			for startsWithBin(c.data[k].Transform) {
-				c.data[pi].Transform = append(c.data[pi].Transform, c.data[k].Transform[:2]...)
-				c.data[k].Transform = c.data[k].Transform[2:]
+			for i := binAt(c.data[k].Transform); i >= 0; i = binAt(c.data[k].Transform) {
+				ts := c.data[k].Transform
+				pair := slices.Clone(ts[i : i+2])
+				have := false
+				for _, t := range c.data[pi].Transform {
+					if t.Type == "bin" && binAs(t) == binAs(pair[1]) {
+						have = true
+					}
+				}
+				if !have {
+					c.data[pi].Transform = append(c.data[pi].Transform, pair...)
+				}
+				c.data[k].Transform = slices.Delete(slices.Clone(ts), i, i+2)
 			}
 		}
 		// The datasets take their numbers in the same order.
