@@ -16,6 +16,18 @@ import (
 // shared is what the layers of a view share: the marks, the scales and the
 // guides, and the size.
 type shared struct {
+	// facetFields are the fields of the rows and the columns of a facet,
+	// which the aggregate and the stack of a cell group by.
+	facetFields []*channelDef
+	// sizeNames are the names of the width and the height, which a cell of
+	// a facet calls child_width and child_height.
+	sizeNames [2]string
+	// scalePrefix names the scales of the positions of a view of a
+	// concatenation, such as concat_0_x.
+	scalePrefix string
+	// common holds the scales that the views of a concatenation share, such
+	// as color, and nil when the view shares none.
+	common *shared
 	marks  []vega.Mark
 	scales map[string]*scaleComp
 	order  []string
@@ -39,6 +51,15 @@ func newView(prefix string) *view {
 // layer returns a layer of the view, which shares its scales.
 func (v *view) layer(prefix, parent string) *view {
 	return &view{shared: v.shared, prefix: parent + prefix}
+}
+
+// sn returns the name of the scale of a channel: the channel, with the
+// prefix of the view for a position.
+func (v *view) sn(ch string) string {
+	if v.scalePrefix != "" && isPositional(ch) {
+		return v.scalePrefix + ch
+	}
+	return ch
 }
 
 // size takes the width and the height of a spec.
@@ -94,6 +115,9 @@ func (v *view) scaleType(ch string) string {
 // its domain. It reports false when the spec turns the scale off with
 // "scale": null.
 func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bool {
+	if v.common != nil && !isPositional(name) {
+		return (&view{shared: v.common}).addScale(u, name, d, fields)
+	}
 	var props map[string]any
 	if d.def != nil && !d.def.Scale.IsZero() {
 		x := valueOf(d.def.Scale)
@@ -260,8 +284,12 @@ func (v *view) finish(out *vega.Spec) {
 		s := v.scales[name]
 		out.Scales = append(out.Scales, v.scaleOf(s))
 	}
-	w, wsig := v.dimension("x", "width", v.width)
-	h, hsig := v.dimension("y", "height", v.height)
+	wname, hname := "width", "height"
+	if v.sizeNames[0] != "" {
+		wname, hname = v.sizeNames[0], v.sizeNames[1]
+	}
+	w, wsig := v.dimension("x", wname, v.width)
+	h, hsig := v.dimension("y", hname, v.height)
 	out.Signals = append(out.Signals, wsig...)
 	out.Signals = append(out.Signals, hsig...)
 	if !w.IsZero() {
@@ -298,11 +326,19 @@ func (v *view) dimension(ch, name string, given vega.Value) (vega.NumberValue, [
 		return vega.Num(continuousSize), nil
 	}
 	inner, outer := s.paddings()
-	stepName := ch + "_step"
+	stepName := v.sn(ch) + "_step"
 	return vega.NumberValue{}, []vega.Signal{
 		{Name: stepName, Value: mustJSON(step)},
-		{Name: name, Update: vega.Expr(fmt.Sprintf("bandspace(domain('%s').length, %s, %s) * %s", ch, num(inner), num(outer), stepName))},
+		{Name: name, Update: vega.Expr(fmt.Sprintf("bandspace(domain('%s').length, %s, %s) * %s", v.sn(ch), num(inner), num(outer), stepName))},
 	}
+}
+
+// sizeName returns the name of the width, for 0, or of the height, for 1.
+func (v *view) sizeName(i int) string {
+	if v.sizeNames[i] != "" {
+		return v.sizeNames[i]
+	}
+	return [2]string{"width", "height"}[i]
 }
 
 // fixed reports whether a width or a height is a number, rather than a
@@ -350,7 +386,7 @@ func (s *scaleComp) paddings() (float64, float64) {
 
 // scaleOf builds the Vega scale of a scale.
 func (v *view) scaleOf(s *scaleComp) vega.Scale {
-	vs := vega.Scale{Name: s.name, Type: s.typ}
+	vs := vega.Scale{Name: v.sn(s.name), Type: s.typ}
 	if s.typ == "linear" {
 		vs.Type = "linear"
 	}
@@ -579,20 +615,20 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 	switch s.channel {
 	case "x", "xOffset":
 		if s.discrete && s.typ != "ordinal" && s.channel == "x" && !fixed(v.width) {
-			return vega.ScaleRange{Step: vega.Value{Signal: "x_step"}}
+			return vega.ScaleRange{Step: vega.Value{Signal: v.sn("x") + "_step"}}
 		}
 		if s.channel == "xOffset" {
-			return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "bandwidth('x')"}}}
+			return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "bandwidth('" + v.sn("x") + "')"}}}
 		}
-		return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "width"}}}
+		return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: v.sizeName(0)}}}
 	case "y", "yOffset":
 		if s.discrete && s.typ != "ordinal" && s.channel == "y" && !fixed(v.height) {
-			return vega.ScaleRange{Step: vega.Value{Signal: "y_step"}}
+			return vega.ScaleRange{Step: vega.Value{Signal: v.sn("y") + "_step"}}
 		}
 		if s.channel == "yOffset" {
-			return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "bandwidth('y')"}}}
+			return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "bandwidth('" + v.sn("y") + "')"}}}
 		}
-		return vega.ScaleRange{Values: []vega.Value{{Signal: "height"}, lit(0)}}
+		return vega.ScaleRange{Values: []vega.Value{{Signal: v.sizeName(1)}, lit(0)}}
 	case "color", "fill", "stroke":
 		switch {
 		case s.discrete && s.field != nil && s.field.typ == ordinal:
@@ -657,7 +693,7 @@ func (v *view) guides(out *vega.Spec) {
 			if _, ok := v.scales[other]; !ok {
 				other = ""
 			}
-			grid, main := axisOf(s, title, other)
+			grid, main := axisOf(s, title, other, v)
 			if grid != nil {
 				grids = append(grids, *grid)
 			}
@@ -748,14 +784,14 @@ var vlSpecifiers = map[string]string{"year-month": "%b %Y ", "year-month-date": 
 
 // axisOf returns the axes of a positional scale: an axis of grid lines for
 // a continuous scale, and the axis of labels, as Vega-Lite writes them.
-func axisOf(s *scaleComp, title string, other string) (grid *vega.Axis, main vega.Axis) {
+func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis, main vega.Axis) {
 	orient := "bottom"
-	size := "width"
+	size := v.sizeName(0)
 	if s.channel == "y" {
-		orient, size = "left", "height"
+		orient, size = "left", v.sizeName(1)
 	}
 	f, t, z := false, true, 0
-	main = vega.Axis{Scale: s.name, Orient: lit(orient), Grid: &f, ZIndex: &z}
+	main = vega.Axis{Scale: v.sn(s.name), Orient: lit(orient), Grid: &f, ZIndex: &z}
 	if title != "" {
 		main.Title = lit(title)
 	}
@@ -765,12 +801,12 @@ func axisOf(s *scaleComp, title string, other string) (grid *vega.Axis, main veg
 	}
 	if showGrid {
 		grid = &vega.Axis{
-			Scale: s.name, Orient: lit(orient), Grid: &t, ZIndex: &z,
+			Scale: v.sn(s.name), Orient: lit(orient), Grid: &t, ZIndex: &z,
 			Domain: vega.BoolValue{Kind: vega.Literal}, Labels: vega.BoolValue{Kind: vega.Literal},
 			Ticks: vega.BoolValue{Kind: vega.Literal}, MaxExtent: lit(0), MinExtent: lit(0),
 		}
 		if other != "" {
-			grid.GridScale = other
+			grid.GridScale = v.sn(other)
 		}
 		if !s.discrete {
 			grid.TickCount = vega.Value{Signal: "ceil(" + size + "/40)"}

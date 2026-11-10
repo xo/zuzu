@@ -34,6 +34,12 @@ func (t Transform) fields() map[string]any {
 func (c *compiler) transformOne(n *dataNode, t Transform, path string) error {
 	f := t.fields()
 	switch {
+	case t.Has("density"), t.Has("loess"), t.Has("regression"), t.Has("quantile"):
+		for _, k := range []string{"density", "loess", "regression", "quantile"} {
+			if t.Has(k) {
+				return c.issue(path, "the transform %s, which comes in phase 5", k)
+			}
+		}
 	case t.Has("filter"):
 		test := predicateOf(f["filter"])
 		c.add(n, transform("filter", map[string]any{"expr": test}))
@@ -175,12 +181,6 @@ func (c *compiler) transformOne(n *dataNode, t Transform, path string) error {
 		c.add(n, transform("stack", params))
 	case t.Has("extent"):
 		c.add(n, transform("extent", map[string]any{"field": f["extent"], "signal": f["param"]}))
-	case t.Has("density"), t.Has("loess"), t.Has("regression"), t.Has("quantile"):
-		for _, k := range []string{"density", "loess", "regression", "quantile"} {
-			if t.Has(k) {
-				return c.issue(path, "the transform %s, which comes in phase 5", k)
-			}
-		}
 	default:
 		return c.issue(path, "a transform with the fields %v", keys(f))
 	}

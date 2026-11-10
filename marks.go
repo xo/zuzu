@@ -143,11 +143,16 @@ func (s *scope) buildScope(path string) ([]scene.Mark, error) {
 		return nil, err
 	}
 	out = append(out, legends...)
-	title, err := s.buildTitle(path)
+	title, err := s.buildTitle(path, out)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, title...)
+	if !s.spec.Layout.IsZero() {
+		if err := s.gridLayout(out); err != nil {
+			return nil, err
+		}
+	}
 	s.placeGuides(out)
 	return out, nil
 }

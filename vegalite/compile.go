@@ -85,6 +85,22 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		t.Anchor = lit("start")
 		out.Title = &t
 	}
+	if isConcat(s) {
+		if err := c.concat(s, out, nil, "", map[string]string{}); err != nil {
+			return nil, err
+		}
+		out.Data = c.data
+		return out, nil
+	}
+	if _, _, _, _, _, ok, err := readFacet(s, nil); err != nil {
+		return nil, err
+	} else if ok {
+		if err := c.facet(s, out, nil, "", map[string]string{}); err != nil {
+			return nil, err
+		}
+		out.Data = c.data
+		return out, nil
+	}
 	v := newView("")
 	if err := c.view(s, v, nil, "", map[string]string{}); err != nil {
 		return nil, err
@@ -126,6 +142,9 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 		v.size(s)
 		return nil
 	case s.Mark != nil:
+		if layered := overlay(s); layered != nil {
+			return c.view(layered, v, src, path, repeat)
+		}
 		v.size(s)
 		return c.unit(s, v, src, path, repeat)
 	case len(s.HConcat) > 0 || len(s.VConcat) > 0 || len(s.Concat) > 0:
@@ -225,9 +244,8 @@ func (c *compiler) source(d *Data, path string) (*dataNode, error) {
 		vd.Name = d.Name
 		n.values = true
 	default:
-		if err := c.issue(path, "this kind of data"); err != nil {
-			return nil, err
-		}
+		// A sphere or a graticule comes with the projections of phase 5.
+		return nil, c.issue(path, "this kind of data")
 	}
 	if d.Format != nil {
 		if vd.Format == nil {
@@ -360,4 +378,50 @@ func str(v vega.Value) string {
 		return ""
 	}
 	return expr.String(x)
+}
+
+// overlay turns an area or a line whose mark asks for a line or points over
+// it into a layer of the marks, as Vega-Lite does. It returns nil for any
+// other spec.
+func overlay(s *Spec) *Spec {
+	if s.Mark.Type != "area" && s.Mark.Type != "line" {
+		return nil
+	}
+	want := func(k string) bool {
+		raw, ok := s.Mark.Props[k]
+		if !ok {
+			return false
+		}
+		var v any
+		if json.Unmarshal(raw, &v) != nil {
+			return false
+		}
+		switch x := v.(type) {
+		case bool:
+			return x
+		case map[string]any:
+			return true
+		}
+		return false
+	}
+	line, point := s.Mark.Type == "area" && want("line"), want("point")
+	if !line && !point {
+		return nil
+	}
+	base := &Mark{Type: s.Mark.Type, Props: Extra{}, object: true}
+	for k, v := range s.Mark.Props {
+		if k != "line" && k != "point" {
+			base.Props[k] = v
+		}
+	}
+	out := *s
+	out.Mark = nil
+	out.Layer = []Spec{{Mark: base}}
+	if line {
+		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line"}})
+	}
+	if point {
+		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "point", Props: Extra{"filled": []byte("true")}, object: true}})
+	}
+	return &out
 }

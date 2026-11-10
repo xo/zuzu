@@ -37,6 +37,8 @@ type unit struct {
 	// sortIndex names, for each channel whose scale has a domain of its
 	// own, the field that holds the index of a value in that domain.
 	sortIndex map[string]string
+	// dates holds the fields of the view that are dates.
+	dates map[string]bool
 	// orient is vertical when the bars run up, and horizontal when they run
 	// across.
 	orient string
@@ -209,6 +211,7 @@ func (u *unit) dataflow(s *Spec) error {
 	c := u.c
 	var dates []string
 	var numbers []string
+	u.dates = map[string]bool{}
 	for _, d := range u.allChannels() {
 		switch d.aggregate {
 		case "", "count", "sum", "valid", "missing", "distinct", "values":
@@ -221,6 +224,9 @@ func (u *unit) dataflow(s *Spec) error {
 		}
 		if d.typ == temporal && d.field != "" && d.aggregate == "" {
 			dates = append(dates, d.field)
+			if d.units == nil {
+				u.dates[d.out] = true
+			}
 		}
 		if d.units != nil && d.field != "" {
 			dates = append(dates, d.field)
@@ -269,7 +275,11 @@ func (u *unit) dataflow(s *Spec) error {
 	if f := u.invalidFields(); len(f) > 0 {
 		var parts []string
 		for _, name := range f {
-			parts = append(parts, "isValid("+fieldRef(name)+") && isFinite(+"+fieldRef(name)+")")
+			test := "isValid(" + fieldRef(name) + ") && isFinite(+" + fieldRef(name) + ")"
+			if u.dates[name] {
+				test = "(isDate(" + fieldRef(name) + ") || (" + test + "))"
+			}
+			parts = append(parts, test)
 		}
 		c.add(n, transform("filter", map[string]any{"expr": strings.Join(parts, " && ")}))
 	}
@@ -286,7 +296,8 @@ func (u *unit) allChannels() []*channelDef {
 			out = append(out, d)
 		}
 	}
-	return append(out, u.detail...)
+	out = append(out, u.detail...)
+	return append(out, u.v.facetFields...)
 }
 
 // aggregated reports whether a channel aggregates.
@@ -373,18 +384,28 @@ func (u *unit) addStack(n *dataNode) {
 	m := u.ch[u.stack]
 	var groupby []any
 	if u.mark != "arc" {
-		if d := u.ch[u.dimension()]; d != nil && d.isField() {
-			groupby = append(groupby, d.out)
-			if d.bin != nil {
-				groupby = append(groupby, d.outEnd)
+		dim := u.dimension()
+		for _, name := range []string{dim, dim + "Offset"} {
+			if d := u.ch[name]; d != nil && d.isField() {
+				groupby = append(groupby, d.out)
+				if d.bin != nil {
+					groupby = append(groupby, d.outEnd)
+				}
 			}
 		}
+	}
+	for _, d := range u.v.facetFields {
+		groupby = append(groupby, d.out)
 	}
 	if groupby == nil {
 		groupby = []any{}
 	}
 	sortFields, orders := []any{}, []any{}
 	for _, d := range u.stackBy {
+		if slices.Contains(groupby, any(d.out)) {
+			// A field that the stack groups by does not order it.
+			continue
+		}
 		field := d.out
 		if idx := u.sortIndex[d.channel]; idx != "" {
 			field = idx

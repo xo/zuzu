@@ -63,6 +63,14 @@ vega-lite.js compiled draws its bars in `#4c78a8`. The rules of the marks in
 the config of the theme, which waits for the item above. The axes, the
 legends and the titles already follow `docs/STYLE.md`.
 
+### Make the grid layout follow the layout of Vega
+
+`grid.go` lays out the cells, the headers, the footers and the titles of a
+facet and of a concatenation in a grid, with the full bounds of each cell.
+It does not read `align`, `center`, `offset`, `headerBand` or a padding for
+the rows apart from the columns, and a header with one item serves only the
+first row or column.
+
 ### Finish the guides
 
 1. An axis reads neither `labelFlush` nor `labelLimit`, and a legend reads

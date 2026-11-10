@@ -558,22 +558,25 @@ in phase 3.
 
 On 2026-11-10 the package `vegalite` reads every Vega-Lite spec of the
 corpus and writes it back with the same JSON. Its compiler handles a single
-view and a layer: the data, the transforms of Vega-Lite, the bins, the time
-units, the aggregate, the stack, the marks, the scales, the axes and the
-legends, with the names of the fields that Vega-Lite gives. `go run
+view, a layer, a facet by row and column, a repeat and a concatenation: the
+data, the transforms of Vega-Lite, the bins, the time units, the
+aggregate, the stack, the marks, the scales, the axes, the legends and the
+headers, with the names of the fields that Vega-Lite gives. The runtime
+lays out the cells of a facet and of a concatenation in a grid. `go run
 ./cmd/conform -vl` in the test module measures it:
 
 | Check | Match | Of |
 | --- | --- | --- |
-| specs, in all three checks | 145 (30.9%) | 470 |
-| datasets | 387 (36.1%) | 1072 |
-| scales | 689 (57.8%) | 1193 |
-| marks that draw data | 1184 (44.2%) | 2676 |
-| the structure of the compiled spec | 238 (50.6%) | 470 |
+| specs, in all three checks | 158 (33.6%) | 470 |
+| datasets | 459 (42.8%) | 1072 |
+| scales | 850 (71.2%) | 1193 |
+| marks that draw data | 1577 (60.5%) | 2607 |
+| the structure of the compiled spec | 259 (55.1%) | 470 |
 
-The facets, the repeats, the concatenations and the composite marks
-`boxplot`, `errorbar` and `errorband` are not compiled yet, and they are the
-largest part of what fails.
+The structure meets its share. The composite marks `boxplot`, `errorbar`
+and `errorband`, a facet that wraps, and the names that vega-lite.js gives
+the datasets of a layer are the largest part of what fails, with the maps
+of phase 5.
 
 ### Phase 5. Tier 1 and tier 2
 

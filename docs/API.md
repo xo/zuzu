@@ -102,8 +102,9 @@ On 2026-11-10 the code of phase 3 has all of the above but these:
 2. `WithEvaluator`, which comes with the package `script` (D9).
 3. `Update`, which comes with live data in phase 8.
 4. The whole of Vega-Lite. Since phase 4 started, `Parse` and
-   `FromVegaLite` compile a single view and a layer, and a facet, a repeat
-   or a concatenation is an issue that wraps `vega.ErrUnsupported`.
+   `FromVegaLite` compile a single view, a layer, a facet, a repeat and a
+   concatenation. A composite mark, such as `boxplot`, is an issue that
+   wraps `vega.ErrUnsupported`.
 
 `SVG` and `Image` are short forms. A program that wants the scene graph calls
 `Render` and gives the result to a renderer, because every renderer reads the

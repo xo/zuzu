@@ -144,13 +144,13 @@ func (u *unit) channelRef(name string) map[string]any {
 		}
 	case d.hasDatum:
 		if u.v.addScale(u, scaleName, d, nil) {
-			base = map[string]any{"scale": scaleName, "value": d.datum}
+			base = map[string]any{"scale": u.v.sn(scaleName), "value": d.datum}
 		} else {
 			base = map[string]any{"value": d.datum}
 		}
 	case d.isField():
 		if u.v.addScale(u, scaleName, d, []string{d.out}) {
-			base = map[string]any{"scale": scaleName, "field": d.out}
+			base = map[string]any{"scale": u.v.sn(scaleName), "field": d.out}
 		} else {
 			base = map[string]any{"field": d.out}
 		}
@@ -229,18 +229,18 @@ func (u *unit) axis(e enc, ch, size string) {
 	discrete := !d.continuous() || (d.units != nil && d.typ != temporal)
 	if d.bin != nil {
 		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
-		e.set(p, map[string]any{"scale": ch, "field": d.out, "offset": 0.5})
-		e.set(p2, map[string]any{"scale": ch, "field": d.outEnd, "offset": -0.5})
+		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out, "offset": 0.5})
+		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.outEnd, "offset": -0.5})
 		if u.mark != "bar" && u.mark != "rect" {
-			e.set(p, map[string]any{"signal": "scale(\"" + ch + "\", 0.5 * " + fieldRef(d.out) + " + 0.5 * " + fieldRef(d.outEnd) + ")"})
+			e.set(p, map[string]any{"signal": "scale(\"" + u.v.sn(ch) + "\", 0.5 * " + fieldRef(d.out) + " + 0.5 * " + fieldRef(d.outEnd) + ")"})
 			delete(e, p2)
 		}
 		return
 	}
 	if u.stack == ch {
 		u.v.addScale(u, ch, d, []string{d.out + "_start", d.out + "_end"})
-		e.set(p, map[string]any{"scale": ch, "field": d.out + "_end"})
-		e.set(p2, map[string]any{"scale": ch, "field": d.out + "_start"})
+		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_end"})
+		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_start"})
 		return
 	}
 	fields := []string{d.out}
@@ -250,12 +250,12 @@ func (u *unit) axis(e enc, ch, size string) {
 	hasScale := u.v.addScale(u, ch, d, fields)
 	ref := func(field string) map[string]any {
 		if hasScale {
-			return map[string]any{"scale": ch, "field": field}
+			return map[string]any{"scale": u.v.sn(ch), "field": field}
 		}
 		return map[string]any{"field": field}
 	}
 	if d.hasDatum {
-		ref = func(string) map[string]any { return map[string]any{"scale": ch, "value": d.datum} }
+		ref = func(string) map[string]any { return map[string]any{"scale": u.v.sn(ch), "value": d.datum} }
 	}
 	switch {
 	case discrete && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" && false):
@@ -267,7 +267,7 @@ func (u *unit) axis(e enc, ch, size string) {
 			return
 		}
 		e.set(p, ref(d.out))
-		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + ch + "'))"})
+		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + u.v.sn(ch) + "'))"})
 	case discrete && u.v.scaleType(ch) == "band":
 		r := ref(d.out)
 		r["band"] = 0.5
@@ -283,7 +283,7 @@ func (u *unit) axis(e enc, ch, size string) {
 		case d2 != nil && d2.hasValue:
 			e.set(p2, map[string]any{"value": d2.value})
 		case (u.mark == "bar" || u.mark == "area") && u.measure() == ch && hasScale:
-			e.set(p2, map[string]any{"scale": ch, "value": 0})
+			e.set(p2, map[string]any{"scale": u.v.sn(ch), "value": 0})
 		case u.mark == "rule" && u.ch[ch+"2"] == nil:
 		}
 	}
@@ -319,7 +319,7 @@ func (u *unit) arc(e enc) {
 	outer := map[string]any{"signal": "min(width,height)/2"}
 	if r := u.ch["radius"]; r != nil && r.isField() {
 		u.v.addScale(u, "radius", r, []string{r.out})
-		outer = map[string]any{"scale": "radius", "field": r.out}
+		outer = map[string]any{"scale": u.v.sn("radius"), "field": r.out}
 	}
 	if v, ok := u.props["outerRadius"]; ok {
 		outer = map[string]any{"value": v}
@@ -337,13 +337,13 @@ func (u *unit) arc(e enc) {
 		e.set("endAngle", map[string]any{"value": 6.283185307179586})
 	case u.stack == "theta":
 		u.v.addScale(u, "theta", t, []string{t.out + "_start", t.out + "_end"})
-		e.set("startAngle", map[string]any{"scale": "theta", "field": t.out + "_end"})
-		e.set("endAngle", map[string]any{"scale": "theta", "field": t.out + "_start"})
+		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out + "_end"})
+		e.set("endAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out + "_start"})
 	case t.isField():
 		u.v.addScale(u, "theta", t, []string{t.out})
-		e.set("startAngle", map[string]any{"scale": "theta", "field": t.out})
+		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out})
 		if u.v.scaleType("theta") == "band" {
-			e.set("endAngle", map[string]any{"scale": "theta", "field": t.out, "band": 1})
+			e.set("endAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out, "band": 1})
 		}
 	}
 }

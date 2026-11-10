@@ -365,8 +365,9 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 	return &m, nil
 }
 
-// buildTitle builds the title of a scope.
-func (s *scope) buildTitle(_ string) ([]scene.Mark, error) {
+// buildTitle builds the title of a scope. A title of a group stands beyond
+// the guides that the group already drew, such as the labels of its axis.
+func (s *scope) buildTitle(_ string, drawn []scene.Mark) ([]scene.Mark, error) {
 	t := s.spec.Title
 	if t == nil {
 		return nil, nil
@@ -410,6 +411,32 @@ func (s *scope) buildTitle(_ string) ([]scene.Mark, error) {
 	}
 	if lt.Offset, err = s.num(t.Offset, off); err != nil {
 		return nil, err
+	}
+	if s.parent != nil {
+		b := layout.Empty()
+		st := s.rt.style()
+		for i := range drawn {
+			if drawn[i].Role != "axis" {
+				continue
+			}
+			mb := st.MarkBounds(&drawn[i])
+			if !mb.IsEmpty() {
+				b.X1, b.Y1 = math.Min(b.X1, mb.X1), math.Min(b.Y1, mb.Y1)
+				b.X2, b.Y2 = math.Max(b.X2, mb.X2), math.Max(b.Y2, mb.Y2)
+			}
+		}
+		if !b.IsEmpty() {
+			switch lt.Orient {
+			case "left":
+				lt.Offset += -math.Min(0, b.X1)
+			case "right":
+				lt.Offset += math.Max(0, b.X2-w)
+			case "bottom":
+				lt.Offset += math.Max(0, b.Y2-h)
+			default:
+				lt.Offset += -math.Min(0, b.Y1)
+			}
+		}
 	}
 	m := s.rt.style().Title(lt)
 	if kind == "title" && s.parent == nil {
