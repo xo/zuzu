@@ -376,14 +376,30 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 	boxLayer := layerOf(box, others, map[string]any{
 		cont: channelWith(def, lb, title), cont + "2": map[string]any{"field": ub},
 	})
-	median := layerOf(map[string]any{"type": "tick", "style": "boxplot-median", "color": "white", "size": size, "thickness": 1}, others, map[string]any{
+	medianMark := map[string]any{"type": "tick", "style": "boxplot-median", "color": "white", "size": size, "thickness": 1}
+	if m, ok := props["median"].(map[string]any); ok {
+		// The median takes the properties that the spec gives it.
+		maps.Copy(medianMark, m)
+	}
+	median := layerOf(medianMark, others, map[string]any{
 		cont: channelWith(def, mb, title),
 	}, position...)
+	// Ticks at the ends of the whiskers, when the spec asks.
+	var ticks []any
+	if t, ok := props["ticks"]; ok && t != false {
+		for _, f := range []string{lw, uw} {
+			tick := map[string]any{"type": "tick", "style": "boxplot-ticks", "color": "black", "size": size / 2}
+			if m, ok := t.(map[string]any); ok {
+				maps.Copy(tick, m)
+			}
+			ticks = append(ticks, layerOf(tick, others, map[string]any{cont: channelWith(def, f, title)}, position...))
+		}
+	}
 	extent, isNum := props["extent"].(float64)
 	if e, ok := props["extent"].(string); ok && e == "min-max" {
 		return map[string]any{
 			"transform": []any{agg([]string{"q1", "q3", "median", "min", "max"}, []string{lb, ub, mb, lw, uw})},
-			"layer":     []any{rule(lw, lb), rule(ub, uw), boxLayer, median},
+			"layer":     append(append([]any{rule(lw, lb), rule(ub, uw)}, ticks...), boxLayer, median),
 		}
 	}
 	if !isNum {
@@ -407,7 +423,7 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 			map[string]any{"filter": "(" + lowFence + " <= " + f + ") && (" + f + " <= " + highFence + ")"},
 			agg([]string{"min", "max", "min", "max"}, []string{lw, uw, lb, ub}, field, field, lb, ub),
 		},
-		"layer": []any{rule(lw, lb), rule(ub, uw)},
+		"layer": append([]any{rule(lw, lb), rule(ub, uw)}, ticks...),
 	}
 	_ = other
 	return map[string]any{"layer": []any{

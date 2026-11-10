@@ -83,9 +83,16 @@ states the share that phase 3 must reach, and `TestPhase3Share` in
 `conform` fails below it. That test skips when the references are not
 there. The conformance job of CI writes them and runs it.
 
+A group mark of a spec can define a dataset with the name of a dataset of
+the top level, as the cells of a facet of vega-lite.js do. vega.js answers
+that name with the dataset of the last group, so the reference holds the
+data of one cell. The check leaves out those names, and does not count
+them.
+
 Add `-vl` to compile each Vega-Lite spec with zuzu rather than run the Vega
 spec of vega-lite.js. It also prints the share of the specs whose compiled
 spec has the structure of the one of vega-lite.js, which phase 4 measures.
+`TestPhase4Share` fails below the share that the plan states for phase 4.
 `go run ./cmd/compile spec.vl.json` prints the Vega spec that zuzu compiles.
 
 ## Look at what zuzu draws

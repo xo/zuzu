@@ -825,6 +825,9 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 			return vega.ScaleRange{Name: "ordinal"}
 		case s.discrete:
 			return vega.ScaleRange{Name: "category"}
+		case s.typ == "linear" && (s.mark == "rect" || s.mark == "geoshape"):
+			// A linear color of rects or shapes fills a heat map.
+			return vega.ScaleRange{Name: "heatmap"}
 		}
 		return vega.ScaleRange{Name: "ramp"}
 	case "shape":

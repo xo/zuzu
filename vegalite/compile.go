@@ -277,8 +277,15 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			}
 		}
 		for i := range s.Layer {
+			inheritEncoding(&s.Layer[i], s.Encoding)
+		}
+		for _, ch := range conflictingChannels(s.Layer) {
+			// Layers that put fields of a discrete and of a continuous type
+			// on a channel cannot share its scale.
+			independent[ch] = true
+		}
+		for i := range s.Layer {
 			l := &s.Layer[i]
-			inheritEncoding(l, s.Encoding)
 			if l.Mark == nil && len(l.Layer) == 0 {
 				continue
 			}
@@ -934,4 +941,36 @@ func layerRepeat(s *Spec) *Spec {
 		out.Layer = append(out.Layer, l)
 	}
 	return &out
+}
+
+// conflictingChannels returns the channels other than positions that the
+// layers give fields of both a discrete type and a continuous type.
+func conflictingChannels(layers []Spec) []string {
+	var out []string
+	for _, ch := range []string{"color", "fill", "stroke", "opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "size", "shape", "strokeDash", "angle"} {
+		discrete, continuous := false, false
+		for _, l := range layers {
+			c, ok := l.Encoding[ch]
+			if !ok {
+				continue
+			}
+			def := c.Def()
+			if def == nil || def.Field.IsZero() {
+				continue
+			}
+			d, err := readChannel(ch, def, nil)
+			if err != nil {
+				continue
+			}
+			if d.continuous() && (d.units == nil || d.typ == temporal) {
+				continuous = true
+			} else {
+				discrete = true
+			}
+		}
+		if discrete && continuous {
+			out = append(out, ch)
+		}
+	}
+	return out
 }

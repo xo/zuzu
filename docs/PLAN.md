@@ -568,11 +568,11 @@ measures it:
 
 | Check | Match | Of | Exit |
 | --- | --- | --- | --- |
-| specs, in all three checks | 378 (80.4%) | 470 | 60% |
-| datasets | 857 (79.9%) | 1072 | 70% |
-| scales | 1130 (94.7%) | 1193 | 80% |
-| marks that draw data | 2269 (84.0%) | 2702 | 75% |
-| the structure of the compiled spec | 408 (86.8%) | 470 | 50% |
+| specs, in all three checks | 401 (85.3%) | 470 | 60% |
+| datasets | 903 (85.3%) | 1059 | 70% |
+| scales | 1139 (95.5%) | 1193 | 80% |
+| marks that draw data | 2460 (91.0%) | 2702 | 75% |
+| the structure of the compiled spec | 420 (89.4%) | 470 | 50% |
 
 Each check meets its exit. Phase 4 is done when the maintainers accept the
 share. `TestPhase4Share` in the test module fails when a share falls below
@@ -583,9 +583,12 @@ layers over the aggregated fields that Vega-Lite names, such as
 `lower_box_x` and `mid_box_x`. Like vega-lite.js, the compiler merges the
 datasets of sibling views that have the same transforms, and the
 aggregates of sibling views that have the same group by fields. The
-largest parts of what fails are the maps and the transforms of phase 5, a
-facet sorted across both rows and columns, nested field names such as
-`a.b`, and some names of the datasets of a layer.
+check of datasets leaves out the names that a group of the reference also
+defines, since vega.js answers those with the data of the last group, so
+it counts 1059 datasets. The largest parts of what fails are the maps and
+the transforms of phase 5, the random numbers of a sample and of a
+bootstrap, a facet or a concatenation inside a concatenation, and the
+numbers of some datasets.
 
 ### Phase 5. Tier 1 and tier 2
 
