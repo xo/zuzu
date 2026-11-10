@@ -52,7 +52,7 @@ type channelDef struct {
 	// bracket says that the field ends with a bracket, as a['b'] does,
 	// after which a suffix is a part of its own.
 	bracket bool
-	utc      bool
+	utc     bool
 	// binnedUnit says that the data holds the start of each unit already.
 	binnedUnit bool
 	// out is the field that the marks draw, and outEnd the end of a bin or
@@ -440,11 +440,12 @@ func escapeField(name string) string {
 // with a test of each object on the way.
 func flattenExpr(path []string) string {
 	var parts []string
-	ref := "datum"
+	var ref strings.Builder
+	ref.WriteString("datum")
 	for _, p := range path {
 		q, _ := json.Marshal(p)
-		ref += "[" + string(q) + "]"
-		parts = append(parts, ref)
+		ref.WriteString("[" + string(q) + "]")
+		parts = append(parts, ref.String())
 	}
 	return strings.Join(parts, " && ")
 }
