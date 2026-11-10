@@ -147,7 +147,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			extra = append(extra, f.def)
 		}
 	}
-	child := newView("child_")
+	child := newView("child_", c.cfg)
 	child.facetFields = extra
 	if len(s.Transform) > 0 && len(s.Facet) == 0 {
 		cell.Transform = s.Transform

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/vega"
 )
@@ -43,6 +44,8 @@ type channelDef struct {
 	units    []string
 	unitName string
 	utc      bool
+	// binnedUnit says that the data holds the start of each unit already.
+	binnedUnit bool
 	// out is the field that the marks draw, and outEnd the end of a bin or
 	// of a time unit.
 	out, outEnd string
@@ -155,6 +158,12 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 		case map[string]any:
 			name = expr.String(x["unit"])
 		}
+		if rest, ok := strings.CutPrefix(name, "binned"); ok {
+			// The data holds the start of each unit already, and the end
+			// is one unit later.
+			name = rest
+			c.binnedUnit = true
+		}
 		c.units, c.utc = timeUnits(name)
 		c.unitName = strings.TrimPrefix(name, "utc")
 		if c.utc {
@@ -203,11 +212,20 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 			c.typ = nominal
 		}
 	}
-	if c.bin != nil && !isPositional(channel) && c.bin["maxbins"] == nil && c.bin["step"] == nil {
-		// A bin of a channel other than a position has 6 bins by default.
-		c.bin["maxbins"] = 6.0
+	if c.bin != nil && c.bin["maxbins"] == nil && c.bin["step"] == nil {
+		// A facet and a channel such as color or size have few bins by
+		// default, as Vega-Lite documents.
+		switch channel {
+		case "row", "column", "facet", "size", "color", "fill", "stroke", "strokeWidth", "opacity", "fillOpacity", "strokeOpacity", "shape":
+			c.bin["maxbins"] = 6.0
+		case "strokeDash":
+			c.bin["maxbins"] = 4.0
+		}
 	}
 	c.out = c.outputField()
+	if c.binnedUnit {
+		c.out = c.field
+	}
 	switch {
 	case c.bin != nil:
 		c.outEnd = c.out + "_end"
@@ -354,9 +372,15 @@ func varName(s string) string {
 }
 
 // fieldRef writes a field as an expression reads it, datum["name"].
+// A name with a path, such as a.b or a["b"], reads each step.
 func fieldRef(name string) string {
-	b, _ := json.Marshal(name)
-	return "datum[" + string(b) + "]"
+	var b strings.Builder
+	b.WriteString("datum")
+	for _, part := range dataflow.SplitField(name) {
+		q, _ := json.Marshal(part)
+		b.WriteString("[" + string(q) + "]")
+	}
+	return b.String()
 }
 
 // predicate writes a predicate of a filter, such as {"field": "x",

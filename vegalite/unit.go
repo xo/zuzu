@@ -21,14 +21,15 @@ var channelOrder = []string{
 
 // unit holds a single view while the compiler reads it.
 type unit struct {
-	c      *compiler
-	v      *view
-	mark   string
-	props  map[string]any
-	ch     map[string]*channelDef
-	detail []*channelDef
-	data   *dataNode
-	path   string
+	c       *compiler
+	v       *view
+	mark    string
+	props   map[string]any
+	ch      map[string]*channelDef
+	detail  []*channelDef
+	tooltip []*channelDef
+	data    *dataNode
+	path    string
 	// stack is the channel that stacks, such as y, and stackBy the fields
 	// that it stacks by.
 	stack   string
@@ -73,8 +74,15 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 				if err != nil {
 					return err
 				}
-				if name == "detail" && d.isField() {
+				if !d.isField() {
+					continue
+				}
+				if name == "detail" {
 					u.detail = append(u.detail, d)
+				} else {
+					// A field of a tooltip joins the aggregate and the bins,
+					// as Vega-Lite does, and nothing else.
+					u.tooltip = append(u.tooltip, d)
 				}
 			}
 			continue
@@ -187,7 +195,7 @@ func (u *unit) stacking(s *Spec) {
 			offset = x
 		}
 	}
-	if d := u.ch[u.dimension()]; d != nil && d.continuous() && d.bin == nil && d.units == nil && u.mark == "bar" {
+	if d := u.ch[u.dimension()]; d != nil && d.continuous() && d.bin == nil && !d.binned && d.units == nil && u.mark == "bar" {
 		if m.def == nil || m.def.Stack.IsZero() {
 			return
 		}
@@ -199,6 +207,15 @@ func (u *unit) stacking(s *Spec) {
 		}
 	}
 	by = append(by, u.detail...)
+	// A field that places the bars, such as the field of an offset, does
+	// not stack them.
+	placed := map[string]bool{}
+	for _, name := range []string{u.dimension(), u.dimension() + "Offset"} {
+		if d := u.ch[name]; d != nil && d.isField() {
+			placed[d.out] = true
+		}
+	}
+	by = slices.DeleteFunc(by, func(d *channelDef) bool { return placed[d.out] })
 	// An aggregate gives one row for each value of the dimension, which
 	// has nothing to stack on, unless a channel such as color splits it.
 	explicit := m.def != nil && !m.def.Stack.IsZero()
@@ -274,6 +291,13 @@ func (u *unit) dataflow(s *Spec) error {
 		}
 	}
 	for _, d := range u.allChannels() {
+		if d.binnedUnit {
+			unit := d.units[len(d.units)-1]
+			c.add(n, transform("formula", map[string]any{
+				"expr": "timeOffset('" + unit + "', datum['" + d.field + "'], 1)", "as": d.outEnd,
+			}))
+			continue
+		}
 		if d.units != nil && d.aggregate == "" {
 			params := map[string]any{"field": d.field, "units": d.units, "as": []any{d.out, d.outEnd}}
 			if d.utc {
@@ -370,6 +394,7 @@ func (u *unit) allChannels() []*channelDef {
 		}
 	}
 	out = append(out, u.detail...)
+	out = append(out, u.tooltip...)
 	return append(out, u.v.facetFields...)
 }
 
@@ -387,6 +412,10 @@ func (u *unit) aggregated() bool {
 // domain of its own, a field with the index of the value in that domain,
 // which orders the stack as the domain orders the legend.
 func (u *unit) addSortIndex(n *dataNode) {
+	if o := u.ch["order"]; o != nil && o.isField() {
+		// The order channel orders the stack.
+		return
+	}
 	for _, d := range u.stackBy {
 		if d.def == nil || d.def.Scale.IsZero() {
 			continue
@@ -508,15 +537,27 @@ func (u *unit) addStack(n *dataNode) {
 		if idx := u.sortIndex[d.channel]; idx != "" {
 			field = idx
 		}
+		// A vertical stack puts the first value at the top, and a
+		// horizontal stack or a pie puts it first.
+		order := "descending"
+		if u.orient == "horizontal" || u.mark == "arc" {
+			order = "ascending"
+		}
 		sortFields = append(sortFields, field)
-		orders = append(orders, "descending")
+		orders = append(orders, order)
 	}
-	if o := u.ch["order"]; o != nil && o.isField() {
+	if o := u.ch["order"]; o != nil {
 		order := "ascending"
-		if !o.def.Sort.IsZero() {
+		if o.def != nil && !o.def.Sort.IsZero() {
 			order = str(o.def.Sort)
 		}
-		sortFields, orders = []any{o.out}, []any{order}
+		if o.isField() {
+			sortFields, orders = []any{o.out}, []any{order}
+		} else {
+			for i := range orders {
+				orders[i] = order
+			}
+		}
 	}
 	u.c.add(n, transform("stack", map[string]any{
 		"groupby": groupby, "field": m.out, "sort": map[string]any{"field": sortFields, "order": orders},
@@ -533,6 +574,9 @@ func (u *unit) invalidFields() []string {
 		return nil
 	}
 	if v, ok := u.props["invalid"]; ok && v == nil {
+		return nil
+	}
+	if _, ok := u.props["invalid"]; !ok && u.c.cfg != nil && u.c.cfg.keepInvalid {
 		return nil
 	}
 	var out []string

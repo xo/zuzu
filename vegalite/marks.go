@@ -246,6 +246,19 @@ func (u *unit) axis(e enc, ch, size string) {
 		}
 		return
 	}
+	if o := u.ch[ch+"Offset"]; o != nil && o.isField() && d.units != nil && d.typ == temporal && u.spans(d) {
+		// Bars side by side within the interval of a time unit.
+		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
+		r := map[string]any{"scale": u.v.sn(ch), "field": d.out}
+		band := u.v.sn(ch)
+		if u.v.addScale(u, ch+"Offset", o, []string{o.out}) {
+			r["offset"] = map[string]any{"scale": u.v.sn(ch + "Offset"), "field": o.out, "band": 0.5}
+			band = u.v.sn(ch + "Offset")
+		}
+		e.set(pc, r)
+		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + band + "'))"})
+		return
+	}
 	if d.units != nil && d.typ == temporal && u.spans(d) {
 		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
 		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out, "offset": 0.5})

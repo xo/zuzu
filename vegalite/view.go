@@ -28,6 +28,7 @@ type shared struct {
 	// common holds the scales that the views of a concatenation share, such
 	// as color, and nil when the view shares none.
 	common *shared
+	cfg    *config
 	marks  []vega.Mark
 	scales map[string]*scaleComp
 	order  []string
@@ -44,8 +45,8 @@ type view struct {
 }
 
 // newView returns an empty view.
-func newView(prefix string) *view {
-	return &view{shared: &shared{scales: map[string]*scaleComp{}}, prefix: prefix}
+func newView(prefix string, cfg *config) *view {
+	return &view{shared: &shared{scales: map[string]*scaleComp{}, cfg: cfg}, prefix: prefix}
 }
 
 // layer returns a layer of the view, which shares its scales.
@@ -342,6 +343,9 @@ func (v *view) finish(out *vega.Spec) {
 // that work it out from the step of a discrete scale.
 func (v *view) dimension(ch, name string, given vega.Value) (vega.NumberValue, []vega.Signal) {
 	step := float64(discreteStep)
+	if v.cfg != nil && v.cfg.step > 0 {
+		step = v.cfg.step
+	}
 	if !given.IsZero() {
 		switch x := valueOf(given).(type) {
 		case float64:
@@ -515,6 +519,9 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	}
 	if quant && (positional || s.channel == "size" || s.channel == "theta" || s.channel == "radius") && s.typ != "log" {
 		zero := s.bins == "" && !s.binned && s.props["domain"] == nil && !s.dimension
+		if v.cfg != nil && v.cfg.zero != nil && positional {
+			zero = zero && *v.cfg.zero
+		}
 		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: zero}
 	}
 	if quant && (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") {

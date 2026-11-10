@@ -56,6 +56,8 @@ type compiler struct {
 	parsed  map[int]map[string]bool
 	nData   int
 	nSource int
+	// cfg is the config of the spec.
+	cfg *config
 	// top is the spec being compiled.
 	top *Spec
 }
@@ -70,9 +72,49 @@ func (c *compiler) issue(path, format string, args ...any) error {
 	return nil
 }
 
+// config holds the parts of the config of a spec that change the data or
+// the scales. The parts that change only the look are left to the theme of
+// zuzu (D12).
+type config struct {
+	// invalid is false when the config keeps invalid values, with
+	// "mark": {"invalid": null}.
+	keepInvalid bool
+	// zero is the default zero of the scales of position.
+	zero *bool
+	// step is the default step of a discrete scale of position.
+	step float64
+}
+
+// readConfig reads the parts of the config that the compiler follows.
+func readConfig(raw []byte) *config {
+	cfg := &config{}
+	if len(raw) == 0 {
+		return cfg
+	}
+	var m struct {
+		Mark  map[string]any `json:"mark"`
+		Scale map[string]any `json:"scale"`
+		View  map[string]any `json:"view"`
+	}
+	if json.Unmarshal(raw, &m) != nil {
+		return cfg
+	}
+	if v, ok := m.Mark["invalid"]; ok && v == nil {
+		cfg.keepInvalid = true
+	}
+	if z, ok := m.Scale["zero"].(bool); ok {
+		cfg.zero = &z
+	}
+	if st, ok := m.View["step"].(float64); ok {
+		cfg.step = st
+	}
+	return cfg
+}
+
 // compile compiles the spec of the top level.
 func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	c.top = s
+	c.cfg = readConfig(s.Config)
 	out := &vega.Spec{Schema: schemaVega}
 	if s.Description != nil {
 		out.Description = *s.Description
@@ -104,7 +146,7 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		out.Data = c.data
 		return out, nil
 	}
-	v := newView("")
+	v := newView("", c.cfg)
 	if err := c.view(s, v, nil, "", map[string]string{}); err != nil {
 		return nil, err
 	}

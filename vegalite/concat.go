@@ -61,7 +61,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 			return err
 		}
 	}
-	common := newView("")
+	common := newView("", c.cfg)
 	for i, cell := range cells {
 		p := fmt.Sprintf("%s/concat/%d", path, i)
 		if _, _, _, _, _, ok, _ := readFacet(cell.spec, cell.repeat); ok || isConcat(cell.spec) {
@@ -70,7 +70,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 			}
 			continue
 		}
-		v := newView(cell.prefix)
+		v := newView(cell.prefix, c.cfg)
 		v.scalePrefix = cell.prefix
 		v.common = common.shared
 		v.sizeNames = [2]string{cell.prefix + "width", cell.prefix + "height"}
