@@ -4,6 +4,9 @@ package geo
 const (
 	geometryCollection = "GeometryCollection"
 	multiLineString    = "MultiLineString"
+	lineString         = "LineString"
+	polygon            = "Polygon"
+	multiPolygon       = "MultiPolygon"
 )
 
 // stream receives a geometry as a sequence of events: the points, the
@@ -70,15 +73,15 @@ func streamObject(o any, s stream) {
 				s.point(x, y)
 			}
 		}
-	case "LineString":
+	case lineString:
 		streamLine(list(m["coordinates"]), s, false)
 	case multiLineString:
 		for _, l := range list(m["coordinates"]) {
 			streamLine(list(l), s, false)
 		}
-	case "Polygon":
+	case polygon:
 		streamPolygon(list(m["coordinates"]), s)
-	case "MultiPolygon":
+	case multiPolygon:
 		for _, p := range list(m["coordinates"]) {
 			streamPolygon(list(p), s)
 		}

@@ -47,6 +47,15 @@
           ]
         }
       ]
+    },
+    {
+      "name": "borders",
+      "url": "data/us-10m.json",
+      "format": {
+        "type": "topojson",
+        "mesh": "states",
+        "filter": "interior"
+      }
     }
   ],
   "scales": [
@@ -99,7 +108,23 @@
             {
               "value": "#f3f5f8"
             }
-          ],
+          ]
+        }
+      },
+      "transform": [
+        {
+          "type": "geoshape",
+          "projection": "projection"
+        }
+      ]
+    },
+    {
+      "type": "shape",
+      "from": {
+        "data": "borders"
+      },
+      "encode": {
+        "enter": {
           "stroke": {
             "value": "#ffffff"
           },

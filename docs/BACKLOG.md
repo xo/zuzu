@@ -72,11 +72,6 @@ mode: `gradient`, `copy`, `geoShape`, `treePath`, `treeAncestors`,
 `geoBounds` and `geoCentroid` measure in the plane of a projection. With no
 projection, Vega measures on the sphere, and zuzu does not.
 
-### Read the mesh of a TopoJSON topology
-
-The format topojson reads the geometries of an object as rows. A mesh, the
-borders of an object joined into lines, is an issue in the loose mode.
-
 ### Decide whether to share rows between datasets as Vega does
 
 A transform of Vega, such as `formula` or `stack`, changes the rows in

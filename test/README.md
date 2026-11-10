@@ -10,6 +10,8 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `testdata/references/` | the references of vega.js, which the oracle writes and git ignores |
 | `testdata/targets/` | a Vega spec for each target of tiers 1 and 2, which draws the chart of the target from the data of the corpus |
 | `targets/` | the test that runs those specs in the strict mode. Set `ZUZU_TARGETS_OUT` to a folder to write their SVG |
+| `testdata/topojson/` | a small topology, and the meshes that the reader of vega.js gives, which `oracle/topojson.mjs` writes |
+| `topojson/` | the test that compares the mesh of zuzu with those meshes |
 | `cmd/inventory/` | the tool that writes the inventory |
 | `cmd/targets/` | the tool that compares the SVG writer with the targets and writes `docs/targets/compare.html` (D13) |
 | `cmd/wasm/` | a program that imports zuzu, so that CI can build it with TinyGo (D29) |
@@ -134,3 +136,14 @@ TZ=America/New_York node oracle/formats.mjs ../format/testdata
 The time zone is New York, so that the cases of local time cross a change
 of the clock. `oracle/exprs.mjs` reads the expressions from
 `expr/testdata/exprs.txt`.
+
+## Write the meshes of TopoJSON
+
+The test in `topojson` compares the mesh of a topology with the rows that
+the reader of vega.js gives, on the small topology in `testdata/topojson`
+and on the maps of the corpus. Run this in this folder after `npm install`
+in `oracle`:
+
+```bash
+node oracle/topojson.mjs testdata
+```

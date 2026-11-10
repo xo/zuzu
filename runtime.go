@@ -563,7 +563,7 @@ func (s *scope) format(f *vega.Format) (dataflow.Format, error) {
 	if f == nil {
 		return dataflow.Format{}, nil
 	}
-	out := dataflow.Format{Type: f.Type, Delimiter: f.Delimiter, Header: f.Header, Property: f.Property, Feature: f.Feature, Mesh: f.Mesh}
+	out := dataflow.Format{Type: f.Type, Delimiter: f.Delimiter, Header: f.Header, Property: f.Property, Feature: f.Feature, Mesh: f.Mesh, Filter: f.Filter}
 	if !f.Parse.IsZero() {
 		v, err := s.value(f.Parse)
 		if err != nil {

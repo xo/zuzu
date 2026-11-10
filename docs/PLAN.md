@@ -673,6 +673,13 @@ rules where the documents of Vega say nothing (D6):
 - The methods `floodfill` and `reduced-search`, and the parameters
   `lineAnchor` and `markIndex`, are issues in the loose mode.
 
+On 2026-11-11 the format topojson also reads a mesh: the arcs of an object,
+each once, joined end to end into one MultiLineString, with the filter
+`interior` or `exterior`. The lines join and come in the order that the
+reader of vega.js gives, and a test in the test module compares them on the
+maps of the corpus. The spec of the choropleth target draws the borders of
+the states from the mesh, as the target does.
+
 A mark of a Vega spec that sets neither a fill nor a stroke takes the paint
 that the config of Vega gives it, in the colors of the theme: the first
 color of the categories, or the text color for a rule and a text.

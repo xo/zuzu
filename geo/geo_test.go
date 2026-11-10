@@ -151,3 +151,55 @@ func TestFeature(t *testing.T) {
 		t.Error("a missing object gives no error")
 	}
 }
+
+func TestMesh(t *testing.T) {
+	t.Parallel()
+	// Polygon a and polygon b share arc 0, b and the first polygon of c
+	// share arc 2, and arc 4 is an island of c. The line of the collection
+	// inside the collection runs along arcs 5 and 6. The results come from
+	// the reader of vega.js.
+	topo := obj(t, `{"type":"Topology","objects":{
+		"shapes":{"type":"GeometryCollection","geometries":[
+			{"type":"Polygon","arcs":[[0,1]],"id":"a"},
+			{"type":"Polygon","arcs":[[2,-1]],"id":"b"},
+			{"type":"MultiPolygon","arcs":[[[3,-3]],[[4]]],"id":"c"},
+			{"type":"GeometryCollection","geometries":[{"type":"LineString","arcs":[5,6]}]}]},
+		"lines":{"type":"MultiLineString","arcs":[[6],[-6]]}},
+		"arcs":[[[1,0],[1,1]],[[1,1],[0,1],[0,0],[1,0]],[[1,1],[2,1],[2,0],[1,0]],
+			[[1,0],[3,0],[3,1],[1,1]],[[5,5],[6,5],[6,6],[5,5]],[[0,3],[1,3]],[[1,3],[2,4]]]}`)
+	// In the quantized topology, arc 1 is empty, at 2,0, and it comes
+	// first in the stitch.
+	quantized := obj(t, `{"type":"Topology","transform":{"scale":[1,1],"translate":[0,0]},
+		"objects":{"l":{"type":"LineString","arcs":[0,1,2]}},
+		"arcs":[[[0,0],[2,0]],[[2,0],[0,0]],[[2,0],[0,2]]]}`)
+	tests := []struct {
+		topo         any
+		name, filter string
+		want         string
+	}{
+		{topo, "shapes", "", `[[[1,1],[2,1],[2,0],[1,0],[1,1],[0,1],[0,0],[1,0],[3,0],[3,1],[1,1]],[[5,5],[6,5],[6,6],[5,5]],[[0,3],[1,3],[2,4]]]`},
+		{topo, "shapes", "interior", `[[[1,0],[1,1],[2,1],[2,0],[1,0]]]`},
+		{topo, "shapes", "exterior", `[[[1,1],[0,1],[0,0],[1,0],[3,0],[3,1],[1,1]],[[5,5],[6,5],[6,6],[5,5]],[[0,3],[1,3],[2,4]]]`},
+		{topo, "lines", "", `[[[1,3],[0,3]],[[1,3],[2,4]]]`},
+		{quantized, "l", "", `[[[0,0],[2,0],[2,0],[2,2]]]`},
+	}
+	for _, test := range tests {
+		m, err := Mesh(test.topo, test.name, test.filter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m["type"] != "MultiLineString" {
+			t.Errorf("%s %q: the type is %v", test.name, test.filter, m["type"])
+		}
+		b, _ := json.Marshal(m["coordinates"])
+		if string(b) != test.want {
+			t.Errorf("%s %q:\ngot  %s\nwant %s", test.name, test.filter, b, test.want)
+		}
+	}
+	if _, err := Mesh(topo, "nope", ""); err == nil {
+		t.Error("a missing object gives no error")
+	}
+	if _, err := Mesh(topo, "shapes", "inside"); err == nil {
+		t.Error("an unknown filter gives no error")
+	}
+}

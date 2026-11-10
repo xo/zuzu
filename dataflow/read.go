@@ -14,7 +14,6 @@ import (
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
 	"github.com/xo/zuzu/geo"
-	"github.com/xo/zuzu/vega"
 )
 
 // Format says how to read data, with its signals resolved.
@@ -34,9 +33,12 @@ type Format struct {
 	// Auto infers the type of each field.
 	Auto bool
 	// Feature names the object of a TopoJSON topology whose geometries
-	// are the rows, and Mesh names the object whose shared borders are
-	// the row.
+	// are the rows, and Mesh names the object whose arcs, joined into
+	// lines, are the row.
 	Feature, Mesh string
+	// Filter keeps the arcs of a mesh between two geometries, for
+	// "interior", or the arcs of one geometry alone, for "exterior".
+	Filter string
 }
 
 // Read reads rows from the text of data in a format. A value that is not
@@ -321,8 +323,8 @@ func inferTypes(rows []Row) map[string]string {
 }
 
 // ReadTopoJSON reads the rows of a TopoJSON topology: a row for each
-// geometry of the object that Feature names. The mesh of an object, its
-// borders joined into lines, is not supported.
+// geometry of the object that Feature names, or one row, the
+// MultiLineString of the mesh of the object that Mesh names.
 func ReadTopoJSON(v any, f Format) ([]Row, error) {
 	switch {
 	case f.Feature != "":
@@ -332,7 +334,11 @@ func ReadTopoJSON(v any, f Format) ([]Row, error) {
 		}
 		return Ingest(fs), nil
 	case f.Mesh != "":
-		return nil, vega.Issue{Err: vega.ErrUnsupported, Message: "the mesh of topojson"}
+		m, err := geo.Mesh(v, f.Mesh, f.Filter)
+		if err != nil {
+			return nil, fmt.Errorf("reading topojson: %w: %w", ErrFormat, err)
+		}
+		return []Row{m}, nil
 	}
 	return nil, fmt.Errorf("reading topojson with no feature or mesh: %w", ErrFormat)
 }
