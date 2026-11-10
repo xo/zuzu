@@ -318,11 +318,23 @@ func (u *unit) dataflow(s *Spec) error {
 	if err := c.transforms(n, s.Transform, u.path+"/transform"); err != nil {
 		return err
 	}
+	unitsDone := false
+	for _, d := range u.allChannels() {
+		if d.def != nil && len(d.units) > 0 {
+			if _, ok := valueOf(d.def.Sort).([]any); ok {
+				// A list of values of a time unit sorts the rows after the
+				// time units.
+				u.addTimeUnits(n)
+				unitsDone = true
+				break
+			}
+		}
+	}
 	if u.addListSort(n) {
 		u.raw = n
 		n.open = false
 		n = c.derive(n)
-	} else if u.aggregated() && u.sortsByField() {
+	} else if u.sortsByField() {
 		// The domain sorts over the rows before the aggregate, so the
 		// aggregate goes in a dataset of its own.
 		u.raw = n
@@ -344,24 +356,8 @@ func (u *unit) dataflow(s *Spec) error {
 			}
 		}
 	}
-	for _, d := range u.allChannels() {
-		if d.binnedUnit {
-			unit := d.units[len(d.units)-1]
-			c.add(n, transform("formula", map[string]any{
-				"expr": "timeOffset('" + unit + "', datum['" + d.field + "'], 1)", "as": d.outEnd,
-			}))
-			continue
-		}
-		if d.units != nil && d.aggregate == "" {
-			params := map[string]any{"field": d.field, "units": d.units, "as": []any{d.out, d.outEnd}}
-			if d.utc {
-				params["timezone"] = "utc"
-			}
-			if d.unitStep != 0 {
-				params["step"] = d.unitStep
-			}
-			c.add(n, transform("timeunit", params))
-		}
+	if !unitsDone {
+		u.addTimeUnits(n)
 	}
 	for _, d := range u.allChannels() {
 		if u.shifted(d) {
@@ -416,11 +412,20 @@ func (u *unit) addListSort(n *dataNode) bool {
 			continue
 		}
 		var b strings.Builder
+		ref := fieldRef(d.field)
+		value := func(v any) string { return string(mustJSON(v)) }
+		index := name + "_" + d.field + "_sort_index"
+		if len(d.units) == 1 {
+			// The values are values of the time unit, which compare as
+			// dates.
+			ref = timeFloorExpr(d.units, d.utc, ref)
+			value = func(v any) string { return dateTimeExpr(map[string]any{d.units[0]: v, "utc": d.utc}) }
+			index = name + "_" + d.out + "_sort_index"
+		}
 		for i, v := range list {
-			fmt.Fprintf(&b, "%s===%s ? %d : ", fieldRef(d.field), string(mustJSON(v)), i)
+			fmt.Fprintf(&b, "%s===%s ? %d : ", ref, value(v), i)
 		}
 		fmt.Fprintf(&b, "%d", len(list))
-		index := name + "_" + d.field + "_sort_index"
 		u.c.add(n, transform("formula", map[string]any{"expr": b.String(), "as": index}))
 		if u.listSort == nil {
 			u.listSort = map[string]string{}
@@ -628,6 +633,29 @@ func (u *unit) addEncodingImpute(n *dataNode) error {
 		u.c.addImpute(n, d.out, key.out, groupby, spec)
 	}
 	return nil
+}
+
+// addTimeUnits adds the time units of the channels.
+func (u *unit) addTimeUnits(n *dataNode) {
+	for _, d := range u.allChannels() {
+		if d.binnedUnit {
+			unit := d.units[len(d.units)-1]
+			u.c.add(n, transform("formula", map[string]any{
+				"expr": "timeOffset('" + unit + "', datum['" + d.field + "'], 1)", "as": d.outEnd,
+			}))
+			continue
+		}
+		if d.units != nil && d.aggregate == "" {
+			params := map[string]any{"field": d.field, "units": d.units, "as": []any{d.out, d.outEnd}}
+			if d.utc {
+				params["timezone"] = "utc"
+			}
+			if d.unitStep != 0 {
+				params["step"] = d.unitStep
+			}
+			u.c.add(n, transform("timeunit", params))
+		}
+	}
 }
 
 // isPath reports whether a mark draws a path through its points.

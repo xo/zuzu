@@ -3,6 +3,7 @@ package vegalite
 import (
 	"encoding/json/v2"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -515,10 +516,16 @@ func timeFloorExpr(units []string, utc bool, f string) string {
 		}
 		return def
 	}
+	date := part("date", "date", "1")
+	if has("day") {
+		// A day of the week falls in the first week of 2012, which starts
+		// on a Sunday.
+		date = pre + "day(" + f + ")+1"
+	}
 	args := []string{
 		part("year", "year", "2012"),
 		part("month", "month", "0"),
-		part("date", "date", "1"),
+		date,
 		part("hours", "hours", "0"),
 		part("minutes", "minutes", "0"),
 		part("seconds", "seconds", "0"),
@@ -548,7 +555,31 @@ func dateTimeExpr(m map[string]any) string {
 		}
 		return def
 	}
+	if d, ok := m["day"]; ok {
+		// A day of the week is a date in the first week of 2012.
+		idx := 0
+		switch x := d.(type) {
+		case float64:
+			idx = int(x)
+		case string:
+			idx = dayIndex(x)
+		}
+		m = maps.Clone(m)
+		m["date"] = idx + 1
+	}
 	return "time(" + fn + "(" + strings.Join([]string{get("year", "2012"), month, get("date", "1"), get("hours", "0"), get("minutes", "0"), get("seconds", "0"), get("milliseconds", "0")}, ", ") + "))"
+}
+
+// dayIndex returns the index from 0, Sunday, of a day by its name.
+func dayIndex(s string) int {
+	names := []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
+	s = strings.ToLower(s)
+	for i, n := range names {
+		if strings.HasPrefix(s, n) {
+			return i
+		}
+	}
+	return 0
 }
 
 // monthIndex returns the index from 0 of a month by its name.
