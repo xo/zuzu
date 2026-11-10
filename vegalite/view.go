@@ -116,7 +116,7 @@ type scaleComp struct {
 	// second says that the scale is the own scale of a layer after the
 	// first, whose axis goes on the other side.
 	second bool
-	mark       string
+	mark   string
 	// titles are the titles of the fields that the scale draws, for its
 	// guide.
 	titles []string
