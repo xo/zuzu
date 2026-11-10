@@ -213,6 +213,11 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 			c.typ = temporal
 		case channel == "theta" || channel == "radius" || channel == "size" || channel == "opacity":
 			c.typ = quantitative
+		case scaleTypeIn(def, "time", "utc"):
+			c.typ = temporal
+		case scaleTypeIn(def, "linear", "log", "pow", "sqrt", "symlog", "quantize", "quantile", "threshold"):
+			// A continuous scale reads numbers.
+			c.typ = quantitative
 		case c.hasDatum:
 			switch c.datum.(type) {
 			case float64:
@@ -561,4 +566,15 @@ func monthIndex(s string) int {
 // lit returns a Value that holds a literal.
 func lit(v any) vega.Value {
 	return vega.Lit(v)
+}
+
+// scaleTypeIn reports whether the scale of a definition has one of some
+// types.
+func scaleTypeIn(def *FieldDef, types ...string) bool {
+	if def == nil || def.Scale.IsZero() {
+		return false
+	}
+	m, _ := valueOf(def.Scale).(map[string]any)
+	t, _ := m["type"].(string)
+	return t != "" && slices.Contains(types, t)
 }

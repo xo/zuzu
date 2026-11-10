@@ -14,13 +14,14 @@ import (
 // mergeIdentical merges the datasets that derive from the same dataset
 // with the same transforms into one, as vega-lite.js does. Then a dataset
 // that has one dataset derived from it, and that nothing else reads, takes
-// the transforms of that dataset. A dataset that goes frees its number.
-func (c *compiler) mergeIdentical(out *vega.Spec, read map[string]bool) {
-	for {
-		if !c.mergeOnce(out, read) {
-			return
-		}
+// the transforms of that dataset. A dataset that goes frees its number. It
+// reports whether it changed anything.
+func (c *compiler) mergeIdentical(out *vega.Spec, read map[string]bool) bool {
+	changed := false
+	for c.mergeOnce(out, read) {
+		changed = true
 	}
+	return changed
 }
 
 // mergeOnce makes one merge, and reports whether it made one.

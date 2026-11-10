@@ -225,6 +225,19 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			// dataset of its own.
 			src.open = false
 		}
+		independent := map[string]bool{}
+		if len(s.Resolve) > 0 {
+			var r struct {
+				Scale map[string]string `json:"scale"`
+			}
+			if err := json.Unmarshal(s.Resolve, &r); err == nil {
+				for ch, mode := range r.Scale {
+					if mode == "independent" {
+						independent[ch] = true
+					}
+				}
+			}
+		}
 		for i := range s.Layer {
 			l := &s.Layer[i]
 			inheritEncoding(l, s.Encoding)
@@ -232,6 +245,10 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 				continue
 			}
 			sub := v.layer(fmt.Sprintf("layer_%d_", i), v.prefix)
+			if len(independent) > 0 {
+				// The layer has its own scale of each independent channel.
+				sub.independent, sub.layerIndex = independent, i
+			}
 			if err := c.view(l, sub, src, fmt.Sprintf("%s/layer/%d", path, i), repeat); err != nil {
 				return err
 			}
@@ -612,12 +629,6 @@ func overlay(s *Spec) *Spec {
 // derives from the parent starts with such an aggregate and no mark reads
 // the parent.
 func (c *compiler) mergeAggregates(out *vega.Spec) {
-	children := map[string][]int{}
-	for i, d := range c.data {
-		if len(d.Source.List) == 1 {
-			children[d.Source.List[0]] = append(children[d.Source.List[0]], i)
-		}
-	}
 	read := marksData(out.Marks)
 	for _, s := range out.Scales {
 		if s.Domain.Data != nil {
@@ -629,6 +640,28 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 			}
 		}
 	}
+	// A merge of datasets can bring aggregates side by side, and a merge
+	// of aggregates can leave datasets that match.
+	for range 10 {
+		a := c.mergeSiblingAggregates(out, read)
+		c.removeEmpty(read)
+		if m := c.mergeIdentical(out, read); !a && !m {
+			break
+		}
+	}
+	c.release(out, read)
+}
+
+// mergeSiblingAggregates merges the aggregates of the datasets that derive
+// from the same dataset, and reports whether it merged any.
+func (c *compiler) mergeSiblingAggregates(out *vega.Spec, read map[string]bool) bool {
+	children := map[string][]int{}
+	for i, d := range c.data {
+		if len(d.Source.List) == 1 {
+			children[d.Source.List[0]] = append(children[d.Source.List[0]], i)
+		}
+	}
+	merged := false
 	for pi := range c.data {
 		parent := &c.data[pi]
 		kids := children[parent.Name]
@@ -707,10 +740,9 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 			"groupby": g, "ops": ops, "fields": fields, "as": as,
 		}))
 		c.reverseNames(out, read, kids)
+		merged = true
 	}
-	c.removeEmpty(read)
-	c.mergeIdentical(out, read)
-	c.release(out, read)
+	return merged
 }
 
 // removeEmpty removes each dataset that derives from one other dataset

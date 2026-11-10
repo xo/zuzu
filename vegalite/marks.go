@@ -299,7 +299,7 @@ func (u *unit) axis(e enc, ch, size string) {
 	}
 	if u.stack == ch {
 		u.v.addScale(u, ch, d, []string{d.out + "_start", d.out + "_end"})
-		if sc := u.v.scales[ch]; sc != nil && u.offset == "normalize" {
+		if sc := u.v.scales[u.v.key(ch)]; sc != nil && u.offset == "normalize" {
 			sc.normalized = true
 		}
 		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_end"})
@@ -430,7 +430,7 @@ func (u *unit) arc(e enc) {
 		if u.stack == "radius" {
 			// Stacked rings: each spans from its start to its end.
 			u.v.addScale(u, "radius", r, []string{r.out + "_start", r.out + "_end"})
-			if sc := u.v.scales["radius"]; sc != nil && sc.props["type"] == nil {
+			if sc := u.v.scales[u.v.key("radius")]; sc != nil && sc.props["type"] == nil {
 				sc.typ = "linear"
 			}
 			outer = map[string]any{"scale": u.v.sn("radius"), "field": r.out + "_end"}
@@ -546,7 +546,7 @@ func (u *unit) offsetRef(ch string, band bool) map[string]any {
 	if !u.v.addScale(u, ch+"Offset", o, []string{o.out}) {
 		return nil
 	}
-	if s := u.v.scales[ch+"Offset"]; s != nil && s.offset == "" {
+	if s := u.v.scales[u.v.key(ch+"Offset")]; s != nil && s.offset == "" {
 		switch {
 		case u.ch[ch] == nil:
 			s.offset = "center"

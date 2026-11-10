@@ -45,6 +45,20 @@ type view struct {
 	*shared
 
 	prefix string
+	// independent holds the channels whose scales a layer does not share
+	// with the other layers, and layerIndex the place of the layer.
+	independent map[string]bool
+	layerIndex  int
+}
+
+// key returns the key of the scale of a channel among the scales of the
+// view: the channel, or the channel with the prefix of a layer whose
+// scale of the channel is its own.
+func (v *view) key(ch string) string {
+	if v.independent[ch] {
+		return v.prefix + ch
+	}
+	return ch
 }
 
 // newView returns an empty view.
@@ -60,6 +74,9 @@ func (v *view) layer(prefix, parent string) *view {
 // sn returns the name of the scale of a channel: the channel, with the
 // prefix of the view for a position.
 func (v *view) sn(ch string) string {
+	if v.independent[ch] {
+		return v.prefix + ch
+	}
 	if v.scalePrefix != "" && (isPositional(ch) || v.prefixAll) {
 		return v.scalePrefix + ch
 	}
@@ -96,6 +113,9 @@ type scaleComp struct {
 	offset string
 	// normalized says that the scale draws a stack normalized to one.
 	normalized bool
+	// second says that the scale is the own scale of a layer after the
+	// first, whose axis goes on the other side.
+	second bool
 	mark       string
 	// titles are the titles of the fields that the scale draws, for its
 	// guide.
@@ -126,7 +146,7 @@ type dataField struct {
 
 // scaleType returns the type of the scale of a channel, or "".
 func (v *view) scaleType(ch string) string {
-	if s, ok := v.scales[ch]; ok {
+	if s, ok := v.scales[v.key(ch)]; ok {
 		return s.typ
 	}
 	return ""
@@ -147,12 +167,14 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 		}
 		props, _ = x.(map[string]any)
 	}
-	s, ok := v.scales[name]
+	key := v.key(name)
+	s, ok := v.scales[key]
 	if !ok {
-		s = &scaleComp{name: name, channel: name, props: map[string]any{}, mark: u.mark, field: d}
+		s = &scaleComp{name: key, channel: name, props: map[string]any{}, mark: u.mark, field: d}
 		s.typ, s.discrete = scaleTypeOf(name, d, u.mark, props)
-		v.scales[name] = s
-		v.order = append(v.order, name)
+		s.second = v.independent[name] && v.layerIndex > 0
+		v.scales[key] = s
+		v.order = append(v.order, key)
 	}
 	maps.Copy(s.props, props)
 	if s.typ == "point" && (name == "x" || name == "y") {
@@ -470,7 +492,7 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		case []any:
 			vals := make([]vega.Value, len(d))
 			for i, x := range d {
-				if m, ok := x.(map[string]any); ok && m["year"] != nil {
+				if m, ok := x.(map[string]any); ok && isDateTime(m) {
 					vals[i] = vega.Value{Signal: dateTimeExpr(m)}
 					continue
 				}
@@ -478,9 +500,28 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 			}
 			vs.Domain = vega.ScaleDomain{Values: vals}
 		case map[string]any:
-			if e, ok := d["expr"].(string); ok {
-				vs.Domain = vega.ScaleDomain{Signal: e}
-			} else {
+			switch {
+			case d["expr"] != nil:
+				vs.Domain = vega.ScaleDomain{Signal: expr.String(d["expr"])}
+			case d["unionWith"] != nil:
+				// The values come first, then the values of the data.
+				vs.Domain = v.dataDomain(s)
+				if ref := vs.Domain.Data; ref != nil {
+					var fields []any
+					if !ref.Field.IsZero() {
+						fields = []any{map[string]any{"data": ref.Data, "field": ref.Field.Name}}
+					} else {
+						for _, f := range ref.Fields {
+							if name, ok := f.(string); ok {
+								f = map[string]any{"data": ref.Data, "field": name}
+							}
+							fields = append(fields, f)
+						}
+					}
+					ref.Data, ref.Field = "", vega.Field{}
+					ref.Fields = append([]any{d["unionWith"]}, fields...)
+				}
+			default:
 				vs.Domain = v.dataDomain(s)
 			}
 		default:
@@ -497,13 +538,17 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	}
 	for _, k := range []string{"domainMin", "domainMax", "domainMid"} {
 		if x, ok := s.props[k]; ok {
+			val := lit(x)
+			if m, ok := x.(map[string]any); ok && isDateTime(m) {
+				val = vega.Value{Signal: dateTimeExpr(m)}
+			}
 			switch k {
 			case "domainMin":
-				vs.DomainMin = lit(x)
+				vs.DomainMin = val
 			case "domainMax":
-				vs.DomainMax = lit(x)
+				vs.DomainMax = val
 			default:
-				vs.DomainMid = lit(x)
+				vs.DomainMid = val
 			}
 		}
 	}
@@ -809,10 +854,10 @@ func (v *view) guides(out *vega.Spec) {
 				title = titleString(t)
 			}
 		}
-		switch name {
+		switch s.channel {
 		case "x", "y":
 			other := "y"
-			if name == "y" {
+			if s.channel == "y" {
 				other = "x"
 			}
 			if _, ok := v.scales[other]; !ok {
@@ -840,9 +885,9 @@ func (v *view) guides(out *vega.Spec) {
 				}
 			}
 			sn := v.sn(name)
-			switch name {
+			switch s.channel {
 			case "color", "fill":
-				if s.mark == "line" || s.mark == "rule" || (s.mark == "point" && name == "color") {
+				if s.mark == "line" || s.mark == "rule" || (s.mark == "point" && s.channel == "color") {
 					l.Stroke = sn
 					if s.mark == "line" || s.mark == "rule" {
 						l.SymbolType = lit("stroke")
@@ -916,12 +961,15 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 	if s.channel == "y" {
 		orient, size = "left", v.sizeName(1)
 	}
+	if s.second {
+		orient = map[string]string{"bottom": "top", "left": "right"}[orient]
+	}
 	f, t, z := false, true, 0
 	main = vega.Axis{Scale: v.sn(s.name), Orient: lit(orient), Grid: &f, ZIndex: &z}
 	if title != "" {
 		main.Title = lit(title)
 	}
-	showGrid := !s.discrete
+	showGrid := !s.discrete && !s.second
 	if g, ok := s.guide["grid"].(bool); ok {
 		showGrid = g
 	}
@@ -1029,4 +1077,15 @@ func offsetRange(s *scaleComp, band, size string) vega.ScaleRange {
 		return vega.ScaleRange{Values: []vega.Value{{Signal: "-" + size + "/2"}, {Signal: size + "/2"}}}
 	}
 	return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: band}}}
+}
+
+// isDateTime reports whether an object is a date time of Vega-Lite, with a
+// part of a date such as a year or hours.
+func isDateTime(m map[string]any) bool {
+	for _, k := range []string{"year", "quarter", "month", "date", "day", "hours", "minutes", "seconds", "milliseconds"} {
+		if _, ok := m[k]; ok {
+			return true
+		}
+	}
+	return false
 }
