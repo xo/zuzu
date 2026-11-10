@@ -28,17 +28,17 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 	switch {
 	case len(s.HConcat) > 0:
 		for i := range s.HConcat {
-			cells = append(cells, cellSpec{&s.HConcat[i], fmt.Sprintf("concat_%d_", i), repeat})
+			cells = append(cells, cellSpec{&s.HConcat[i], fmt.Sprintf("%sconcat_%d_", c.concatPrefix, i), repeat})
 		}
 		columns = len(s.HConcat)
 	case len(s.VConcat) > 0:
 		for i := range s.VConcat {
-			cells = append(cells, cellSpec{&s.VConcat[i], fmt.Sprintf("concat_%d_", i), repeat})
+			cells = append(cells, cellSpec{&s.VConcat[i], fmt.Sprintf("%sconcat_%d_", c.concatPrefix, i), repeat})
 		}
 		columns = 1
 	case len(s.Concat) > 0:
 		for i := range s.Concat {
-			cells = append(cells, cellSpec{&s.Concat[i], fmt.Sprintf("concat_%d_", i), repeat})
+			cells = append(cells, cellSpec{&s.Concat[i], fmt.Sprintf("%sconcat_%d_", c.concatPrefix, i), repeat})
 		}
 		columns = len(s.Concat)
 		if s.Columns != nil {
@@ -46,6 +46,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		}
 	case len(s.Repeat) > 0 && s.Spec != nil:
 		var err error
+		// The views of a repeat take no prefix of an outer concatenation.
 		cells, columns, err = repeatCells(s, repeat)
 		if err != nil {
 			return err
@@ -100,8 +101,30 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 	common := newView("", c.cfg)
 	for i, cell := range cells {
 		p := fmt.Sprintf("%s/concat/%d", path, i)
-		if _, _, _, _, _, ok, _ := readFacet(cell.spec, cell.repeat); ok || isConcat(cell.spec) {
-			if err := c.issue(p, "a facet or a concatenation inside a concatenation"); err != nil {
+		if isConcat(cell.spec) {
+			// A concatenation inside a concatenation is a group with a
+			// layout of its own, whose views take its prefix too. Its
+			// scales and its signals go to the top.
+			outerPrefix := c.concatPrefix
+			c.concatPrefix = cell.prefix
+			nested := &vega.Spec{}
+			err := c.concat(cell.spec, nested, src, p, cell.repeat)
+			c.concatPrefix = outerPrefix
+			if err != nil {
+				return err
+			}
+			out.Scales = append(out.Scales, nested.Scales...)
+			out.Signals = append(out.Signals, nested.Signals...)
+			out.Legends = append(out.Legends, nested.Legends...)
+			group := vega.Mark{Type: "group", Name: cell.prefix + "group"}
+			group.Layout = nested.Layout
+			group.Marks = nested.Marks
+			group.Title = cell.spec.Title
+			out.Marks = append(out.Marks, group)
+			continue
+		}
+		if _, _, _, _, _, ok, _ := readFacet(cell.spec, cell.repeat); ok {
+			if err := c.issue(p, "a facet inside a concatenation"); err != nil {
 				return err
 			}
 			continue
@@ -145,8 +168,21 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 	if len(s.Repeat) > 0 {
 		align = "all"
 	}
-	out.Layout = lit(map[string]any{"padding": 20, "columns": columns, "bounds": "full", "align": align})
-	c.mergeAggregates(out)
+	layout := map[string]any{"padding": 20.0, "columns": columns, "bounds": "full", "align": align}
+	if v := valueOf(s.Spacing); v != nil {
+		layout["padding"] = v
+	}
+	if v := valueOf(s.Bounds); v != nil {
+		layout["bounds"] = v
+	}
+	if c.concatPrefix != "" && len(s.HConcat) > 0 {
+		// A row inside a concatenation leaves its columns to Vega.
+		delete(layout, "columns")
+	}
+	out.Layout = lit(layout)
+	if c.concatPrefix == "" {
+		c.mergeAggregates(out)
+	}
 	return nil
 }
 

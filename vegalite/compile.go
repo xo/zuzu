@@ -85,6 +85,9 @@ type compiler struct {
 	// compiled, and proj the projection that the views share.
 	projStack []jsontext.Value
 	proj      *projComp
+	// concatPrefix is the prefix of the names of the views of a
+	// concatenation inside another.
+	concatPrefix string
 }
 
 // reservation is a number of a dataset that a layer over a dataset takes.
