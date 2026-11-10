@@ -241,6 +241,23 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		child.scalePrefix, child.prefixAll = np, true
 	}
 	child.facetFields = extra
+	indep := map[string]bool{}
+	if len(s.Resolve) > 0 {
+		var r struct {
+			Scale map[string]string `json:"scale"`
+		}
+		if json.Unmarshal(s.Resolve, &r) == nil {
+			for ch, mode := range r.Scale {
+				if mode == "independent" && (ch == "x" || ch == "y") {
+					indep[ch] = true
+				}
+			}
+		}
+	}
+	if len(indep) > 0 {
+		// Each cell has its own scale of an independent channel.
+		child.independent, child.indepPrefix = indep, child.prefix
+	}
 	if len(s.Transform) > 0 && len(s.Facet) == 0 {
 		cell.Transform = s.Transform
 	}
@@ -270,6 +287,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	for i := range child.marks {
 		renameData(&child.marks[i], main, cellData)
 	}
+	cellScales, cellAxes, distinct, sizeSig := c.cellScales(child, indep, sizes, main, cellData, cw, chh)
 	out.Scales = append(out.Scales, sizes.Scales...)
 	out.Signals = append(out.Signals, sizes.Signals...)
 	if !sizes.Width.IsZero() {
@@ -298,10 +316,23 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			groupby = append(groupby, f.def.outEnd)
 		}
 		params := map[string]any{"groupby": groupby}
+		agg := map[string][]any{}
 		if f.sortField != "" {
-			for k, v := range f.sortAggregate("") {
-				params[k] = v
-			}
+			agg = f.sortAggregate("")
+		}
+		ch := "x"
+		if f.channel == "row" {
+			ch = "y"
+		}
+		if d, ok := distinct[ch]; ok {
+			// The header has the size of the cells, from the count of the
+			// values of their own scale.
+			agg["fields"] = append(agg["fields"], d.field)
+			agg["ops"] = append(agg["ops"], "distinct")
+			agg["as"] = append(agg["as"], d.as)
+		}
+		for k, v := range agg {
+			params[k] = v
 		}
 		c.data = append(c.data, vega.Data{
 			Name: name, Source: vega.Strings{List: []string{facetData}},
@@ -311,6 +342,12 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	}
 	width := prod(map[string]any{"signal": cw})
 	height := prod(map[string]any{"signal": chh})
+	if w, ok := sizeSig["x"]; ok {
+		width = w
+	}
+	if h, ok := sizeSig["y"]; ok {
+		height = h
+	}
 	headerTitle := func(f *facetDef, orient string) *vega.Title {
 		ref := "parent[" + strconv.Quote(f.def.out) + "]"
 		t := &vega.Title{
@@ -421,11 +458,22 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		orders = append(orders, f.sort)
 	}
 	facet := &vega.Facet{Name: fname, Data: facetData, GroupBy: vega.List(groupby...)}
-	switch {
-	case row != nil && column != nil:
-		facet.Aggregate = mustJSON(map[string]any{"cross": true})
-	case len(agg) > 0:
-		facet.Aggregate = mustJSON(agg)
+	for _, ch := range []string{"x", "y"} {
+		if d, ok := distinct[ch]; ok {
+			agg["fields"] = append(agg["fields"], d.field)
+			agg["ops"] = append(agg["ops"], "distinct")
+			agg["as"] = append(agg["as"], d.as)
+		}
+	}
+	aggregate := map[string]any{}
+	for k, v := range agg {
+		aggregate[k] = v
+	}
+	if row != nil && column != nil {
+		aggregate["cross"] = true
+	}
+	if len(aggregate) > 0 {
+		facet.Aggregate = mustJSON(aggregate)
 	}
 	sortList := make([]any, len(sortFields))
 	for i, f := range sortFields {
@@ -435,13 +483,14 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		Type: "group", Name: np + "cell", Style: vega.Strings{List: []string{"cell"}},
 		From:  &vega.From{Facet: facet},
 		Sort:  &vega.Sort{Field: lit(sortList), Order: vega.List(orders...)},
-		Marks: child.marks, Axes: grids,
+		Marks: child.marks, Axes: append(grids, cellAxes...),
 		Encode: vega.Encode{"update": vega.Props{"width": width, "height": height}},
 	}
 	if wrap != nil && wrap.labels() {
 		cellMark.Title = headerTitle(wrap, "")
 	}
 	cellMark.Data = cellDatasets
+	cellMark.Scales = cellScales
 	marks = append(marks, cellMark)
 	out.Marks = marks
 	cols := any(1)
@@ -595,6 +644,96 @@ func (c *compiler) wrapHeaders(wrap *facetDef, columns int, domain, np string, x
 		})
 	}
 	return marks
+}
+
+// distinctField is the count of the values of a field that sizes the
+// cells of a facet with an independent discrete scale.
+type distinctField struct {
+	field, as string
+}
+
+// cellScales takes the independent scales of the child of a facet out of
+// the scales of the top level, with their axes, for each cell to make from
+// its own data. A discrete scale with steps sizes each cell by the count
+// of its values, so the signal of the size goes, and the size of a cell
+// comes from that count.
+func (c *compiler) cellScales(child *view, indep map[string]bool, sizes *vega.Spec, main, cellData, cw, chh string) ([]vega.Scale, []vega.Axis, map[string]distinctField, map[string]vega.Production) {
+	distinct := map[string]distinctField{}
+	sizeSig := map[string]vega.Production{}
+	if len(indep) == 0 {
+		return nil, nil, distinct, sizeSig
+	}
+	rename := func(n string) string {
+		if n == main {
+			return cellData
+		}
+		return n
+	}
+	names := map[string]string{}
+	for ch := range indep {
+		names[child.sn(ch)] = ch
+	}
+	var scales []vega.Scale
+	var keep []vega.Scale
+	for _, sc := range sizes.Scales {
+		ch, ok := names[sc.Name]
+		if !ok {
+			keep = append(keep, sc)
+			continue
+		}
+		renameDomain(sc.Domain.Data, rename)
+		scales = append(scales, sc)
+		ref := sc.Domain.Data
+		if sc.Range.Step.IsZero() || ref == nil {
+			continue
+		}
+		field := ref.Field.Name
+		if field == "" && len(ref.Fields) > 0 {
+			// The scale of a layer reads the same field of each layer.
+			if m, ok := ref.Fields[0].(map[string]any); ok {
+				field, _ = m["field"].(string)
+			}
+		}
+		if field == "" {
+			continue
+		}
+		d := distinctField{field: field, as: "distinct_" + field}
+		distinct[ch] = d
+		inner, outer := 0.0, 0.0
+		if x, ok := valueOf(sc.PaddingInner).(float64); ok {
+			inner = x
+		}
+		if x, ok := valueOf(sc.PaddingOuter).(float64); ok {
+			outer = x
+		}
+		if sc.Type == "point" {
+			inner = 1
+			if x, ok := valueOf(sc.Padding).(float64); ok {
+				outer = x
+			}
+		}
+		k := func(x float64) string { return strconv.FormatFloat(x, 'f', -1, 64) }
+		sizeSig[ch] = prod(map[string]any{"signal": "bandspace(datum[" + strconv.Quote(d.as) + "], " + k(inner) + ", " + k(outer) + ") * " + child.sn(ch) + "_step"})
+	}
+	sizes.Scales = keep
+	drop := map[string]bool{}
+	if _, ok := distinct["x"]; ok {
+		drop[cw] = true
+	}
+	if _, ok := distinct["y"]; ok {
+		drop[chh] = true
+	}
+	sizes.Signals = slices.DeleteFunc(sizes.Signals, func(sg vega.Signal) bool { return drop[sg.Name] })
+	var axes, rest []vega.Axis
+	for _, a := range sizes.Axes {
+		if _, ok := names[a.Scale]; ok {
+			axes = append(axes, a)
+		} else {
+			rest = append(rest, a)
+		}
+	}
+	sizes.Axes = rest
+	return scales, axes, distinct, sizeSig
 }
 
 // mainData returns the dataset that most marks of a view draw.

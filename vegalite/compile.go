@@ -247,7 +247,7 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			sub := v.layer(fmt.Sprintf("layer_%d_", i), v.prefix)
 			if len(independent) > 0 {
 				// The layer has its own scale of each independent channel.
-				sub.independent, sub.layerIndex = independent, i
+				sub.independent, sub.layerIndex, sub.indepPrefix = independent, i, sub.prefix
 			}
 			if err := c.view(l, sub, src, fmt.Sprintf("%s/layer/%d", path, i), repeat); err != nil {
 				return err

@@ -49,6 +49,9 @@ type view struct {
 	// with the other layers, and layerIndex the place of the layer.
 	independent map[string]bool
 	layerIndex  int
+	// indepPrefix names the independent scales: the prefix of the view
+	// that made them independent.
+	indepPrefix string
 }
 
 // key returns the key of the scale of a channel among the scales of the
@@ -56,7 +59,7 @@ type view struct {
 // scale of the channel is its own.
 func (v *view) key(ch string) string {
 	if v.independent[ch] {
-		return v.prefix + ch
+		return v.indepPrefix + ch
 	}
 	return ch
 }
@@ -68,14 +71,14 @@ func newView(prefix string, cfg *config) *view {
 
 // layer returns a layer of the view, which shares its scales.
 func (v *view) layer(prefix, parent string) *view {
-	return &view{shared: v.shared, prefix: parent + prefix}
+	return &view{shared: v.shared, prefix: parent + prefix, independent: v.independent, indepPrefix: v.indepPrefix}
 }
 
 // sn returns the name of the scale of a channel: the channel, with the
 // prefix of the view for a position.
 func (v *view) sn(ch string) string {
 	if v.independent[ch] {
-		return v.prefix + ch
+		return v.indepPrefix + ch
 	}
 	if v.scalePrefix != "" && (isPositional(ch) || v.prefixAll) {
 		return v.scalePrefix + ch
@@ -410,7 +413,7 @@ func (v *view) dimension(ch, name string, given vega.Value) (vega.NumberValue, [
 			// "container" fills a container that a static chart has not.
 		}
 	}
-	s, ok := v.scales[ch]
+	s, ok := v.scales[v.key(ch)]
 	if !ok || !s.discrete || s.typ == "ordinal" {
 		if !ok && hasMarkWithout(v, ch) {
 			return vega.Num(step), nil
@@ -443,7 +446,7 @@ func fixed(v vega.Value) bool {
 // hasMarkWithout reports whether the view has no channel on an axis, so
 // that its size is one step.
 func hasMarkWithout(v *view, ch string) bool {
-	return len(v.marks) > 0 && v.scales[ch] == nil
+	return len(v.marks) > 0 && v.scales[v.key(ch)] == nil
 }
 
 // num writes a number as JavaScript does.
