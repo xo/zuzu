@@ -1163,5 +1163,49 @@
  [
   "contrast('#336699', 'yellow')",
   5.585367592206377
+ ],
+ [
+  "replace('a (b)', / \\(.*\\)/, '')",
+  "a"
+ ],
+ [
+  "test(/^h/i, datum.b)",
+  true
+ ],
+ [
+  "test(/^h/, datum.b)",
+  false
+ ],
+ [
+  "replace(datum.b, /o/g, '0')",
+  "Hell0, W0rld"
+ ],
+ [
+  "split('a1b22c', /\\d+/)",
+  [
+   "a",
+   "b",
+   "c"
+  ]
+ ],
+ [
+  "replace(datum.b, /[/,]/g, '|')",
+  "Hello| World"
+ ],
+ [
+  "isRegExp(/a/)",
+  true
+ ],
+ [
+  "datum.a / 2 / 3",
+  0.5
+ ],
+ [
+  "(datum.a) / 2",
+  1.5
+ ],
+ [
+  "[6][0] / 3",
+  2
  ]
 ]

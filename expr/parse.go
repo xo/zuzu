@@ -76,13 +76,17 @@ const (
 	kindStr
 	kindIdent
 	kindPunct
+	// kindRegExp is a literal of a regular expression, /pattern/flags,
+	// with the pattern in text and the flags in flags.
+	kindRegExp
 )
 
 type token struct {
-	kind kind
-	text string
-	num  float64
-	pos  int
+	kind  kind
+	text  string
+	flags string
+	num   float64
+	pos   int
 }
 
 // unicodeEscape reads the four hex digits after the u at l.pos, and the
@@ -158,6 +162,10 @@ func lex(src string) ([]token, error) {
 			if err := l.str(c); err != nil {
 				return nil, err
 			}
+		case c == '/' && l.regExpAllowed():
+			if err := l.regExp(); err != nil {
+				return nil, err
+			}
 		case c == '_' || c == '$' || unicode.IsLetter(rune(c)) || c >= utf8.RuneSelf:
 			for l.pos < len(src) {
 				r, n := utf8.DecodeRuneInString(src[l.pos:])
@@ -182,6 +190,68 @@ func lex(src string) ([]token, error) {
 			}
 		}
 	}
+}
+
+// regExpAllowed reports whether a slash at this place starts a regular
+// expression rather than a division: it does where an operand can start,
+// which is not after a number, a string, a name or a closing bracket.
+func (l *lexer) regExpAllowed() bool {
+	if len(l.toks) == 0 {
+		return true
+	}
+	t := l.toks[len(l.toks)-1]
+	switch t.kind {
+	case kindNum, kindStr, kindIdent, kindRegExp:
+		return false
+	case kindPunct:
+		return t.text != ")" && t.text != "]" && t.text != "}"
+	}
+	return true
+}
+
+// regExp reads a literal of a regular expression: the pattern up to a
+// slash that no backslash escapes and that lies outside a class in
+// brackets, then the flags.
+func (l *lexer) regExp() error {
+	start := l.pos
+	src := l.src
+	i := l.pos + 1
+	inClass := false
+	for ; ; i++ {
+		if i >= len(src) || src[i] == '\n' || src[i] == '\r' {
+			return fmt.Errorf("reading the regular expression at %d: %w", start, ErrSyntax)
+		}
+		c := src[i]
+		if c == '\\' {
+			i++
+			continue
+		}
+		switch {
+		case c == '[':
+			inClass = true
+		case c == ']':
+			inClass = false
+		case c == '/' && !inClass:
+			l.regExpFlags(start, src[start+1:i], i+1)
+			return nil
+		}
+	}
+}
+
+// regExpFlags reads the flags of a regular expression from i, and adds its
+// token.
+func (l *lexer) regExpFlags(start int, pattern string, i int) {
+	src := l.src
+	f := i
+	for i < len(src) {
+		r, n := utf8.DecodeRuneInString(src[i:])
+		if r != '_' && r != '$' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			break
+		}
+		i += n
+	}
+	l.toks = append(l.toks, token{kind: kindRegExp, text: pattern, flags: src[f:i], pos: start})
+	l.pos = i
 }
 
 // number reads a number literal: decimal, with an exponent, or hexadecimal.
@@ -467,6 +537,12 @@ func (p *parser) primary() (node, error) {
 		return literal{t.num}, nil
 	case kindStr:
 		return literal{t.text}, nil
+	case kindRegExp:
+		re, err := newRegExp(t.text, t.flags)
+		if err != nil {
+			return nil, fmt.Errorf("the regular expression /%s/%s at %d: %w: %w", t.text, t.flags, t.pos, ErrSyntax, err)
+		}
+		return literal{re}, nil
 	case kindIdent:
 		switch t.text {
 		case "true":

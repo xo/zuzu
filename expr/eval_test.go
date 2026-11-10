@@ -224,3 +224,12 @@ func TestScope(t *testing.T) {
 		t.Errorf("a bad format = %v, want %v", err, ErrArgument)
 	}
 }
+
+func TestRegExpLiteralErrors(t *testing.T) {
+	t.Parallel()
+	for _, src := range []string{"test(/abc, 'a')", "test(/a(/, 'a')", "test(/a/q, 'a')"} {
+		if _, err := Compile(src); !errors.Is(err, ErrSyntax) {
+			t.Errorf("Compile(%q) = %v, want ErrSyntax", src, err)
+		}
+	}
+}

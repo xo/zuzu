@@ -514,7 +514,7 @@ The phase holds these packages:
 
 1. `vega` reads and writes every spec of the corpus and gives back the same
    JSON.
-2. `expr` parses the grammar of vega-expression. It matches vega.js on 253
+2. `expr` parses the grammar of vega-expression. It matches vega.js on 263
    expressions that `test/oracle/exprs.mjs` evaluates, with the functions of
    colors.
 3. `format` matches d3-format on 1176 numbers, d3-time-format on 820 times

@@ -67,7 +67,8 @@ calls them. The function library is written in Go.
    behave as they do in JavaScript. A test against a JavaScript engine finds
    each difference.
 5. The regular expressions of Go have no lookbehind and no backreference,
-   which JavaScript has. A spec that uses either gets an error.
+   which JavaScript has. A spec that uses either gets an error. A regular
+   expression can be a literal, such as `/^h/i`, or a call to `regexp`.
 6. The tree can be written back as JavaScript, so the browser component runs
    the same expression.
 

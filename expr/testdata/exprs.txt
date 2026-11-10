@@ -253,3 +253,13 @@ luminance('white')
 luminance('#336699')
 contrast('white', 'black')
 contrast('#336699', 'yellow')
+replace('a (b)', / \(.*\)/, '')
+test(/^h/i, datum.b)
+test(/^h/, datum.b)
+replace(datum.b, /o/g, '0')
+split('a1b22c', /\d+/)
+replace(datum.b, /[/,]/g, '|')
+isRegExp(/a/)
+datum.a / 2 / 3
+(datum.a) / 2
+[6][0] / 3

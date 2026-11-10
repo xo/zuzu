@@ -88,12 +88,6 @@ mode: `gradient`, `copy`, `geoShape`, `treePath`, `treeAncestors`,
 `geoBounds` and `geoCentroid` measure in the plane of a projection. With no
 projection, Vega measures on the sphere, and zuzu does not.
 
-### Read the literals of regular expressions
-
-vega-expression reads a regular expression written as a literal, such as
-`/ \(.*\)/`. zuzu reads one only through the function `regexp`, and a
-literal is an error of syntax.
-
 ### Read the mesh of a TopoJSON topology
 
 The format topojson reads the geometries of an object as rows. A mesh, the
