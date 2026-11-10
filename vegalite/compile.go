@@ -91,6 +91,9 @@ type compiler struct {
 	// nested says that the view being compiled lies inside another, so
 	// the optimizations wait for the whole spec.
 	nested bool
+	// innerFacet says that the facet being compiled is the cells of
+	// another facet, whose scales take no prefix.
+	innerFacet bool
 }
 
 // reservation is a number of a dataset that a layer over a dataset takes.

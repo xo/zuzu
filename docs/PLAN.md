@@ -616,7 +616,7 @@ transforms `stratify`, `tree`, `treelinks`, `pack` and `partition`.
 On 2026-11-10, after the transforms of statistics, of hierarchies, of
 geography and of contours, 536 specs match: 78.9 percent of the whole
 corpus, above the share that this plan proposes. The Vega-Lite check of
-`-vl` matches 457 of 470 specs, 97.2 percent. Four specs of the first target
+`-vl` matches 461 of 470 specs, 98.1 percent. Four specs of the first target
 still differ in the Vega check:
 
 - `density-heatmaps`: vega.js in Node.js has no canvas, so its heatmap
@@ -627,10 +627,8 @@ still differ in the Vega check:
   numbers and strings together. JavaScript compares them in a way that is
   not transitive, so the order follows the sort of V8.
 
-The 13 specs that differ in the Vega-Lite check are those two, three facets
-of facets and a facet with an independent scale inside a layer, which the
-compiler does not support yet, and seven whose datasets vega-lite.js numbers
-or merges by rules that no document of Vega-Lite describes and that zuzu
+The nine specs that differ in the Vega-Lite check are those two and seven
+whose datasets vega-lite.js numbers or merges by rules that no document of Vega-Lite describes and that zuzu
 does not find yet: `bar_heatlane`, `concat_population_pyramid`,
 `facet_bullet`, `repeat_child_layer`, `repeat_histogram_flights`,
 `wheat_wages` and the Deneb `variance-chart`.

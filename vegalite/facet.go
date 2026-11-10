@@ -245,7 +245,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	}
 	cw, chh, fname := np+childWidth, np+childHeight, np+"facet"
 	child := newView(np+"child_", c.cfg)
-	if np != "" {
+	if np != "" && !c.innerFacet {
 		child.scalePrefix, child.prefixAll = np, true
 	}
 	child.facetFields = extra
@@ -275,6 +275,17 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	if len(s.Transform) > 0 && len(s.Facet) == 0 {
 		cell.Transform = s.Transform
 	}
+	if _, _, _, _, _, ok, _ := readFacet(cell, repeat); ok && !c.innerFacet {
+		if wrap != nil || np != "" {
+			return c.issue(path, "a facet of a facet that wraps or has a name")
+		}
+		return c.facetOfFacet(row, column, cell, out, src, path, repeat)
+	}
+	if len(indep) > 0 && len(cell.Layer) > 0 && src != nil {
+		// Each cell copies the datasets of the layers, so the source
+		// stays as it is.
+		src.open = false
+	}
 	before := len(c.data)
 	if err := c.view(cell, child, src, path+"/spec", repeat); err != nil {
 		return err
@@ -300,11 +311,18 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			sorted = true
 		}
 	}
-	if sorted && src != nil && len(marksData(child.marks)) > 1 {
+	if (sorted || len(indep) > 0) && src != nil && len(marksData(child.marks)) > 1 {
 		// The marks of a layer read several datasets: each cell makes all
-		// of them from its own rows.
+		// of them from its own rows, when the facet sorts or the cells have
+		// scales of their own.
 		var names map[string]string
-		cellDatasets, names = c.copyToCell(before, c.name(src), fname, extra)
+		keep := extra
+		if !sorted {
+			// Cells with scales of their own keep the fields of the facet
+			// in the groups of their aggregates.
+			keep = nil
+		}
+		cellDatasets, names = c.copyToCell(before, c.name(src), fname, keep)
 		for i := range child.marks {
 			renameMarkData(&child.marks[i], func(n string) string {
 				if r, ok := names[n]; ok {
@@ -314,7 +332,9 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			})
 		}
 		facetData, main, cellData = c.name(src), "", ""
-		cellDatasets, child.marks = c.mergeCell(fname, cellDatasets, child.marks)
+		if sorted {
+			cellDatasets, child.marks = c.mergeCell(fname, cellDatasets, child.marks)
+		}
 	}
 	var childNames []string
 	for _, d := range c.data[before:] {
@@ -1012,4 +1032,175 @@ func renameData(m *vega.Mark, from, to string) {
 	for i := range m.Marks {
 		renameData(&m.Marks[i], from, to)
 	}
+}
+
+// facetOfFacet compiles a facet whose cells are a facet, as vega-lite.js
+// does: each cell of the outer facet is a group with the layout of the
+// inner facet, which partitions the rows of the cell again. The inner
+// facet takes the names of a facet named child, and its headers read the
+// rows of the outer cell. The title of a field of each facet in the same
+// direction joins the two, as Origin / Cylinders.
+func (c *compiler) facetOfFacet(row, column *facetDef, cell *Spec, out *vega.Spec, src *dataNode, path string, repeat map[string]string) error {
+	innerRow, innerCol, err := facetRowColumn(cell, repeat)
+	if err != nil {
+		return err
+	}
+	outer := row
+	if outer == nil {
+		outer = column
+	}
+	if outer == nil || row != nil && column != nil {
+		return c.issue(path, "a facet of a facet with rows and columns outside")
+	}
+	// The inner facet.
+	named := *cell
+	named.Name = "child"
+	inner := &vega.Spec{}
+	if src != nil {
+		// The cells copy the transforms of their data, so the source
+		// stays as it is.
+		src.open = false
+	}
+	wasInner, wasNested := c.innerFacet, c.nested
+	c.innerFacet, c.nested = true, true
+	before := len(c.data)
+	err = c.facet(&named, inner, src, path+"/spec", repeat)
+	c.innerFacet, c.nested = wasInner, wasNested
+	if err != nil {
+		return err
+	}
+	// The domains of the inner headers read the rows of the outer cell, so
+	// they move into its group.
+	var cellData []vega.Data
+	kept := c.data[:before:before]
+	for _, d := range c.data[before:] {
+		if strings.HasPrefix(d.Name, "child_") && strings.HasSuffix(d.Name, "_domain") {
+			d.Source = vega.List("facet")
+			cellData = append(cellData, d)
+			continue
+		}
+		kept = append(kept, d)
+	}
+	c.data = kept
+	// The inner cells partition the rows of the outer cell, and each copies
+	// the transforms of the data of the scales from its own rows.
+	for i := range inner.Marks {
+		m := &inner.Marks[i]
+		if m.Name != "child_cell" || m.From == nil || m.From.Facet == nil {
+			continue
+		}
+		main := m.From.Facet.Data
+		m.From.Facet.Data = "facet"
+		for j := range c.data {
+			if c.data[j].Name != main {
+				continue
+			}
+			n, ok := dataNumber(main)
+			if !ok {
+				break
+			}
+			// vega-lite.js names the copy in the cell first, and the data
+			// of the scales two numbers later.
+			top := fmt.Sprintf("data_%d", n+2)
+			c.nData = max(c.nData, n+3)
+			m.Data = append(m.Data, vega.Data{Name: main, Source: vega.List("child_facet"), Transform: c.data[j].Transform})
+			for k := range m.Marks {
+				renameData(&m.Marks[k], "child_facet", main)
+			}
+			c.data[j].Name = top
+			for k := range inner.Scales {
+				renameDomain(inner.Scales[k].Domain.Data, func(s string) string {
+					if s == main {
+						return top
+					}
+					return s
+				})
+			}
+			break
+		}
+	}
+	// A title in the same direction as the outer one joins it.
+	title := outer.title()
+	same := (row != nil && innerRow != nil) || (column != nil && innerCol != nil)
+	if same {
+		in := innerRow
+		if column != nil {
+			in = innerCol
+		}
+		if t := in.title(); t != "" {
+			title += " / " + t
+		}
+		drop := "row-title"
+		if column != nil {
+			drop = "column-title"
+		}
+		inner.Marks = slices.DeleteFunc(inner.Marks, func(m vega.Mark) bool { return m.Name == drop })
+	}
+	out.Scales = append(out.Scales, inner.Scales...)
+	out.Signals = append(out.Signals, inner.Signals...)
+	out.Legends = append(out.Legends, inner.Legends...)
+	// The outer facet: its domain, its title, its header and its cells.
+	channel := "row"
+	if column != nil {
+		channel = "column"
+	}
+	field := outer.def.out
+	domain := channel + "_domain"
+	c.data = append(c.data, vega.Data{Name: domain, Source: vega.List(c.name(src)), Transform: []vega.Transform{
+		transform("aggregate", map[string]any{"groupby": []any{field}}),
+	}})
+	ref := "parent[" + strconv.Quote(field) + "]"
+	label := &vega.Title{
+		Text:  vega.Value{Signal: "isValid(" + ref + ") ? " + ref + " : \"\"+" + ref},
+		Style: vega.Strings{List: []string{"guide-label"}}, Frame: lit("group"), Offset: lit(10),
+	}
+	groupTitle := &vega.Title{Text: lit(title), Style: vega.Strings{List: []string{"guide-title"}}, Offset: lit(10)}
+	if channel == "row" {
+		label.Orient = lit("left")
+		groupTitle.Orient = lit("left")
+	}
+	sort := &vega.Sort{Field: lit("datum[" + strconv.Quote(field) + "]"), Order: vega.List(outer.sort)}
+	var marks []vega.Mark
+	if title != "" {
+		marks = append(marks, vega.Mark{Type: "group", Name: channel + "-title", Role: channel + "-title", Title: groupTitle})
+	}
+	header := channel + "_header"
+	marks = append(marks, vega.Mark{
+		Type: "group", Name: header, Role: channel + "-header", From: &vega.From{Data: domain}, Sort: sort, Title: label,
+	})
+	facet := &vega.Facet{Name: "facet", Data: c.name(src), GroupBy: vega.List(field)}
+	layout := map[string]any{}
+	_ = json.Unmarshal(inner.Layout.JSON, &layout)
+	var encode vega.Encode
+	if column != nil && innerCol != nil {
+		// The columns of each cell are the values of the inner field in it.
+		as := "distinct_" + innerCol.def.field
+		facet.Aggregate = mustJSON(map[string]any{"fields": []any{innerCol.def.field}, "ops": []any{"distinct"}, "as": []any{as}})
+		encode = vega.Encode{"update": vega.Props{"columns": prod(map[string]any{"field": as})}}
+		delete(layout, "columns")
+	}
+	cellMark := vega.Mark{
+		Type: "group", Name: "cell", From: &vega.From{Facet: facet},
+		Sort: &vega.Sort{Field: lit([]any{"datum[" + strconv.Quote(field) + "]"}), Order: vega.List(outer.sort)},
+		Data: cellData, Marks: inner.Marks, Layout: lit(layout), Encode: encode,
+	}
+	marks = append(marks, cellMark)
+	out.Marks = marks
+	cols := any(1)
+	if column != nil {
+		cols = map[string]any{"signal": "length(data('" + domain + "'))"}
+	}
+	out.Layout = lit(map[string]any{"padding": 20, "columns": cols, "bounds": "full", "align": "all"})
+	if !c.nested {
+		c.mergeAggregates(out)
+	}
+	return nil
+}
+
+// facetRowColumn reads the row and the column of a facet.
+func facetRowColumn(s *Spec, repeat map[string]string) (*facetDef, *facetDef, error) {
+	if row, column, _, _, _, _, err := readFacet(s, repeat); err != nil || row != nil || column != nil {
+		return row, column, err
+	}
+	return nil, nil, nil
 }
