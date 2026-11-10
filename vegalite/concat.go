@@ -75,6 +75,10 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		if err := c.transforms(src, s.Transform, path+"/transform"); err != nil {
 			return err
 		}
+	} else if src != nil && readers > 1 {
+		// The views share the source, so each adds its transforms to a
+		// dataset of its own.
+		src.open = false
 	}
 	c.shareSources = true
 	own, sharedPos := map[string]bool{}, map[string]bool{}
