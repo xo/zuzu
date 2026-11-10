@@ -131,6 +131,10 @@ type Item struct {
 	Clip  bool   `json:"clip,omitzero"`
 	Items []Mark `json:"items,omitzero"`
 
+	// Datum is the row of data that the item draws, which the runtime keeps
+	// for the comparison with vega.js (D17). It is not written to JSON.
+	Datum any `json:"-"`
+
 	// Extra holds the properties that zuzu does not use, such as the datum,
 	// so that a scene graph of vega.js reads without loss.
 	Extra map[string]jsontext.Value `json:",embed"`

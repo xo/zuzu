@@ -83,9 +83,18 @@ linters:
           msg: take the context from the caller, never make one here
     # A file that was only read returns an error from Close that nothing can
     # act on.
+    # An operator of the expression language, such as ===, reads best as
+    # itself in the tables and the switches of the lexer and the evaluator.
+    goconst:
+      ignore-string-values:
+        - '^[-+*/%<>=!&|^~?:]+$'
+        # A name of the grammar of Vega, such as left, linear or utc, reads
+        # best as itself, as the spec writes it.
+        - '^[a-z][a-z0-9-]*$'
     errcheck:
       exclude-functions:
         - (*os.File).Close
+        - (io.ReadCloser).Close
     errorlint:
       errorf: true
       asserts: true

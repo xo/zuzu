@@ -1,0 +1,1107 @@
+[
+ [
+  "1 + 2 * 3",
+  7
+ ],
+ [
+  "7 % -3",
+  1
+ ],
+ [
+  "-7 % 3",
+  -1
+ ],
+ [
+  "1 / 0",
+  {
+   "number": "Infinity"
+  }
+ ],
+ [
+  "0 / 0",
+  {
+   "number": "NaN"
+  }
+ ],
+ [
+  "'a' + 1",
+  "a1"
+ ],
+ [
+  "1 + '2'",
+  "12"
+ ],
+ [
+  "'3' * '4'",
+  12
+ ],
+ [
+  "true + 1",
+  2
+ ],
+ [
+  "null + 1",
+  1
+ ],
+ [
+  "[1, 2] + [3]",
+  "1,23"
+ ],
+ [
+  "1 < 2 < 3",
+  true
+ ],
+ [
+  "'10' < '9'",
+  true
+ ],
+ [
+  "10 < '9'",
+  false
+ ],
+ [
+  "null == datum.missing",
+  true
+ ],
+ [
+  "null === datum.missing",
+  false
+ ],
+ [
+  "0 == ''",
+  true
+ ],
+ [
+  "'1' == 1",
+  true
+ ],
+ [
+  "NaN == NaN",
+  false
+ ],
+ [
+  "!!''",
+  false
+ ],
+ [
+  "!!'0'",
+  true
+ ],
+ [
+  "datum.a",
+  3
+ ],
+ [
+  "datum['b']",
+  "Hello, World"
+ ],
+ [
+  "datum.d[1]",
+  2
+ ],
+ [
+  "datum.d.length",
+  3
+ ],
+ [
+  "datum.b.length",
+  12
+ ],
+ [
+  "datum.missing",
+  {
+   "undefined": true
+  }
+ ],
+ [
+  "datum.c",
+  null
+ ],
+ [
+  "datum.o.y",
+  "two"
+ ],
+ [
+  "datum.d[5]",
+  {
+   "undefined": true
+  }
+ ],
+ [
+  "5 & 3",
+  1
+ ],
+ [
+  "5 | 3",
+  7
+ ],
+ [
+  "5 ^ 3",
+  6
+ ],
+ [
+  "~5",
+  -6
+ ],
+ [
+  "-16 >> 2",
+  -4
+ ],
+ [
+  "-16 >>> 28",
+  15
+ ],
+ [
+  "1 << 31",
+  -2147483648
+ ],
+ [
+  "0 || 'x'",
+  "x"
+ ],
+ [
+  "1 && 'y'",
+  "y"
+ ],
+ [
+  "'x' in datum.o",
+  true
+ ],
+ [
+  "'q' in datum.o",
+  false
+ ],
+ [
+  "PI",
+  3.141592653589793
+ ],
+ [
+  "E",
+  2.718281828459045
+ ],
+ [
+  "SQRT2",
+  1.4142135623730951
+ ],
+ [
+  "abs(datum.n)",
+  2.5
+ ],
+ [
+  "ceil(datum.n)",
+  -2
+ ],
+ [
+  "floor(datum.n)",
+  -3
+ ],
+ [
+  "round(datum.n)",
+  -2
+ ],
+ [
+  "round(2.5)",
+  3
+ ],
+ [
+  "round(-0.5)",
+  {
+   "number": "-0"
+  }
+ ],
+ [
+  "sqrt(2)",
+  1.4142135623730951
+ ],
+ [
+  "pow(2, 10)",
+  1024
+ ],
+ [
+  "exp(1)",
+  2.718281828459045
+ ],
+ [
+  "log(10)",
+  2.302585092994046
+ ],
+ [
+  "sin(PI / 2)",
+  1
+ ],
+ [
+  "atan2(1, 1)",
+  0.7853981633974483
+ ],
+ [
+  "min(3, 1, 2)",
+  1
+ ],
+ [
+  "max(3, 1, 2)",
+  3
+ ],
+ [
+  "min()",
+  {
+   "number": "Infinity"
+  }
+ ],
+ [
+  "max()",
+  {
+   "number": "-Infinity"
+  }
+ ],
+ [
+  "max(1, NaN)",
+  {
+   "number": "NaN"
+  }
+ ],
+ [
+  "clamp(15, 0, 10)",
+  10
+ ],
+ [
+  "clamp(-1, 0, 10)",
+  0
+ ],
+ [
+  "isNaN('x')",
+  false
+ ],
+ [
+  "isNaN('1')",
+  false
+ ],
+ [
+  "isFinite('1e3')",
+  false
+ ],
+ [
+  "isFinite(1 / 0)",
+  false
+ ],
+ [
+  "isValid(null)",
+  false
+ ],
+ [
+  "isValid(0)",
+  true
+ ],
+ [
+  "isValid(NaN)",
+  false
+ ],
+ [
+  "isValid(datum.missing)",
+  false
+ ],
+ [
+  "isDefined(datum.missing)",
+  false
+ ],
+ [
+  "isDefined(datum.c)",
+  true
+ ],
+ [
+  "isNumber('1')",
+  false
+ ],
+ [
+  "isNumber(1)",
+  true
+ ],
+ [
+  "isString('1')",
+  true
+ ],
+ [
+  "isArray(datum.d)",
+  true
+ ],
+ [
+  "isObject(datum.o)",
+  true
+ ],
+ [
+  "isObject(datum.d)",
+  true
+ ],
+ [
+  "isObject(1)",
+  false
+ ],
+ [
+  "isBoolean(false)",
+  true
+ ],
+ [
+  "isDate(datetime(2020, 0, 1))",
+  true
+ ],
+ [
+  "isRegExp(regexp('a'))",
+  true
+ ],
+ [
+  "toNumber('42.5')",
+  42.5
+ ],
+ [
+  "toNumber('')",
+  null
+ ],
+ [
+  "toNumber(null)",
+  null
+ ],
+ [
+  "toNumber('abc')",
+  {
+   "number": "NaN"
+  }
+ ],
+ [
+  "toString(42)",
+  "42"
+ ],
+ [
+  "toString(null)",
+  null
+ ],
+ [
+  "toString(datum.d)",
+  "1,2,3"
+ ],
+ [
+  "toBoolean('false')",
+  false
+ ],
+ [
+  "toBoolean('0')",
+  false
+ ],
+ [
+  "toBoolean('yes')",
+  true
+ ],
+ [
+  "toBoolean('')",
+  null
+ ],
+ [
+  "toBoolean(0)",
+  false
+ ],
+ [
+  "toDate(0)",
+  0
+ ],
+ [
+  "toDate('2024-02-29')",
+  1709164800000
+ ],
+ [
+  "toDate('2024-02-29T12:00')",
+  1709226000000
+ ],
+ [
+  "toDate('Feb 29 2024')",
+  1709182800000
+ ],
+ [
+  "toDate('')",
+  null
+ ],
+ [
+  "toDate(null)",
+  null
+ ],
+ [
+  "time(toDate('2024-02-29'))",
+  1709164800000
+ ],
+ [
+  "datetime(2024, 1, 29)",
+  {
+   "date": 1709182800000
+  }
+ ],
+ [
+  "datetime(2024, 1, 29, 13, 45, 30, 250)",
+  {
+   "date": 1709232330250
+  }
+ ],
+ [
+  "datetime(99, 0, 1)",
+  {
+   "date": 915166800000
+  }
+ ],
+ [
+  "datetime(2024, 12, 1)",
+  {
+   "date": 1735707600000
+  }
+ ],
+ [
+  "utc(2024, 1, 29)",
+  1709164800000
+ ],
+ [
+  "utc(2024, 1, 29, 13)",
+  1709211600000
+ ],
+ [
+  "year(datum.t)",
+  2024
+ ],
+ [
+  "utcyear(datum.t)",
+  2024
+ ],
+ [
+  "month(datum.t)",
+  1
+ ],
+ [
+  "utcmonth(datum.t)",
+  1
+ ],
+ [
+  "date(datum.t)",
+  29
+ ],
+ [
+  "day(datum.t)",
+  4
+ ],
+ [
+  "dayofyear(datum.t)",
+  60
+ ],
+ [
+  "quarter(datum.t)",
+  1
+ ],
+ [
+  "week(datum.t)",
+  8
+ ],
+ [
+  "utcweek(datum.t)",
+  8
+ ],
+ [
+  "hours(datum.t)",
+  12
+ ],
+ [
+  "utchours(datum.t)",
+  17
+ ],
+ [
+  "minutes(datum.t)",
+  30
+ ],
+ [
+  "seconds(datum.t)",
+  5
+ ],
+ [
+  "milliseconds(datum.t)",
+  7
+ ],
+ [
+  "utcmilliseconds(datum.t)",
+  7
+ ],
+ [
+  "timezoneoffset(datum.t)",
+  300
+ ],
+ [
+  "timezoneoffset(datetime(2024, 6, 1))",
+  240
+ ],
+ [
+  "year('nope')",
+  {
+   "number": "NaN"
+  }
+ ],
+ [
+  "timeOffset('month', datum.t, 2)",
+  {
+   "date": 1714408205007
+  }
+ ],
+ [
+  "utcOffset('day', datum.t, -3)",
+  {
+   "date": 1708968605007
+  }
+ ],
+ [
+  "timeOffset('year', datetime(2024, 1, 29))",
+  {
+   "date": 1740805200000
+  }
+ ],
+ [
+  "utcOffset('hours', datum.t)",
+  {
+   "date": 1709231405007
+  }
+ ],
+ [
+  "timeSequence('day', datetime(2024, 2, 8), datetime(2024, 2, 12))",
+  [
+   {
+    "date": 1709874000000
+   },
+   {
+    "date": 1709960400000
+   },
+   {
+    "date": 1710046800000
+   },
+   {
+    "date": 1710129600000
+   }
+  ]
+ ],
+ [
+  "utcSequence('month', utc(2024, 0, 15), utc(2024, 6, 1), 2)",
+  [
+   {
+    "date": 1706745600000
+   },
+   {
+    "date": 1711929600000
+   },
+   {
+    "date": 1717200000000
+   }
+  ]
+ ],
+ [
+  "format(1234.5678, ',.2f')",
+  "1,234.57"
+ ],
+ [
+  "format(0.123, '.1%')",
+  "12.3%"
+ ],
+ [
+  "format(1500000, '~s')",
+  "1.5M"
+ ],
+ [
+  "format(-1, '+d')",
+  "−1"
+ ],
+ [
+  "format('12', '$.2f')",
+  "$12.00"
+ ],
+ [
+  "timeFormat(datum.t, '%Y-%m-%d %H:%M:%S.%L')",
+  "2024-02-29 12:30:05.007"
+ ],
+ [
+  "utcFormat(datum.t, '%Y-%m-%d %H:%M:%S.%L')",
+  "2024-02-29 17:30:05.007"
+ ],
+ [
+  "timeFormat(datum.t, '%A %B %-d %I %p')",
+  "Thursday February 29 12 PM"
+ ],
+ [
+  "utcFormat(datum.t, '%a %b %e %j %U %W %V %u %w %q')",
+  "Thu Feb 29 060 08 09 09 4 4 1"
+ ],
+ [
+  "timeFormat(datetime(2020, 0, 1), timeUnitSpecifier(['year', 'month', 'date']))",
+  "2020-01-01"
+ ],
+ [
+  "timeFormat(datum.t, timeUnitSpecifier(['year', 'month'], {'year-month': '%b %Y '}))",
+  "Feb 2024"
+ ],
+ [
+  "timeUnitSpecifier('hours')",
+  "%H:00"
+ ],
+ [
+  "timeParse('2024-03-08 01:02', '%Y-%m-%d %H:%M')",
+  {
+   "date": 1709877720000
+  }
+ ],
+ [
+  "utcParse('2024-03-08 01:02', '%Y-%m-%d %H:%M')",
+  {
+   "date": 1709859720000
+  }
+ ],
+ [
+  "timeParse('bad', '%Y')",
+  null
+ ],
+ [
+  "dayFormat(0)",
+  "Sunday"
+ ],
+ [
+  "dayAbbrevFormat(6)",
+  "Sat"
+ ],
+ [
+  "monthFormat(11)",
+  "December"
+ ],
+ [
+  "monthAbbrevFormat(0)",
+  "Jan"
+ ],
+ [
+  "dayFormat(7)",
+  "Sunday"
+ ],
+ [
+  "length('héllo')",
+  5
+ ],
+ [
+  "length(datum.d)",
+  3
+ ],
+ [
+  "upper(datum.b)",
+  "HELLO, WORLD"
+ ],
+ [
+  "lower(datum.b)",
+  "hello, world"
+ ],
+ [
+  "indexof(datum.b, 'o')",
+  4
+ ],
+ [
+  "lastindexof(datum.b, 'o')",
+  8
+ ],
+ [
+  "indexof(datum.d, 2)",
+  1
+ ],
+ [
+  "indexof(datum.d, '2')",
+  -1
+ ],
+ [
+  "slice(datum.b, 7)",
+  "World"
+ ],
+ [
+  "slice(datum.b, -5, -1)",
+  "Worl"
+ ],
+ [
+  "slice(datum.d, 1)",
+  [
+   2,
+   3
+  ]
+ ],
+ [
+  "slice(datum.d, -1)",
+  [
+   3
+  ]
+ ],
+ [
+  "substring(datum.b, 5, 0)",
+  "Hello"
+ ],
+ [
+  "substring(datum.b, -3, 2)",
+  "He"
+ ],
+ [
+  "pad('7', 3, '0')",
+  "700"
+ ],
+ [
+  "pad('7', 4, '-', 'left')",
+  "---7"
+ ],
+ [
+  "pad('7', 4, '*', 'center')",
+  "*7**"
+ ],
+ [
+  "pad('long', 2)",
+  "long"
+ ],
+ [
+  "truncate(datum.b, 8)",
+  "Hello, …"
+ ],
+ [
+  "truncate(datum.b, 8, 'left')",
+  "…, World"
+ ],
+ [
+  "truncate(datum.b, 8, 'center')",
+  "Hell…rld"
+ ],
+ [
+  "truncate(datum.b, 5, 'right', '...')",
+  "He..."
+ ],
+ [
+  "truncate('short', 10)",
+  "short"
+ ],
+ [
+  "trim('  x y  ')",
+  "x y"
+ ],
+ [
+  "replace(datum.b, 'o', '0')",
+  "Hell0, World"
+ ],
+ [
+  "replace(datum.b, regexp('o', 'g'), '0')",
+  "Hell0, W0rld"
+ ],
+ [
+  "replace(datum.b, regexp('(\\\\w+), (\\\\w+)'), '$2 $1')",
+  "World Hello"
+ ],
+ [
+  "replace(datum.b, regexp('L', 'gi'), '[$&]')",
+  "He[l][l]o, Wor[l]d"
+ ],
+ [
+  "split('a,b,,c', ',')",
+  [
+   "a",
+   "b",
+   "",
+   "c"
+  ]
+ ],
+ [
+  "split('a,b,c', ',', 2)",
+  [
+   "a",
+   "b"
+  ]
+ ],
+ [
+  "split('abc', '')",
+  [
+   "a",
+   "b",
+   "c"
+  ]
+ ],
+ [
+  "split('a1b22c', regexp('\\\\d+'))",
+  [
+   "a",
+   "b",
+   "c"
+  ]
+ ],
+ [
+  "parseFloat('3.14abc')",
+  3.14
+ ],
+ [
+  "parseFloat('  -1e3x')",
+  -1000
+ ],
+ [
+  "parseFloat('.5')",
+  0.5
+ ],
+ [
+  "parseFloat('abc')",
+  {
+   "number": "NaN"
+  }
+ ],
+ [
+  "parseFloat('1e')",
+  1
+ ],
+ [
+  "parseInt('42px')",
+  42
+ ],
+ [
+  "parseInt('0x1f')",
+  31
+ ],
+ [
+  "parseInt('ff', 16)",
+  255
+ ],
+ [
+  "parseInt('-12.9')",
+  -12
+ ],
+ [
+  "parseInt('z', 36)",
+  35
+ ],
+ [
+  "parseInt('')",
+  {
+   "number": "NaN"
+  }
+ ],
+ [
+  "test(regexp('^h', 'i'), datum.b)",
+  true
+ ],
+ [
+  "test(regexp('^h'), datum.b)",
+  false
+ ],
+ [
+  "join(datum.d)",
+  "1,2,3"
+ ],
+ [
+  "join(datum.d, ' - ')",
+  "1 - 2 - 3"
+ ],
+ [
+  "join([1, null, 2])",
+  "1,,2"
+ ],
+ [
+  "reverse(datum.d)",
+  [
+   3,
+   2,
+   1
+  ]
+ ],
+ [
+  "sort([3, 1, 10, 2])",
+  [
+   1,
+   2,
+   3,
+   10
+  ]
+ ],
+ [
+  "sort(['b', 'a', 'C'])",
+  [
+   "C",
+   "a",
+   "b"
+  ]
+ ],
+ [
+  "extent([3, null, 1, NaN, 7])",
+  [
+   1,
+   7
+  ]
+ ],
+ [
+  "span([2, 9, 5])",
+  3
+ ],
+ [
+  "peek(datum.d)",
+  3
+ ],
+ [
+  "peek([])",
+  {
+   "undefined": true
+  }
+ ],
+ [
+  "lerp([0, 10], 0.25)",
+  2.5
+ ],
+ [
+  "inrange(5, [10, 0])",
+  true
+ ],
+ [
+  "inrange(11, [0, 10])",
+  false
+ ],
+ [
+  "clampRange([8, 12], 0, 10)",
+  [
+   6,
+   10
+  ]
+ ],
+ [
+  "clampRange([-5, 20], 0, 10)",
+  [
+   0,
+   10
+  ]
+ ],
+ [
+  "sequence(5)",
+  [
+   0,
+   1,
+   2,
+   3,
+   4
+  ]
+ ],
+ [
+  "sequence(1, 3)",
+  [
+   1,
+   2
+  ]
+ ],
+ [
+  "sequence(0, 1, 0.25)",
+  [
+   0,
+   0.25,
+   0.5,
+   0.75
+  ]
+ ],
+ [
+  "sequence(5, 0, -2)",
+  [
+   5,
+   3,
+   1
+  ]
+ ],
+ [
+  "merge({a: 1, b: 2}, {b: 3}, datum.o)",
+  {
+   "a": 1,
+   "b": 3,
+   "x": 1,
+   "y": "two"
+  }
+ ],
+ [
+  "if(datum.a > 2, 'big', 'small')",
+  "big"
+ ],
+ [
+  "if(datum.a > 5, 1 / 0, 'lazy')",
+  "lazy"
+ ],
+ [
+  "datum.a > 2 ? 'yes' : 'no'",
+  "yes"
+ ],
+ [
+  "[datum.a, datum.b, [1, [2]]]",
+  [
+   3,
+   "Hello, World",
+   [
+    1,
+    [
+     2
+    ]
+   ]
+  ]
+ ],
+ [
+  "{k: datum.a, 'q r': 2}",
+  {
+   "k": 3,
+   "q r": 2
+  }
+ ],
+ [
+  "cumulativeNormal(0)",
+  0.5
+ ],
+ [
+  "cumulativeNormal(1.96)",
+  0.9750021048517795
+ ],
+ [
+  "densityNormal(0)",
+  0.3989422804014327
+ ],
+ [
+  "quantileNormal(0.975)",
+  1.959963984540054
+ ],
+ [
+  "quantileNormal(0.5, 10, 2)",
+  10
+ ],
+ [
+  "cumulativeLogNormal(1)",
+  0.5
+ ],
+ [
+  "densityLogNormal(1)",
+  0.3989422804014327
+ ],
+ [
+  "quantileLogNormal(0.5)",
+  1
+ ],
+ [
+  "cumulativeUniform(0.25)",
+  0.25
+ ],
+ [
+  "densityUniform(0.5, 0, 2)",
+  0.5
+ ],
+ [
+  "quantileUniform(0.25, 10, 20)",
+  12.5
+ ],
+ [
+  "datetime(0)",
+  {
+   "date": 0
+  }
+ ],
+ [
+  "datetime('2024-02-29')",
+  {
+   "date": 1709164800000
+  }
+ ],
+ [
+  "datetime(datetime(2020, 1, 1))",
+  {
+   "date": 1580533200000
+  }
+ ],
+ [
+  "utc(1000)",
+  -30610224000000
+ ]
+]

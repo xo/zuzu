@@ -112,7 +112,7 @@ it.
 
 An expression and an axis both format numbers and times. Vega uses
 d3-format, such as `,.2f`, and d3-time-format, such as `%Y-%m-%d`. The
-package `format` ports both, and the expression functions `format` and
+package `format` implements both, and the expression functions `format` and
 `timeFormat` call it. The rules of d3 for locale, rounding and the SI prefix
 are exact, so the tests compare the output with d3 on the same inputs.
 

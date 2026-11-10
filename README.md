@@ -44,8 +44,19 @@ sends live charts to a web browser, and draws the results of a query for
 zuzu is in its first phases. Phase 0, the repository, the tests of the
 documents, CI, the corpus and the oracle, is done. The scene graph, the
 themes, the SVG writer and the measurement of text with the bundled IBM Plex
-Sans exist (phases 1 and 2). Nothing reads a spec yet. [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the
-questions that the maintainers have not answered.
+Sans exist (phases 1 and 2). zuzu reads a Vega spec and draws it (phase 3).
+On the 540 specs of the first target, its datasets, scales and marks match
+those of vega.js for 83 percent of the specs. Vega-Lite comes in phase 4.
+[`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
+that the maintainers have not answered.
+
+```go
+chart, _, err := zuzu.Parse(src)
+if err != nil {
+	return err
+}
+report, err := chart.SVG(ctx, w, zuzu.WithLoader(zuzu.FSLoader(os.DirFS("data"))))
+```
 
 The first step was a survey of what other libraries do. Open
 [`docs/survey/compare.html`](docs/survey/compare.html) to see the same real

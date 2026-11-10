@@ -1,0 +1,317 @@
+package zuzu
+
+import (
+	"bytes"
+	"context"
+	"encoding/json/v2"
+	"fmt"
+	"io"
+	"log/slog"
+	"math/rand/v2"
+	"strings"
+	"time"
+
+	"github.com/xo/zuzu/dataflow"
+	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/scale"
+	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/svg"
+	"github.com/xo/zuzu/theme"
+	"github.com/xo/zuzu/vega"
+)
+
+// Error is an error of the package zuzu.
+type Error string
+
+// Error satisfies the error interface.
+func (err Error) Error() string {
+	return string(err)
+}
+
+// The errors of the package. The errors of a spec are in the package vega.
+const (
+	// ErrUnknownDialect is the error of a spec whose $schema names neither
+	// Vega nor Vega-Lite, and of a spec with no $schema and no WithDialect.
+	ErrUnknownDialect Error = "unknown spec dialect"
+	// ErrNoLoader is the error of a spec that names data by url, when the
+	// render has no loader (D25).
+	ErrNoLoader Error = "no loader for url data"
+	// ErrCycle is the error of a signal, a dataset or a scale that depends
+	// on itself.
+	ErrCycle Error = "cycle in the spec"
+	// ErrUnknownName is the error of a reference to a signal, a dataset or a
+	// scale that the spec does not have.
+	ErrUnknownName Error = "unknown name"
+)
+
+// Report lists what zuzu did not draw in the loose mode, and what it warns
+// of in either mode (D26).
+type Report = vega.Report
+
+// Dialect is the language of a spec.
+type Dialect int
+
+// The dialects.
+const (
+	// Vega is a Vega spec.
+	Vega Dialect = iota + 1
+	// VegaLite is a Vega-Lite spec.
+	VegaLite
+)
+
+// Option is a setting of Parse.
+type Option func(*options)
+
+// options are the settings of Parse.
+type options struct {
+	dialect Dialect
+	strict  bool
+	funcs   map[string]expr.Func
+	logger  *slog.Logger
+}
+
+// WithDialect sets the dialect of a spec that has no $schema.
+func WithDialect(d Dialect) Option {
+	return func(o *options) { o.dialect = d }
+}
+
+// WithStrict sets the feature mode (D26). In the strict mode, a feature
+// that zuzu does not support is an error. In the loose mode, the default,
+// zuzu skips it and names it in the report.
+func WithStrict(strict bool) Option {
+	return func(o *options) { o.strict = strict }
+}
+
+// WithFunction adds a Go function that an expression can call by name. It
+// takes the place of a built in function of the same name.
+func WithFunction(name string, fn expr.Func) Option {
+	return func(o *options) {
+		if o.funcs == nil {
+			o.funcs = map[string]expr.Func{}
+		}
+		o.funcs[name] = fn
+	}
+}
+
+// WithLogger sets where zuzu logs.
+func WithLogger(l *slog.Logger) Option {
+	return func(o *options) { o.logger = l }
+}
+
+// Chart is a parsed spec. It does not change after Parse, so it is safe for
+// concurrent use.
+type Chart struct {
+	spec *vega.Spec
+	opts options
+}
+
+// Parse reads a Vega or a Vega-Lite spec. The $schema field decides which.
+// A spec without $schema needs WithDialect.
+func Parse(src []byte, opts ...Option) (*Chart, Report, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	var head struct {
+		Schema string `json:"$schema"`
+	}
+	if err := json.Unmarshal(src, &head); err != nil {
+		return nil, nil, fmt.Errorf("reading the $schema of a spec: %w: %w", vega.ErrInvalidSpec, err)
+	}
+	d := o.dialect
+	switch {
+	case strings.Contains(head.Schema, "/vega-lite/"):
+		d = VegaLite
+	case strings.Contains(head.Schema, "/vega/"):
+		d = Vega
+	case head.Schema != "":
+		return nil, nil, fmt.Errorf("the $schema %q: %w", head.Schema, ErrUnknownDialect)
+	}
+	switch d {
+	case Vega:
+		spec, err := vega.Parse(src)
+		if err != nil {
+			return nil, nil, err
+		}
+		return FromVega(spec, opts...)
+	case VegaLite:
+		return nil, nil, vega.Issue{Err: vega.ErrUnsupported, Message: "Vega-Lite compiles to Vega in phase 4"}
+	}
+	return nil, nil, fmt.Errorf("a spec with no $schema: %w", ErrUnknownDialect)
+}
+
+// FromVega takes a Vega spec that a program built as Go values. It copies
+// the spec, so a later change by the caller does not reach the Chart.
+func FromVega(spec *vega.Spec, opts ...Option) (*Chart, Report, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	b, err := vega.Write(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+	cp, err := vega.Parse(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &Chart{spec: cp, opts: o}, nil, nil
+}
+
+// Spec returns a copy of the Vega spec, to read or to debug.
+func (c *Chart) Spec() *vega.Spec {
+	b, err := vega.Write(c.spec)
+	if err != nil {
+		return nil
+	}
+	cp, err := vega.Parse(b)
+	if err != nil {
+		return nil
+	}
+	return cp
+}
+
+// RenderOption is a setting of a render.
+type RenderOption func(*renderOptions)
+
+// renderOptions are the settings of a render.
+type renderOptions struct {
+	loader     Loader
+	values     map[string][]dataflow.Row
+	resultSets map[string]ResultSet
+	mode       theme.Mode
+	scheme     theme.Scheme
+	hasScheme  bool
+	loc        *time.Location
+	locale     *format.Locale
+	random     func() rand.Source
+	width      float64
+	height     float64
+	logger     *slog.Logger
+}
+
+// WithLoader sets how the data of a url is read (D25).
+func WithLoader(l Loader) RenderOption {
+	return func(o *renderOptions) { o.loader = l }
+}
+
+// WithValues gives the rows of a named dataset. They take the place of the
+// values or the url of the dataset in the spec, and its transforms still
+// run.
+func WithValues(name string, rows []map[string]any) RenderOption {
+	return func(o *renderOptions) {
+		if o.values == nil {
+			o.values = map[string][]dataflow.Row{}
+		}
+		o.values[name] = rows
+	}
+}
+
+// WithResultSet gives the rows of a named dataset, read from the result of
+// a query. zuzu reads it once, and the caller closes it.
+func WithResultSet(name string, rs ResultSet) RenderOption {
+	return func(o *renderOptions) {
+		if o.resultSets == nil {
+			o.resultSets = map[string]ResultSet{}
+		}
+		o.resultSets[name] = rs
+	}
+}
+
+// WithMode sets the light or the dark mode (D14).
+func WithMode(m theme.Mode) RenderOption {
+	return func(o *renderOptions) { o.mode = m }
+}
+
+// WithScheme sets the color scheme (D14).
+func WithScheme(s theme.Scheme) RenderOption {
+	return func(o *renderOptions) { o.scheme, o.hasScheme = s, true }
+}
+
+// WithLocation sets the time zone of local time (D27). The default is the
+// zone of the system.
+func WithLocation(loc *time.Location) RenderOption {
+	return func(o *renderOptions) { o.loc = loc }
+}
+
+// WithLocale sets the locale of numbers and dates (D27).
+func WithLocale(l format.Locale) RenderOption {
+	return func(o *renderOptions) { o.locale = &l }
+}
+
+// WithRandom sets the function that makes the source of random numbers of
+// a render (D28). Each render calls it once.
+func WithRandom(fn func() rand.Source) RenderOption {
+	return func(o *renderOptions) { o.random = fn }
+}
+
+// WithSize sets the size of the chart, in place of its width and height.
+func WithSize(width, height float64) RenderOption {
+	return func(o *renderOptions) { o.width, o.height = width, height }
+}
+
+// WithRenderLogger sets where a render logs.
+func WithRenderLogger(l *slog.Logger) RenderOption {
+	return func(o *renderOptions) { o.logger = l }
+}
+
+// View holds the state of one render. It is not safe for concurrent use.
+type View struct {
+	rt    *runtime
+	scene *scene.Scene
+}
+
+// NewView runs the spec and keeps its state.
+func (c *Chart) NewView(ctx context.Context, opts ...RenderOption) (*View, Report, error) {
+	rt := newRuntime(ctx, c, opts)
+	s, err := rt.render()
+	if err != nil {
+		return nil, rt.report, err
+	}
+	return &View{rt: rt, scene: s}, rt.report, nil
+}
+
+// Scene returns the scene graph of the view.
+func (v *View) Scene() *scene.Scene {
+	return v.scene
+}
+
+// Data returns the rows of a dataset of the top level, after its
+// transforms.
+func (v *View) Data(name string) ([]map[string]any, error) {
+	return v.rt.root.dataset(name)
+}
+
+// Signal returns the value of a signal of the top level.
+func (v *View) Signal(name string) (any, error) {
+	return v.rt.root.signal(name)
+}
+
+// Scale returns a scale of the top level.
+func (v *View) Scale(name string) (scale.Scale, error) {
+	return v.rt.root.scale(name)
+}
+
+// Render runs the spec and returns the scene graph.
+func (c *Chart) Render(ctx context.Context, opts ...RenderOption) (*scene.Scene, Report, error) {
+	v, report, err := c.NewView(ctx, opts...)
+	if err != nil {
+		return nil, report, err
+	}
+	return v.scene, report, nil
+}
+
+// SVG renders the chart and writes it as SVG.
+func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Report, error) {
+	s, report, err := c.Render(ctx, opts...)
+	if err != nil {
+		return report, err
+	}
+	var b bytes.Buffer
+	if err := svg.Write(&b, s); err != nil {
+		return report, err
+	}
+	_, err = w.Write(b.Bytes())
+	return report, err
+}

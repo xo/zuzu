@@ -1,0 +1,52 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "A bar chart with an axis on each side, a title and a legend.",
+  "width": 320,
+  "height": 180,
+  "padding": 8,
+  "title": {"text": "Sales by region"},
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"region": "North", "q": "Q1", "sales": 28},
+        {"region": "South", "q": "Q1", "sales": 55},
+        {"region": "East", "q": "Q1", "sales": 43},
+        {"region": "West", "q": "Q1", "sales": 91},
+        {"region": "North", "q": "Q2", "sales": 81},
+        {"region": "South", "q": "Q2", "sales": 53},
+        {"region": "East", "q": "Q2", "sales": 19},
+        {"region": "West", "q": "Q2", "sales": 87}
+      ],
+      "transform": [
+        {"type": "stack", "groupby": ["region"], "field": "sales", "sort": {"field": "q"}}
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "x", "type": "band", "domain": {"data": "table", "field": "region"}, "range": "width", "padding": 0.2},
+    {"name": "y", "type": "linear", "domain": {"data": "table", "field": "y1"}, "range": "height", "nice": true},
+    {"name": "color", "type": "ordinal", "domain": {"data": "table", "field": "q"}, "range": "category"}
+  ],
+  "axes": [
+    {"orient": "left", "scale": "y", "grid": true, "title": "Sales"},
+    {"orient": "bottom", "scale": "x"}
+  ],
+  "legends": [{"fill": "color", "title": "Quarter"}],
+  "marks": [
+    {
+      "type": "rect",
+      "name": "bars",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "region"},
+          "width": {"scale": "x", "band": 1},
+          "y": {"scale": "y", "field": "y0"},
+          "y2": {"scale": "y", "field": "y1"},
+          "fill": {"scale": "color", "field": "q"}
+        }
+      }
+    }
+  ]
+}

@@ -9,9 +9,11 @@ reproduce the look of Vega (D12). A theme is a mode, light or dark, and a
 color scheme that swaps apart from it (D14).
 
 On 2026-11-10 phases 0 and 2 are done, and phase 1 waits for a maintainer to
-accept `docs/targets/compare.html`. The packages `scene`, `theme`, `svg` and
-`text` exist. Code follows the plan (D3). Every decision from D1 to D29 is
-decided. The open questions are at the end of `docs/PLAN.md`.
+accept `docs/targets/compare.html`. The code of phase 3 runs static Vega
+specs, and its exit waits for the maintainers to accept the share that
+open question 13 proposes. Code follows the plan (D3).
+Every decision from D1 to D29 is decided. The open questions are at the end
+of `docs/PLAN.md`.
 
 ## Standing rules
 
@@ -155,13 +157,19 @@ On 2026-11-10 the repository holds these files:
 | `docs/STYLE.md` | the rules and the tokens of the look (D12, D14) |
 | `docs/survey/` | the survey of other libraries and the page that compares them (D23) |
 | `docs/targets/` | the script that draws the target SVGs and their gallery, which git ignores (D13) |
-| `doc.go`, `*_test.go` | the package `zuzu`, which holds no code yet, and the tests of the documents |
+| `*.go`, `testdata/` | the package `zuzu`: the API of D24 and the runtime that runs a spec, with its golden files, and the tests of the documents |
+| `vega/` | the Go types of a Vega spec, read from JSON and written back (D21) |
+| `expr/` | the expression language of Vega, with its oracle cases in `expr/testdata` (D9) |
+| `format/` | the formats of numbers and times of d3, the units of time and the dates that JavaScript reads, with their oracle cases in `format/testdata` (D27) |
+| `dataflow/` | the reading of data and the transforms |
+| `scale/` | the scales and their ticks |
+| `layout/` | the axes, the legends and the titles in the look of zuzu, and the bounds of a scene (D12) |
 | `scene/` | the scene graph and its JSON form (D8) |
 | `theme/` | the modes and the color schemes (D14) |
 | `svg/` | the SVG writer, with its golden files in `svg/testdata` (D10) |
 | `text/` | the measurement of text and the bundled IBM Plex Sans, in `text/fonts` with its license (D11, D16) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
-| `test/` | the test module: the corpus, the inventory, the oracle and the TinyGo check. `test/README.md` says how to run each |
+| `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |
 
 The packages go where "Packages" in `docs/PLAN.md` says.
 

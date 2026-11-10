@@ -14,10 +14,11 @@ decided on the way.
 ### Run the oracle in CI
 
 The oracle writes the references in about 8 seconds, and git ignores them
-(`test/README.md`). When the first comparison with them exists, in phase 3,
-add a job to `.github/workflows/test.yml` that sets up Node.js, installs the
-packages of `test/oracle` and runs the oracle with `TZ=UTC` before the tests
-of the test module.
+(`test/README.md`). The comparison with them exists in `test/conform` since
+phase 3. Add a job to `.github/workflows/test.yml` that sets up Node.js,
+installs the packages of `test/oracle`, runs the oracle with `TZ=UTC`, and
+runs `go run ./cmd/conform`. Then add a test that fails when a share falls
+below the exit of phase 3.
 
 ### Add a test that names a person in a decision
 
@@ -54,8 +55,59 @@ against d3, in `svg/shapes_test.go`.
 ### Make the Vega config of a theme
 
 D14 says that a theme becomes one Vega config. The package `vega` holds the
-type of a config, and it comes in phase 3. Until then, `theme.Theme` holds the
-colors, and the config waits.
+type `Config` since phase 3, as a map of JSON, and the runtime does not read
+it yet. The runtime reads the colors of `theme.Theme` directly: the guides,
+the background, and the ranges `category`, `ordinal`, `ramp`, `heatmap` and
+`diverging`. A scheme that a spec names, such as `blues`, takes a ramp of the
+theme, and a scheme of categories, such as `tableau10`, takes the colors of
+the categories of the theme.
+
+## Phase 3
+
+### Draw the marks in the look of zuzu
+
+The marks follow the encodings of the spec, so a Vega-Lite spec that
+vega-lite.js compiled draws its bars in `#4c78a8`. The rules of the marks in
+`docs/STYLE.md`, such as the round end of a bar and the line of 2, come from
+the config of the theme, which waits for the item above. The axes, the
+legends and the titles already follow `docs/STYLE.md`.
+
+### Finish the guides
+
+1. A quantitative axis draws no base line at zero, which rule 2 of "Axes and
+   grids" in `docs/STYLE.md` asks for.
+2. An axis reads neither `labelFlush` nor `labelLimit`, and a legend reads
+   neither `direction`, `orient`, `columns` nor its encodings.
+3. A legend of sizes draws a circle for each value, and not the nested
+   circles of the targets.
+4. The autosize `fit`, `fit-x` and `fit-y` grow the canvas as `pad` does, and
+   do not shrink the plot area.
+5. The package `layout` has no tests of its own. The golden file
+   `testdata/bar.svg` and the gallery of the test module show its output.
+
+### Add the expression functions that zuzu does not have
+
+An expression that calls one of these functions is an issue in the loose
+mode: `contrast`, `luminance`, `rgb`, `hsl`, `lab`, `hcl`, `gradient`,
+`copy`, the functions `geo*` of phase 5, `treePath`, `treeAncestors`,
+`vlSelectionTest` and `vlSelectionResolve`.
+
+### Decide whether to share rows between datasets as Vega does
+
+A transform of Vega, such as `formula` or `stack`, changes the rows in
+place, and the datasets that derive from the same source share those rows.
+So a dataset of vega.js can hold fields that a transform of another dataset
+added, and `facet_bullet` and `pancake-spider-chart` differ for this reason.
+zuzu copies a row before a transform changes it, which keeps each dataset to
+its own transforms. The maintainers can decide whether zuzu follows Vega
+here. Until then, the conformance counts these as differences.
+
+### Make the order of mixed values the same as vega.js
+
+A domain sorted with `sort: true` that mixes strings and numbers, such as
+the titles of `bar_grouped_thin`, has an order in vega.js that depends on the
+sort of JavaScript, which is not a total order on mixed types. zuzu sorts
+numbers before strings.
 
 ## Themes
 

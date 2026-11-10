@@ -4,9 +4,8 @@ This document holds the plan for `github.com/xo/zuzu`. The decisions are in
 [`decisions/`](decisions/README.md), one file each (D4). The open questions
 for the maintainers are at the end of this file.
 
-No code exists yet. The plan and the rules come before any code (D3), so this
-file is the place to change the design. A change to the plan is a decision
-first.
+The plan and the rules came before any code (D3), so this file is the place
+to change the design. A change to the plan is a decision first.
 
 ## Purpose
 
@@ -130,7 +129,7 @@ short word, and an exported name does not repeat its package.
 | `vegalite` | the Go types of a Vega-Lite spec and the compiler to `vega` |
 | `expr` | the expression language: the parser, the tree, the evaluator and the functions (D9) |
 | `script` | the evaluator that runs scripts in goja, which a program imports only if it wants it (D9) |
-| `format` | the formats of numbers and times, with the syntax of d3-format and d3-time-format, and the tables of each locale (D27) |
+| `format` | the formats of numbers and times, with the syntax of d3-format and d3-time-format, the tables of each locale (D27), the units of time and the dates that JavaScript reads |
 | `dataflow` | the data sources and the transforms |
 | `scale` | the scales, and the interpolation of a color ramp |
 | `geo` | the projections and the geographic paths |
@@ -481,6 +480,50 @@ share is set at the start of the phase, from the inventory.
 
 Do not build signals that bind events.
 
+No share was set at the start of the phase. This plan proposes one, and
+open question 13 asks the maintainers to accept it. The check runs over the
+540 specs of the first target: the 70 Vega specs, and the Vega specs that
+vega-lite.js compiled from the 470 Vega-Lite specs, which the references
+hold. The transforms of tiers 1 and 2, the projections and topojson come in
+phase 5, so the specs that need them fail here. The proposed exit is that 80
+percent of the specs match in all three checks, and that 85 percent of the
+datasets, 90 percent of the scales and 90 percent of the marks that draw
+data match.
+
+On 2026-11-10 the code of phase 3 exists, and `go run ./cmd/conform` in the
+test module measures it:
+
+| Check | Match | Of |
+| --- | --- | --- |
+| specs, in all three checks | 450 (83.3%) | 540 |
+| datasets | 1103 (89.8%) | 1228 |
+| scales, by type and domain | 1329 (97.2%) | 1367 |
+| marks that draw data, by the data of their items | 3671 (94.3%) | 3893 |
+
+Every spec runs. In the loose mode, the report names each feature that zuzu
+skipped. The most common are the mark `shape` with its geographic
+transforms, and the transforms `density`, `geojson`, `geopoint`, `kde`,
+`stratify` and `regression`, all of phase 5. Most of the other differences
+come from vega.js itself. A transform of Vega changes the rows that the
+datasets which derive from the same source share, and zuzu copies a row
+before it changes it. `docs/BACKLOG.md` lists what is left.
+
+The phase holds these packages:
+
+1. `vega` reads and writes every spec of the corpus and gives back the same
+   JSON.
+2. `expr` parses the grammar of vega-expression. It matches vega.js on 238
+   expressions that `test/oracle/exprs.mjs` evaluates.
+3. `format` matches d3-format on 1176 numbers, d3-time-format on 820 times
+   and 42 parses, and `Date.parse` on 32 dates. `test/oracle/formats.mjs`
+   writes the cases.
+4. `dataflow` reads JSON, CSV, TSV and DSV, and runs 20 transforms.
+5. `scale` holds the scales of Vega and their ticks.
+6. `layout` draws the axes, the legends and the titles in the look of zuzu.
+7. The root package runs a spec: it works out each signal, dataset and scale
+   when something first asks for it, builds the marks and the facets, and
+   grows the canvas to hold the guides, as the autosize `pad` of Vega does.
+
 ### Phase 4. Vega-Lite
 
 The `vegalite` types and the compiler to `vega`, for Vega-Lite without
@@ -605,3 +648,8 @@ stays true.
 12. Which fonts suit the schemes from editor themes, and does zuzu list a
     font for each? The fonts must be under the Open Font License or a
     license like it, and zuzu bundles none of them (D15, D16).
+13. Is the share of phase 3 accepted? Phase 3 above proposes that 80 percent
+    of the 540 specs of the first target match in all three checks of D17,
+    and that 85 percent of the datasets, 90 percent of the scales and 90
+    percent of the marks that draw data match. On 2026-11-10 the code meets
+    it.

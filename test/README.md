@@ -11,7 +11,10 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `cmd/inventory/` | the tool that writes the inventory |
 | `cmd/targets/` | the tool that compares the SVG writer with the targets and writes `docs/targets/compare.html` (D13) |
 | `cmd/wasm/` | a program that imports zuzu, so that CI can build it with TinyGo (D29) |
-| `oracle/` | the oracle, which runs vega.js and vega-lite.js in Node.js |
+| `cmd/conform/` | the tool that compares zuzu with the references (D17) |
+| `cmd/gallery/` | the tool that draws the specs of the corpus with zuzu, on a page |
+| `conform/` | the comparison of datasets, scales and marks that `cmd/conform` runs |
+| `oracle/` | the oracles, which run vega.js, vega-lite.js and d3 in Node.js |
 
 ## The corpus
 
@@ -62,3 +65,48 @@ it, prints the share of pixels that differ, and writes
 `-testdata ../svg/testdata/targets` to copy the scene graphs of tier 0 into
 the golden tests of `svg`.
 
+## Compare zuzu with the references
+
+Write the references first, as above. Then run this in this folder:
+
+```bash
+go run ./cmd/conform
+```
+
+It runs each spec of the first target in zuzu, in the loose mode, and prints
+the share of the specs, the datasets, the scales and the marks that match
+the references. A Vega-Lite spec runs as the Vega spec that vega-lite.js
+compiled, which its reference holds. Add `-v` to print what differs, and
+`-only text` to check only the specs whose path holds the text. The plan
+states the share that phase 3 must reach.
+
+## Look at what zuzu draws
+
+Run this in this folder:
+
+```bash
+go run ./cmd/gallery -out /tmp/gallery
+```
+
+It draws each spec of the first target with zuzu, and writes the SVG files
+and a page, `index.html`, that shows them with the issues of each. Add
+`-dark` for the dark mode, `-only text` to draw some specs, and `-n` to draw
+at most that many.
+
+## Write the cases of the expressions and the formats
+
+The tests of the packages `expr` and `format` compare zuzu with vega.js and
+d3 on cases that two scripts write. Run these in this folder after
+`npm install` in `oracle`:
+
+```bash
+TZ=America/New_York node oracle/exprs.mjs ../expr/testdata
+```
+
+```bash
+TZ=America/New_York node oracle/formats.mjs ../format/testdata
+```
+
+The time zone is New York, so that the cases of local time cross a change
+of the clock. `oracle/exprs.mjs` reads the expressions from
+`expr/testdata/exprs.txt`.

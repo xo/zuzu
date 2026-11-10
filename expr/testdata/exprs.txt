@@ -1,0 +1,240 @@
+# The expressions that test/oracle/exprs.mjs evaluates with vega.js. A line
+# that starts with # is a comment.
+1 + 2 * 3
+7 % -3
+-7 % 3
+1 / 0
+0 / 0
+'a' + 1
+1 + '2'
+'3' * '4'
+true + 1
+null + 1
+[1, 2] + [3]
+1 < 2 < 3
+'10' < '9'
+10 < '9'
+null == datum.missing
+null === datum.missing
+0 == ''
+'1' == 1
+NaN == NaN
+!!''
+!!'0'
+datum.a
+datum['b']
+datum.d[1]
+datum.d.length
+datum.b.length
+datum.missing
+datum.c
+datum.o.y
+datum.d[5]
+5 & 3
+5 | 3
+5 ^ 3
+~5
+-16 >> 2
+-16 >>> 28
+1 << 31
+0 || 'x'
+1 && 'y'
+'x' in datum.o
+'q' in datum.o
+PI
+E
+SQRT2
+abs(datum.n)
+ceil(datum.n)
+floor(datum.n)
+round(datum.n)
+round(2.5)
+round(-0.5)
+sqrt(2)
+pow(2, 10)
+exp(1)
+log(10)
+sin(PI / 2)
+atan2(1, 1)
+min(3, 1, 2)
+max(3, 1, 2)
+min()
+max()
+max(1, NaN)
+clamp(15, 0, 10)
+clamp(-1, 0, 10)
+isNaN('x')
+isNaN('1')
+isFinite('1e3')
+isFinite(1 / 0)
+isValid(null)
+isValid(0)
+isValid(NaN)
+isValid(datum.missing)
+isDefined(datum.missing)
+isDefined(datum.c)
+isNumber('1')
+isNumber(1)
+isString('1')
+isArray(datum.d)
+isObject(datum.o)
+isObject(datum.d)
+isObject(1)
+isBoolean(false)
+isDate(datetime(2020, 0, 1))
+isRegExp(regexp('a'))
+toNumber('42.5')
+toNumber('')
+toNumber(null)
+toNumber('abc')
+toString(42)
+toString(null)
+toString(datum.d)
+toBoolean('false')
+toBoolean('0')
+toBoolean('yes')
+toBoolean('')
+toBoolean(0)
+toDate(0)
+toDate('2024-02-29')
+toDate('2024-02-29T12:00')
+toDate('Feb 29 2024')
+toDate('')
+toDate(null)
+time(toDate('2024-02-29'))
+datetime(2024, 1, 29)
+datetime(2024, 1, 29, 13, 45, 30, 250)
+datetime(99, 0, 1)
+datetime(2024, 12, 1)
+utc(2024, 1, 29)
+utc(2024, 1, 29, 13)
+year(datum.t)
+utcyear(datum.t)
+month(datum.t)
+utcmonth(datum.t)
+date(datum.t)
+day(datum.t)
+dayofyear(datum.t)
+quarter(datum.t)
+week(datum.t)
+utcweek(datum.t)
+hours(datum.t)
+utchours(datum.t)
+minutes(datum.t)
+seconds(datum.t)
+milliseconds(datum.t)
+utcmilliseconds(datum.t)
+timezoneoffset(datum.t)
+timezoneoffset(datetime(2024, 6, 1))
+year('nope')
+timeOffset('month', datum.t, 2)
+utcOffset('day', datum.t, -3)
+timeOffset('year', datetime(2024, 1, 29))
+utcOffset('hours', datum.t)
+timeSequence('day', datetime(2024, 2, 8), datetime(2024, 2, 12))
+utcSequence('month', utc(2024, 0, 15), utc(2024, 6, 1), 2)
+format(1234.5678, ',.2f')
+format(0.123, '.1%')
+format(1500000, '~s')
+format(-1, '+d')
+format('12', '$.2f')
+timeFormat(datum.t, '%Y-%m-%d %H:%M:%S.%L')
+utcFormat(datum.t, '%Y-%m-%d %H:%M:%S.%L')
+timeFormat(datum.t, '%A %B %-d %I %p')
+utcFormat(datum.t, '%a %b %e %j %U %W %V %u %w %q')
+timeFormat(datetime(2020, 0, 1), timeUnitSpecifier(['year', 'month', 'date']))
+timeFormat(datum.t, timeUnitSpecifier(['year', 'month'], {'year-month': '%b %Y '}))
+timeUnitSpecifier('hours')
+timeParse('2024-03-08 01:02', '%Y-%m-%d %H:%M')
+utcParse('2024-03-08 01:02', '%Y-%m-%d %H:%M')
+timeParse('bad', '%Y')
+dayFormat(0)
+dayAbbrevFormat(6)
+monthFormat(11)
+monthAbbrevFormat(0)
+dayFormat(7)
+length('héllo')
+length(datum.d)
+upper(datum.b)
+lower(datum.b)
+indexof(datum.b, 'o')
+lastindexof(datum.b, 'o')
+indexof(datum.d, 2)
+indexof(datum.d, '2')
+slice(datum.b, 7)
+slice(datum.b, -5, -1)
+slice(datum.d, 1)
+slice(datum.d, -1)
+substring(datum.b, 5, 0)
+substring(datum.b, -3, 2)
+pad('7', 3, '0')
+pad('7', 4, '-', 'left')
+pad('7', 4, '*', 'center')
+pad('long', 2)
+truncate(datum.b, 8)
+truncate(datum.b, 8, 'left')
+truncate(datum.b, 8, 'center')
+truncate(datum.b, 5, 'right', '...')
+truncate('short', 10)
+trim('  x y  ')
+replace(datum.b, 'o', '0')
+replace(datum.b, regexp('o', 'g'), '0')
+replace(datum.b, regexp('(\\w+), (\\w+)'), '$2 $1')
+replace(datum.b, regexp('L', 'gi'), '[$&]')
+split('a,b,,c', ',')
+split('a,b,c', ',', 2)
+split('abc', '')
+split('a1b22c', regexp('\\d+'))
+parseFloat('3.14abc')
+parseFloat('  -1e3x')
+parseFloat('.5')
+parseFloat('abc')
+parseFloat('1e')
+parseInt('42px')
+parseInt('0x1f')
+parseInt('ff', 16)
+parseInt('-12.9')
+parseInt('z', 36)
+parseInt('')
+test(regexp('^h', 'i'), datum.b)
+test(regexp('^h'), datum.b)
+join(datum.d)
+join(datum.d, ' - ')
+join([1, null, 2])
+reverse(datum.d)
+sort([3, 1, 10, 2])
+sort(['b', 'a', 'C'])
+extent([3, null, 1, NaN, 7])
+span([2, 9, 5])
+peek(datum.d)
+peek([])
+lerp([0, 10], 0.25)
+inrange(5, [10, 0])
+inrange(11, [0, 10])
+clampRange([8, 12], 0, 10)
+clampRange([-5, 20], 0, 10)
+sequence(5)
+sequence(1, 3)
+sequence(0, 1, 0.25)
+sequence(5, 0, -2)
+merge({a: 1, b: 2}, {b: 3}, datum.o)
+if(datum.a > 2, 'big', 'small')
+if(datum.a > 5, 1 / 0, 'lazy')
+datum.a > 2 ? 'yes' : 'no'
+[datum.a, datum.b, [1, [2]]]
+{k: datum.a, 'q r': 2}
+cumulativeNormal(0)
+cumulativeNormal(1.96)
+densityNormal(0)
+quantileNormal(0.975)
+quantileNormal(0.5, 10, 2)
+cumulativeLogNormal(1)
+densityLogNormal(1)
+quantileLogNormal(0.5)
+cumulativeUniform(0.25)
+densityUniform(0.5, 0, 2)
+quantileUniform(0.25, 10, 20)
+datetime(0)
+datetime('2024-02-29')
+datetime(datetime(2020, 1, 1))
+utc(1000)

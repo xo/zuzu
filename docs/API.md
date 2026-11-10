@@ -87,7 +87,23 @@ type View struct{ /* unexported */ }
 
 func (v *View) Scene() *scene.Scene
 func (v *View) Update(ctx context.Context, changes ...Change) (Report, error)
+
+// Data, Signal and Scale read the datasets, the signals and the scales of
+// the top level, as the view of vega.js does. The conformance check of D17
+// reads them.
+func (v *View) Data(name string) ([]map[string]any, error)
+func (v *View) Signal(name string) (any, error)
+func (v *View) Scale(name string) (scale.Scale, error)
 ```
+
+On 2026-11-10 the code of phase 3 has all of the above but these:
+
+1. `Image` and `WithFonts`, which come with the fonts of okage (BACKLOG).
+2. `WithEvaluator`, which comes with the package `script` (D9).
+3. `Update`, which comes with live data in phase 8.
+4. Vega-Lite, which `Parse` reads in phase 4 and `FromVegaLite` takes.
+   Until then `Parse` returns an issue that wraps `vega.ErrUnsupported`
+   for a Vega-Lite spec.
 
 `SVG` and `Image` are short forms. A program that wants the scene graph calls
 `Render` and gives the result to a renderer, because every renderer reads the
@@ -129,7 +145,10 @@ the wrong place does not compile.
 | `WithRandom(func() rand.Source)` | a source seeded from the system | the random numbers of a render (D28) |
 | `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with |
 | `WithSize(width, height float64)` | from the spec | the size of the chart |
-| `WithLogger(*slog.Logger)` | none | where zuzu logs |
+| `WithRenderLogger(*slog.Logger)` | none | where a render logs |
+
+A Go function cannot have two types, so the logger of a render is
+`WithRenderLogger`, and `WithLogger` is the logger of `Parse`.
 
 `WithRandom` takes a function that makes a source, and not a source, so that
 two renders on two goroutines never share one. The `rand` package is
@@ -437,18 +456,27 @@ func Config(m Mode, s Scheme) vega.Config
 ```go
 package expr
 
-// Value is the value of an expression: a number, a string, a boolean, a
-// date, an array, an object, null or undefined.
-type Value struct{ /* unexported */ }
+// Func is a function that an expression can call. It takes the scope of
+// the call, so that a function of the view, such as scale, reaches it.
+type Func func(s *Scope, args []any) (any, error)
 
-// Func is a function that an expression can call.
-type Func func(args []Value) (Value, error)
+// Scope is what an expression reads when it runs: the datum, the datum of
+// the group, the signals, the functions, the time zone, the random source
+// and the locale.
+type Scope struct{ /* fields */ }
 
-// Evaluator compiles an expression into something that runs.
-type Evaluator interface {
-	Compile(src string, scope Scope) (Program, error)
-}
+// Compile parses an expression, and Eval runs it in a scope.
+func Compile(src string) (*Program, error)
+func (p *Program) Eval(s *Scope) (any, error)
 ```
+
+A value of an expression is a plain Go value, and not a type of its own:
+`float64` for a number, `string`, `bool`, `nil` for null, `expr.Undefined`,
+`time.Time` for a date, `[]any` for an array, `map[string]any` for an
+object and `*expr.RegExp`. The rows of a dataset hold the same values, so a
+function of the caller reads them with no conversion. The interface
+`Evaluator`, which the goja evaluator implements (D9), comes with the
+package `script`.
 
 The package `script` holds the evaluator that runs scripts in goja (D9). A
 program that does not import it does not link goja.
