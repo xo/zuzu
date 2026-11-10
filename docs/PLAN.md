@@ -769,3 +769,13 @@ stays true.
     and D6 says that zuzu follows the documented behavior. The plan
     proposes the structure: the same datasets by name, the same scales by
     name and type, and the same marks by name and type.
+15. What are the names and the parameters of the transforms and the scale
+    that zuzu adds for the charts of tiers 1 and 2 that Vega cannot draw?
+    The plan says that zuzu adds a sankey and a time scale that skips the
+    days with no trade, with names that start with `zuzu.` (D6). Tier 2
+    also names a chord diagram and hex bins, which Vega has no transform
+    for. The plan does not say what each takes and writes: for example,
+    the fields of the source, the target and the value of a sankey, and
+    the width and the padding of its nodes, or whether the time scale reads
+    a list of the days to skip or a calendar of weekdays. Phase 5 waits for
+    this answer to draw those four targets from a spec.
