@@ -349,6 +349,9 @@ func (u *unit) dataflow(s *Spec) error {
 			if d.utc {
 				params["timezone"] = "utc"
 			}
+			if d.unitStep != 0 {
+				params["step"] = d.unitStep
+			}
 			c.add(n, transform("timeunit", params))
 		}
 	}

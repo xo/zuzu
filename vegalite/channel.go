@@ -43,6 +43,8 @@ type channelDef struct {
 	// are in UTC.
 	units    []string
 	unitName string
+	// unitStep is the number of units of each interval, when it is not 1.
+	unitStep float64
 	utc      bool
 	// binnedUnit says that the data holds the start of each unit already.
 	binnedUnit bool
@@ -171,6 +173,13 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 		c.unitName = strings.TrimPrefix(name, "utc")
 		if c.utc {
 			c.unitName = name
+		}
+		if m, ok := tu.(map[string]any); ok {
+			if st, ok := m["step"].(float64); ok && st != 1 {
+				// A step of more than one unit names the field after it.
+				c.unitStep = st
+				c.unitName += "_step_" + strconv.FormatFloat(st, 'f', -1, 64)
+			}
 		}
 	}
 	if !def.Value.IsZero() {
@@ -400,18 +409,30 @@ func predicate(p map[string]any) string {
 	}
 	field, _ := p["field"].(string)
 	f := fieldRef(field)
+	var unit string
+	utc := false
 	if tu, ok := p["timeUnit"]; ok {
 		name := expr.String(tu)
 		if m, ok := tu.(map[string]any); ok {
 			name = expr.String(m["unit"])
 		}
-		units, utc := timeUnits(name)
+		var units []string
+		units, utc = timeUnits(name)
 		f = timeFloorExpr(units, utc, f)
+		if len(units) == 1 {
+			unit = units[0]
+		}
 	}
 	lit := func(v any) string {
 		if m, ok := v.(map[string]any); ok {
 			if _, ok := m["year"]; ok {
 				return dateTimeExpr(m)
+			}
+		}
+		if unit != "" && v != nil {
+			// A value of a single time unit is a date in that unit.
+			if _, isList := v.([]any); !isList {
+				return dateTimeExpr(map[string]any{unit: v, "utc": utc})
 			}
 		}
 		b, _ := json.Marshal(v)

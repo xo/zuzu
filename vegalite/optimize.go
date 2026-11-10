@@ -51,6 +51,11 @@ func (c *compiler) mergeOnce(out *vega.Spec, read map[string]bool) bool {
 			return true
 		}
 	}
+	for _, p := range c.data {
+		if c.mergePrefix(out, read, children[p.Name]) {
+			return true
+		}
+	}
 	for pi, p := range c.data {
 		kids := children[p.Name]
 		if len(kids) != 1 || read[p.Name] || !p.Values.IsZero() || !c.derived(p.Name) {
@@ -62,6 +67,58 @@ func (c *compiler) mergeOnce(out *vega.Spec, read map[string]bool) bool {
 		return true
 	}
 	return false
+}
+
+// mergePrefix finds two datasets of a list that start with the same
+// transform, other than a filter of invalid values, and moves that
+// transform into a new dataset that both derive from. The new dataset
+// takes the name of the first, which takes a new name. It reports whether
+// it made a change.
+func (c *compiler) mergePrefix(out *vega.Spec, read map[string]bool, kids []int) bool {
+	seen := map[string]int{}
+	var group []int
+	for _, k := range kids {
+		ts := c.data[k].Transform
+		if len(ts) == 0 || invalidFilter(ts[:1]) {
+			continue
+		}
+		key, err := canonical(ts[0])
+		if err != nil {
+			continue
+		}
+		first, ok := seen[key]
+		if !ok {
+			seen[key] = k
+			continue
+		}
+		group = []int{first, k}
+		break
+	}
+	if group == nil {
+		return false
+	}
+	a := group[0]
+	name := c.data[a].Name
+	renamed := fmt.Sprintf("data_%d", c.nData)
+	c.nData++
+	c.renameAll(out, read, map[string]string{name: renamed})
+	merged := vega.Data{Name: name, Source: c.data[a].Source, Transform: c.data[a].Transform[:1:1]}
+	c.data[a].Transform = c.data[a].Transform[1:]
+	c.data[a].Source = vega.List(name)
+	b := group[1]
+	c.data[b].Transform = c.data[b].Transform[1:]
+	c.data[b].Source = vega.List(name)
+	c.data = slices.Insert(c.data, a, merged)
+	// The datasets left with no transforms read the new dataset.
+	for _, n := range []string{c.data[b+1].Name, renamed} {
+		for i, d := range c.data {
+			if d.Name == n && len(d.Transform) == 0 {
+				c.drop(out, read, i, name)
+				break
+			}
+		}
+	}
+	return true
 }
 
 // canonical writes a value as JSON with the keys of every object sorted,
