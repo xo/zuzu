@@ -1,0 +1,28 @@
+The data of this folder, in data.js, and the data of the targets in
+docs/targets, which read the same file, is a copy of twelve files of
+vega-datasets 3.3.1.
+
+vega-datasets: https://github.com/vega/vega-datasets, tag v3.3.1,
+commit 08eaed074411eeec211736c73264c2b306cda060. The package is under the
+BSD 3-Clause License, as its package.json and datapackage.json state. The
+repository holds no LICENSE file of its own.
+
+Each dataset also has the source and the license that datapackage.json of
+that commit names:
+
+File                                 License       Source
+stocks.csv                           not stated    not stated
+cars.json                            not stated    StatLib Datasets Archive
+seattle-weather.csv                  public domain NOAA National Climatic Data Center
+ohlc.json                            not stated    Yahoo Finance and CBOE, VIX historical data
+flare.json                           not stated    the Flare visualization toolkit
+flare-dependencies.json              not stated    the Flare visualization toolkit
+us-10m.json                          ISC           TopoJSON US Atlas, US Census Bureau
+population_engineers_hurricanes.csv  public domain US Census Bureau and NOAA
+barley.json                          not stated    Wiebe, Reinbach-Welch and Cowan, US Department of Agriculture, 1940
+penguins.json                        CC0 1.0       Palmer Station Antarctica LTER, Allison Horst
+gapminder.json                       CC BY 4.0     Gapminder Foundation
+miserables.json                      not stated    D. E. Knuth, The Stanford GraphBase, 1993
+
+CC BY 4.0 asks for credit. A chart drawn from gapminder.json names the
+Gapminder Foundation in its source line.

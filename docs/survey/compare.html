@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chart Library Comparison</title>
+<!--
+  compare.html draws the same real data with the main chart and diagram
+  libraries, side by side, so that a person can compare what each one draws
+  and how much each one does without help. It is for review, and zuzu does not
+  use it. docs/survey/README.md says how to open it and how to regenerate its
+  data and its static images.
+
+  Each library is pinned to an exact version on jsDelivr. A version is at
+  least two weeks old on the day it was pinned.
+-->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.32/dist/uPlot.min.css">
+<style>
+:root {
+  --bg: #f4f5f2; --card: #ffffff; --fg: #1d2421; --muted: #5f6b66; --rule: #d8ddd8;
+  --accent: #0f7a6c; --accent-soft: #dcefe9; --warn: #9a5418; --warn-soft: #f6e6d6;
+  --none: #9aa39f; --code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #121715; --card: #1a201e; --fg: #e3e9e6; --muted: #9aa8a2; --rule: #2d3834;
+  --accent: #52c3ae; --accent-soft: #1b3a34; --warn: #e3a36e; --warn-soft: #3a2b1e;
+  --none: #5d6763; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 1600px; margin: 0 auto; padding: 28px 16px 64px; display: grid; gap: 28px; }
+h1, h2 { margin: 0; line-height: 1.2; text-wrap: balance; }
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.3rem; }
+p { margin: 0; max-width: 80ch; }
+.muted { color: var(--muted); }
+code { font-family: var(--code); font-size: .88em; }
+.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--rule);
+  padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.bar .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bar label { font-size: .82rem; display: inline-flex; gap: 4px; align-items: center; padding: 3px 8px;
+  border: 1px solid var(--rule); border-radius: 999px; background: var(--card); cursor: pointer; }
+.bar button { font: inherit; font-size: .85rem; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--rule);
+  background: var(--card); color: var(--fg); cursor: pointer; }
+.bar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--card); }
+.bar select { font: inherit; font-size: .85rem; padding: 3px 6px; background: var(--card); color: var(--fg); border: 1px solid var(--rule); border-radius: 6px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); }
+table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--rule); text-align: center; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 600; color: var(--muted); vertical-align: bottom; }
+td a { color: inherit; text-decoration: none; display: block; }
+.k-native { color: var(--accent); font-weight: 700; }
+.k-plugin, .k-composed, .k-prep { color: var(--warn); font-weight: 700; }
+.k-none { color: var(--none); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: .82rem; color: var(--muted); }
+section.row { display: grid; gap: 12px; scroll-margin-top: 64px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; display: grid;
+  grid-template-rows: auto 1fr auto; min-width: 0; scroll-margin-top: 64px; }
+.card header { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; padding: 10px 12px 4px; }
+.card header b { font-size: .95rem; }
+.card header .ver { font-family: var(--code); font-size: .72rem; color: var(--muted); }
+.pill { font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; }
+.pill.native { background: var(--accent-soft); color: var(--accent); }
+.pill.plugin, .pill.composed, .pill.prep { background: var(--warn-soft); color: var(--warn); }
+.pill.none { background: transparent; color: var(--none); border: 1px solid var(--rule); }
+.chart { position: relative; height: 310px; min-width: 0; overflow: hidden; padding: 0 6px; }
+.chart.diagram { height: auto; min-height: 220px; overflow: auto; display: grid; place-items: center; padding: 8px; }
+#dag .grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 720px), 1fr)); }
+#dag .chart { height: 360px; }
+#dag .chart.diagram { height: auto; }
+.chart img { max-width: 100%; max-height: 100%; display: block; margin: 0 auto; }
+.chart .msg { padding: 24px 12px; color: var(--muted); font-size: .85rem; }
+.chart .err { padding: 12px; color: #c0392b; font: .78rem/1.4 var(--code); white-space: pre-wrap; }
+.card footer { padding: 4px 12px 10px; font-size: .78rem; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.card footer .loc { font-family: var(--code); }
+.card.is-none .chart { height: auto; }
+</style>
+</head>
+<body>
+<div class="bar" role="toolbar" aria-label="Page controls">
+  <div class="group" role="group" aria-label="Theme">
+    <button type="button" id="t-light" aria-pressed="true">Light</button>
+    <button type="button" id="t-dark" aria-pressed="false">Dark</button>
+  </div>
+  <div class="group">
+    <label for="jump" class="muted" style="border:0;background:none;padding:0">Jump to</label>
+    <select id="jump"></select>
+  </div>
+  <div class="group" id="libs" role="group" aria-label="Libraries to show"></div>
+</div>
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <h1>Chart Library Comparison</h1>
+    <p>The same real data, drawn by each of the main chart and diagram libraries with its defaults. Read it to see what each library draws by itself, what it needs a plugin for, and what the caller must prepare first. Only the dark mode is set by hand where a library has no dark theme of its own. The colors, fonts, spacing and animation are each library's own.</p>
+    <p class="muted" id="source"></p>
+  </header>
+
+  <section style="display:grid;gap:10px">
+    <h2>Coverage</h2>
+    <div class="legend">
+      <span><span class="k-native">●</span> built in</span>
+      <span><span class="k-plugin">◐</span> plugin or extra module</span>
+      <span><span class="k-composed">◑</span> composed from other marks</span>
+      <span><span class="k-prep">◒</span> built in, but the caller aggregates the data</span>
+      <span><span class="k-none">–</span> not available</span>
+      <span>Select a cell to go to its chart.</span>
+    </div>
+    <div class="scroll"><table id="matrix"></table></div>
+    <p class="muted">The adapter that draws each chart is in <code>compare.js</code>, one block for each kind of chart. Read the blocks side by side to compare how much each library asks of the caller.</p>
+  </section>
+
+  <div id="rows" style="display:grid;gap:36px"></div>
+</div>
+
+<!-- data -->
+<script src="data.js"></script>
+<!-- libraries -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.2/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega@6.4.0/build/vega.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@6.5.0/build/vega-lite.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@7.3.0/build/vega-embed.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@3.1.0/dist/chartjs-chart-matrix.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.19.1/dist/chartjs-chart-sankey.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@4.2.2/dist/chartjs-chart-treemap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.4.5/build/index.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@4.1.2/plotly.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/highcharts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/highcharts-more.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/modules/stock.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/modules/map.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/modules/heatmap.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/modules/treemap.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/modules/sunburst.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/modules/sankey.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/modules/histogram-bellcurve.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@13.1.1/themes/adaptive.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@8.5.0/dist/apexcharts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.19/dist/plot.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.15.4/umd/Recharts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.32/dist/uPlot.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@12.2.0/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@viz-js/viz@3.31.0/dist/viz-global.js"></script>
+<!-- the page -->
+<script src="compare.js"></script>
+</body>
+</html>

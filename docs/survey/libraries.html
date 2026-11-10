@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--
+  libraries.html is the survey of chart and diagram libraries that came
+  before the plan of zuzu. It records the stars, the downloads and the views
+  of three other models as measured on 2026-11-09, and it is not updated.
+  docs/survey/README.md says what each file in this folder is.
+-->
+<title>Chart Library Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: single reading column (max 1180px) — verdict, scatter, sortable master table, side tables. Graph-paper motif from the subject. */
+:root{
+  --bg:#f6f7f4; --paper:#ffffff; --fg:#1b2420; --muted:#5d6a64; --rule:#d9dfda; --grid:#e8ece8;
+  --accent:#0f7a6c; --accent-soft:#d6ece7; --warn:#a8591a; --warn-soft:#f5e3d3; --plum:#6b4a8a; --plum-soft:#e9e1f1;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111715; --paper:#18201d; --fg:#e4ebe7; --muted:#97a59f; --rule:#2c3833; --grid:#1f2925;
+  --accent:#4fc4b0; --accent-soft:#183b35; --warn:#e5a06a; --warn-soft:#3b2a1c; --plum:#bfa0e0; --plum-soft:#2f2540; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111715; --paper:#18201d; --fg:#e4ebe7; --muted:#97a59f; --rule:#2c3833; --grid:#1f2925;
+  --accent:#4fc4b0; --accent-soft:#183b35; --warn:#e5a06a; --warn-soft:#3b2a1c; --plum:#bfa0e0; --plum-soft:#2f2540; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--body);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;background-attachment:fixed}
+.wrap{max-width:1180px;margin:0 auto;padding-block:40px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:1.6rem;font-weight:700}
+h3{font-size:1.1rem;font-weight:700}
+p{margin:0;max-width:68ch}
+.eyebrow{font:600 .72rem/1 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}
+.lede{font-size:1.12rem;color:var(--muted)}
+header{display:grid;gap:14px}
+section{display:grid;gap:16px;min-width:0}
+.panel{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:20px}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.verdict .panel{display:grid;gap:8px;align-content:start}
+.rank{font:600 .8rem var(--mono);color:var(--accent)}
+.big{font:700 2rem/1 var(--display);font-variant-numeric:tabular-nums}
+.models{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.model{display:grid;gap:10px;align-content:start}
+.model blockquote{margin:0;font:700 1.15rem/1.3 var(--display);text-wrap:balance}
+.model ul{margin:0;padding-left:1.1em;display:grid;gap:4px;color:var(--muted);font-size:.95rem}
+.tag{display:inline-block;font:600 .7rem/1 var(--mono);padding:5px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent);letter-spacing:.04em}
+.tag.w{background:var(--warn-soft);color:var(--warn)}
+.tag.p{background:var(--plum-soft);color:var(--plum)}
+.scroll{overflow-x:auto;background:var(--paper);border:1px solid var(--rule);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:9px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+th{font:600 .7rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);white-space:nowrap;position:sticky;top:0;background:var(--paper)}
+th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+th button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+th button[aria-sort]::after{content:"↕";opacity:.4}
+th button[aria-sort="ascending"]::after{content:"↑";opacity:1}
+th button[aria-sort="descending"]::after{content:"↓";opacity:1}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+th.num{text-align:right}
+td.name{font-weight:700;white-space:nowrap}
+td.name small{display:block;font-weight:400;color:var(--muted);font-size:.78rem}
+td.dim{color:var(--muted)}
+tr:hover td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.dots{font-family:var(--mono);letter-spacing:2px;white-space:nowrap}
+.on{color:var(--accent)} .off{color:var(--rule)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;color:var(--muted)}
+.legend code{font-family:var(--mono);color:var(--fg)}
+.filters{display:flex;flex-wrap:wrap;gap:8px}
+.filters button{font:600 .78rem var(--mono);padding:7px 11px;border-radius:999px;border:1px solid var(--rule);background:var(--paper);color:var(--fg);cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.filters button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg text{fill:var(--fg);font-family:var(--mono)}
+.note{font-size:.82rem;color:var(--muted)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px}
+.two > *{min-width:0}
+.hi{background:var(--warn-soft);color:var(--warn);padding:0 4px;border-radius:3px;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">Survey · November 2026 · 20 chart libraries + 4 diagram tools</span>
+  <h1>Chart Library Field Guide</h1>
+  <p class="lede">What developers in every language actually reach for, how many chart types each library ships, and whether looks or features decide the winner. Star and download counts were pulled live from GitHub, GitLab, npm, PyPI, CRAN and crates.io on 9 Nov 2026. Qualitative views come from Gemini 3.1 Pro, GPT-6 Astra and DeepSeek V4 Pro, cross-checked against those numbers.</p>
+</header>
+
+<section>
+  <span class="eyebrow">The short answer</span>
+  <h2>Distribution beats beauty. Good defaults are a threshold, not a differentiator.</h2>
+  <div class="verdict">
+    <div class="panel"><span class="rank">Driver 1 · Being the default somewhere</span><span class="big">64.6M</span><p>Recharts npm downloads per week, 6× ECharts. It is the engine behind shadcn/ui charts. Matplotlib (159M/mo) is what <code>pandas.plot()</code> calls. Mermaid (25.9M/wk) renders natively in GitHub. None of them won a beauty contest.</p></div>
+    <div class="panel"><span class="rank">Driver 2 · Ergonomics and framework fit</span><span class="big">8 types</span><p>Chart.js ships only 8 chart types but has 67.8k stars, because ten lines of config get you a decent chart. Highcharts ships 90+ types and has 12.5k. Breadth does not predict popularity (see the scatter below).</p></div>
+    <div class="panel"><span class="rank">Driver 3 · License</span><span class="big">10.2M vs 3.6M</span><p>ECharts (Apache-2.0) vs Highcharts (commercial) weekly npm. They are comparably polished and capable. ApexCharts moved to a dual license (free under $2M revenue), which forces a new procurement step at larger companies.</p></div>
+    <div class="panel"><span class="rank">Driver 4 · Performance carves niches</span><span class="big">4 types</span><p>uPlot draws lines, bars, points and bands, with plain defaults. It still runs inside Grafana because it streams huge time series on Canvas. TradingView Lightweight Charts owns finance the same way.</p></div>
+    <div class="panel"><span class="rank">Where aesthetics decides</span><span class="big">Customer-facing</span><p>SaaS product UI, journalism, executive decks, quick prototypes. Polish is part of the deliverable there. That is where Nivo, amCharts, Highcharts and ApexCharts sell. Seaborn exists because Matplotlib's defaults were ugly, and it still sits on Matplotlib.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Breadth vs. popularity</span>
+  <h2>More chart types does not mean more users</h2>
+  <p class="note">X: built-in chart or series types (first-party, permutations like stacked/horizontal not counted). Y: GitHub stars, log scale. D3 and visx are left out because they ship primitives, not chart types. Plotly uses the larger of its two repos.</p>
+  <div class="scroll" style="padding:12px"><svg id="scatter" viewBox="0 0 900 430" role="img" aria-label="Scatter plot of chart type count against GitHub stars" style="width:100%;min-width:620px;display:block"></svg></div>
+</section>
+
+<section>
+  <span class="eyebrow">Master table</span>
+  <h2>The top 20 charting libraries</h2>
+  <p class="note">Ranked by a blend of stars, package downloads and how widely each one is used in production, not by any single metric. Click a column header to sort. Download figures count CI and transitive installs, so compare them within one registry only.</p>
+  <div class="filters" role="group" aria-label="Filter by ecosystem" id="filters"></div>
+  <div class="legend"><span>Features: <code>I</code> interactive · <code>A</code> animation · <code>S</code> server/static export · <code>3</code> 3D · <code>G</code> maps/geo · <code>F</code> finance/OHLC · <code>B</code> big-data (Canvas/WebGL, 100k+ pts)</span></div>
+  <div class="scroll" style="max-height:78vh">
+    <table id="master"><thead><tr>
+      <th><button data-k="rank">#</button></th>
+      <th><button data-k="name">Library</button></th>
+      <th><button data-k="lang">Ecosystem</button></th>
+      <th><button data-k="license">License</button></th>
+      <th><button data-k="render">Renders</button></th>
+      <th class="num"><button data-k="types">Chart types</button></th>
+      <th class="num"><button data-k="stars">GitHub ★</button></th>
+      <th class="num"><button data-k="dlv">Downloads</button></th>
+      <th>Features</th>
+      <th><button data-k="best">Mostly used for</button></th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Diagram-as-code, for comparison</span>
+  <h2>Mermaid, Graphviz, PlantUML, D2</h2>
+  <p>These draw structure (nodes, edges, sequences) instead of encoding numbers. People pick them because the source is plain text that diffs in a pull request, the layout engine places everything for you, and Mermaid renders inside GitHub, GitLab, Notion and Obsidian without any build step. Mermaid now also has pie, xychart, sankey, quadrant, gantt, radar and treemap. That covers a burndown in an issue or a pie in a PRD. It does not replace a chart library: there is no live data binding, little interactivity, and large graphs render slowly.</p>
+  <div class="scroll"><table id="diagrams"><thead><tr>
+    <th>Tool</th><th>Language</th><th>License</th><th class="num">Diagram types</th><th class="num">Stars</th><th class="num">Downloads</th><th>Chart overlap</th><th>Why people pick it</th>
+  </tr></thead><tbody></tbody></table></div>
+  <p class="note">Graphviz is hosted on GitLab, so its star count is low. The Python <code>graphviz</code> binding (33.3M/mo) shows its real reach. It also sits under Doxygen, Sphinx, Terraform graph and many profilers.</p>
+  <h3>Other non-chart tools with big audiences</h3>
+  <div class="scroll"><table id="adjacent"><thead><tr><th>Tool</th><th>Kind</th><th class="num">Stars</th><th>Note</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <span class="eyebrow">Beyond JavaScript and Python</span>
+  <h2>What other languages use</h2>
+  <p>Outside JS, Python and R, the most common pattern is to <b>wrap a JS engine, usually ECharts</b> (go-echarts, pyecharts, charming for Rust, Echarts-PHP). The alternative is a native rasterizer for server-side images. PHP has no notable native library. Laravel projects wrap Chart.js or ApexCharts, and JpGraph is legacy.</p>
+  <div class="scroll"><table id="langs"><thead><tr><th>Ecosystem</th><th>Library</th><th class="num">Stars</th><th>Approach</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <span class="eyebrow">Use cases</span>
+  <h2>What people actually use them for</h2>
+  <div class="scroll"><table id="uses"><thead><tr><th>Job</th><th>Usual winner</th><th>Runner-up</th><th>Why it wins</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <span class="eyebrow">Three flagship models, asked the same question</span>
+  <h2>Do looks drive adoption?</h2>
+  <div class="models">
+    <div class="panel model"><span class="tag">Gemini 3.1 Pro</span>
+      <blockquote>“Functionality drives adoption. Aesthetics are top-of-funnel marketing.”</blockquote>
+      <ul><li>Chart.js beat D3 on ergonomics, not beauty.</li><li>Recharts beats the prettier Nivo because the JSX API feels native.</li><li>ECharts takes enterprise share from Highcharts because it is free.</li><li>Matplotlib wins on ecosystem gravity despite its dated defaults.</li></ul></div>
+    <div class="panel model"><span class="tag p">GPT-6 Astra</span>
+      <blockquote>“Workflow first, capabilities second, aesthetics third, unless visual expression is the product.”</blockquote>
+      <ul><li>Aesthetics is decisive for SaaS UI, journalism, exec decks and prototypes.</li><li>Underrated: ECharts in the West, Observable Plot, uPlot.</li><li>Over-recommended: D3 for routine dashboards, Plotly for tiny embeds (payload).</li></ul></div>
+    <div class="panel model"><span class="tag w">DeepSeek V4 Pro</span>
+      <blockquote>“Defaults drive adoption; functionality and ecosystem drive retention.”</blockquote>
+      <ul><li>Overrated: Recharts. SVG struggles past about 10k points and the wrapper fights customization.</li><li>Underrated: D2. Best syntax and layout of the diagram tools, held back by no native GitHub rendering.</li><li>ECharts and AntV won China through Chinese-first docs, built-in China maps, and being embedded in BI and mini-program platforms (DataV, Quick BI, WeChat, Alipay).</li></ul></div>
+  </div>
+  <div class="panel" style="display:grid;gap:8px"><h3>Where they agree, and the tiebreak</h3>
+    <p>All three agree that framework fit, licensing and ecosystem outrank polish once a tool is good enough. The only real split is DeepSeek's claim that looks win the <em>first</em> install. The download data supports a narrower version of that. Looks help a library get <em>tried</em>, but the libraries with the most installs are the ones another tool installs for you: shadcn ships Recharts, pandas calls Matplotlib, GitHub renders Mermaid. The beauty-first options (Nivo at 2.0M/wk, amCharts 5 at 0.59M/wk) sit far below the defaults.</p>
+  </div>
+</section>
+
+<p class="note">Method: stars come from the GitHub REST API (GitLab for Graphviz). Downloads: npm last week, PyPI last month (pypistats), CRAN last month (cranlogs), crates.io last 90 days. Chart-type counts are first-party built-in series, marks, geoms or traces from each project's docs, rounded where the docs say "~". Treat them as ±20%. Plotters' crates.io number is mostly transitive installs through the <code>criterion</code> benchmarking crate. amCharts is developed in private, so its public repo's star count understates its use.</p>
+</div>
+
+<script>
+const L=[
+ // rank,name,sub,lang,eco,license,render,types,typesLabel,stars,starsLabel,dlv,dl,features(IAS3GFB),best
+ [1,"D3","d3.js","JavaScript","js","ISC","SVG / Canvas",0,"toolkit",113883,"113.9k",32650889,"32.7M npm/wk","IAS·G··","Bespoke and editorial viz, a base for other libraries"],
+ [2,"Chart.js","","JavaScript","js","MIT","Canvas",8,"8 (+plugins)",67781,"67.8k",16934553,"16.9M npm/wk","IAS····","Quick, simple web charts"],
+ [3,"Apache ECharts","+ go-echarts, pyecharts, charming","JS/TS + wrappers","js","Apache-2.0","Canvas / SVG / WebGL",22,"22 (+8 GL)",67692,"67.7k",10216365,"10.2M npm/wk","IAS3GFB","Dashboards and BI, big data, maps, everything-in-one"],
+ [4,"Recharts","","React","react","MIT","SVG",12,"12",27690,"27.7k",64589847,"64.6M npm/wk*","IA·····","React product analytics, shadcn/ui charts"],
+ [5,"Matplotlib","","Python","py","PSF-style","Raster / PDF / SVG",30,"~30 (+3D)",23434,"23.4k",159227526,"159M PyPI/mo","·AS3G··","Scientific figures, backbone of pandas plotting"],
+ [6,"Plotly","plotly.js · plotly.py · R · Julia","Py / JS / R","py","MIT","SVG / WebGL",45,"~45 traces",18884,"18.9k + 18.4k",48777457,"48.8M PyPI/mo · 1.0M npm/wk","IAS3GFB","Notebook EDA, Dash data apps"],
+ [7,"Highcharts","+ Stock, Maps, Gantt","JS/TS + wrappers","js","Commercial (free non-com.)","SVG (+WebGL boost)",90,"90+",12502,"12.5k",3562210,"3.6M npm/wk","IAS3GFB","Enterprise and regulated, accessibility, vendor support"],
+ [8,"visx","Airbnb","React","react","MIT","SVG",0,"primitives",21098,"21.1k",10577503,"10.6M npm/wk†","IA·····","Custom React viz built from D3 primitives"],
+ [9,"Bokeh","","Python","py","BSD-3","Canvas / WebGL",30,"~30 glyphs",20470,"20.5k",5191430,"5.2M PyPI/mo","IAS·G·B","Python-driven interactive web apps"],
+ [10,"Vega-Lite / Altair","+ Vega","JSON grammar · Python","py","BSD-3","SVG / Canvas",17,"17 marks",12037,"12.0k + 5.5k + 10.5k",37927349,"37.9M PyPI/mo (Altair) · 2.0M npm/wk","IAS·G··","Declarative grammar, notebooks, Streamlit"],
+ [11,"Seaborn","","Python","py","BSD-3","via Matplotlib",25,"~25",14099,"14.1k",26669876,"26.7M PyPI/mo","··S····","Statistical EDA with better defaults"],
+ [12,"Lightweight Charts","TradingView","JavaScript","js","Apache-2.0","Canvas",6,"6 (+custom)",17815,"17.8k",1968896,"2.0M npm/wk","IA···FB","Trading and crypto UIs"],
+ [13,"ApexCharts","","JavaScript","js","Dual (free < $2M rev.)","SVG",16,"16",15185,"15.2k",2823690,"2.8M npm/wk","IAS··F·","SaaS admin dashboards"],
+ [14,"Nivo","","React","react","MIT","SVG / Canvas / HTML",28,"~28",14130,"14.1k",2016530,"2.0M npm/wk","IAS·G··","Polished, themed React dashboards"],
+ [15,"ggplot2","","R","r","MIT","Raster / PDF / SVG",50,"~50 geoms",7025,"7.0k",2089154,"2.1M CRAN/mo","··S·G··","Statistical graphics for publication in R"],
+ [16,"AntV G2","Alibaba / Ant Group","JS/TS","js","MIT","Canvas / SVG / WebGL",30,"~30 marks",12654,"12.7k",456443,"0.46M npm/wk","IAS·G·B","Chinese enterprise BI"],
+ [17,"uPlot","","JavaScript","js","MIT","Canvas",4,"4",10626,"10.6k",1124653,"1.1M npm/wk","I·····B","Real-time time series (Grafana)"],
+ [18,"Observable Plot","","JavaScript","js","ISC","SVG",30,"~30 marks",5421,"5.4k",1273897,"1.3M npm/wk","IAS·G··","Concise exploratory charts, a short path from D3"],
+ [19,"amCharts 5","","JS/TS","js","Commercial (free w/ logo)","Canvas",30,"~30 families",449,"0.4k‡",588837,"0.59M npm/wk","IAS3GFB","Animated product charts, maps, Gantt"],
+ [20,"Plotters","","Rust","rust","MIT","Bitmap / SVG / WASM",10,"~10",4649,"4.6k",65181842,"65M crates/90d§","··S3·F·","Native Rust and server-side images"],
+];
+const FEAT="IAS3GFB";
+const tb=document.querySelector("#master tbody");
+let rows=L.map(r=>({rank:r[0],name:r[1],sub:r[2],lang:r[3],eco:r[4],license:r[5],render:r[6],types:r[7],typesL:r[8],stars:r[9],starsL:r[10],dlv:r[11],dl:r[12],feat:r[13],best:r[14]}));
+let sortK="rank",sortDir=1,eco="all";
+function dots(f){return [...FEAT].map((c,i)=>`<span class="${f[i]===c?'on':'off'}" title="${c}">${c}</span>`).join("")}
+function render(){
+  const vis=rows.filter(r=>eco==="all"||r.eco===eco).sort((a,b)=>{const x=a[sortK],y=b[sortK];return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*sortDir});
+  tb.innerHTML=vis.map(r=>`<tr><td class="num">${r.rank}</td><td class="name">${r.name}${r.sub?`<small>${r.sub}</small>`:""}</td><td>${r.lang}</td><td class="dim">${r.license}</td><td class="dim">${r.render}</td><td class="num">${r.typesL}</td><td class="num">${r.starsL}</td><td class="num">${r.dl}</td><td class="dots">${dots(r.feat)}</td><td>${r.best}</td></tr>`).join("");
+  document.querySelectorAll("#master th button").forEach(b=>{if(b.dataset.k===sortK)b.setAttribute("aria-sort",sortDir>0?"ascending":"descending");else b.setAttribute("aria-sort","none")});
+}
+document.querySelectorAll("#master th button").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.k;if(k===sortK)sortDir*=-1;else{sortK=k;sortDir=(k==="stars"||k==="types"||k==="dlv")?-1:1}render()}));
+const ECOS=[["all","All"],["js","JavaScript"],["react","React"],["py","Python"],["r","R"],["rust","Rust"]];
+const fl=document.getElementById("filters");
+fl.innerHTML=ECOS.map(([k,l])=>`<button type="button" data-e="${k}" aria-pressed="${k==='all'}">${l}</button>`).join("");
+fl.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;eco=b.dataset.e;fl.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
+render();
+const tf=document.createElement("p");tf.className="note";
+tf.innerHTML="* Recharts installs include shadcn/ui chart components and CI. † @visx/shape, the most-installed visx package. ‡ Developed in private, public repo only. § Mostly transitive via <code>criterion</code>.";
+document.querySelector("#master").closest(".scroll").after(tf);
+
+// diagrams
+const D=[
+ ["Mermaid","JS/TS","MIT","~23","91.0k","25.9M npm/wk","pie, xychart, sankey, quadrant, gantt, radar, treemap","Renders natively in GitHub/GitLab/Notion/Obsidian. Docs, PRs, flowcharts, sequence diagrams"],
+ ["Graphviz","C (DOT)","EPL-1.0","1 language, 8 layout engines","1.5k (GitLab)","33.3M PyPI/mo (binding)","none","Best automatic layout for large dependency and call graphs. Many tools generate DOT"],
+ ["PlantUML","Java","GPL (+LGPL/Apache/MIT builds)","~25","13.4k","—","gantt, mindmap, WBS, timing","Full UML, enterprise architecture docs, Confluence"],
+ ["D2","Go","MPL-2.0","~6 (flow, sequence, grid, sql_table, class…)","25.8k","—","none","Modern syntax, themes, ELK/TALA layouts. Polished architecture diagrams"],
+];
+document.querySelector("#diagrams tbody").innerHTML=D.map(r=>`<tr><td class="name">${r[0]}</td><td>${r[1]}</td><td class="dim">${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td><td class="num">${r[5]}</td><td class="dim">${r[6]}</td><td>${r[7]}</td></tr>`).join("");
+const A=[["Excalidraw","Hand-drawn whiteboard","135.3k","More stars than any chart library. Aesthetics as the product"],["mingrammer/diagrams","Cloud architecture as Python code","42.8k","Icons and layout via Graphviz"],["xyflow (React Flow)","Node-graph UI","38.9k","Interactive editors, not charts"],["AntV G6","Graph/network viz","12.4k","Companion to G2"],["Cytoscape.js","Network analysis","11.3k","Bioinformatics, graph theory"],["ratatui","Rust terminal UI (charts, sparklines)","23.2k","Terminal dashboards. termui (Go) has 13.6k"]];
+document.querySelector("#adjacent tbody").innerHTML=A.map(r=>`<tr><td class="name">${r[0]}</td><td>${r[1]}</td><td class="num">${r[2]}</td><td class="dim">${r[3]}</td></tr>`).join("");
+
+const G=[
+ ["Go","go-echarts","7.7k","Generates ECharts HTML"],["Go","wcharczuk/go-chart · gonum/plot","4.0k · 3.0k","Native PNG/SVG"],
+ ["Rust","plotters","4.6k","Native bitmap/SVG/WASM"],["Rust","charming · plotly.rs","2.6k · 1.5k","Wrap ECharts / Plotly"],
+ [".NET","ScottPlot","6.8k","Native, fast, WinForms/WPF/Avalonia"],[".NET","LiveCharts2 · OxyPlot","5.5k · 3.5k","Animated XAML charts · scientific"],
+ ["Java/JVM","XChart · JFreeChart","1.6k · 1.4k","Swing/server images, legacy reporting"],
+ ["PHP","lavacharts · Echarts-PHP · laravel-chartjs · larapex","618 · 329 · 485 · 302","All wrap JS engines (Google Charts, ECharts, Chart.js, ApexCharts)"],
+ ["PHP","JpGraph","legacy","Native GD images, rarely chosen for new work"],
+ ["Ruby","Chartkick","6.5k","One-liner wrapper over Chart.js/Highcharts/Google"],
+ ["Python","pyecharts","15.8k","ECharts from Python, big in China"],["Julia","Plots.jl","2.0k","Meta-API over GR/Plotly/PGF backends"],
+];
+document.querySelector("#langs tbody").innerHTML=G.map(r=>`<tr><td>${r[0]}</td><td class="name">${r[1]}</td><td class="num">${r[2]}</td><td class="dim">${r[3]}</td></tr>`).join("");
+
+const U=[
+ ["Web dashboards / BI","ECharts","Chart.js, Highcharts","Breadth, big data, maps, free license. Chart.js for simple cases"],
+ ["React product UI","Recharts","Nivo, visx, MUI X Charts","Composable JSX, bundled with shadcn/ui"],
+ ["Scientific publication","Matplotlib / ggplot2","Seaborn","Vector output, control of every tick, taught in curricula"],
+ ["Notebook EDA","Plotly, Seaborn","Altair, Bokeh","Hover/zoom without JS. One-line statistical plots"],
+ ["Finance / trading","Lightweight Charts","Highcharts Stock, amCharts","Canvas candlesticks with smooth pan/zoom on mobile"],
+ ["Real-time monitoring","uPlot","ECharts","Millions of points at 60fps on Canvas"],
+ ["Server-side reports / PDF","Matplotlib, ggplot2","JFreeChart, Plotters, ScottPlot","No headless browser needed"],
+ ["Bespoke / journalism","D3","Observable Plot","Total control of marks, layout and transitions"],
+ ["Docs / architecture","Mermaid","D2, PlantUML, Graphviz","Text in the repo, rendered by the platform"],
+];
+document.querySelector("#uses tbody").innerHTML=U.map(r=>`<tr><td class="name">${r[0]}</td><td><b>${r[1]}</b></td><td class="dim">${r[2]}</td><td>${r[3]}</td></tr>`).join("");
+
+// scatter
+(function(){
+  const svg=document.getElementById("scatter"),W=900,H=430,m={l:64,r:24,t:16,b:48};
+  const pts=rows.filter(r=>r.types>0).map(r=>({n:r.name.replace(" / Altair","").replace("Apache ",""),x:r.types,y:r.stars}));
+  const xMax=100,yMin=300,yMax=150000;
+  const X=v=>m.l+(v/xMax)*(W-m.l-m.r), Y=v=>m.t+(1-(Math.log10(v)-Math.log10(yMin))/(Math.log10(yMax)-Math.log10(yMin)))*(H-m.t-m.b);
+  let s="";
+  [300,1000,3000,10000,30000,100000].forEach(v=>{s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${m.l-8}" y="${Y(v)+4}" font-size="11" text-anchor="end" style="fill:var(--muted)">${v>=1000?v/1000+"k":v}</text>`});
+  [0,20,40,60,80,100].forEach(v=>{s+=`<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${H-m.b}" stroke="var(--grid)"/><text x="${X(v)}" y="${H-m.b+18}" font-size="11" text-anchor="middle" style="fill:var(--muted)">${v}</text>`});
+  s+=`<text x="${(W+m.l)/2}" y="${H-8}" font-size="12" text-anchor="middle" style="fill:var(--muted)">built-in chart types →</text>`;
+  s+=`<text transform="translate(16 ${(H-m.b+m.t)/2}) rotate(-90)" font-size="12" text-anchor="middle" style="fill:var(--muted)">GitHub stars (log) →</text>`;
+  const off={"Chart.js":[10,-8],"ECharts":[10,4],"Recharts":[10,-6],"Matplotlib":[10,-6],"Plotly":[10,4],"Highcharts":[-10,-10,"end"],"Bokeh":[10,-8],"Vega-Lite":[-10,12,"end"],"Seaborn":[-10,-8,"end"],"Lightweight Charts":[10,-6],"ApexCharts":[10,4],"Nivo":[10,-6],"ggplot2":[10,4],"AntV G2":[10,10],"uPlot":[10,10],"Observable Plot":[10,4],"amCharts 5":[10,4],"Plotters":[10,4]};
+  pts.forEach(p=>{const o=off[p.n]||[10,4];const hl=p.n==="Chart.js"||p.n==="Highcharts";
+    s+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="${hl?7:5}" fill="${hl?'var(--warn)':'var(--accent)'}" fill-opacity=".85" stroke="var(--paper)" stroke-width="1.5"><title>${p.n}: ${p.x} types, ${p.y.toLocaleString()} stars</title></circle>`;
+    s+=`<text x="${X(p.x)+o[0]}" y="${Y(p.y)+o[1]}" font-size="11.5" text-anchor="${o[2]||'start'}" ${hl?'font-weight="600"':''}>${p.n}</text>`});
+  svg.innerHTML=s;
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Every text file is LF on every checkout, including a checkout on Windows.
+# Git for Windows writes CRLF by default. See dbmeta D89 and D110.
+* text=auto eol=lf
+
+# The data and the images of the survey are generated. docs/survey/README.md
+# says how. A diff of them is noise, so git shows none.
+docs/survey/data.js linguist-generated -diff
+docs/survey/static/** linguist-generated -diff

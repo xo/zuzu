@@ -1,0 +1,21 @@
+# Everything this repository ignores, in one file (dbmeta D58).
+
+# The Claude Code permissions of one person. The shared .claude/settings.json
+# is not ignored, because a setting that belongs to the project is committed.
+# See dbmeta D89.
+.claude/settings.local.json
+
+# The git worktrees in which the coding agents work. Each one is a checkout of
+# this repository, and its work comes back through the main checkout.
+/.claude/worktrees/
+
+# The packages that the generator of the targets installs with npm. The
+# versions are pinned in docs/targets/package.json and its lock file.
+/docs/targets/node_modules/
+
+# The output of the generator of the targets and its lock file. The
+# maintainers chose on 2026-11-10 not to commit them for now. Run the
+# generator to see the targets, as docs/targets/README.md says.
+/docs/targets/svg/
+/docs/targets/index.html
+/docs/targets/package-lock.json
