@@ -2,6 +2,9 @@ package layout
 
 import (
 	"math"
+	"strings"
+
+	"github.com/xo/zuzu/expr"
 
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
@@ -21,7 +24,8 @@ type Axis struct {
 	Count float64
 	// Format writes the label of a value.
 	Format func(any) string
-	// Grid, Labels and Domain say which parts to draw.
+	// Grid, Labels and Domain say which parts the spec asks for. A domain
+	// line is drawn only along a band axis.
 	Grid, Labels, Domain bool
 	Title                string
 	// LabelAngle turns the labels, in degrees.
@@ -71,6 +75,28 @@ func (a *Axis) ticks() ([]any, []float64) {
 	return out, pos
 }
 
+// zero returns the position of zero along the axis, for a linear scale
+// whose domain holds zero.
+func (a *Axis) zero() (float64, bool) {
+	typ := strings.TrimPrefix(a.Scale.Type(), "sequential-")
+	if typ != "linear" && typ != "pow" && typ != "sqrt" && typ != "symlog" {
+		return 0, false
+	}
+	dom := a.Scale.Domain()
+	if len(dom) < 2 {
+		return 0, false
+	}
+	lo, hi := expr.Number(dom[0]), expr.Number(dom[len(dom)-1])
+	if math.Min(lo, hi) > 0 || math.Max(lo, hi) < 0 {
+		return 0, false
+	}
+	p, ok := a.Scale.Map(0.0).(float64)
+	if !ok || math.IsNaN(p) {
+		return 0, false
+	}
+	return p, true
+}
+
 // Axis draws an axis as a group of the role axis, with its grid, its
 // labels, its base line and its title. The group sits at the origin of the
 // plot area.
@@ -90,11 +116,24 @@ func (s Style) Axis(a *Axis) scene.Mark {
 			grid.Items = append(grid.Items, it)
 		}
 		group.Items = append(group.Items, grid)
+		if z, ok := a.zero(); ok {
+			// The base line at zero of a scale of numbers is one line in
+			// the color of an axis (docs/STYLE.md).
+			it := scene.Item{Stroke: scene.Paint{Color: t.Axis}, StrokeWidth: ptr(1)}
+			if a.vertical() {
+				it.X, it.X2, it.Y, it.Y2 = 0, a.Cross, z, z
+			} else {
+				it.X, it.X2, it.Y, it.Y2 = z, z, 0, a.Cross
+			}
+			group.Items = append(group.Items, scene.Mark{Type: scene.Rule, Role: "axis-zero", Items: []scene.Item{it}})
+		}
 	}
 	if a.Labels && len(vals) > 0 {
 		group.Items = append(group.Items, s.axisLabels(a, vals, pos))
 	}
-	if a.Domain {
+	// The look of zuzu draws a base line along a band axis, and none along
+	// an axis of numbers (docs/STYLE.md).
+	if a.Domain && scale.Discrete(a.Scale.Type()) {
 		dom := scene.Mark{Type: scene.Rule, Role: "axis-domain"}
 		it := scene.Item{Stroke: scene.Paint{Color: t.Axis}, StrokeWidth: ptr(1)}
 		switch a.Orient {

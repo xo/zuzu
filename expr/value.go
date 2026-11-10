@@ -19,6 +19,7 @@ import (
 //	[]any            an array
 //	map[string]any   an object
 //	*RegExp          a regular expression, which the function regexp makes
+//	*Color           a color, which the functions rgb, hsl, lab and hcl make
 //
 // The zero time.Time is an invalid date, as new Date(NaN) is.
 
@@ -146,6 +147,8 @@ func String(v any) string {
 		return strings.Join(parts, ",")
 	case map[string]any:
 		return "[object Object]"
+	case *Color:
+		return x.String()
 	}
 	return ""
 }
@@ -187,7 +190,7 @@ func primitive(v any, hint string) any {
 			return String(x)
 		}
 		return Number(x)
-	case []any, map[string]any:
+	case []any, map[string]any, *Color:
 		return String(x)
 	}
 	return v

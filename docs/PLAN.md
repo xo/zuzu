@@ -132,6 +132,7 @@ short word, and an exported name does not repeat its package.
 | `format` | the formats of numbers and times, with the syntax of d3-format and d3-time-format, the tables of each locale (D27), the units of time and the dates that JavaScript reads |
 | `dataflow` | the data sources and the transforms |
 | `scale` | the scales, and the interpolation of a color ramp |
+| `internal/color` | the colors of CSS and their spaces: RGB, HSL, CIELAB and HCL, which `scale` and `expr` share |
 | `geo` | the projections and the geographic paths |
 | `layout` | the axes, the legends, the titles, the size of a view and the grid of a facet |
 | `scene` | the scene graph and its JSON form (D8) |
@@ -512,14 +513,17 @@ The phase holds these packages:
 
 1. `vega` reads and writes every spec of the corpus and gives back the same
    JSON.
-2. `expr` parses the grammar of vega-expression. It matches vega.js on 238
-   expressions that `test/oracle/exprs.mjs` evaluates.
+2. `expr` parses the grammar of vega-expression. It matches vega.js on 253
+   expressions that `test/oracle/exprs.mjs` evaluates, with the functions of
+   colors.
 3. `format` matches d3-format on 1176 numbers, d3-time-format on 820 times
    and 42 parses, and `Date.parse` on 32 dates. `test/oracle/formats.mjs`
    writes the cases.
 4. `dataflow` reads JSON, CSV, TSV and DSV, and runs 20 transforms.
 5. `scale` holds the scales of Vega and their ticks.
 6. `layout` draws the axes, the legends and the titles in the look of zuzu.
+   The conformance job of CI runs the oracle and fails when a share falls
+   below the proposed exit.
 7. The root package runs a spec: it works out each signal, dataset and scale
    when something first asks for it, builds the marks and the facets, and
    grows the canvas to hold the guides, as the autosize `pad` of Vega does.

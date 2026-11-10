@@ -284,6 +284,8 @@ func get(obj, prop any) any {
 		if i, ok := index(prop); ok && i < len(o) {
 			return o[i]
 		}
+	case *Color:
+		return o.get(String(prop))
 	case string:
 		if String(prop) == lengthProp {
 			return float64(len(utf16.Encode([]rune(o))))

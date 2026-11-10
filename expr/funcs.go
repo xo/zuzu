@@ -446,6 +446,7 @@ func makeBuiltins() map[string]Func {
 			return re.MatchString(String(arg(args, 1))), nil
 		},
 	})
+	maps.Copy(builtins, colorFuncs)
 	for name, field := range dateFields {
 		builtins[name] = dateField(field, false)
 		builtins["utc"+name] = dateField(field, true)
@@ -506,7 +507,7 @@ func isEmpty(v any) bool {
 // JavaScript.
 func isObject(v any) bool {
 	switch v.(type) {
-	case []any, map[string]any, time.Time, *RegExp:
+	case []any, map[string]any, time.Time, *RegExp, *Color:
 		return true
 	}
 	return false

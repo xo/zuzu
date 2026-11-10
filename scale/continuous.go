@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/internal/color"
 )
 
 // continuous is a scale with a continuous domain: linear, pow, sqrt, log,
@@ -18,7 +19,7 @@ type continuous struct {
 	domain   []float64 // as given, after nice and zero
 	tdomain  []float64 // transformed
 	rng      []float64
-	colors   []rgba
+	colors   []color.RGBA
 	color    bool
 	interp   string
 	clamp    bool
@@ -75,7 +76,8 @@ func newContinuous(o Options) (Scale, error) {
 	if isColor(o.Range) {
 		s.color = true
 		for _, c := range o.Range {
-			s.colors = append(s.colors, parseColor(expr.String(c)))
+			rgb, _ := color.Parse(expr.String(c))
+			s.colors = append(s.colors, rgb)
 		}
 		if o.Reverse {
 			slices.Reverse(s.colors)
@@ -214,9 +216,9 @@ func (s *continuous) Map(v any) any {
 	if s.color {
 		j := min(i, len(s.colors)-2)
 		if len(s.colors) == 1 {
-			return s.colors[0].hex()
+			return s.colors[0].Hex()
 		}
-		return interpolate(s.colors[j], s.colors[j+1], f, s.interp).hex()
+		return color.Mix(s.colors[j], s.colors[j+1], f, s.interp).Hex()
 	}
 	j := min(i, len(s.rng)-2)
 	r := s.rng[j] + f*(s.rng[j+1]-s.rng[j])
@@ -261,7 +263,7 @@ func (s *continuous) Range() []any {
 	if s.color {
 		out := make([]any, len(s.colors))
 		for i, c := range s.colors {
-			out[i] = c.hex()
+			out[i] = c.Hex()
 		}
 		return out
 	}

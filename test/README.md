@@ -78,7 +78,9 @@ the share of the specs, the datasets, the scales and the marks that match
 the references. A Vega-Lite spec runs as the Vega spec that vega-lite.js
 compiled, which its reference holds. Add `-v` to print what differs, and
 `-only text` to check only the specs whose path holds the text. The plan
-states the share that phase 3 must reach.
+states the share that phase 3 must reach, and `TestPhase3Share` in
+`conform` fails below it. That test skips when the references are not
+there. The conformance job of CI writes them and runs it.
 
 ## Look at what zuzu draws
 

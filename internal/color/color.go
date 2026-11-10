@@ -1,4 +1,7 @@
-package scale
+// Package color reads the colors of CSS and converts them between the color
+// spaces of d3: RGB, HSL, CIELAB and HCL. The scales and the expressions
+// share it.
+package color
 
 import (
 	"fmt"
@@ -7,9 +10,9 @@ import (
 	"strings"
 )
 
-// rgba is a color with channels from 0 to 255 and an opacity from 0 to 1.
-type rgba struct {
-	r, g, b, a float64
+// RGBA is a color with channels from 0 to 255 and an opacity from 0 to 1.
+type RGBA struct {
+	R, G, B, A float64
 }
 
 // named are the named colors of CSS.
@@ -71,15 +74,16 @@ var named = map[string]uint32{
 	"yellowgreen": 0x9acd32,
 }
 
-// parseColor reads a color of CSS: a name, #rgb, #rrggbb, rgb(), rgba(),
-// hsl() or hsla(). A color that does not read is black.
-func parseColor(s string) rgba {
+// Parse reads a color of CSS: a name, #rgb, #rrggbb, rgb(), rgba(),
+// hsl() or hsla(). It reports false, with black, for a color that does not
+// read.
+func Parse(s string) (RGBA, bool) {
 	s = strings.ToLower(strings.TrimSpace(s))
 	if v, ok := named[s]; ok {
-		return rgba{float64(v >> 16 & 0xff), float64(v >> 8 & 0xff), float64(v & 0xff), 1}
+		return RGBA{float64(v >> 16 & 0xff), float64(v >> 8 & 0xff), float64(v & 0xff), 1}, true
 	}
 	if s == "transparent" {
-		return rgba{0, 0, 0, 0}
+		return RGBA{0, 0, 0, 0}, true
 	}
 	if strings.HasPrefix(s, "#") {
 		h := s[1:]
@@ -96,13 +100,13 @@ func parseColor(s string) rgba {
 		}
 		v, err := strconv.ParseUint(h, 16, 32)
 		if err != nil || len(h) != 8 {
-			return rgba{a: 1}
+			return RGBA{A: 1}, false
 		}
-		return rgba{float64(v >> 24 & 0xff), float64(v >> 16 & 0xff), float64(v >> 8 & 0xff), float64(v&0xff) / 255}
+		return RGBA{float64(v >> 24 & 0xff), float64(v >> 16 & 0xff), float64(v >> 8 & 0xff), float64(v&0xff) / 255}, true
 	}
 	lp, rp := strings.IndexByte(s, '('), strings.LastIndexByte(s, ')')
 	if lp < 0 || rp < lp {
-		return rgba{a: 1}
+		return RGBA{A: 1}, false
 	}
 	fn := s[:lp]
 	parts := strings.FieldsFunc(s[lp+1:rp], func(r rune) bool { return r == ',' || r == ' ' || r == '/' })
@@ -120,15 +124,16 @@ func parseColor(s string) rgba {
 	}
 	switch fn {
 	case "rgb", "rgba":
-		return rgba{num(0, 255), num(1, 255), num(2, 255), num(3, 1)}
+		return RGBA{num(0, 255), num(1, 255), num(2, 255), num(3, 1)}, true
 	case "hsl", "hsla":
-		return fromHSL(num(0, 360), num(1, 1), num(2, 1), num(3, 1))
+		return FromHSL(num(0, 360), num(1, 1), num(2, 1), num(3, 1)), true
 	}
-	return rgba{a: 1}
+	return RGBA{A: 1}, false
 }
 
-// fromHSL converts hue, saturation and lightness to a color.
-func fromHSL(h, s, l, a float64) rgba {
+// FromHSL converts a hue in degrees, a saturation and a lightness from 0 to
+// 1, and an opacity to a color.
+func FromHSL(h, s, l, a float64) RGBA {
 	h = math.Mod(h, 360)
 	if h < 0 {
 		h += 360
@@ -153,26 +158,70 @@ func fromHSL(h, s, l, a float64) rgba {
 		h = math.Mod(h+360, 360)
 		return hue(h) * 255
 	}
-	return rgba{conv(h + 120), conv(h), conv(h - 120), a}
+	return RGBA{conv(h + 120), conv(h), conv(h - 120), a}
 }
 
-// hex writes a color as #rrggbb, or as rgba() when it is not opaque.
-func (c rgba) hex() string {
-	clamp := func(v float64) int {
-		return int(math.Max(0, math.Min(255, math.Round(v))))
+// Hex writes a color as #rrggbb, or as rgba() when it is not opaque.
+func (c RGBA) Hex() string {
+	if c.A < 1 {
+		return c.String()
 	}
-	if c.a < 1 {
-		return fmt.Sprintf("rgba(%d, %d, %d, %s)", clamp(c.r), clamp(c.g), clamp(c.b), strconv.FormatFloat(c.a, 'g', 3, 64))
+	return fmt.Sprintf("#%02x%02x%02x", channel(c.R), channel(c.G), channel(c.B))
+}
+
+// String writes a color as rgb() or rgba(), as d3 writes a color.
+func (c RGBA) String() string {
+	if c.A < 1 {
+		return fmt.Sprintf("rgba(%d, %d, %d, %s)", channel(c.R), channel(c.G), channel(c.B), strconv.FormatFloat(math.Max(0, c.A), 'g', -1, 64))
 	}
-	return fmt.Sprintf("#%02x%02x%02x", clamp(c.r), clamp(c.g), clamp(c.b))
+	return fmt.Sprintf("rgb(%d, %d, %d)", channel(c.R), channel(c.G), channel(c.B))
 }
 
-// lab is a color in CIELAB.
-type lab struct {
-	l, a, b, alpha float64
+// channel rounds a channel to an integer from 0 to 255.
+func channel(v float64) int {
+	if math.IsNaN(v) {
+		return 0
+	}
+	return int(math.Max(0, math.Min(255, math.Round(v))))
 }
 
-// The white point and the constants of CIELAB.
+// HSL returns the hue in degrees, the saturation and the lightness of a
+// color. The hue of a gray is NaN, as in d3.
+func (c RGBA) HSL() (h, s, l float64) {
+	r, g, b := c.R/255, c.G/255, c.B/255
+	lo, hi := math.Min(r, math.Min(g, b)), math.Max(r, math.Max(g, b))
+	h, s, l = math.NaN(), hi-lo, (hi+lo)/2
+	if s == 0 {
+		if l > 0 && l < 1 {
+			return h, 0, l
+		}
+		return h, s, l
+	}
+	switch hi {
+	case r:
+		h = (g - b) / s
+		if g < b {
+			h += 6
+		}
+	case g:
+		h = (b-r)/s + 2
+	default:
+		h = (r-g)/s + 4
+	}
+	if l < 0.5 {
+		s /= hi + lo
+	} else {
+		s /= 2 - hi - lo
+	}
+	return h * 60, s, l
+}
+
+// Lab is a color in CIELAB, with an opacity.
+type Lab struct {
+	L, A, B, Alpha float64
+}
+
+// The white point and the constants of CIELAB, as d3 uses them.
 const (
 	xn, yn, zn = 0.96422, 1, 0.82521
 	t0, t1     = 4.0 / 29, 6.0 / 29
@@ -180,36 +229,60 @@ const (
 	t3         = t1 * t1 * t1
 )
 
-// toLab converts a color to CIELAB, with the white point of the
-// illuminant that d3 uses.
-func (c rgba) toLab() lab {
-	r, g, b := linear(c.r), linear(c.g), linear(c.b)
+// Lab converts a color to CIELAB, with the white point of the illuminant
+// that d3 uses.
+func (c RGBA) Lab() Lab {
+	r, g, b := linear(c.R), linear(c.G), linear(c.B)
 	y := xyz((0.2225045*r + 0.7168786*g + 0.0606169*b) / yn)
 	x, z := y, y
 	if r != g || g != b {
 		x = xyz((0.4360747*r + 0.3850649*g + 0.1430804*b) / xn)
 		z = xyz((0.0139322*r + 0.0971045*g + 0.7141733*b) / zn)
 	}
-	return lab{116*y - 16, 500 * (x - y), 200 * (y - z), c.a}
+	return Lab{116*y - 16, 500 * (x - y), 200 * (y - z), c.A}
 }
 
-// rgb converts a color in CIELAB back to RGB.
-func (c lab) rgb() rgba {
-	y := (c.l + 16) / 116
+// RGBA converts a color in CIELAB to RGB.
+func (c Lab) RGBA() RGBA {
+	y := (c.L + 16) / 116
 	x, z := y, y
-	if !math.IsNaN(c.a) {
-		x = y + c.a/500
+	if !math.IsNaN(c.A) {
+		x = y + c.A/500
 	}
-	if !math.IsNaN(c.b) {
-		z = y - c.b/200
+	if !math.IsNaN(c.B) {
+		z = y - c.B/200
 	}
 	x, y, z = xn*lab2xyz(x), yn*lab2xyz(y), zn*lab2xyz(z)
-	return rgba{
+	return RGBA{
 		gamma(3.1338561*x - 1.6168667*y - 0.4906146*z),
 		gamma(-0.9787684*x + 1.9161415*y + 0.0334540*z),
 		gamma(0.0719453*x - 0.2289914*y + 1.4052427*z),
-		c.alpha,
+		c.Alpha,
 	}
+}
+
+// HCL returns the hue in degrees, the chroma and the lightness of a color in
+// CIELAB.
+func (c Lab) HCL() (h, ch, l float64) {
+	ch = math.Hypot(c.A, c.B)
+	h = math.Atan2(c.B, c.A) * 180 / math.Pi
+	if h < 0 {
+		h += 360
+	}
+	if ch < 1e-6 {
+		h = math.NaN()
+	}
+	return h, ch, c.L
+}
+
+// FromHCL converts a hue in degrees, a chroma and a lightness to a color in
+// CIELAB.
+func FromHCL(h, ch, l, alpha float64) Lab {
+	if math.IsNaN(h) {
+		return Lab{l, 0, 0, alpha}
+	}
+	r := h * math.Pi / 180
+	return Lab{l, ch * math.Cos(r), ch * math.Sin(r), alpha}
 }
 
 func xyz(t float64) float64 {
@@ -241,18 +314,25 @@ func gamma(x float64) float64 {
 	return 255 * (1.055*math.Pow(x, 1/2.4) - 0.055)
 }
 
-// interpolate returns the color a share f of the way from a to b, in a
-// color space: rgb, the default, lab, hcl or hsl.
-func interpolate(a, b rgba, f float64, space string) rgba {
+// Luminance returns the relative luminance of a color, from 0 for black to
+// 1 for white, as WCAG 2 defines it.
+func (c RGBA) Luminance() float64 {
+	return 0.2126*linear(c.R) + 0.7152*linear(c.G) + 0.0722*linear(c.B)
+}
+
+// Mix returns the color a share f of the way from a to b, in a color
+// space: rgb, the default, lab, hcl or hsl. A space that ends in -long
+// takes the long way round the hue.
+func Mix(a, b RGBA, f float64, space string) RGBA {
 	mix := func(x, y float64) float64 { return x + f*(y-x) }
 	switch strings.TrimSuffix(space, "-long") {
 	case "lab":
-		la, lb := a.toLab(), b.toLab()
-		return lab{mix(la.l, lb.l), mix(la.a, lb.a), mix(la.b, lb.b), mix(la.alpha, lb.alpha)}.rgb()
+		la, lb := a.Lab(), b.Lab()
+		return Lab{mix(la.L, lb.L), mix(la.A, lb.A), mix(la.B, lb.B), mix(la.Alpha, lb.Alpha)}.RGBA()
 	case "hcl":
-		la, lb := a.toLab(), b.toLab()
-		ha, ca := math.Atan2(la.b, la.a)*180/math.Pi, math.Hypot(la.a, la.b)
-		hb, cb := math.Atan2(lb.b, lb.a)*180/math.Pi, math.Hypot(lb.a, lb.b)
+		la, lb := a.Lab(), b.Lab()
+		ha, ca := math.Atan2(la.B, la.A)*180/math.Pi, math.Hypot(la.A, la.B)
+		hb, cb := math.Atan2(lb.B, lb.A)*180/math.Pi, math.Hypot(lb.A, lb.B)
 		if ca < 1e-6 {
 			ha = hb
 		}
@@ -265,13 +345,7 @@ func interpolate(a, b rgba, f float64, space string) rgba {
 		}
 		h := (ha + f*d) * math.Pi / 180
 		c := mix(ca, cb)
-		return lab{mix(la.l, lb.l), c * math.Cos(h), c * math.Sin(h), mix(la.alpha, lb.alpha)}.rgb()
+		return Lab{mix(la.L, lb.L), c * math.Cos(h), c * math.Sin(h), mix(la.Alpha, lb.Alpha)}.RGBA()
 	}
-	return rgba{mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b), mix(a.a, b.a)}
-}
-
-// Interpolate returns the color a share f of the way between two colors
-// of CSS, in a color space.
-func Interpolate(a, b string, f float64, space string) string {
-	return interpolate(parseColor(a), parseColor(b), f, space).hex()
+	return RGBA{mix(a.R, b.R), mix(a.G, b.G), mix(a.B, b.B), mix(a.A, b.A)}
 }

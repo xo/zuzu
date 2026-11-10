@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -31,72 +30,36 @@ func main() {
 
 // run checks every reference and prints a summary.
 func run(ctx context.Context, dir, only string, verbose bool) error {
-	paths, err := filepath.Glob(filepath.Join(dir, "references", "*", "*.ref.json"))
+	s, err := conform.Summarize(ctx, dir, only)
 	if err != nil {
 		return err
 	}
-	if len(paths) == 0 {
-		return fmt.Errorf("no references in %s: run the oracle first", dir)
-	}
-	sort.Strings(paths)
-	var specs, specsOK, errs, ds, dsOK, sc, scOK, mk, mkOK int
 	issues := map[string]int{}
 	errCounts := map[string]int{}
-	for _, p := range paths {
-		if only != "" && !strings.Contains(p, only) {
-			continue
-		}
-		ref, err := conform.Read(p)
-		if err != nil {
-			return err
-		}
-		if ref.Error != "" {
-			continue
-		}
-		res := conform.Check(ctx, ref, filepath.Join(dir, "corpus"))
-		specs++
-		ds += res.Datasets
-		dsOK += res.DatasetsOK
-		sc += res.Scales
-		scOK += res.ScalesOK
-		mk += res.Marks
-		mkOK += res.MarksOK
+	for _, res := range s.Results {
 		for _, is := range res.Report {
 			issues[is.Message+": "+is.Err.Error()]++
 		}
 		switch {
 		case res.Err != nil:
-			errs++
 			errCounts[firstLine(res.Err.Error())]++
 			if verbose {
-				fmt.Printf("ERR  %s: %v\n", ref.Spec, res.Err)
+				fmt.Printf("ERR  %s: %v\n", res.Spec, res.Err)
 			}
-		case res.OK():
-			specsOK++
-		default:
-			if verbose {
-				fmt.Printf("DIFF %s\n", ref.Spec)
-				for _, d := range res.Diffs {
-					fmt.Printf("\t%s\n", d)
-				}
+		case !res.OK() && verbose:
+			fmt.Printf("DIFF %s\n", res.Spec)
+			for _, d := range res.Diffs {
+				fmt.Printf("\t%s\n", d)
 			}
 		}
 	}
-	fmt.Printf("specs:    %d of %d match (%.1f%%), %d could not run\n", specsOK, specs, pct(specsOK, specs), errs)
-	fmt.Printf("datasets: %d of %d match (%.1f%%)\n", dsOK, ds, pct(dsOK, ds))
-	fmt.Printf("scales:   %d of %d match (%.1f%%)\n", scOK, sc, pct(scOK, sc))
-	fmt.Printf("marks:    %d of %d match (%.1f%%)\n", mkOK, mk, pct(mkOK, mk))
+	fmt.Printf("specs:    %d of %d match (%.1f%%), %d could not run\n", s.SpecsOK, s.Specs, conform.Share(s.SpecsOK, s.Specs), s.Errors)
+	fmt.Printf("datasets: %d of %d match (%.1f%%)\n", s.DatasetsOK, s.Datasets, conform.Share(s.DatasetsOK, s.Datasets))
+	fmt.Printf("scales:   %d of %d match (%.1f%%)\n", s.ScalesOK, s.Scales, conform.Share(s.ScalesOK, s.Scales))
+	fmt.Printf("marks:    %d of %d match (%.1f%%)\n", s.MarksOK, s.Marks, conform.Share(s.MarksOK, s.Marks))
 	printTop("errors", errCounts)
 	printTop("issues", issues)
 	return nil
-}
-
-// pct returns a share in percent.
-func pct(n, of int) float64 {
-	if of == 0 {
-		return 0
-	}
-	return 100 * float64(n) / float64(of)
 }
 
 // firstLine returns the first line of a message, without the path.

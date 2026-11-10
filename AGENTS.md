@@ -163,6 +163,7 @@ On 2026-11-10 the repository holds these files:
 | `format/` | the formats of numbers and times of d3, the units of time and the dates that JavaScript reads, with their oracle cases in `format/testdata` (D27) |
 | `dataflow/` | the reading of data and the transforms |
 | `scale/` | the scales and their ticks |
+| `internal/color/` | the colors of CSS and their color spaces, which `scale` and `expr` share |
 | `layout/` | the axes, the legends and the titles in the look of zuzu, and the bounds of a scene (D12) |
 | `scene/` | the scene graph and its JSON form (D8) |
 | `theme/` | the modes and the color schemes (D14) |

@@ -4,6 +4,10 @@
 # module and the test module each have a go.mod, so each is linted and tested
 # from its own folder.
 #
+# The conformance job runs vega.js and vega-lite.js over the corpus to write
+# the references of D17, then checks that zuzu still matches them at the
+# share that the plan states for phase 3.
+#
 # The tinygo job builds the packages of zuzu with TinyGo for WebAssembly, which
 # D29 makes a target. TinyGo builds a program, so it builds test/cmd/wasm,
 # which imports them.
@@ -81,6 +85,38 @@ jobs:
       - name: Test the test module
         working-directory: test
         run: go test -race -count=1 ./...
+
+  conformance:
+    name: Conformance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache-dependency-path: test/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install the oracle
+        # vega and vega-lite are pinned in test/oracle/package.json.
+        working-directory: test/oracle
+        run: npm install --no-audit --no-fund
+
+      - name: Write the references
+        working-directory: test
+        run: TZ=UTC node oracle/oracle.mjs testdata
+
+      - name: Compare zuzu with the references
+        working-directory: test
+        run: go run ./cmd/conform && go test -count=1 -run TestPhase3Share ./conform
 
   tinygo:
     name: TinyGo

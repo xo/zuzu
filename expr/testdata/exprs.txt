@@ -238,3 +238,18 @@ datetime(0)
 datetime('2024-02-29')
 datetime(datetime(2020, 1, 1))
 utc(1000)
+'' + rgb(10, 20, 30)
+'' + rgb('#ff8000')
+rgb('steelblue').g
+'' + rgb(10, 20, 30, 0.5)
+'' + hsl(120, 0.5, 0.5)
+hsl('#ff0000').h
+hsl('#808080').s
+'' + lab(50, 20, -30)
+lab('white').l
+'' + hcl(250, 40, 60)
+hcl('#336699').c
+luminance('white')
+luminance('#336699')
+contrast('white', 'black')
+contrast('#336699', 'yellow')

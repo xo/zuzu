@@ -86,8 +86,7 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The look of zuzu draws a base line only along a band axis (D12).
-	ax.Domain = domain && scale.Discrete(sc.Type())
+	ax.Domain = domain
 	if ax.Title, err = s.titleText(a.Title); err != nil {
 		return nil, err
 	}

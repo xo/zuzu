@@ -471,6 +471,8 @@ func paint(v any) scene.Paint {
 	switch x := v.(type) {
 	case string:
 		return scene.Paint{Color: x}
+	case *expr.Color:
+		return scene.Paint{Color: x.String()}
 	case map[string]any:
 		b, err := json.Marshal(x)
 		if err != nil {

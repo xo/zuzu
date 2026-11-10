@@ -11,15 +11,6 @@ decided on the way.
 
 ## Phase 0
 
-### Run the oracle in CI
-
-The oracle writes the references in about 8 seconds, and git ignores them
-(`test/README.md`). The comparison with them exists in `test/conform` since
-phase 3. Add a job to `.github/workflows/test.yml` that sets up Node.js,
-installs the packages of `test/oracle`, runs the oracle with `TZ=UTC`, and
-runs `go run ./cmd/conform`. Then add a test that fails when a share falls
-below the exit of phase 3.
-
 ### Add a test that names a person in a decision
 
 `TestTheDocumentsNameNoPerson` reads every document for the names of the
@@ -74,22 +65,17 @@ legends and the titles already follow `docs/STYLE.md`.
 
 ### Finish the guides
 
-1. A quantitative axis draws no base line at zero, which rule 2 of "Axes and
-   grids" in `docs/STYLE.md` asks for.
-2. An axis reads neither `labelFlush` nor `labelLimit`, and a legend reads
+1. An axis reads neither `labelFlush` nor `labelLimit`, and a legend reads
    neither `direction`, `orient`, `columns` nor its encodings.
-3. A legend of sizes draws a circle for each value, and not the nested
+2. A legend of sizes draws a circle for each value, and not the nested
    circles of the targets.
-4. The autosize `fit`, `fit-x` and `fit-y` grow the canvas as `pad` does, and
+3. The autosize `fit`, `fit-x` and `fit-y` grow the canvas as `pad` does, and
    do not shrink the plot area.
-5. The package `layout` has no tests of its own. The golden file
-   `testdata/bar.svg` and the gallery of the test module show its output.
 
 ### Add the expression functions that zuzu does not have
 
 An expression that calls one of these functions is an issue in the loose
-mode: `contrast`, `luminance`, `rgb`, `hsl`, `lab`, `hcl`, `gradient`,
-`copy`, the functions `geo*` of phase 5, `treePath`, `treeAncestors`,
+mode: `gradient`, `copy`, the functions `geo*` of phase 5, `treePath`, `treeAncestors`,
 `vlSelectionTest` and `vlSelectionResolve`.
 
 ### Decide whether to share rows between datasets as Vega does
