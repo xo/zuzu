@@ -8,8 +8,8 @@ zuzu draws its own look, at the quality of nivo and visx, and does not
 reproduce the look of Vega (D12). A theme is a mode, light or dark, and a
 color scheme that swaps apart from it (D14).
 
-On 2026-11-10 zuzu is in planning. No code of the package exists, and none is
-written before the plan is ready (D3). Every decision from D1 to D29 is
+On 2026-11-10 phase 0 is done and phase 1 is in progress: the packages
+`scene`, `theme` and `svg` exist. Code follows the plan (D3). Every decision from D1 to D29 is
 decided. The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules
@@ -154,24 +154,26 @@ On 2026-11-10 the repository holds these files:
 | `docs/STYLE.md` | the rules and the tokens of the look (D12, D14) |
 | `docs/survey/` | the survey of other libraries and the page that compares them (D23) |
 | `docs/targets/` | the script that draws the target SVGs and their gallery, which git ignores (D13) |
+| `doc.go`, `*_test.go` | the package `zuzu`, which holds no code yet, and the tests of the documents |
+| `scene/` | the scene graph and its JSON form (D8) |
+| `theme/` | the modes and the color schemes (D14) |
+| `svg/` | the SVG writer, with its golden files in `svg/testdata` (D10) |
+| `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
+| `test/` | the test module: the corpus, the inventory, the oracle and the TinyGo check. `test/README.md` says how to run each |
 
-When code exists, the packages go where "Packages" in `docs/PLAN.md` says,
-and the test module goes in `test/` with its own `go.mod`.
+The packages go where "Packages" in `docs/PLAN.md` says.
 
 ## Before you stage
 
-No code exists yet, so there is no test to run. Read each document you
-changed against the rules of `simple-english`, and make sure that each new
-decision has its row in `docs/decisions/README.md`.
-
-When code exists, run these, as dbmeta does:
+Run these, as CI does:
 
 ```bash
 gofmt -l . && go vet ./... && go build ./... && go test -race -count=2 ./...
-golangci-lint run ./...
+golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go test ./...)
 ```
 
-`docs/BACKLOG.md` holds the work that adds them, under Phase 0.
+`gofmt -l .` must print nothing. The tests of the root module read the
+documents, so a change to a document runs them too.
 
 ## Writing documentation
 

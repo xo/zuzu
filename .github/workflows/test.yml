@@ -1,0 +1,105 @@
+# Tests zuzu on every push and pull request.
+#
+# The unit job lints, formats, vets, builds and tests both modules. The root
+# module and the test module each have a go.mod, so each is linted and tested
+# from its own folder.
+#
+# The tinygo job builds the packages of zuzu with TinyGo for WebAssembly, which
+# D29 makes a target. TinyGo builds a program, so it builds test/cmd/wasm,
+# which imports them.
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the older run useless, so cancel it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache-dependency-path: |
+            go.sum
+            test/go.sum
+
+      - name: Lint
+        # Pinned. The configuration is `default: all`, so an unpinned upgrade
+        # enables a new linter and fails a build that changed nothing.
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.1
+
+      - name: Lint the test module
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.1
+          working-directory: test
+
+      - name: Check formatting
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "these files are not formatted:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./... && (cd test && go vet ./...)
+
+      - name: Build
+        run: go build ./... && (cd test && go build ./...)
+
+      - name: Build without cgo
+        # The module that a user imports uses no cgo (D5), and a consumer
+        # builds it with CGO_ENABLED=0. That is checked rather than assumed.
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: Test
+        run: go test -race -count=2 ./...
+
+      - name: Test the test module
+        working-directory: test
+        run: go test -race -count=1 ./...
+
+  tinygo:
+    name: TinyGo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Set up TinyGo
+        # Pinned to the release that was tested on 2026-11-10 (D29).
+        uses: acifani/setup-tinygo@v3
+        with:
+          tinygo-version: 0.44.0
+
+      - name: Build for WebAssembly
+        working-directory: test
+        run: GOOS=wasip1 GOARCH=wasm tinygo build -o zuzu.wasm ./cmd/wasm

@@ -11,50 +11,50 @@ decided on the way.
 
 ## Phase 0
 
-### Port the tests that check the documents
+### Run the oracle in CI
 
-dbmeta has five tests that keep the documents honest. zuzu needs the same
-tests, written for its own layout, before the first code of the package:
+The oracle writes the references in about 8 seconds, and git ignores them
+(`test/README.md`). When the first comparison with them exists, in phase 3,
+add a job to `.github/workflows/test.yml` that sets up Node.js, installs the
+packages of `test/oracle` and runs the oracle with `TZ=UTC` before the tests
+of the test module.
 
-1. `TestSkillsAreCopies` fails on a skill that is a symbolic link, a skill
-   that has only one copy, and two copies that differ (dbmeta D89).
-2. `TestClaudeImportsAgents` fails when `CLAUDE.md` holds anything but
-   `@AGENTS.md` (dbmeta D110).
-3. `TestTheRootHoldsFourDocuments` fails on a Markdown file in the root other
-   than the four (dbmeta D50).
-4. `TestTheDecisionIndexIsComplete` fails when a decision has no row in
-   `docs/decisions/README.md`, and prints the row (dbmeta D111).
-5. `TestProseIsSimpleEnglish` checks the rules of `simple-english` that a
-   machine can check (dbmeta D156).
+### Add a test that names a person in a decision
 
-A sixth test fails when a document names a person rather than the
-maintainers (D22). The list of names it looks for is the open part.
+`TestTheDocumentsNameNoPerson` reads every document for the names of the
+maintainers (D22). Its list of names is short, and a new maintainer adds a
+name to it.
 
-### Add the CI workflow and the lint configuration
+## Phase 1
 
-`README.md` shows the badge of `.github/workflows/test.yml`, which does not
-exist. Add the workflow with the tests above, and a `.golangci.yml` with the
-posture of dbmeta: `default: all`, a disable list, and the reason beside each
-entry. The badge has no status until then.
+### Write the tier 0 targets as scene graphs
 
-### Bring the corpus into the test module
+The exit of phase 1 needs a scene graph for each tier 0 target, rendered by
+`svg` and compared with the target in a gallery, in both modes and every
+scheme. `docs/targets/gen-targets.mjs` holds the layout of each target, so it
+can write the scene graph of each one as JSON, in the form that `scene`
+reads, beside its SVG. A test in `svg` then renders each scene graph, and a
+page shows each target beside the output of zuzu.
 
-Copy the specs, the data and the reference SVGs from the testdata of
-`vegagoja` into the test module. Put the license file of each source in the
-folder that holds its files: the BSD 3-Clause License of Vega beside the
-Vega examples, the same of Vega-Lite beside the Vega-Lite examples, and the
-license of Deneb, which `vegagoja/testdata/deneb/LICENSE` holds, beside the
-Deneb samples. Write an
-inventory that lists, for each spec, its marks, its transforms, the
-expression functions it calls and whether it binds an event (D7, D17).
+### Draw what the writer does not draw yet
 
-### Write the oracle
+`svg` returns an error for each of these:
 
-A tool in the test module that runs vega.js and vega-lite.js in Node.js and
-writes the references for each spec that D17 lists: the compiled Vega spec,
-the rows of each dataset after its transforms, the scales, and the items of
-each mark with their data. It pins Vega 6.4.0 and Vega-Lite 6.5.0, or the
-releases current when it is written.
+1. The interpolations `cardinal`, `catmull-rom`, `natural` and `bundle` of a
+   line or an area.
+2. The symbol shapes `wedge`, `arrow` and `stroke`, and a shape given as the
+   path of an SVG.
+3. The marks `shape` and `trail`.
+
+It also draws an arc without round corners, where the arc of Vega has a
+`cornerRadius`, and it does not cut a text to its `limit`, which needs the
+measurement of text (D11).
+
+### Make the Vega config of a theme
+
+D14 says that a theme becomes one Vega config. The package `vega` holds the
+type of a config, and it comes in phase 3. Until then, `theme.Theme` holds the
+colors, and the config waits.
 
 ## Themes
 

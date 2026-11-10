@@ -422,6 +422,11 @@ datasets, the scales and the bound items.
 Exit: CI passes, the inventory exists, and the oracle writes the references
 for the whole corpus. No code of the package exists.
 
+Phase 0 was done on 2026-11-10. The tests of the documents, the lint
+configuration and the CI workflow exist. The corpus holds 679 specs, and 540
+are in the first target. The oracle writes their references with no failure.
+[`../test/README.md`](../test/README.md) says how to run each tool.
+
 ### Phase 1. The scene graph and the SVG writer
 
 The Go types of the scene graph, their JSON form, and the SVG writer. The
@@ -433,6 +438,14 @@ person accepts against the targets in a gallery, in both modes and in every
 scheme. Their golden files exist, and okage renders each one.
 
 Do not start the runtime yet.
+
+On 2026-11-10 the packages `scene`, `theme` and `svg` exist. `scene` reads
+and writes the scene graph of vega.js. `theme` holds the two modes and the
+four schemes, and a test checks them against [`STYLE.md`](STYLE.md). `svg`
+draws every kind of mark that the targets use, and its golden files render in
+okage. The exit is not met yet: the tier 0 targets do not exist as scene
+graphs, and no gallery compares them. "Phase 1" in
+[`BACKLOG.md`](BACKLOG.md) lists what is left.
 
 ### Phase 2. Text
 

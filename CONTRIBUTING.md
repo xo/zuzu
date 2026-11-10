@@ -17,16 +17,15 @@ for the maintainers.
 
 ## Before you send a change
 
-No code exists yet. Read each document you changed against the rules of the
-`simple-english` skill, and make sure that each new decision has its row in
-`docs/decisions/README.md`.
-
-When code exists, run the checks that CI runs:
+Run the checks that CI runs:
 
 ```bash
 gofmt -l . && go vet ./... && go build ./... && go test -race -count=2 ./...
-golangci-lint run ./...
+golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go test ./...)
 ```
+
+The tests of the root module read the documents too: the links, the decision
+numbers, the index of the decisions and the rules of `simple-english`.
 
 ## The look
 

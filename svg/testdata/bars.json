@@ -1,0 +1,334 @@
+{
+ "width": 520,
+ "height": 320,
+ "background": "#ffffff",
+ "root": {
+  "marktype": "group",
+  "role": "frame",
+  "items": [
+   {
+    "x": 0,
+    "y": 0,
+    "width": 520,
+    "height": 320,
+    "items": [
+     {
+      "marktype": "rule",
+      "role": "axis-grid",
+      "items": [
+       {
+        "x": 56,
+        "y": 280.0,
+        "x2": 496,
+        "stroke": "#eceff3"
+       },
+       {
+        "x": 56,
+        "y": 218.667,
+        "x2": 496,
+        "stroke": "#eceff3"
+       },
+       {
+        "x": 56,
+        "y": 157.333,
+        "x2": 496,
+        "stroke": "#eceff3"
+       },
+       {
+        "x": 56,
+        "y": 96.0,
+        "x2": 496,
+        "stroke": "#eceff3"
+       }
+      ]
+     },
+     {
+      "marktype": "text",
+      "role": "axis-label",
+      "items": [
+       {
+        "x": 48,
+        "y": 280.0,
+        "text": "0",
+        "fontSize": 11,
+        "align": "right",
+        "baseline": "middle",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 48,
+        "y": 218.667,
+        "text": "100",
+        "fontSize": 11,
+        "align": "right",
+        "baseline": "middle",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 48,
+        "y": 157.333,
+        "text": "200",
+        "fontSize": 11,
+        "align": "right",
+        "baseline": "middle",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 48,
+        "y": 96.0,
+        "text": "300",
+        "fontSize": 11,
+        "align": "right",
+        "baseline": "middle",
+        "fill": "#5f6b7d"
+       }
+      ]
+     },
+     {
+      "marktype": "rect",
+      "role": "mark",
+      "items": [
+       {
+        "x": 69.93333333333334,
+        "y": 108.88,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#5b6ee1",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 95.66666666666667,
+        "y": 134.456,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#f0a830",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 143.26666666666665,
+        "y": 122.005,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#5b6ee1",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 168.99999999999997,
+        "y": 178.125,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#f0a830",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 216.6,
+        "y": 178.187,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#5b6ee1",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 242.33333333333331,
+        "y": 118.632,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#f0a830",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 289.93333333333334,
+        "y": 140.467,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#5b6ee1",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 315.6666666666667,
+        "y": 169.355,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#f0a830",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 363.26666666666665,
+        "y": 153.101,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#5b6ee1",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 389.0,
+        "y": 176.592,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#f0a830",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 436.59999999999997,
+        "y": 159.173,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#5b6ee1",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       },
+       {
+        "x": 462.3333333333333,
+        "y": 203.517,
+        "width": 22.73333333333333,
+        "y2": 280,
+        "fill": "#f0a830",
+        "cornerRadiusTopLeft": 3,
+        "cornerRadiusTopRight": 3
+       }
+      ]
+     },
+     {
+      "marktype": "rule",
+      "role": "axis-domain",
+      "items": [
+       {
+        "x": 56,
+        "y": 280,
+        "x2": 496,
+        "stroke": "#cfd5de"
+       }
+      ]
+     },
+     {
+      "marktype": "text",
+      "role": "axis-label",
+      "items": [
+       {
+        "x": 92.66666666666666,
+        "y": 298,
+        "text": "Waseca",
+        "fontSize": 11,
+        "align": "center",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 165.99999999999997,
+        "y": 298,
+        "text": "Crookston",
+        "fontSize": 11,
+        "align": "center",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 239.33333333333331,
+        "y": 298,
+        "text": "Morris",
+        "fontSize": 11,
+        "align": "center",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 312.6666666666667,
+        "y": 298,
+        "text": "University Farm",
+        "fontSize": 11,
+        "align": "center",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 386.0,
+        "y": 298,
+        "text": "Duluth",
+        "fontSize": 11,
+        "align": "center",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 459.3333333333333,
+        "y": 298,
+        "text": "Grand Rapids",
+        "fontSize": 11,
+        "align": "center",
+        "fill": "#5f6b7d"
+       }
+      ]
+     },
+     {
+      "marktype": "text",
+      "role": "title",
+      "items": [
+       {
+        "x": 24,
+        "y": 34,
+        "text": "Barley yield by site",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "fill": "#1b2230"
+       },
+       {
+        "x": 24,
+        "y": 54,
+        "text": "Total yield in bushels per acre, over ten varieties",
+        "fontSize": 12.5,
+        "fill": "#5f6b7d"
+       }
+      ]
+     },
+     {
+      "marktype": "symbol",
+      "role": "legend-symbol",
+      "items": [
+       {
+        "x": 29,
+        "y": 68,
+        "size": 100,
+        "shape": "square",
+        "fill": "#5b6ee1"
+       },
+       {
+        "x": 79,
+        "y": 68,
+        "size": 100,
+        "shape": "square",
+        "fill": "#f0a830"
+       }
+      ]
+     },
+     {
+      "marktype": "text",
+      "role": "legend-label",
+      "items": [
+       {
+        "x": 39,
+        "y": 68,
+        "text": "1931",
+        "fontSize": 11,
+        "baseline": "middle",
+        "fill": "#5f6b7d"
+       },
+       {
+        "x": 89,
+        "y": 68,
+        "text": "1932",
+        "fontSize": 11,
+        "baseline": "middle",
+        "fill": "#5f6b7d"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

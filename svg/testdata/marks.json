@@ -1,0 +1,51 @@
+{
+ "width": 420, "height": 300, "background": "#ffffff",
+ "root": {"marktype": "group", "role": "frame", "items": [{"x": 10, "y": 10, "width": 400, "height": 280, "items": [
+  {"marktype": "rect", "items": [
+   {"x": 0, "y": 0, "width": 60, "height": 40, "fill": "#5b6ee1", "cornerRadius": 6},
+   {"x": 70, "y": 0, "width": 30, "height": 40, "fill": "#1fa187", "cornerRadiusTopLeft": 4, "cornerRadiusTopRight": 4},
+   {"x": 110, "y": 40, "x2": 160, "y2": 5, "fill": "#f0a830", "stroke": "#1b2230", "strokeWidth": 1.5}
+  ]},
+  {"marktype": "rule", "items": [
+   {"x": 0, "y": 55, "x2": 160, "stroke": "#cfd5de"},
+   {"x": 0, "y": 62, "x2": 160, "stroke": "#98a2b3", "strokeDash": [4, 3]}
+  ]},
+  {"marktype": "line", "items": [
+   {"x": 0, "y": 120, "stroke": "#5b6ee1", "strokeWidth": 2, "strokeCap": "round", "strokeJoin": "round", "interpolate": "monotone"},
+   {"x": 40, "y": 90}, {"x": 80, "y": 110}, {"x": 120, "y": 75}, {"x": 160, "y": 95}
+  ]},
+  {"marktype": "line", "items": [
+   {"x": 0, "y": 140, "stroke": "#e2577a", "interpolate": "step"},
+   {"x": 40, "y": 130}, {"x": 80, "y": 150, "defined": false}, {"x": 120, "y": 128}, {"x": 160, "y": 138}
+  ]},
+  {"marktype": "area", "items": [
+   {"x": 0, "y": 200, "y2": 240, "interpolate": "basis", "fill": {"gradient": "linear", "x1": 0, "y1": 0, "x2": 0, "y2": 1, "stops": [{"offset": 0, "color": "#5b6ee1"}, {"offset": 1, "color": "#ffffff"}]}},
+   {"x": 40, "y": 170, "y2": 240}, {"x": 80, "y": 185, "y2": 240}, {"x": 120, "y": 160, "y2": 240}, {"x": 160, "y": 175, "y2": 240}
+  ]},
+  {"marktype": "symbol", "items": [
+   {"x": 200, "y": 20, "size": 100, "fill": "#5b6ee1"},
+   {"x": 225, "y": 20, "size": 100, "shape": "square", "fill": "#1fa187"},
+   {"x": 250, "y": 20, "size": 100, "shape": "diamond", "fill": "#f0a830"},
+   {"x": 275, "y": 20, "size": 100, "shape": "cross", "fill": "#e2577a"},
+   {"x": 300, "y": 20, "size": 100, "shape": "triangle-up", "fill": "#3aa2d6"},
+   {"x": 325, "y": 20, "size": 100, "shape": "triangle-down", "fill": "#9a6fd1", "angle": 15},
+   {"x": 350, "y": 20, "size": 100, "fill": "#ffffff", "stroke": "#7fb04a", "strokeWidth": 2}
+  ]},
+  {"marktype": "arc", "items": [
+   {"x": 260, "y": 110, "startAngle": 0, "endAngle": 2.1, "innerRadius": 30, "outerRadius": 50, "padAngle": 0.02, "fill": "#5b6ee1"},
+   {"x": 260, "y": 110, "startAngle": 2.1, "endAngle": 4.4, "innerRadius": 30, "outerRadius": 50, "padAngle": 0.02, "fill": "#1fa187"},
+   {"x": 260, "y": 110, "startAngle": 4.4, "endAngle": 6.283185307179586, "innerRadius": 30, "outerRadius": 50, "padAngle": 0.02, "fill": "#f0a830"},
+   {"x": 350, "y": 110, "startAngle": 0, "endAngle": 6.283185307179586, "innerRadius": 0, "outerRadius": 30, "fill": "#e2577a"}
+  ]},
+  {"marktype": "path", "items": [{"x": 200, "y": 170, "path": "M0,0L20,30L40,0Z", "fill": "#9a6fd1", "opacity": 0.6}]},
+  {"marktype": "text", "items": [
+   {"x": 260, "y": 110, "text": "1,461", "fontSize": 16, "fontWeight": 600, "align": "center", "baseline": "middle", "fill": "#1b2230"},
+   {"x": 260, "y": 200, "text": ["two", "lines"], "fontSize": 11, "align": "left", "baseline": "top", "fill": "#5f6b7d"},
+   {"x": 330, "y": 200, "text": "halo", "fontSize": 12, "fontWeight": "bold", "fill": "#1b2230", "stroke": "#ffffff", "strokeWidth": 3, "align": "right"},
+   {"x": 380, "y": 250, "text": "turned", "fontSize": 10, "angle": -90, "fill": "#98a2b3"}
+  ]},
+  {"marktype": "group", "items": [{"x": 0, "y": 250, "width": 160, "height": 20, "clip": true, "fill": "#f5f6f8", "cornerRadius": 4, "items": [
+   {"marktype": "rect", "items": [{"x": -10, "y": 5, "width": 200, "height": 10, "fill": "#c2569f"}]}
+  ]}]}
+ ]}]}
+}

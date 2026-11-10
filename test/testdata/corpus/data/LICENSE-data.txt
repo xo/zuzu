@@ -1,0 +1,14 @@
+The files of this folder are copies of the data that the specs of the corpus
+read. They came from the testdata of github.com/xo/vegagoja at commit
+eb05b17, which took them from vega-datasets.
+
+vega-datasets is at https://github.com/vega/vega-datasets. The package is
+under the BSD 3-Clause License, as its package.json states, and the
+repository holds no LICENSE file of its own. Each dataset also has a source
+and a license of its own. datapackage.json, from the tag v3.3.1 of
+vega-datasets, lists them under "sources" and "licenses" for each file.
+
+Three files that the corpus names are left out, because they are large and
+only specs that bind events read them, which the first release does not
+support (D7): flights-200k.json, flights-20k.json and
+platformer-terrain.json. The inventory marks the specs that need them.

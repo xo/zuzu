@@ -19,3 +19,12 @@
 /docs/targets/svg/
 /docs/targets/index.html
 /docs/targets/package-lock.json
+
+# The WebAssembly file that the TinyGo job of CI builds.
+/test/zuzu.wasm
+
+# The references that the oracle writes, about 174 MB, and the packages it
+# installs with npm. Run the oracle to make them, as test/README.md says.
+/test/testdata/references/
+/test/oracle/node_modules/
+/test/oracle/package-lock.json

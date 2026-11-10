@@ -41,8 +41,10 @@ sends live charts to a web browser, and draws the results of a query for
 
 # Status
 
-zuzu is in planning. No code exists. The plan and the rules come before any
-code, and [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the
+zuzu is in its first phases. Phase 0, the repository, the tests of the
+documents, CI, the corpus and the oracle, is done. Phase 1 is in progress:
+the scene graph, the themes and the SVG writer exist, and nothing reads a
+spec yet. [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the
 questions that the maintainers have not answered.
 
 The first step was a survey of what other libraries do. Open

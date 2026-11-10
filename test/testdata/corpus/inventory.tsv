@@ -1,0 +1,680 @@
+spec	dialect	marks	transforms	functions	events	data	first
+deneb/calendar-heatmap.vl.json	vegalite	bar	calculate	day,month,monthAbbrevFormat,week,year	no		yes
+deneb/coronation-arc.vg.json	vega	arc,group,text			no		yes
+deneb/gantt-chart.vg.json	vega	group,line,path,rect,rule,symbol,text	aggregate,filter,flatten,fold,formula,lookup,sequence,window	bandspace,bandwidth,data,datetime,day,domain,indata,isValid,min,now,pow,round,scale,span,split,timeFormat,timeParse,toNumber,upper	no		yes
+deneb/infographic-bar-chart.vg.json	vega	path,rect,text	formula,window	bandwidth,hsl,merge,scale	no		yes
+deneb/marimekko-chart.vg.json	vega	group,path,rect,rule,text	aggregate,formula,lookup,stack,window	B,Others,format,round	no		yes
+deneb/mekko-bar-chart.vg.json	vega	group,path,rect,rule,text	aggregate,formula,lookup,stack,window	B,Others,format,round	no		yes
+deneb/pancake-spider-chart.vg.json	vega	group,line,rule,text	aggregate,fold,formula,joinaggregate,lookup,project,window	Time,abs,carbs,cos,data,fat,fibre,indexof,protein,replace,round,salt,saturates,scale,sin,sugars	no		yes
+deneb/parliament-chart.vg.json	vega	symbol,text	formula,joinaggregate,lookup,project,sequence,window	cos,data,length,sin	no		yes
+deneb/sankey-chart.vg.json	vega	group,path,rect,text	aggregate,filter,flatten,formula,linkpath,lookup,project,stack	bandwidth,data,format,range,scale,toNumber	no		yes
+deneb/unit-bar-chart.vl.json	vegalite	bar	calculate,flatten	sequence	no		yes
+deneb/unit-circle-chart.vg.json	vega	arc,text	formula,pie,sequence		no		yes
+deneb/variance-chart.vl.json	vegalite	bar,circle,rule,text	aggregate,calculate		no		yes
+deneb/waffle-charts.vl.json	vegalite	circle,text	aggregate,calculate,flatten,joinaggregate	ceil,if,round,sequence	no		yes
+vega/airport-connections.vg.json	vega	path,symbol,text	aggregate,collect,filter,geopath,geopoint,linkpath,lookup,voronoi		yes		no
+vega/annual-precipitation.vg.json	vega	shape	geoshape,isocontour	sequence	no		yes
+vega/annual-temperature.vg.json	vega	area,group	formula	date,datetime,hours,month,year	no		yes
+vega/arc-diagram.vg.json	vega	path,symbol,text	aggregate,formula,linkpath,lookup,window	max,min	no		yes
+vega/area-chart.vg.json	vega	area			no		yes
+vega/bar-chart.vg.json	vega	rect,text			yes		no
+vega/barley-trellis-plot.vg.json	vega	group,symbol,text			no		yes
+vega/beeswarm-plot.vg.json	vega	symbol	force	pow	no		yes
+vega/binned-scatter-plot.vg.json	vega	symbol	aggregate,bin,extent,filter		no		yes
+vega/box-plot.vg.json	vega	group,rect	aggregate,filter	Mass	no		yes
+vega/brushing-scatter-plots.vg.json	vega	group,rect,symbol	cross,filter,formula	Length,clamp,clampRange,group,inrange,invert,slice,span,x,y	yes		no
+vega/budget-forecasts.vg.json	vega	group,line,rule,symbol,text	aggregate,filter,formula,lookup	abs,clamp,format,invert,x,y	yes		no
+vega/calendar-view.vg.json	vega	group,rect	aggregate,filter,formula,sequence,timeunit,window	data,date,datetime,format,month,timeFormat,timeOffset,year	no		yes
+vega/circle-packing.vg.json	vega	symbol	pack,stratify		no		yes
+vega/clock.vg.json	vega	arc,symbol,text	formula,sequence	cos,hours,max,min,minutes,now,pow,seconds,sin	yes		no
+vega/connected-scatter-plot.vg.json	vega	line,symbol,text			no		yes
+vega/contour-plot.vg.json	vega	image,path,symbol	filter,geopath,heatmap,isocontour,kde2d	scale	no		yes
+vega/county-unemployment.vg.json	vega	shape	filter,geoshape,lookup	format	no		yes
+vega/crossfilter-flights.vg.json	vega	group,rect,text	aggregate,bin,crossfilter,resolvefilter	abs,invert,max,min,pow,scale,span,x	yes	data/flights-200k.json	no
+vega/density-heatmaps.vg.json	vega	group,image	filter,heatmap,kde2d	if,scale	no		yes
+vega/distortion-comparison.vg.json	vega	shape,symbol	formula,geoshape,graticule	geoArea,geoCentroid	no		yes
+vega/donut-chart.vg.json	vega	arc	pie		no		yes
+vega/dorling-cartogram.vg.json	vega	symbol,text	filter,force,formula,lookup	format,geoCentroid,sqrt	no		yes
+vega/dot-plot.vg.json	vega	group,symbol	bin,dotbin,extent,stack	max,scale,span	no		yes
+vega/earthquakes.vg.json	vega	shape	geoshape	exp,scale	no		yes
+vega/edge-bundling.vg.json	vega	group,line,text	filter,formula,stratify,tree	cos,indata,inrange,sin,treePath	yes		no
+vega/error-bars.vg.json	vega	rect,symbol	aggregate,formula		no		yes
+vega/falkensee-population.vg.json	vega	line,rect,symbol	extent		no		yes
+vega/flight-passengers.vg.json	vega	line,symbol	formula,timeunit	format,timeFormat	no		yes
+vega/force-directed-layout.vg.json	vega	path,symbol	force,linkpath	item,xy	yes		no
+vega/global-development.vg.json	vega	line,symbol,text	aggregate,collect,filter,formula,lookup	abs,hypot,indata,max,min,scale,x,y	yes		no
+vega/grouped-bar-chart.vg.json	vega	group,rect,text		bandwidth,contrast	no		yes
+vega/heatmap.vg.json	vega	rect	formula	date,datetime,hours,month,timeFormat,year	no		yes
+vega/histogram-null-values.vg.json	vega	rect	aggregate,bin,extent,filter		no		yes
+vega/histogram.vg.json	vega	rect	aggregate,bin		no		yes
+vega/horizon-graph.vg.json	vega	area,group	filter,formula	floor,pow	yes		no
+vega/hypothetical-outcome-plots.vg.json	vega	rect	formula,sequence	clamp,datetime,random,timeFormat	yes		no
+vega/interactive-legend.vg.json	vega	rect,symbol	filter	clamp,clampRange,data,indata,inrange,invert,length,range,slice,span,x	yes		no
+vega/job-voyager.vg.json	vega	area,group,text	aggregate,filter,stack	regexp,scale,test	yes		no
+vega/labeled-scatter-plot.vg.json	vega	line,symbol,text	filter,label,regression		no		yes
+vega/line-chart.vg.json	vega	group,line			no		yes
+vega/loess-regression.vg.json	vega	group,line,symbol	filter,loess		no		yes
+vega/nested-bar-chart.vg.json	vega	group,rect	aggregate,extent,formula,stack	bandspace	no		yes
+vega/overview-plus-detail.vg.json	vega	area,group,rect		clamp,clampRange,invert,slice,span,x	yes		no
+vega/packed-bubble-chart.vg.json	vega	symbol,text	force	pow,sqrt	no		yes
+vega/pacman.vg.json	vega	arc,group,rect,symbol,text	collect,formula,sequence	abs,data,indata,max,min,pow,setdata	yes		no
+vega/parallel-coordinates.vg.json	vega	group,line	filter,formula	isNumber,year	no		yes
+vega/pi-monte-carlo.vg.json	vega	arc,group,rule,symbol,text	filter,formula,sequence,window	format,hypot,random	no		yes
+vega/pie-chart.vg.json	vega	arc	pie		no		yes
+vega/platformer.vg.json	vega	group,rect	formula	containerSize,hsl,indata,indexof,max,min,replace,rgb,round	yes	data/platformer-terrain.json	no
+vega/population-pyramid.vg.json	vega	group,rect,text	aggregate,filter		no		yes
+vega/probability-density.vg.json	vega	area,line,rect	aggregate,density	data,domain,scale	no		yes
+vega/projections.vg.json	vega	group,shape,text	geoshape,graticule		no		yes
+vega/quantile-dot-plot.vg.json	vega	rule,symbol,text	dotbin,extent,formula,sequence,stack	clamp,cumulativeLogNormal,format,invert,log,quantileLogNormal,scale,sqrt,x	yes		no
+vega/quantile-quantile-plot.vg.json	vega	group,symbol	formula,quantile	quantileNormal,quantileUniform	no		yes
+vega/radar-chart.vg.json	vega	group,line,rule,text	aggregate	abs,cos,scale,sin	no		yes
+vega/radial-plot.vg.json	vega	arc,text	pie		no		yes
+vega/radial-tree-layout.vg.json	vega	path,symbol,text	formula,linkpath,stratify,tree,treelinks	cos,inrange,sin	no		yes
+vega/regression.vg.json	vega	group,line,symbol	filter,regression	domain	no		yes
+vega/reorderable-matrix.vg.json	vega	rect,text	cross,formula,lookup,window	clamp,data,length,range,span,x,y	yes		no
+vega/scatter-plot-null-values.vg.json	vega	symbol,text	aggregate,filter,formula	year	no		yes
+vega/scatter-plot.vg.json	vega	symbol	filter		no		yes
+vega/stacked-area-chart.vg.json	vega	area,group	stack		no		yes
+vega/stacked-bar-chart.vg.json	vega	rect	stack		no		yes
+vega/stock-index-chart.vg.json	vega	group,line,rule,text	filter,formula,lookup	clamp,invert,month,time,timeFormat,x,year	yes		no
+vega/sunburst.vg.json	vega	arc	partition,stratify		no		yes
+vega/time-units.vg.json	vega	rect	aggregate,timeunit	Delay,format,min,timeFormat,timeSequence,timeUnitSpecifier	no	data/flights-20k.json	no
+vega/timelines.vg.json	vega	rect,text			no		yes
+vega/top-k-plot-with-others.vg.json	vega	rect	aggregate,filter,formula,lookup,window		no		yes
+vega/top-k-plot.vg.json	vega	rect	aggregate,filter,window		no		yes
+vega/tree-layout.vg.json	vega	path,symbol,text	linkpath,stratify,tree,treelinks		no		yes
+vega/treemap.vg.json	vega	rect,text	filter,stratify,treemap		no		yes
+vega/u-district-cuisine.vg.json	vega	area,group,rule,symbol,text	density	bandwidth,domain,round,scale	no		yes
+vega/violin-plot.vg.json	vega	area,group,rect	aggregate,filter,kde	Mass	no		yes
+vega/volcano-contours.vg.json	vega	path	geopath,isocontour	data,round,sequence	no		yes
+vega/warming-stripes.vg.json	vega	rect,text		data,length	yes		no
+vega/watch.vg.json	vega	arc,rule,text	formula,sequence	cos,hours,max,milliseconds,min,minutes,now,pow,seconds,sin	yes		no
+vega/weekly-temperature.vg.json	vega	rect,text	filter		no		yes
+vega/wheat-and-wages.vg.json	vega	area,line,rect,text	filter,formula		no		yes
+vega/wheat-plot.vg.json	vega	symbol	bin,extent,stack	sequence	no		yes
+vega/wind-vectors.vg.json	vega	symbol			no		yes
+vega/word-cloud.vg.json	vega	text	countpattern,formula,wordcloud	if,random	no		yes
+vega/world-map.vg.json	vega	shape	geoshape,graticule		no		yes
+vega/zoomable-binned-plot.vg.json	vega	rect,symbol	aggregate,bin,extent	clamp,invert,pinchDistance,pow,slice,span,x,xy,y	yes		no
+vega/zoomable-circle-packing.vg.json	vega	rect,symbol,text	filter,formula,pack,project,stratify,window	ceil,clamp,click,data,indexof,isValid,length,lerp,luminance,min,now,pluck,pow,scale,treeAncestors	yes		no
+vega/zoomable-scatter-plot.vg.json	vega	symbol	extent	clamp,invert,pinchDistance,pow,slice,span,x,xy,y	yes		no
+vega/zoomable-world-map.vg.json	vega	shape	geoshape,graticule	clamp,copy,invert,pow,xy	yes		no
+vegalite/airport_connections.vl.json	vegalite	circle,geoshape,rule	aggregate,filter,lookup		yes		no
+vegalite/arc_color_mappings.vl.json	vegalite	arc			no		yes
+vegalite/arc_donut.vl.json	vegalite	arc			no		yes
+vegalite/arc_facet.vl.json	vegalite	arc			no		yes
+vegalite/arc_ordinal_theta.vl.json	vegalite	arc			no		yes
+vegalite/arc_params.vl.json	vegalite	arc			yes		no
+vegalite/arc_pie.vl.json	vegalite	arc			no		yes
+vegalite/arc_pie_normalize_tooltip.vl.json	vegalite	arc			no		yes
+vegalite/arc_pie_pyramid.vl.json	vegalite	arc			no		yes
+vegalite/arc_radial.vl.json	vegalite	arc,text			no		yes
+vegalite/arc_radial_histogram.vl.json	vegalite	arc,text			no		yes
+vegalite/area.vl.json	vegalite	area			no		yes
+vegalite/area_cumulative_freq.vl.json	vegalite	area	aggregate,sort		no		yes
+vegalite/area_density.vl.json	vegalite	area	density		no		yes
+vegalite/area_density_facet.vl.json	vegalite	area	extent		no		yes
+vegalite/area_density_stacked.vl.json	vegalite	area	density		no		yes
+vegalite/area_density_stacked_fold.vl.json	vegalite	area	counts,fold		no		yes
+vegalite/area_gradient.vl.json	vegalite	area	filter		no		yes
+vegalite/area_horizon.vl.json	vegalite	area	calculate		no		yes
+vegalite/area_overlay.vl.json	vegalite	area	filter		no		yes
+vegalite/area_overlay_with_y2.vl.json	vegalite	area	filter		no		yes
+vegalite/area_params.vl.json	vegalite	area			yes		no
+vegalite/area_temperature_range.vl.json	vegalite	area			no		yes
+vegalite/area_vertical.vl.json	vegalite	area			no		yes
+vegalite/argmin_spaces.vl.json	vegalite	point			no		yes
+vegalite/bar.vl.json	vegalite	bar			no		yes
+vegalite/bar_1d.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_1d_binned.vl.json	vegalite	bar			no		yes
+vegalite/bar_1d_default_size.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_1d_dimension_only.vl.json	vegalite	bar			no		yes
+vegalite/bar_1d_step_config.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_1d_temporal.vl.json	vegalite	bar			no		yes
+vegalite/bar_aggregate.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_aggregate_count.vl.json	vegalite	bar			no		yes
+vegalite/bar_aggregate_format.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_aggregate_size.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_aggregate_sort_by_encoding.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_aggregate_sort_mean.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_aggregate_transform.vl.json	vegalite	bar	aggregate		no		yes
+vegalite/bar_aggregate_vertical.vl.json	vegalite	bar			no		yes
+vegalite/bar_argmax.vl.json	vegalite	bar			no		yes
+vegalite/bar_argmax_transform.vl.json	vegalite	bar	aggregate		no		yes
+vegalite/bar_array_aggregate.vl.json	vegalite	bar			no		yes
+vegalite/bar_axis_orient.vl.json	vegalite	bar			yes		no
+vegalite/bar_axis_space_saving.vl.json	vegalite	bar			no		yes
+vegalite/bar_axis_title_quoted.vl.json	vegalite	bar			no		yes
+vegalite/bar_binned_data.vl.json	vegalite	bar			no		yes
+vegalite/bar_binned_yearmonth_grouped.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_binned_yearmonth_grouped_center_band.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_binned_yearmonth_label.vl.json	vegalite	bar,text	filter		no		yes
+vegalite/bar_binned_yearmonth_label_band_center.vl.json	vegalite	bar,text	filter		no		yes
+vegalite/bar_binnedyearmonth.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_bullet_expr_bind.vl.json	vegalite	bar,tick			yes		no
+vegalite/bar_color_disabled_scale.vl.json	vegalite	bar			no		yes
+vegalite/bar_column_fold.vl.json	vegalite	bar	fold		no		yes
+vegalite/bar_column_pivot.vl.json	vegalite	bar	pivot		no		yes
+vegalite/bar_config_no_zero.vl.json	vegalite	bar			no		yes
+vegalite/bar_corner_radius_end.vl.json	vegalite	bar			no		yes
+vegalite/bar_count_minimap.vl.json	vegalite	bar	filter		yes		no
+vegalite/bar_custom_sort_full.vl.json	vegalite	bar			no		yes
+vegalite/bar_custom_sort_partial.vl.json	vegalite	bar			no		yes
+vegalite/bar_custom_time_domain.vl.json	vegalite	bar			no		yes
+vegalite/bar_default_tooltip_title_null.vl.json	vegalite	bar			no		yes
+vegalite/bar_distinct.vl.json	vegalite	bar			no		yes
+vegalite/bar_diverging_stack_population_pyramid.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/bar_diverging_stack_transform.vl.json	vegalite	bar	calculate,joinaggregate,stack	if	no		yes
+vegalite/bar_filter_calc.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/bar_fit.vl.json	vegalite	bar			no		yes
+vegalite/bar_gantt.vl.json	vegalite	bar			no		yes
+vegalite/bar_gantt_config_no_zero.vl.json	vegalite	bar			no		yes
+vegalite/bar_group_timeunit.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_custom_padding.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_errorbar.vl.json	vegalite	bar,errorbar			no		yes
+vegalite/bar_grouped_facet.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_facet_independent_scale.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_facet_independent_scale_fixed_width.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_fixed_width.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_horizontal.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_label.vl.json	vegalite	bar,text	calculate		no		yes
+vegalite/bar_grouped_repeated.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_stacked.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_step_for_offset.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_step_for_position.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_thin.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_thin_minBandSize.vl.json	vegalite	bar			no		yes
+vegalite/bar_grouped_timeunit_yearweek.vl.json	vegalite	bar	filter		no		yes
+vegalite/bar_heatlane.vl.json	vegalite	bar	aggregate,bin,calculate,joinaggregate		no		yes
+vegalite/bar_layered_transparent.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/bar_layered_weather.vl.json	vegalite	bar,text			no		yes
+vegalite/bar_month.vl.json	vegalite	bar			no		yes
+vegalite/bar_month_band.vl.json	vegalite	bar			no		yes
+vegalite/bar_month_band_config.vl.json	vegalite	bar			no		yes
+vegalite/bar_month_temporal.vl.json	vegalite	bar			no		yes
+vegalite/bar_month_temporal_band_center.vl.json	vegalite	bar			no		yes
+vegalite/bar_month_temporal_band_center_config.vl.json	vegalite	bar			no		yes
+vegalite/bar_month_temporal_initial.vl.json	vegalite	bar			no		yes
+vegalite/bar_multi_values_per_categories.vl.json	vegalite	bar			no		yes
+vegalite/bar_narrow_int_span.vl.json	vegalite	bar			no		yes
+vegalite/bar_negative.vl.json	vegalite	bar			no		yes
+vegalite/bar_negative_horizontal_label.vl.json	vegalite	bar,text			no		yes
+vegalite/bar_params.vl.json	vegalite	bar			no		yes
+vegalite/bar_params_bound.vl.json	vegalite	bar			yes		no
+vegalite/bar_percent_of_total.vl.json	vegalite	bar	calculate,joinaggregate		no		yes
+vegalite/bar_q_qpow.vl.json	vegalite	bar			no		yes
+vegalite/bar_qq_stack.vl.json	vegalite	bar			no		yes
+vegalite/bar_qq_stack_horizontal.vl.json	vegalite	bar			no		yes
+vegalite/bar_ranged_not_binned.vl.json	vegalite	bar			no		yes
+vegalite/bar_simple_binned_timeunit_special_chars.vl.json	vegalite	bar			no		yes
+vegalite/bar_simple_extent.vl.json	vegalite	bar,rule	extent	scale	no		yes
+vegalite/bar_size_default.vl.json	vegalite	bar			no		yes
+vegalite/bar_size_explicit_bad.vl.json	vegalite	bar			no		yes
+vegalite/bar_size_fit.vl.json	vegalite	bar			no		yes
+vegalite/bar_size_responsive.vl.json	vegalite	bar			no		yes
+vegalite/bar_size_step_small.vl.json	vegalite	bar			no		yes
+vegalite/bar_sort_by_count.vl.json	vegalite	bar			no		yes
+vegalite/bar_swap_axes.vl.json	vegalite	bar			no		yes
+vegalite/bar_swap_custom.vl.json	vegalite	bar			no		yes
+vegalite/bar_temporal_color_config_time_unit_band_position.vl.json	vegalite	bar			no		yes
+vegalite/bar_title.vl.json	vegalite	bar			no		yes
+vegalite/bar_title_start.vl.json	vegalite	bar			no		yes
+vegalite/bar_tooltip.vl.json	vegalite	bar			no		yes
+vegalite/bar_tooltip_aggregate.vl.json	vegalite	tick			no		yes
+vegalite/bar_tooltip_groupby.vl.json	vegalite	tick			no		yes
+vegalite/bar_tooltip_multi.vl.json	vegalite	bar			no		yes
+vegalite/bar_tooltip_title.vl.json	vegalite	bar			no		yes
+vegalite/bar_x_offset_without_x.vl.json	vegalite	bar			no		yes
+vegalite/bar_yearmonth.vl.json	vegalite	bar			no		yes
+vegalite/bar_yearmonth_center_band.vl.json	vegalite	bar			no		yes
+vegalite/bar_yearmonth_custom_format.vl.json	vegalite	bar			no		yes
+vegalite/bar_yearmonthdate_minBandSize.vl.json	vegalite	bar			no		yes
+vegalite/boxplot_1D_horizontal.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_1D_horizontal_custom_mark.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_1D_horizontal_explicit.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_1D_invalid.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_1D_vertical.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_2D_horizontal.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_2D_horizontal_color_size.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_2D_vertical.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_groupped.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_minmax_2D_horizontal.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_minmax_2D_horizontal_custom_midtick_color.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_minmax_2D_vertical.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_preaggregated.vl.json	vegalite	bar,point,rule,tick	flatten		no		yes
+vegalite/boxplot_tooltip_aggregate.vl.json	vegalite	boxplot			no		yes
+vegalite/boxplot_tooltip_not_aggregate.vl.json	vegalite	boxplot			no		yes
+vegalite/brush_table.vl.json	vegalite	point,text	filter,window		yes		no
+vegalite/circle.vl.json	vegalite	circle			no		yes
+vegalite/circle_binned.vl.json	vegalite	circle			no		yes
+vegalite/circle_binned_maxbins_2.vl.json	vegalite	circle			no		yes
+vegalite/circle_binned_maxbins_20.vl.json	vegalite	circle			no		yes
+vegalite/circle_binned_maxbins_5.vl.json	vegalite	circle			no		yes
+vegalite/circle_bubble_health_income.vl.json	vegalite	circle			yes		no
+vegalite/circle_custom_tick_labels.vl.json	vegalite	circle			no		yes
+vegalite/circle_flatten.vl.json	vegalite	circle	flatten		no		yes
+vegalite/circle_github_punchcard.vl.json	vegalite	circle			no		yes
+vegalite/circle_labelangle_orient_signal.vl.json	vegalite	circle			yes		no
+vegalite/circle_natural_disasters.vl.json	vegalite	circle	filter		no		yes
+vegalite/circle_opacity.vl.json	vegalite	circle			no		yes
+vegalite/circle_scale_quantile.vl.json	vegalite	circle			no		yes
+vegalite/circle_scale_quantize.vl.json	vegalite	circle			no		yes
+vegalite/circle_scale_threshold.vl.json	vegalite	circle			no		yes
+vegalite/circle_wilkinson_dotplot.vl.json	vegalite	circle	window		no		yes
+vegalite/circle_wilkinson_dotplot_stacked.vl.json	vegalite	circle	window		no		yes
+vegalite/concat_bar_layer_circle.vl.json	vegalite	bar,circle	filter		yes		no
+vegalite/concat_bar_scales_discretize.vl.json	vegalite	circle			no		yes
+vegalite/concat_bar_scales_discretize_2_cols.vl.json	vegalite	circle			no		yes
+vegalite/concat_hover.vl.json	vegalite	point			yes		no
+vegalite/concat_hover_filter.vl.json	vegalite	point	filter		yes		no
+vegalite/concat_layer_voyager_result.vl.json	vegalite	circle,point,rule,text	filter		no		yes
+vegalite/concat_marginal_histograms.vl.json	vegalite	bar,rect			no		yes
+vegalite/concat_population_pyramid.vl.json	vegalite	bar,text	calculate,filter		no		yes
+vegalite/concat_weather.vl.json	vegalite	bar,point	filter		no		yes
+vegalite/config_numberFormatType_test.vl.json	vegalite	point			no		yes
+vegalite/config_numberFormatType_tooltip.vl.json	vegalite	bar			no		yes
+vegalite/connected_scatterplot.vl.json	vegalite	line			no		yes
+vegalite/dynamic_color_legend.vl.json	vegalite	bar,point	filter		yes		no
+vegalite/embedded_csv.vl.json	vegalite	point			no		yes
+vegalite/errorband_2d_horizontal_color_encoding.vl.json	vegalite	errorband			no		yes
+vegalite/errorband_2d_vertical_borders.vl.json	vegalite	errorband			no		yes
+vegalite/errorband_tooltip.vl.json	vegalite	errorband			no		yes
+vegalite/errorbar_2d_vertical_ticks.vl.json	vegalite	errorbar			no		yes
+vegalite/errorbar_aggregate.vl.json	vegalite	point,rule,tick	filter		no		yes
+vegalite/errorbar_horizontal_aggregate.vl.json	vegalite	point,rule,tick	filter		no		yes
+vegalite/errorbar_tooltip.vl.json	vegalite	errorbar			no		yes
+vegalite/facet_bullet.vl.json	vegalite	bar,tick			no		yes
+vegalite/facet_column_facet_column_point_future.vl.json	vegalite	point			no		yes
+vegalite/facet_column_facet_row_point_future.vl.json	vegalite	point			no		yes
+vegalite/facet_cross_independent_scale.vl.json	vegalite	rect			no		yes
+vegalite/facet_custom.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/facet_custom_header.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/facet_grid_bar.vl.json	vegalite	bar			no		yes
+vegalite/facet_independent_scale.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/facet_independent_scale_layer_broken.vl.json	vegalite	line,point	calculate,filter		no		yes
+vegalite/facet_row_facet_row_point_future.vl.json	vegalite	point			no		yes
+vegalite/geo_choropleth.vl.json	vegalite	geoshape	from		no		yes
+vegalite/geo_circle.vl.json	vegalite	circle	calculate	substring	no		yes
+vegalite/geo_constant_value.vl.json	vegalite	square			no		yes
+vegalite/geo_custom_projection.vl.json	vegalite	circle,geoshape			no		yes
+vegalite/geo_graticule.vl.json	vegalite	geoshape			no		yes
+vegalite/geo_graticule_object.vl.json	vegalite	geoshape			no		yes
+vegalite/geo_layer.vl.json	vegalite	circle,geoshape			no		yes
+vegalite/geo_layer_line_london.vl.json	vegalite	geoshape,text	calculate	indexof,substring	no		yes
+vegalite/geo_line.vl.json	vegalite	circle,geoshape,line	from		no		yes
+vegalite/geo_params_projections.vl.json	vegalite	geoshape			yes		no
+vegalite/geo_point.vl.json	vegalite	circle			no		yes
+vegalite/geo_repeat.vl.json	vegalite	geoshape	lookup		no		yes
+vegalite/geo_rule.vl.json	vegalite	circle,geoshape,rule	filter,lookup		no		yes
+vegalite/geo_sphere.vl.json	vegalite	geoshape			no		yes
+vegalite/geo_text.vl.json	vegalite	circle,geoshape,text			no		yes
+vegalite/geo_trellis.vl.json	vegalite	geoshape	from		no		yes
+vegalite/hconcat_weather.vl.json	vegalite	bar,point	filter		no		yes
+vegalite/histogram.vl.json	vegalite	bar			no		yes
+vegalite/histogram_bin_change.vl.json	vegalite	bar			no		yes
+vegalite/histogram_bin_spacing.vl.json	vegalite	bar			no		yes
+vegalite/histogram_bin_spacing_reverse.vl.json	vegalite	bar			no		yes
+vegalite/histogram_bin_transform.vl.json	vegalite	bar	bin		no		yes
+vegalite/histogram_invalid_null.vl.json	vegalite	bar			no		yes
+vegalite/histogram_log.vl.json	vegalite	bar	bin,calculate	log,pow	no		yes
+vegalite/histogram_no_spacing.vl.json	vegalite	bar			no		yes
+vegalite/histogram_nonlinear.vl.json	vegalite	bar		format	no		yes
+vegalite/histogram_ordinal.vl.json	vegalite	bar			no		yes
+vegalite/histogram_ordinal_sort.vl.json	vegalite	bar			no		yes
+vegalite/histogram_rel_freq.vl.json	vegalite	bar	aggregate,bin,calculate,joinaggregate		no		yes
+vegalite/histogram_reverse.vl.json	vegalite	bar			no		yes
+vegalite/interactive_1d_geo_brush.vl.json	vegalite	circle,geoshape	filter		yes		no
+vegalite/interactive_airport_crossfilter.vl.json	vegalite	bar,circle,geoshape	aggregate,filter,from,lookup	data,isValid	yes		no
+vegalite/interactive_area_brush.vl.json	vegalite	area	filter		yes		no
+vegalite/interactive_bar_select_highlight.vl.json	vegalite	bar			yes		no
+vegalite/interactive_bin_extent.vl.json	vegalite	bar	calculate	hours,minutes	yes		no
+vegalite/interactive_bin_extent_bottom.vl.json	vegalite	bar	calculate	hours,minutes	yes		no
+vegalite/interactive_brush.vl.json	vegalite	point			yes		no
+vegalite/interactive_concat_layer.vl.json	vegalite	bar,point,rect	filter		yes		no
+vegalite/interactive_crossfilter.vl.json	vegalite	bar	calculate,filter	hours	yes		no
+vegalite/interactive_dashboard_europe_pop.vl.json	vegalite	bar,point			yes		no
+vegalite/interactive_geo_earthquakes.vl.json	vegalite	circle,geoshape	calculate,filter	pow	yes		no
+vegalite/interactive_global_development.vl.json	vegalite	circle,line,text	filter,lookup		yes		no
+vegalite/interactive_histogram_full_height_hover.vl.json	vegalite	bar			yes		no
+vegalite/interactive_index_chart.vl.json	vegalite	line,point,rule,text	calculate,filter,lookup		yes		no
+vegalite/interactive_layered_crossfilter.vl.json	vegalite	bar	calculate,filter	hours	yes		no
+vegalite/interactive_layered_crossfilter_discrete.vl.json	vegalite	bar	calculate,filter	hours	yes		no
+vegalite/interactive_legend.vl.json	vegalite	area			yes		no
+vegalite/interactive_legend_dblclick.vl.json	vegalite	area			yes		no
+vegalite/interactive_line_brush_cursor.vl.json	vegalite	line	filter		yes		no
+vegalite/interactive_line_hover.vl.json	vegalite	circle,line,text	filter		yes		no
+vegalite/interactive_line_point_hover.vl.json	vegalite	circle,line			yes		no
+vegalite/interactive_multi_line_label.vl.json	vegalite	line,point,rule,text	filter		yes		no
+vegalite/interactive_multi_line_pivot_tooltip.vl.json	vegalite	line,point,rule	filter,pivot		yes		no
+vegalite/interactive_multi_line_tooltip.vl.json	vegalite	line,rule			yes		no
+vegalite/interactive_overview_detail.vl.json	vegalite	area			yes		no
+vegalite/interactive_paintbrush.vl.json	vegalite	point			yes		no
+vegalite/interactive_paintbrush_color.vl.json	vegalite	circle			yes		no
+vegalite/interactive_paintbrush_color_nearest.vl.json	vegalite	circle			yes		no
+vegalite/interactive_paintbrush_interval.vl.json	vegalite	point			yes		no
+vegalite/interactive_paintbrush_simple_false.vl.json	vegalite	point			yes		no
+vegalite/interactive_paintbrush_simple_true.vl.json	vegalite	point			yes		no
+vegalite/interactive_panzoom_splom.vl.json	vegalite	point			yes		no
+vegalite/interactive_panzoom_vconcat_shared.vl.json	vegalite	point			yes		no
+vegalite/interactive_point_domainRaw_binding.vl.json	vegalite	circle			yes		no
+vegalite/interactive_point_init.vl.json	vegalite	circle	calculate	year	yes		no
+vegalite/interactive_query_widgets.vl.json	vegalite	circle	calculate,filter	year	yes		no
+vegalite/interactive_seattle_weather.vl.json	vegalite	bar,point	filter		yes		no
+vegalite/interactive_splom.vl.json	vegalite	point			yes		no
+vegalite/interactive_stocks_nearest_index.vl.json	vegalite	line,point,rule,text	filter		yes		no
+vegalite/isotype_bar_chart.vl.json	vegalite	point			no		yes
+vegalite/isotype_bar_chart_emoji.vl.json	vegalite	text	calculate,window		no		yes
+vegalite/isotype_grid.vl.json	vegalite	point	calculate	ceil	yes		no
+vegalite/joinaggregate_mean_difference.vl.json	vegalite	bar,rule	filter,joinaggregate		no		yes
+vegalite/joinaggregate_mean_difference_by_year.vl.json	vegalite	bar,tick	filter,joinaggregate,timeUnit		no		yes
+vegalite/joinaggregate_percent_of_total.vl.json	vegalite	bar	calculate,joinaggregate		no		yes
+vegalite/joinaggregate_residual_graph.vl.json	vegalite	point	calculate,filter,joinaggregate		no		yes
+vegalite/layer_arc_label.vl.json	vegalite	arc,text			no		yes
+vegalite/layer_bar_annotations.vl.json	vegalite	bar,rule,text	calculate,filter		no		yes
+vegalite/layer_bar_circle_grouped.vl.json	vegalite	bar,circle	calculate		no		yes
+vegalite/layer_bar_fruit.vl.json	vegalite	bar,text			no		yes
+vegalite/layer_bar_grouped_line_ungrouped.vl.json	vegalite	bar,line			no		yes
+vegalite/layer_bar_labels.vl.json	vegalite	bar,text			no		yes
+vegalite/layer_bar_labels_grey.vl.json	vegalite	bar,text			no		yes
+vegalite/layer_bar_labels_style.vl.json	vegalite	bar,text			no		yes
+vegalite/layer_bar_line.vl.json	vegalite	bar,line			no		yes
+vegalite/layer_bar_line_union.vl.json	vegalite	bar,line			no		yes
+vegalite/layer_bar_month.vl.json	vegalite	bar,rule			no		yes
+vegalite/layer_bar_tick_datum_grouped.vl.json	vegalite	bar,tick			no		yes
+vegalite/layer_boxplot_circle.vl.json	vegalite	boxplot,circle			no		yes
+vegalite/layer_candlestick.vl.json	vegalite	bar,rule			no		yes
+vegalite/layer_circle_independent_color.vl.json	vegalite	circle	filter		no		yes
+vegalite/layer_color_legend_left.vl.json	vegalite	line,point			no		yes
+vegalite/layer_cumulative_histogram.vl.json	vegalite	bar	aggregate,field,filter,sort		no		yes
+vegalite/layer_dual_axis.vl.json	vegalite	area,line	filter		no		yes
+vegalite/layer_falkensee.vl.json	vegalite	line,point,rect			no		yes
+vegalite/layer_histogram.vl.json	vegalite	bar	filter		no		yes
+vegalite/layer_histogram_global_mean.vl.json	vegalite	bar,rule			no		yes
+vegalite/layer_likert.vl.json	vegalite	circle,text,tick	filter		no		yes
+vegalite/layer_line_co2_concentration.vl.json	vegalite	line,text	calculate	floor,month,year	no		yes
+vegalite/layer_line_color_rule.vl.json	vegalite	line,rule			no		yes
+vegalite/layer_line_datum_rule.vl.json	vegalite	line,rule			no		yes
+vegalite/layer_line_datum_rule_datetime.vl.json	vegalite	line,rule			no		yes
+vegalite/layer_line_errorband_2d_horizontal_borders_strokedash.vl.json	vegalite	errorband,line			no		yes
+vegalite/layer_line_errorband_ci.vl.json	vegalite	errorband,line			no		yes
+vegalite/layer_line_errorband_pre_aggregated.vl.json	vegalite	errorband,line			no		yes
+vegalite/layer_line_mean_point_raw.vl.json	vegalite	line,point	filter		no		yes
+vegalite/layer_line_rolling_mean_point_raw.vl.json	vegalite	line,point	window		no		yes
+vegalite/layer_line_window.vl.json	vegalite	line	calculate,window	Crossfilter	no		yes
+vegalite/layer_overlay.vl.json	vegalite	line			no		yes
+vegalite/layer_point_errorbar_1d_horizontal.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_1d_vertical.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_2d_horizontal.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_2d_horizontal_ci.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_2d_horizontal_color_encoding.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_2d_horizontal_custom_ticks.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_2d_horizontal_iqr.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_2d_horizontal_stdev.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_2d_vertical.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_ci.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_pre_aggregated_asymmetric_error.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_pre_aggregated_symmetric_error.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_pre_aggregated_upper_lower.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_errorbar_stdev.vl.json	vegalite	errorbar,point			no		yes
+vegalite/layer_point_line_loess.vl.json	vegalite	line,point	loess		no		yes
+vegalite/layer_point_line_regression.vl.json	vegalite	line,point,text	calculate,params,regression	format	no		yes
+vegalite/layer_precipitation_mean.vl.json	vegalite	bar,rule			no		yes
+vegalite/layer_ranged_dot.vl.json	vegalite	line,point	filter		no		yes
+vegalite/layer_rect_extent.vl.json	vegalite	point,rect,rule			no		yes
+vegalite/layer_scatter_errorband_1D_stdev_global_mean.vl.json	vegalite	errorband,point,rule			no		yes
+vegalite/layer_scatter_errorband_1d_stdev.vl.json	vegalite	errorband,point			no		yes
+vegalite/layer_single_color.vl.json	vegalite	line			no		yes
+vegalite/layer_text_heatmap.vl.json	vegalite	rect,text	aggregate		no		yes
+vegalite/layer_text_heatmap_joinaggregate.vl.json	vegalite	rect,text	aggregate,calculate,joinaggregate		no		yes
+vegalite/layer_timeunit_rect.vl.json	vegalite	bar,rect			no		yes
+vegalite/line.vl.json	vegalite	line	filter		no		yes
+vegalite/line_bump.vl.json	vegalite	line			no		yes
+vegalite/line_calculate.vl.json	vegalite	line	calculate		no		yes
+vegalite/line_color.vl.json	vegalite	line			no		yes
+vegalite/line_color_binned.vl.json	vegalite	line			no		yes
+vegalite/line_color_halo.vl.json	vegalite	line	pivot		no		yes
+vegalite/line_color_label.vl.json	vegalite	circle,line,text	filter		no		yes
+vegalite/line_concat_facet.vl.json	vegalite	line			no		yes
+vegalite/line_conditional_axis.vl.json	vegalite	line	filter	timeFormat	no		yes
+vegalite/line_conditional_axis_config.vl.json	vegalite	line	filter	timeFormat	no		yes
+vegalite/line_dashed_part.vl.json	vegalite	line			no		yes
+vegalite/line_detail.vl.json	vegalite	line			no		yes
+vegalite/line_domainminmax.vl.json	vegalite	line	filter		no		yes
+vegalite/line_encoding_impute_keyvals.vl.json	vegalite	line			no		yes
+vegalite/line_encoding_impute_keyvals_sequence.vl.json	vegalite	line			no		yes
+vegalite/line_impute_frame.vl.json	vegalite	line			no		yes
+vegalite/line_impute_keyvals.vl.json	vegalite	line	keyvals		no		yes
+vegalite/line_impute_method.vl.json	vegalite	line			no		yes
+vegalite/line_impute_transform_frame.vl.json	vegalite	line	impute		no		yes
+vegalite/line_impute_transform_value.vl.json	vegalite	line	impute		no		yes
+vegalite/line_impute_value.vl.json	vegalite	line			no		yes
+vegalite/line_inside_domain_using_clip.vl.json	vegalite	line			no		yes
+vegalite/line_inside_domain_using_transform.vl.json	vegalite	line	filter		no		yes
+vegalite/line_max_year.vl.json	vegalite	line			no		yes
+vegalite/line_mean_month.vl.json	vegalite	line			no		yes
+vegalite/line_mean_year.vl.json	vegalite	line			no		yes
+vegalite/line_monotone.vl.json	vegalite	line	filter		no		yes
+vegalite/line_month.vl.json	vegalite	line			no		yes
+vegalite/line_month_center_band.vl.json	vegalite	line			no		yes
+vegalite/line_month_center_band_offset.vl.json	vegalite	bar			no		yes
+vegalite/line_narrow_2year_span.vl.json	vegalite	line	filter		no		yes
+vegalite/line_narrow_year_span.vl.json	vegalite	line	filter		no		yes
+vegalite/line_narrow_yearmonth_span.vl.json	vegalite	line	filter		no		yes
+vegalite/line_narrow_yearquarter_span.vl.json	vegalite	line	filter		no		yes
+vegalite/line_outside_domain.vl.json	vegalite	line			no		yes
+vegalite/line_overlay.vl.json	vegalite	line			no		yes
+vegalite/line_overlay_stroked.vl.json	vegalite	line			no		yes
+vegalite/line_params.vl.json	vegalite	line			yes		no
+vegalite/line_quarter_legend.vl.json	vegalite	line			no		yes
+vegalite/line_shape_overlay.vl.json	vegalite	line	filter		no		yes
+vegalite/line_skip_invalid.vl.json	vegalite	line			no		yes
+vegalite/line_skip_invalid_mid.vl.json	vegalite	line			no		yes
+vegalite/line_skip_invalid_mid_cap_square.vl.json	vegalite	line			no		yes
+vegalite/line_skip_invalid_mid_overlay.vl.json	vegalite	line			no		yes
+vegalite/line_slope.vl.json	vegalite	line			no		yes
+vegalite/line_sort_axis.vl.json	vegalite	line			no		yes
+vegalite/line_step.vl.json	vegalite	line	filter		no		yes
+vegalite/line_strokedash.vl.json	vegalite	line			no		yes
+vegalite/line_timestamp_domain.vl.json	vegalite	line			no		yes
+vegalite/line_timeunit_transform.vl.json	vegalite	line	field		no		yes
+vegalite/lookup.vl.json	vegalite	bar	lookup		no		yes
+vegalite/nested_concat_align.vl.json	vegalite	bar			no		yes
+vegalite/parallel_coordinate.vl.json	vegalite	line,rule,text,tick	calculate,filter,fold,joinaggregate,window	Length	no		yes
+vegalite/param_expr.vl.json	vegalite	point			yes		no
+vegalite/param_search_input.vl.json	vegalite	point		regexp,test	yes		no
+vegalite/point_1d.vl.json	vegalite	point			no		yes
+vegalite/point_1d_array.vl.json	vegalite	point			no		yes
+vegalite/point_2d.vl.json	vegalite	point			no		yes
+vegalite/point_2d_aggregate.vl.json	vegalite	point			no		yes
+vegalite/point_2d_array.vl.json	vegalite	point			no		yes
+vegalite/point_2d_array_named.vl.json	vegalite	point			no		yes
+vegalite/point_2d_config_no_zero.vl.json	vegalite	point			no		yes
+vegalite/point_2d_tooltip.vl.json	vegalite	point			no		yes
+vegalite/point_2d_tooltip_data.vl.json	vegalite	point			no		yes
+vegalite/point_aggregate_detail.vl.json	vegalite	point			no		yes
+vegalite/point_angle_windvector.vl.json	vegalite	point			no		yes
+vegalite/point_background.vl.json	vegalite	point			no		yes
+vegalite/point_binned_color.vl.json	vegalite	point			no		yes
+vegalite/point_binned_opacity.vl.json	vegalite	point			no		yes
+vegalite/point_binned_size.vl.json	vegalite	point			no		yes
+vegalite/point_bubble.vl.json	vegalite	point			no		yes
+vegalite/point_color.vl.json	vegalite	point			no		yes
+vegalite/point_color_custom.vl.json	vegalite	point			no		yes
+vegalite/point_color_ordinal.vl.json	vegalite	point			no		yes
+vegalite/point_color_quantitative.vl.json	vegalite	point			no		yes
+vegalite/point_color_shape_constant.vl.json	vegalite	point			no		yes
+vegalite/point_color_with_shape.vl.json	vegalite	point			no		yes
+vegalite/point_colorramp_size.vl.json	vegalite	point			no		yes
+vegalite/point_diverging_color.vl.json	vegalite	point			no		yes
+vegalite/point_dot_timeunit_color.vl.json	vegalite	point			no		yes
+vegalite/point_filled.vl.json	vegalite	point			no		yes
+vegalite/point_grouped.vl.json	vegalite	point			no		yes
+vegalite/point_href.vl.json	vegalite	point	calculate		no		yes
+vegalite/point_invalid_color.vl.json	vegalite	point			no		yes
+vegalite/point_log.vl.json	vegalite	point			no		yes
+vegalite/point_no_axis_domain_grid.vl.json	vegalite	point			no		yes
+vegalite/point_offset_random.vl.json	vegalite	point	calculate	random	no		yes
+vegalite/point_ordinal_bin_offset_random.vl.json	vegalite	point	calculate	random	no		yes
+vegalite/point_ordinal_color.vl.json	vegalite	point			no		yes
+vegalite/point_overlap.vl.json	vegalite	point			no		yes
+vegalite/point_params.vl.json	vegalite	point			yes		no
+vegalite/point_quantile_quantile.vl.json	vegalite	point	calculate,step	quantileNormal,quantileUniform	no		yes
+vegalite/point_scale_range_field.vl.json	vegalite	circle			no		yes
+vegalite/point_shape_custom.vl.json	vegalite	point			no		yes
+vegalite/point_tooltip.vl.json	vegalite	point			no		yes
+vegalite/rect_binned_heatmap.vl.json	vegalite	rect	filter		no		yes
+vegalite/rect_heatmap.vl.json	vegalite	rect			no		yes
+vegalite/rect_heatmap_weather.vl.json	vegalite	rect			no		yes
+vegalite/rect_heatmap_weather_temporal_center_band.vl.json	vegalite	rect			no		yes
+vegalite/rect_heatmap_weather_temporal_center_band_config.vl.json	vegalite	rect			no		yes
+vegalite/rect_lasagna.vl.json	vegalite	rect	filter		no		yes
+vegalite/rect_mosaic_labelled.vl.json	vegalite	rect,text	aggregate,calculate,joinaggregate,sort,stack		no		yes
+vegalite/rect_mosaic_labelled_with_offset.vl.json	vegalite	rect,text	aggregate,calculate,frame,offset,stack,window		no		yes
+vegalite/rect_mosaic_simple.vl.json	vegalite	rect	aggregate,joinaggregate,offset,stack		no		yes
+vegalite/rect_params.vl.json	vegalite	rect			yes		no
+vegalite/repeat_child_layer.vl.json	vegalite	line			no		yes
+vegalite/repeat_histogram.vl.json	vegalite	bar			no		yes
+vegalite/repeat_histogram_autosize.vl.json	vegalite	bar			no		yes
+vegalite/repeat_histogram_flights.vl.json	vegalite	bar	calculate	hours	no		yes
+vegalite/repeat_independent_colors.vl.json	vegalite	point			no		yes
+vegalite/repeat_layer.vl.json	vegalite	line			no		yes
+vegalite/repeat_line_weather.vl.json	vegalite	line			no		yes
+vegalite/repeat_splom.vl.json	vegalite	point			no		yes
+vegalite/repeat_splom_cars.vl.json	vegalite	point			no		yes
+vegalite/rule_color_mean.vl.json	vegalite	rule			no		yes
+vegalite/rule_extent.vl.json	vegalite	rule			no		yes
+vegalite/rule_params.vl.json	vegalite	rule			yes		no
+vegalite/sample_scatterplot.vl.json	vegalite	point	sample		no		yes
+vegalite/scatter_image.vl.json	vegalite	image			no		yes
+vegalite/selection_bind_cylyr.vl.json	vegalite	circle	calculate	year	yes		no
+vegalite/selection_bind_origin.vl.json	vegalite	point			yes		no
+vegalite/selection_brush_timeunit.vl.json	vegalite	point	filter		yes		no
+vegalite/selection_clear_brush.vl.json	vegalite	point			yes		no
+vegalite/selection_composition_and.vl.json	vegalite	rect			yes		no
+vegalite/selection_composition_or.vl.json	vegalite	rect			yes		no
+vegalite/selection_concat.vl.json	vegalite	point			yes		no
+vegalite/selection_filter.vl.json	vegalite	point	filter		yes		no
+vegalite/selection_filter_composition.vl.json	vegalite	point	filter		yes		no
+vegalite/selection_filter_false.vl.json	vegalite	point	filter		yes		no
+vegalite/selection_filter_true.vl.json	vegalite	point	filter		yes		no
+vegalite/selection_heatmap.vl.json	vegalite	rect			yes		no
+vegalite/selection_insert.vl.json	vegalite	circle			yes		no
+vegalite/selection_interval_mark_style.vl.json	vegalite	rect			yes		no
+vegalite/selection_layer_bar_month.vl.json	vegalite	bar,rule	filter		yes		no
+vegalite/selection_multi_condition.vl.json	vegalite	point			yes		no
+vegalite/selection_project_binned_interval.vl.json	vegalite	bar	filter		yes		no
+vegalite/selection_project_interval.vl.json	vegalite	rect			yes		no
+vegalite/selection_project_interval_x.vl.json	vegalite	rect			yes		no
+vegalite/selection_project_interval_x_y.vl.json	vegalite	rect			yes		no
+vegalite/selection_project_interval_y.vl.json	vegalite	rect			yes		no
+vegalite/selection_project_multi.vl.json	vegalite	point			yes		no
+vegalite/selection_project_multi_cylinders.vl.json	vegalite	point			yes		no
+vegalite/selection_project_multi_cylinders_origin.vl.json	vegalite	point			yes		no
+vegalite/selection_project_multi_origin.vl.json	vegalite	point			yes		no
+vegalite/selection_project_single.vl.json	vegalite	point			yes		no
+vegalite/selection_project_single_cylinders.vl.json	vegalite	point			yes		no
+vegalite/selection_project_single_cylinders_origin.vl.json	vegalite	point			yes		no
+vegalite/selection_project_single_origin.vl.json	vegalite	point			yes		no
+vegalite/selection_resolution_global.vl.json	vegalite	point			yes		no
+vegalite/selection_resolution_intersect.vl.json	vegalite	point			yes		no
+vegalite/selection_resolution_union.vl.json	vegalite	point			yes		no
+vegalite/selection_toggle_altKey.vl.json	vegalite	circle			yes		no
+vegalite/selection_toggle_altKey_shiftKey.vl.json	vegalite	circle			yes		no
+vegalite/selection_toggle_shiftKey.vl.json	vegalite	circle			yes		no
+vegalite/selection_translate_brush_drag.vl.json	vegalite	circle			yes		no
+vegalite/selection_translate_brush_shift-drag.vl.json	vegalite	circle			yes		no
+vegalite/selection_translate_scatterplot_drag.vl.json	vegalite	circle			yes		no
+vegalite/selection_translate_scatterplot_shift-drag.vl.json	vegalite	circle			yes		no
+vegalite/selection_type_interval.vl.json	vegalite	rect			yes		no
+vegalite/selection_type_interval_invert.vl.json	vegalite	rect			yes		no
+vegalite/selection_type_point.vl.json	vegalite	rect			yes		no
+vegalite/selection_type_point_zorder.vl.json	vegalite	circle			yes		no
+vegalite/selection_type_single_dblclick.vl.json	vegalite	rect			yes		no
+vegalite/selection_type_single_pointerover.vl.json	vegalite	rect			yes		no
+vegalite/selection_zoom_brush_shift-wheel.vl.json	vegalite	circle			yes		no
+vegalite/selection_zoom_brush_wheel.vl.json	vegalite	circle			yes		no
+vegalite/selection_zoom_scatterplot_shift-wheel.vl.json	vegalite	circle			yes		no
+vegalite/selection_zoom_scatterplot_wheel.vl.json	vegalite	circle			yes		no
+vegalite/sequence_line.vl.json	vegalite	line	calculate	sin	no		yes
+vegalite/sequence_line_fold.vl.json	vegalite	line	calculate,fold	cos,sin	no		yes
+vegalite/square.vl.json	vegalite	square			no		yes
+vegalite/stacked_area.vl.json	vegalite	area			no		yes
+vegalite/stacked_area_normalize.vl.json	vegalite	area			no		yes
+vegalite/stacked_area_ordinal.vl.json	vegalite	area			no		yes
+vegalite/stacked_area_overlay.vl.json	vegalite	area	calculate,filter		no		yes
+vegalite/stacked_area_stream.vl.json	vegalite	area			no		yes
+vegalite/stacked_area_without_agg.vl.json	vegalite	area			no		yes
+vegalite/stacked_bar_1d.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_count.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_count_corner_radius_config.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_count_corner_radius_mark.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_count_corner_radius_mark_x.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_count_corner_radius_stroke.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_h.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_h_normalized_labeled.vl.json	vegalite	bar,text	calculate,filter		no		yes
+vegalite/stacked_bar_h_order.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_h_order_custom.vl.json	vegalite	bar	calculate	if	no		yes
+vegalite/stacked_bar_normalize.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/stacked_bar_population.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/stacked_bar_population_transform.vl.json	vegalite	bar	calculate,filter,sort		no		yes
+vegalite/stacked_bar_size.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_sum_opacity.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/stacked_bar_unaggregate.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_v.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_v_ascending.vl.json	vegalite	bar			no		yes
+vegalite/stacked_bar_weather.vl.json	vegalite	bar			no		yes
+vegalite/test_aggregate_nested.vl.json	vegalite	bar			no		yes
+vegalite/test_field_with_spaces.vl.json	vegalite	point			no		yes
+vegalite/test_single_point_color.vl.json	vegalite	point			no		yes
+vegalite/test_subobject.vl.json	vegalite	point			no		yes
+vegalite/test_subobject_missing.vl.json	vegalite	line	filter		no		yes
+vegalite/test_subobject_nested.vl.json	vegalite	point			no		yes
+vegalite/text_format.vl.json	vegalite	text			no		yes
+vegalite/text_params.vl.json	vegalite	point,text			yes		no
+vegalite/text_scatterplot_colored.vl.json	vegalite	text	calculate		no		yes
+vegalite/text_tooltip_image.vl.json	vegalite	text			no		yes
+vegalite/tick_dot.vl.json	vegalite	tick			no		yes
+vegalite/tick_dot_thickness.vl.json	vegalite	tick			no		yes
+vegalite/tick_grouped.vl.json	vegalite	tick			no		yes
+vegalite/tick_sort.vl.json	vegalite	tick			no		yes
+vegalite/tick_strip.vl.json	vegalite	tick			no		yes
+vegalite/tick_strip_tick_band.vl.json	vegalite	tick			no		yes
+vegalite/time_custom_step.vl.json	vegalite	bar			no		yes
+vegalite/time_output_utc_scale.vl.json	vegalite	line			no		yes
+vegalite/time_output_utc_timeunit.vl.json	vegalite	line			no		yes
+vegalite/time_parse_binnedutc.vl.json	vegalite	bar			no		yes
+vegalite/time_parse_local.vl.json	vegalite	point			no		yes
+vegalite/time_parse_utc.vl.json	vegalite	point			no		yes
+vegalite/time_parse_utc_format.vl.json	vegalite	point			no		yes
+vegalite/trail_color.vl.json	vegalite	trail			no		yes
+vegalite/trail_comet.vl.json	vegalite	trail	calculate,fold,pivot	toNumber	no		yes
+vegalite/trellis_anscombe.vl.json	vegalite	circle			no		yes
+vegalite/trellis_area.vl.json	vegalite	area	filter		no		yes
+vegalite/trellis_area_seattle.vl.json	vegalite	area	calculate	hours,timeFormat	no		yes
+vegalite/trellis_area_sort_array.vl.json	vegalite	area	filter		no		yes
+vegalite/trellis_bar.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/trellis_bar_histogram.vl.json	vegalite	bar			no		yes
+vegalite/trellis_bar_histogram_label_rotated.vl.json	vegalite	bar			no		yes
+vegalite/trellis_bar_no_header.vl.json	vegalite	bar	calculate,filter		no		yes
+vegalite/trellis_barley.vl.json	vegalite	point			no		yes
+vegalite/trellis_barley_independent.vl.json	vegalite	point			no		yes
+vegalite/trellis_barley_layer_median.vl.json	vegalite	point,rule			no		yes
+vegalite/trellis_column_year.vl.json	vegalite	line			no		yes
+vegalite/trellis_cross_sort.vl.json	vegalite	point,rule	joinaggregate		no		yes
+vegalite/trellis_cross_sort_array.vl.json	vegalite	point,rule	joinaggregate		no		yes
+vegalite/trellis_line_quarter.vl.json	vegalite	point			no		yes
+vegalite/trellis_row_column.vl.json	vegalite	point			no		yes
+vegalite/trellis_scatter.vl.json	vegalite	point			no		yes
+vegalite/trellis_scatter_binned_row.vl.json	vegalite	point			no		yes
+vegalite/trellis_scatter_small.vl.json	vegalite	point			no		yes
+vegalite/trellis_selections.vl.json	vegalite	circle			yes		no
+vegalite/trellis_stacked_bar.vl.json	vegalite	bar			no		yes
+vegalite/vconcat_flatten.vl.json	vegalite	circle,line	aggregate,filter,flatten		yes		no
+vegalite/vconcat_weather.vl.json	vegalite	bar,point	filter		no		yes
+vegalite/waterfall_chart.vl.json	vegalite	bar,rule,text	calculate,window		no		yes
+vegalite/wheat_wages.vl.json	vegalite	area,bar,line,rect,rule,text	calculate		no		yes
+vegalite/window_cumulative_running_average.vl.json	vegalite	circle,line	filter,timeUnit,window		no		yes
+vegalite/window_rank.vl.json	vegalite	line	sort		no		yes
+vegalite/window_top_k.vl.json	vegalite	bar	filter,sort		no		yes
+vegalite/window_top_k_others.vl.json	vegalite	bar	aggregate,calculate,window		no		yes
