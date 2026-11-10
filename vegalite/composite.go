@@ -299,7 +299,17 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 			cont: channelWith(def, lower, title), cont + "2": map[string]any{"field": upper},
 		})))
 	} else {
-		band := map[string]any{"type": "area", "style": "errorband-band", "opacity": 0.3}
+		// A band with no other position is a rect across the view, and its
+		// borders are rules.
+		other := "x"
+		if cont == "x" {
+			other = "y"
+		}
+		bandType, borderType := "area", "line"
+		if _, ok := others[other]; !ok {
+			bandType, borderType = "rect", "rule"
+		}
+		band := map[string]any{"type": bandType, "style": "errorband-band", "opacity": 0.3}
 		if color != nil {
 			band["color"] = color
 		}
@@ -308,7 +318,7 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 		})))
 		if b, ok := props["borders"]; ok && b != false {
 			for _, f := range []string{lower, upper} {
-				line := map[string]any{"type": "line", "style": "errorband-borders"}
+				line := map[string]any{"type": borderType, "style": "errorband-borders"}
 				if color != nil {
 					line["color"] = color
 				}

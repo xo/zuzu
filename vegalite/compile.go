@@ -257,6 +257,12 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			// dataset of its own.
 			src.open = false
 		}
+		for _, l := range s.Layer {
+			if l.Data != nil {
+				// Layers that read the same url share one source.
+				c.shareSources = true
+			}
+		}
 		independent := map[string]bool{}
 		if len(s.Resolve) > 0 {
 			var r struct {
@@ -307,7 +313,7 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 			}
 			return c.view(expanded, v, src, path, repeat)
 		}
-		if layered := overlay(s); layered != nil {
+		if layered := overlay(s, c.cfg); layered != nil {
 			return c.view(layered, v, src, path, repeat)
 		}
 		v.size(s)
@@ -637,18 +643,19 @@ func str(v vega.Value) string {
 // overlay turns an area or a line whose mark asks for a line or points over
 // it into a layer of the marks, as Vega-Lite does. It returns nil for any
 // other spec.
-func overlay(s *Spec) *Spec {
+func overlay(s *Spec, cfg *config) *Spec {
 	if s.overlaid || s.Mark.Type != "area" && s.Mark.Type != "line" {
 		return nil
 	}
 	want := func(k string) bool {
-		raw, ok := s.Mark.Props[k]
-		if !ok {
-			return false
-		}
 		var v any
-		if json.Unmarshal(raw, &v) != nil {
-			return false
+		if raw, ok := s.Mark.Props[k]; ok {
+			if json.Unmarshal(raw, &v) != nil {
+				return false
+			}
+		} else if cfg != nil {
+			// The config of the mark can ask for the overlay.
+			v = cfg.marks[s.Mark.Type][k]
 		}
 		switch x := v.(type) {
 		case bool:
@@ -820,9 +827,22 @@ func (c *compiler) mergeSiblingAggregates(out *vega.Spec, read map[string]bool) 
 		// the name of the first child, and the children derive from it.
 		first := kids[0]
 		name := c.data[first].Name
-		renamed := fmt.Sprintf("data_%d", c.nData)
-		c.nData++
-		c.renameAll(out, read, map[string]string{name: renamed})
+		// The merged dataset takes the number of the first child, which
+		// takes the next number, and the datasets after it move up one.
+		if n, ok := dataNumber(name); ok {
+			names := map[string]string{}
+			for _, d := range c.data {
+				if m, ok := dataNumber(d.Name); ok && m >= n {
+					names[d.Name] = fmt.Sprintf("data_%d", m+1)
+				}
+			}
+			c.nData++
+			c.renameAll(out, read, names)
+		} else {
+			renamed := fmt.Sprintf("data_%d", c.nData)
+			c.nData++
+			c.renameAll(out, read, map[string]string{name: renamed})
+		}
 		mid := vega.Data{Name: name, Source: vega.List(parent.Name), Transform: []vega.Transform{agg}}
 		for _, k := range kids {
 			c.data[k].Source = vega.List(name)

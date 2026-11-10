@@ -249,15 +249,21 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		child.scalePrefix, child.prefixAll = np, true
 	}
 	child.facetFields = extra
-	indep := map[string]bool{}
+	indep, axisIndep := map[string]bool{}, map[string]bool{}
 	if len(s.Resolve) > 0 {
 		var r struct {
 			Scale map[string]string `json:"scale"`
+			Axis  map[string]string `json:"axis"`
 		}
 		if json.Unmarshal(s.Resolve, &r) == nil {
 			for ch, mode := range r.Scale {
 				if mode == "independent" && (ch == "x" || ch == "y") {
 					indep[ch] = true
+				}
+			}
+			for ch, mode := range r.Axis {
+				if mode == "independent" && (ch == "x" || ch == "y") {
+					axisIndep[ch] = true
 				}
 			}
 		}
@@ -310,16 +316,24 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		facetData, main, cellData = c.name(src), "", ""
 		cellDatasets, child.marks = c.mergeCell(fname, cellDatasets, child.marks)
 	}
+	var childNames []string
+	for _, d := range c.data[before:] {
+		childNames = append(childNames, d.Name)
+	}
 	for _, f := range []*facetDef{row, column, wrap} {
 		if f != nil && f.sortField != "" && f.sortList == nil && cellDatasets == nil {
-			if fd, d, ok := c.splitFacet(main, extra, sizes, fname); ok {
+			if fd, d, inside, ok := c.splitFacet(main, extra, sizes, fname); ok {
 				facetData, cellData, cellDatasets = fd, d.Name, []vega.Data{d}
+				if !inside {
+					main = c.shiftNames(childNames, 2, child.marks, sizes.Scales)[main]
+				}
 			}
 		}
 	}
 	if sorted && cellDatasets == nil && main != "" && src != nil && main != c.name(src) {
 		// With no aggregate to split at, each cell makes the datasets of
 		// the child from its own rows.
+		c.shiftNames(childNames, 2, child.marks, sizes.Scales)
 		var names map[string]string
 		cellDatasets, names = c.copyToCell(before, c.name(src), fname, extra)
 		for i := range child.marks {
@@ -358,6 +372,13 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		default:
 			xAxes = append(xAxes, a)
 		}
+	}
+	// An independent axis goes in each cell, after the grids.
+	if axisIndep["x"] {
+		cellAxes, xAxes = append(cellAxes, xAxes...), nil
+	}
+	if axisIndep["y"] {
+		cellAxes, yAxes = append(cellAxes, yAxes...), nil
 	}
 	// A list that sorts a facet gives each row the index of its value.
 	for _, f := range []*facetDef{row, column, wrap} {
@@ -633,7 +654,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 // on, without the fields of the facet, from its own rows. The datasets of
 // the top level keep the aggregate for the domains of the scales. It
 // returns the dataset that the facet reads and the dataset of a cell.
-func (c *compiler) splitFacet(main string, fields []*channelDef, sizes *vega.Spec, fname string) (string, vega.Data, bool) {
+func (c *compiler) splitFacet(main string, fields []*channelDef, sizes *vega.Spec, fname string) (string, vega.Data, bool, bool) {
 	facetFields := map[string]bool{}
 	for _, f := range fields {
 		facetFields[f.out] = true
@@ -671,7 +692,7 @@ func (c *compiler) splitFacet(main string, fields []*channelDef, sizes *vega.Spe
 		}
 	}
 	if at < 0 {
-		return "", vega.Data{}, false
+		return "", vega.Data{}, false, false
 	}
 	var rest []vega.Transform
 	rest = append(rest, c.data[chain[at]].Transform[from:]...)
@@ -693,7 +714,7 @@ func (c *compiler) splitFacet(main string, fields []*channelDef, sizes *vega.Spe
 	facetData := c.data[chain[at]].Name
 	if from == 0 {
 		if at == 0 {
-			return "", vega.Data{}, false
+			return "", vega.Data{}, false, false
 		}
 		// The aggregate starts its dataset, so the facet reads the
 		// dataset before it.
@@ -724,7 +745,41 @@ func (c *compiler) splitFacet(main string, fields []*channelDef, sizes *vega.Spe
 		}
 		c.data = slices.Insert(c.data, parent+1, split)
 	}
-	return facetData, cell, true
+	return facetData, cell, from > 0, true
+}
+
+// shiftNames gives the datasets of a list that the compiler numbers the
+// numbers some places higher, as vega-lite.js numbers the datasets of the
+// child of a facet after those of the facet. It renames them in the marks
+// and the scales, and returns the new name of each name.
+func (c *compiler) shiftNames(list []string, by int, marks []vega.Mark, scales []vega.Scale) map[string]string {
+	names := map[string]string{}
+	for _, n := range list {
+		names[n] = n
+		if m, ok := dataNumber(n); ok {
+			names[n] = fmt.Sprintf("data_%d", m+by)
+		}
+	}
+	c.nData += by
+	rename := func(n string) string {
+		if r, ok := names[n]; ok {
+			return r
+		}
+		return n
+	}
+	for i := range c.data {
+		c.data[i].Name = rename(c.data[i].Name)
+		for k := range c.data[i].Source.List {
+			c.data[i].Source.List[k] = rename(c.data[i].Source.List[k])
+		}
+	}
+	for i := range marks {
+		renameMarkData(&marks[i], rename)
+	}
+	for i := range scales {
+		renameDomain(scales[i].Domain.Data, rename)
+	}
+	return names
 }
 
 // facetKey writes the key of a value of a facet, which tells the values
