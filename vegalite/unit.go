@@ -185,8 +185,13 @@ func (u *unit) dimension() string {
 // does by default when its measure is quantitative.
 func (u *unit) stacking(s *Spec) {
 	measure := u.measure()
-	if _, ok := u.ch["theta"]; ok {
+	if u.mark == "arc" || u.ch["theta"] != nil {
+		// An arc stacks its angle, or its radius when the angle is
+		// discrete.
 		measure = "theta"
+		if t := u.ch["theta"]; (t == nil || t.typ != quantitative) && u.ch["radius"] != nil && u.ch["radius"].typ == quantitative {
+			measure = "radius"
+		}
 	}
 	m := u.ch[measure]
 	explicit := m != nil && m.def != nil && !m.def.Stack.IsZero()
@@ -207,7 +212,7 @@ func (u *unit) stacking(s *Spec) {
 	if m == nil || m.typ != quantitative || m.bin != nil || m.binned || !m.isField() {
 		return
 	}
-	if measure != "theta" {
+	if measure != "theta" && measure != "radius" {
 		if _, ok := u.ch[measure+"2"]; ok {
 			return
 		}
@@ -610,7 +615,12 @@ func (u *unit) addStack(n *dataNode) {
 		}))
 	}
 	var groupby []any
-	if u.mark != "arc" {
+	if u.stack == "radius" {
+		// The rings of each angle stack apart.
+		if t := u.ch["theta"]; t != nil && t.isField() {
+			groupby = append(groupby, t.out)
+		}
+	} else if u.mark != "arc" && u.stack != "theta" {
 		dim := u.dimension()
 		for _, name := range []string{dim, dim + "Offset"} {
 			if d := u.ch[name]; d != nil && d.isField() {
@@ -640,7 +650,7 @@ func (u *unit) addStack(n *dataNode) {
 		// A vertical stack puts the first value at the top, and a
 		// horizontal stack or a pie puts it first.
 		order := "descending"
-		if u.orient == "horizontal" || u.mark == "arc" {
+		if u.orient == "horizontal" || u.mark == "arc" || u.stack == "theta" {
 			order = "ascending"
 		}
 		sortFields = append(sortFields, field)

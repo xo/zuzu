@@ -175,7 +175,13 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		out.Data = c.data
 		return out, nil
 	}
-	v := newView("", c.cfg)
+	prefix := ""
+	if s.Name != "" {
+		// A named view prefixes the names of its scales and its marks.
+		prefix = varName(s.Name) + "_"
+	}
+	v := newView(prefix, c.cfg)
+	v.scalePrefix = prefix
 	if err := c.view(s, v, nil, "", map[string]string{}); err != nil {
 		return nil, err
 	}

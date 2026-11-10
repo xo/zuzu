@@ -25,6 +25,9 @@ type shared struct {
 	// scalePrefix names the scales of the positions of a view of a
 	// concatenation, such as concat_0_x.
 	scalePrefix string
+	// prefixAll says that the prefix names every scale, as the name of a
+	// facet does, and not only the scales of position.
+	prefixAll bool
 	// common holds the scales that the views of a concatenation share, such
 	// as color, and nil when the view shares none.
 	common *shared
@@ -57,7 +60,7 @@ func (v *view) layer(prefix, parent string) *view {
 // sn returns the name of the scale of a channel: the channel, with the
 // prefix of the view for a position.
 func (v *view) sn(ch string) string {
-	if v.scalePrefix != "" && isPositional(ch) {
+	if v.scalePrefix != "" && (isPositional(ch) || v.prefixAll) {
 		return v.scalePrefix + ch
 	}
 	return ch
@@ -836,26 +839,27 @@ func (v *view) guides(out *vega.Spec) {
 					l.Title = lit(title)
 				}
 			}
+			sn := v.sn(name)
 			switch name {
 			case "color", "fill":
 				if s.mark == "line" || s.mark == "rule" || (s.mark == "point" && name == "color") {
-					l.Stroke = name
+					l.Stroke = sn
 					if s.mark == "line" || s.mark == "rule" {
 						l.SymbolType = lit("stroke")
 					}
 				} else {
-					l.Fill = name
+					l.Fill = sn
 				}
 			case "stroke":
-				l.Stroke = name
+				l.Stroke = sn
 			case "size":
-				l.Size = name
+				l.Size = sn
 			case "shape":
-				l.Shape = name
+				l.Shape = sn
 			case "opacity":
-				l.Opacity = name
+				l.Opacity = sn
 			case "strokeDash":
-				l.StrokeDash = name
+				l.StrokeDash = sn
 			}
 			for k, x := range s.guide {
 				switch k {

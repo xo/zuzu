@@ -425,15 +425,25 @@ func (u *unit) arc(e enc) {
 	e.set("x", map[string]any{"signal": "width", "mult": 0.5})
 	e.set("y", map[string]any{"signal": "height", "mult": 0.5})
 	outer := map[string]any{"signal": "min(width,height)/2"}
+	inner := map[string]any{"value": 0}
 	if r := u.ch["radius"]; r != nil && r.isField() {
-		u.v.addScale(u, "radius", r, []string{r.out})
-		outer = map[string]any{"scale": u.v.sn("radius"), "field": r.out}
+		if u.stack == "radius" {
+			// Stacked rings: each spans from its start to its end.
+			u.v.addScale(u, "radius", r, []string{r.out + "_start", r.out + "_end"})
+			if sc := u.v.scales["radius"]; sc != nil && sc.props["type"] == nil {
+				sc.typ = "linear"
+			}
+			outer = map[string]any{"scale": u.v.sn("radius"), "field": r.out + "_end"}
+			inner = map[string]any{"scale": u.v.sn("radius"), "field": r.out + "_start"}
+		} else {
+			u.v.addScale(u, "radius", r, []string{r.out})
+			outer = map[string]any{"scale": u.v.sn("radius"), "field": r.out}
+		}
 	}
 	if v, ok := u.props["outerRadius"]; ok {
 		outer = map[string]any{"value": v}
 	}
 	e.set("outerRadius", outer)
-	inner := map[string]any{"value": 0}
 	if v, ok := u.props["innerRadius"]; ok {
 		inner = map[string]any{"value": v}
 	}
