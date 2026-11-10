@@ -118,6 +118,19 @@ func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Res
 		}
 		src = b
 	}
+	// vega.js answers the name of a dataset that a group also defines
+	// with the dataset of the last such group, so the reference holds the
+	// data of one cell. The check leaves those names out.
+	vegaSrc := []byte(ref.Compiled)
+	if len(vegaSrc) == 0 && dialect == zuzu.Vega {
+		vegaSrc = src
+	}
+	shadowed := shadowedData(vegaSrc)
+	for name := range shadowed {
+		if _, ok := ref.Datasets[name]; ok {
+			res.Datasets--
+		}
+	}
 	chart, _, err := zuzu.Parse(src, zuzu.WithDialect(dialect))
 	if err != nil {
 		res.Err = err
@@ -139,6 +152,9 @@ func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Res
 	}
 	slices.Sort(names)
 	for _, name := range names {
+		if shadowed[name] {
+			continue
+		}
 		want := ref.Datasets[name]
 		rows, err := view.Data(name)
 		if err != nil {
@@ -550,4 +566,44 @@ func structure(spec map[string]any) map[string]any {
 	list, _ := spec["marks"].([]any)
 	walk(list)
 	return map[string]any{"data": names("data", "name"), "scales": names("scales", "name", "type"), "marks": marks}
+}
+
+// shadowedData returns the names of the datasets of the top level of a
+// Vega spec that a group mark also defines.
+func shadowedData(src []byte) map[string]bool {
+	var spec struct {
+		Data []struct {
+			Name string `json:"name"`
+		} `json:"data"`
+		Marks []any `json:"marks"`
+	}
+	if json.Unmarshal(src, &spec) != nil {
+		return nil
+	}
+	top := map[string]bool{}
+	for _, d := range spec.Data {
+		top[d.Name] = true
+	}
+	out := map[string]bool{}
+	var walk func(marks []any)
+	walk = func(marks []any) {
+		for _, m := range marks {
+			mm, ok := m.(map[string]any)
+			if !ok {
+				continue
+			}
+			data, _ := mm["data"].([]any)
+			for _, d := range data {
+				if dm, ok := d.(map[string]any); ok {
+					if name, ok := dm["name"].(string); ok && top[name] {
+						out[name] = true
+					}
+				}
+			}
+			inner, _ := mm["marks"].([]any)
+			walk(inner)
+		}
+	}
+	walk(spec.Marks)
+	return out
 }

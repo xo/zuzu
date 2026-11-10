@@ -426,6 +426,24 @@ func renameMarkData(m *vega.Mark, rename func(string) string) {
 			m.From.Facet.Data = rename(m.From.Facet.Data)
 		}
 	}
+	if len(m.Data) > 0 {
+		// A group that defines a dataset hides the dataset of the same
+		// name outside it.
+		local := map[string]bool{}
+		if m.From != nil && m.From.Facet != nil {
+			local[m.From.Facet.Name] = true
+		}
+		for _, d := range m.Data {
+			local[d.Name] = true
+		}
+		outer := rename
+		rename = func(n string) string {
+			if local[n] {
+				return n
+			}
+			return outer(n)
+		}
+	}
 	for i := range m.Scales {
 		renameDomain(m.Scales[i].Domain.Data, rename)
 	}

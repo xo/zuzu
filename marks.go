@@ -397,7 +397,13 @@ func (s *scope) sortItems(sort *vega.Sort, states []*itemState, _ [][]dataflow.R
 		case map[string]any:
 			src, _ := x["expr"].(string)
 			keys[i] = key{func(st *itemState) (any, error) {
-				return s.eval(src, map[string]any{"datum": st.it.Datum})
+				// As in Vega, datum is the item, which holds the data in
+				// its own datum.
+				item := map[string]any{
+					"datum": st.it.Datum, "x": st.it.X, "y": st.it.Y,
+					"width": st.it.Width, "height": st.it.Height,
+				}
+				return s.eval(src, item)
 			}}
 		}
 	}

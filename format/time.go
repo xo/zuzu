@@ -196,7 +196,16 @@ func (f *fields) time(zone *time.Location) time.Time {
 	case f.weekU >= 0 || f.weekW >= 0 || f.weekV >= 0:
 		month, day = 1, f.weekDay(loc)
 	}
-	t := WallTime(f.year, month, day, f.hour, f.minute, f.second, f.milli, loc)
+	year := f.year
+	if 0 <= year && year < 100 {
+		// d3 builds a date of a year from 0 to 99 in the year -1, which is
+		// not a leap year, and then sets the year. The day of the month
+		// overflows there, so 29 February becomes 1 March.
+		probe := time.Date(-1, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		month, day = int(probe.Month()), probe.Day()
+		year += probe.Year() + 1
+	}
+	t := WallTime(year, month, day, f.hour, f.minute, f.second, f.milli, loc)
 	if f.zone != nil {
 		t = t.Add(-time.Duration(*f.zone) * time.Minute).In(zone)
 	}

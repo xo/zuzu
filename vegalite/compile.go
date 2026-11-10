@@ -391,6 +391,9 @@ func (c *compiler) source(d *Data, path string) (*dataNode, error) {
 		}
 		vd.Name = d.Name
 		d = &Data{Values: vega.Value{JSON: raw}, Format: d.Format}
+	} else if d.Name != "" && (d.URL != "" || !d.Values.IsZero()) {
+		// A dataset of a url or of values with a name keeps the name.
+		vd.Name = d.Name
 	} else {
 		vd.Name = fmt.Sprintf("source_%d", c.nSource)
 		c.nSource++
