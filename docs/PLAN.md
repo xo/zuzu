@@ -140,6 +140,7 @@ short word, and an exported name does not repeat its package.
 | `theme` | the modes and the color schemes, and the Vega config they make (D14, D15) |
 | `svg` | the SVG writer |
 | `raster` | the direct okage renderer (D11) |
+| `internal/shape` | the geometry of the items as path data, which `svg` writes and `raster` parses, so that both draw the same shapes |
 | `graph` | the graph model and the layered layout, with `dot` and `mermaid` below it (D18) |
 | `web` | the browser component, which embeds its JavaScript (D19) |
 | `test/` | a separate module with the corpus, the vega.js oracle and the comparisons (D17) |
@@ -240,7 +241,8 @@ two axis lines and 10 runs of text:
 The parse is 7 to 10 percent of the total, and the rasterization is the rest.
 A direct renderer saves about that much, and it skips the SVG writer. It
 helps a program that draws many charts, and D11 builds it only when a
-measurement on the corpus shows the gain.
+measurement on the corpus shows the gain. The measurement on the corpus, in
+phase 6, found a larger gain.
 
 The direct renderer draws with the root package of okage: `Pixmap.FillPath`,
 `Pixmap.StrokePath` and `Pixmap.FillRect` with a `Paint`, `path.PathBuilder`
@@ -691,6 +693,50 @@ SVG and okage, build it (D11).
 
 Exit: the image of each chart is the same as the image through SVG, within
 the tolerance of okage D31, and the time saved is measured and written down.
+
+On 2026-11-11 the measurement came first. `test/cmd/rasterbench` times each
+step of the image of each of the 540 specs of the first target, on an AMD
+Ryzen 9 9950X:
+
+| Step | okage v0.2.0 | okage with the fix of its arcs |
+| --- | --- | --- |
+| the scene | 2.8 s | 2.8 s |
+| the SVG writer | 0.3 s | 0.3 s |
+| the parse of okage | 14.5 s | 1.4 s |
+| the rasterization of okage | 3.7 s | 3.7 s |
+| the share of the writer and the parse in the image | 80 percent | 31 percent |
+
+The parse was slow because okage computed the sine, the cosine and the
+other functions of an arc with math/big, at about 9 microseconds a call. A
+path with arcs took about 250 microseconds to parse, and a symbol, a slice
+of a pie and a rect with round corners each have arcs. The okage peer
+found the cause and staged the fix, as okage v0.2.1, which waits for its
+maintainers. The second column uses the staged fix.
+
+Either way the gain is larger than the 7 to 10 percent of the estimate
+above, so `raster` exists. It draws every mark but text with the drawing of
+okage, from the same geometry as the SVG writer, which `internal/shape`
+holds. Without text, the 540 specs draw in 2.9 s directly, against 18.4 s
+through SVG with okage v0.2.0, and 4.6 s with the fix: 37 percent less
+time. No spec differs from its image through SVG in more than 1 percent of
+its pixels, by the metric of okage D31, and the worst differs in 0.5
+percent. A test of the test module checks this on the whole corpus.
+
+These rules make the images match, because okage draws them so:
+
+- An item with an opacity below 1 draws into a layer over its bounds, which
+  goes onto the image with that opacity.
+- A group that clips draws its marks into a layer, which goes onto the
+  image through the mask of its clip, once.
+- An arc of path data becomes cubic curves, at least four for a whole turn,
+  more for a radius above a few hundred pixels.
+- A gradient spans the tight bounds of its path.
+
+Text is not done, so the exit is not met. The direct renderer needs the
+outlines of the glyphs, with the fonts, the fallback and the shaping of
+okage (D11). The okage peer asked the okage maintainers on 2026-11-11 for a
+decision on that API. Until it exists, `raster.Draw` takes a
+`TextRenderer`, and a scene with text and no `TextRenderer` is an error.
 
 ### Phase 7. DOT and Mermaid
 

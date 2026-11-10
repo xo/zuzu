@@ -1,21 +1,25 @@
-package svg
+// Package shape draws the geometry of the items of a scene as the path data
+// of SVG: the curves of lines and areas, the symbols, the arcs, the trails
+// and the rects with round corners. The SVG writer writes the paths, and the
+// direct renderer parses them, so that both draw the same shapes.
+package shape
 
 import (
-	"fmt"
+	"errors"
 	"math"
 	"strconv"
 	"strings"
 	"unicode"
 )
 
-// curve returns the path of a line through points, with an interpolation of
-// Vega. The curves follow the documented curves of d3-shape (D6). A path that
+// Curve returns the path of a line through points, with an interpolation of
+// Vega, and false for an interpolation that it does not know. The curves follow the documented curves of d3-shape (D6). A path that
 // does not move first continues the path before it with a line. tension is
 // the tension of the item, which Vega gives to cardinal as its tension, to
 // bundle as its beta and to catmull-rom as its alpha. Zero means the default.
-func curve(interpolate string, pts [][2]float64, move bool, tension float64) (string, error) {
+func Curve(interpolate string, pts [][2]float64, move bool, tension float64) (string, bool) {
 	if len(pts) == 0 {
-		return "", nil
+		return "", true
 	}
 	var b strings.Builder
 	if move {
@@ -52,9 +56,9 @@ func curve(interpolate string, pts [][2]float64, move bool, tension float64) (st
 	case "natural":
 		natural(&b, pts)
 	default:
-		return "", fmt.Errorf("drawing a curve %q: %w", interpolate, ErrUnsupportedCurve)
+		return "", false
 	}
-	return b.String(), nil
+	return b.String(), true
 }
 
 // lines draws straight lines through the points after the first.
@@ -282,57 +286,59 @@ func naturalControls(x []float64) (a, b []float64) {
 	return a, b
 }
 
-// shape returns the path of a symbol of a size, which is the area of the
+// Symbol returns the path of a symbol of a size, which is the area of the
 // symbol in square pixels, with the shapes of Vega. A shape that is not a
 // name is the path of an SVG, drawn in a square from -1 to 1 and scaled to
-// the size, as Vega draws a custom shape.
-func shape(name string, size float64) (string, error) {
+// the size, as Vega draws a custom shape. It returns false for a shape that
+// is neither.
+func Symbol(name string, size float64) (string, bool) {
 	r := math.Sqrt(size) / 2
 	h := math.Sqrt(3) / 2 * r
 	o := h - r*math.Tan(math.Pi/6)
 	switch name {
 	case "", "circle":
 		return "M" + pt(r, 0) + "A" + num(r) + "," + num(r) + " 0 1,1 " + pt(-r, 0) +
-			"A" + num(r) + "," + num(r) + " 0 1,1 " + pt(r, 0) + "Z", nil
+			"A" + num(r) + "," + num(r) + " 0 1,1 " + pt(r, 0) + "Z", true
 	case "square":
-		return "M" + pt(-r, -r) + "H" + num(r) + "V" + num(r) + "H" + num(-r) + "Z", nil
+		return "M" + pt(-r, -r) + "H" + num(r) + "V" + num(r) + "H" + num(-r) + "Z", true
 	case "diamond":
-		return "M" + pt(-r, 0) + "L" + pt(0, -r) + "L" + pt(r, 0) + "L" + pt(0, r) + "Z", nil
+		return "M" + pt(-r, 0) + "L" + pt(0, -r) + "L" + pt(r, 0) + "L" + pt(0, r) + "Z", true
 	case "cross":
 		s := r / 2.5
 		return "M" + pt(-r, -s) + "L" + pt(-r, s) + "L" + pt(-s, s) + "L" + pt(-s, r) +
 			"L" + pt(s, r) + "L" + pt(s, s) + "L" + pt(r, s) + "L" + pt(r, -s) +
-			"L" + pt(s, -s) + "L" + pt(s, -r) + "L" + pt(-s, -r) + "L" + pt(-s, -s) + "Z", nil
+			"L" + pt(s, -s) + "L" + pt(s, -r) + "L" + pt(-s, -r) + "L" + pt(-s, -s) + "Z", true
 	case "arrow":
 		s, t, v := r/7, r/2.5, r/8
 		return "M" + pt(-s, r) + "L" + pt(s, r) + "L" + pt(s, -v) + "L" + pt(t, -v) +
-			"L" + pt(0, -r) + "L" + pt(-t, -v) + "L" + pt(-s, -v) + "Z", nil
+			"L" + pt(0, -r) + "L" + pt(-t, -v) + "L" + pt(-s, -v) + "Z", true
 	case "wedge":
 		w := r / 4
-		return "M" + pt(0, -h-o) + "L" + pt(-w, h-o) + "L" + pt(w, h-o) + "Z", nil
+		return "M" + pt(0, -h-o) + "L" + pt(-w, h-o) + "L" + pt(w, h-o) + "Z", true
 	case "triangle":
-		return "M" + pt(0, -h-o) + "L" + pt(-r, h-o) + "L" + pt(r, h-o) + "Z", nil
+		return "M" + pt(0, -h-o) + "L" + pt(-r, h-o) + "L" + pt(r, h-o) + "Z", true
 	case "triangle-up":
-		return "M" + pt(0, -h) + "L" + pt(-r, h) + "L" + pt(r, h) + "Z", nil
+		return "M" + pt(0, -h) + "L" + pt(-r, h) + "L" + pt(r, h) + "Z", true
 	case "triangle-down":
-		return "M" + pt(0, h) + "L" + pt(-r, -h) + "L" + pt(r, -h) + "Z", nil
+		return "M" + pt(0, h) + "L" + pt(-r, -h) + "L" + pt(r, -h) + "Z", true
 	case "triangle-right":
-		return "M" + pt(h, 0) + "L" + pt(-h, -r) + "L" + pt(-h, r) + "Z", nil
+		return "M" + pt(h, 0) + "L" + pt(-h, -r) + "L" + pt(-h, r) + "Z", true
 	case "triangle-left":
-		return "M" + pt(-h, 0) + "L" + pt(h, -r) + "L" + pt(h, r) + "Z", nil
+		return "M" + pt(-h, 0) + "L" + pt(h, -r) + "L" + pt(h, r) + "Z", true
 	case "stroke":
-		return "M" + pt(-r, 0) + "L" + pt(r, 0), nil
+		return "M" + pt(-r, 0) + "L" + pt(r, 0), true
 	}
 	d, err := scalePath(name, r)
 	if err != nil {
-		return "", fmt.Errorf("drawing a symbol %q: %w", name, ErrUnsupportedShape)
+		return "", false
 	}
-	return d, nil
+	return d, true
 }
 
 // scalePath multiplies each coordinate of an SVG path by k. The flags and the
 // rotation of an arc do not scale.
 func scalePath(d string, k float64) (string, error) {
+	errPath := errors.New("bad path")
 	var out strings.Builder
 	var cmd rune
 	arg := 0
@@ -354,7 +360,7 @@ func scalePath(d string, k float64) (string, error) {
 			}
 			v, err := strconv.ParseFloat(d[i:j], 64)
 			if err != nil || cmd == 0 {
-				return "", fmt.Errorf("reading the path %q: %w", d, ErrUnsupportedShape)
+				return "", errPath
 			}
 			if arg > 0 {
 				out.WriteByte(' ')
@@ -372,9 +378,9 @@ func scalePath(d string, k float64) (string, error) {
 	return out.String(), nil
 }
 
-// trail returns the outline of a trail: a line through points whose width is
+// Trail returns the outline of a trail: a line through points whose width is
 // the size of each point, with round ends, as the trail of Vega draws it.
-func trail(pts [][3]float64) string {
+func Trail(pts [][3]float64) string {
 	var b strings.Builder
 	for i := 1; i < len(pts); i++ {
 		x1, y1, r1 := pts[i-1][0], pts[i-1][1], pts[i-1][2]/2
@@ -461,11 +467,11 @@ func (p *pathBuilder) arc(cx, cy, r, a0, a1 float64, ccw bool) {
 	p.x, p.y = x1, y1
 }
 
-// arcPath returns the path of a slice of a ring, centered on the origin, as
+// Arc returns the path of a slice of a ring, centered on the origin, as
 // the arc of d3-shape draws it. Angles are in radians, clockwise from twelve
 // o'clock. The pad angle opens a gap between two slices, and the corner
 // radius rounds the four corners of the slice.
-func arcPath(r0, r1, start, end, pad, corner float64) string {
+func Arc(r0, r1, start, end, pad, corner float64) string {
 	const eps = 1e-12
 	if r1 < r0 {
 		r0, r1 = r1, r0
@@ -611,4 +617,19 @@ func intersect(x0, y0, x1, y1, x2, y2, x3, y3 float64) (x, y float64, ok bool) {
 	}
 	t = (x32*(y0-y2) - y32*(x0-x2)) / t
 	return x0 + t*x10, y0 + t*y10, true
+}
+
+// num writes a number with at most three decimals and no trailing zeros, as
+// the SVG writer writes its numbers.
+func num(v float64) string {
+	v = math.Round(v*1000) / 1000
+	if v == 0 {
+		return "0"
+	}
+	return strconv.FormatFloat(v, 'f', -1, 64)
+}
+
+// pt writes a point as x,y.
+func pt(x, y float64) string {
+	return num(x) + "," + num(y)
 }

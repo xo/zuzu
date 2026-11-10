@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text"
 )
@@ -175,8 +176,8 @@ func (w *writer) group(it *scene.Item) error {
 
 // rect writes a rect item, with round corners if it has them.
 func (w *writer) rect(it *scene.Item) {
-	x, y, wd, ht := box(it)
-	tl, tr, br, bl := corners(it)
+	x, y, wd, ht := shape.Box(it)
+	tl, tr, br, bl := shape.Corners(it)
 	if tl == tr && tr == br && br == bl {
 		r := math.Min(tl, math.Min(wd, ht)/2)
 		fmt.Fprintf(w.out, `<rect x="%s" y="%s" width="%s" height="%s"`, num(x), num(y), num(wd), num(ht))
@@ -187,182 +188,56 @@ func (w *writer) rect(it *scene.Item) {
 		w.out.WriteString("/>")
 		return
 	}
-	limit := func(r float64) float64 { return math.Max(0, math.Min(r, math.Min(wd, ht)/2)) }
-	tl, tr, br, bl = limit(tl), limit(tr), limit(br), limit(bl)
-	d := "M" + pt(x+tl, y) + "H" + num(x+wd-tr) +
-		quad(x+wd, y, x+wd, y+tr, tr) + "V" + num(y+ht-br) +
-		quad(x+wd, y+ht, x+wd-br, y+ht, br) + "H" + num(x+bl) +
-		quad(x, y+ht, x, y+ht-bl, bl) + "V" + num(y+tl) +
-		quad(x, y, x+tl, y, tl) + "Z"
-	fmt.Fprintf(w.out, `<path d="%s"`, d)
+	fmt.Fprintf(w.out, `<path d="%s"`, shape.RoundRect(x, y, wd, ht, tl, tr, br, bl))
 	w.style(it, "none")
 	w.out.WriteString("/>")
 }
 
-// quad returns a quadratic curve through the corner (cx, cy) to (x, y), or a
-// line when the radius is zero.
-func quad(cx, cy, x, y, r float64) string {
-	if r == 0 {
-		return "L" + pt(x, y)
-	}
-	return "Q" + pt(cx, cy) + " " + pt(x, y)
-}
-
-// box returns the position and the size of a rect, from x2 and y2 where the
-// item has no width or height, and with no negative size.
-func box(it *scene.Item) (x, y, wd, ht float64) {
-	x, y, wd, ht = it.X, it.Y, it.Width, it.Height
-	if wd == 0 && it.X2 != 0 {
-		wd = it.X2 - it.X
-	}
-	if ht == 0 && it.Y2 != 0 {
-		ht = it.Y2 - it.Y
-	}
-	if wd < 0 {
-		x, wd = x+wd, -wd
-	}
-	if ht < 0 {
-		y, ht = y+ht, -ht
-	}
-	return x, y, wd, ht
-}
-
-// corners returns the radius of each corner: top left, top right, bottom
-// right and bottom left. A corner with its own radius overrides the radius of
-// every corner.
-func corners(it *scene.Item) (tl, tr, br, bl float64) {
-	pick := func(own float64) float64 {
-		if own != 0 {
-			return own
-		}
-		return it.CornerRadius
-	}
-	return pick(it.CornerRadiusTopLeft), pick(it.CornerRadiusTopRight),
-		pick(it.CornerRadiusBottomRight), pick(it.CornerRadiusBottomLeft)
-}
-
-// rule writes a rule item, a line from (x, y) to (x2, y2). An end that the
-// item does not set is the start.
+// rule writes a rule item, a line from (x, y) to (x2, y2).
 func (w *writer) rule(it *scene.Item) {
-	x2, y2 := it.X2, it.Y2
-	if x2 == 0 && it.Width == 0 {
-		x2 = it.X
-	}
-	if y2 == 0 && it.Height == 0 {
-		y2 = it.Y
-	}
+	x2, y2 := shape.RuleEnd(it)
 	fmt.Fprintf(w.out, `<line x1="%s" y1="%s" x2="%s" y2="%s"`, num(it.X), num(it.Y), num(x2), num(y2))
 	w.style(it, "none")
 	w.out.WriteString("/>")
 }
 
 // line writes a line mark: one path through its items, with the paint and
-// the interpolation of the first item. An item that is not defined breaks the
-// line.
+// the interpolation of the first item.
 func (w *writer) line(items []scene.Item) error {
-	first := &items[0]
-	var d strings.Builder
-	for _, run := range runs(items) {
-		pts := make([][2]float64, len(run))
-		for i, it := range run {
-			pts[i] = [2]float64{it.X, it.Y}
-		}
-		seg, err := curve(first.Interpolate, pts, true, first.Tension)
-		if err != nil {
-			return err
-		}
-		d.WriteString(seg)
+	d, ok := shape.Line(items)
+	if !ok {
+		return fmt.Errorf("drawing a curve %q: %w", items[0].Interpolate, ErrUnsupportedCurve)
 	}
-	fmt.Fprintf(w.out, `<path d="%s"`, d.String())
-	w.style(first, "none")
+	fmt.Fprintf(w.out, `<path d="%s"`, d)
+	w.style(&items[0], "none")
 	w.out.WriteString("/>")
 	return nil
 }
 
-// area writes an area mark: from the line of x and y along its items, back
-// along the line of x and y2, or of x2 and y for an area whose orient is
-// horizontal.
+// area writes an area mark.
 func (w *writer) area(items []scene.Item) error {
-	first := &items[0]
-	var d strings.Builder
-	for _, run := range runs(items) {
-		top := make([][2]float64, len(run))
-		base := make([][2]float64, len(run))
-		for i, it := range run {
-			top[i] = [2]float64{it.X, it.Y}
-			if first.Orient == "horizontal" {
-				base[len(run)-1-i] = [2]float64{it.X2, it.Y}
-			} else {
-				base[len(run)-1-i] = [2]float64{it.X, it.Y2}
-			}
-		}
-		a, err := curve(first.Interpolate, top, true, first.Tension)
-		if err != nil {
-			return err
-		}
-		b, err := curve(first.Interpolate, base, false, first.Tension)
-		if err != nil {
-			return err
-		}
-		d.WriteString(a + b + "Z")
+	d, ok := shape.Area(items)
+	if !ok {
+		return fmt.Errorf("drawing a curve %q: %w", items[0].Interpolate, ErrUnsupportedCurve)
 	}
-	fmt.Fprintf(w.out, `<path d="%s"`, d.String())
-	w.style(first, "#000")
+	fmt.Fprintf(w.out, `<path d="%s"`, d)
+	w.style(&items[0], "#000")
 	w.out.WriteString("/>")
 	return nil
 }
 
-// trail writes a trail mark: a line through its items whose width is the size
-// of each item, filled with the paint of the first item.
+// trail writes a trail mark, filled with the paint of the first item.
 func (w *writer) trail(items []scene.Item) {
-	var d strings.Builder
-	for _, run := range runs(items) {
-		pts := make([][3]float64, len(run))
-		for i, it := range run {
-			size := 2.0
-			if it.Size != nil {
-				size = *it.Size
-			}
-			pts[i] = [3]float64{it.X, it.Y, size}
-		}
-		d.WriteString(trail(pts))
-	}
-	fmt.Fprintf(w.out, `<path d="%s"`, d.String())
+	fmt.Fprintf(w.out, `<path d="%s"`, shape.TrailOf(items))
 	w.style(&items[0], "#000")
 	w.out.WriteString("/>")
 }
 
-// runs splits the items of a line or an area where an item is not defined.
-func runs(items []scene.Item) [][]scene.Item {
-	var out [][]scene.Item
-	start := -1
-	for i, it := range items {
-		if it.Defined != nil && !*it.Defined {
-			if start >= 0 {
-				out = append(out, items[start:i])
-			}
-			start = -1
-			continue
-		}
-		if start < 0 {
-			start = i
-		}
-	}
-	if start >= 0 {
-		out = append(out, items[start:])
-	}
-	return out
-}
-
 // symbol writes a symbol item at its position, rotated by its angle.
 func (w *writer) symbol(it *scene.Item) error {
-	size := 64.0
-	if it.Size != nil {
-		size = *it.Size
-	}
-	d, err := shape(it.Shape, size)
-	if err != nil {
-		return err
+	d, ok := shape.SymbolOf(it)
+	if !ok {
+		return fmt.Errorf("drawing a symbol %q: %w", it.Shape, ErrUnsupportedShape)
 	}
 	fmt.Fprintf(w.out, `<path transform="%s" d="%s"`, transform(it.X, it.Y, it.Angle), d)
 	w.style(it, "none")
@@ -383,7 +258,7 @@ func transform(x, y, angle float64) string {
 // arc writes an arc item, a slice of a ring, at its position.
 func (w *writer) arc(it *scene.Item) {
 	fmt.Fprintf(w.out, `<path transform="translate(%s,%s)" d="%s"`, num(it.X), num(it.Y),
-		arcPath(it.InnerRadius, it.OuterRadius, it.StartAngle, it.EndAngle, it.PadAngle, it.CornerRadius))
+		shape.ArcOf(it))
 	w.style(it, "none")
 	w.out.WriteString("/>")
 }
@@ -624,11 +499,6 @@ func num(v float64) string {
 		return "0"
 	}
 	return strconv.FormatFloat(v, 'f', -1, 64)
-}
-
-// pt writes a point as x,y.
-func pt(x, y float64) string {
-	return num(x) + "," + num(y)
 }
 
 // esc escapes the text of an attribute or an element.

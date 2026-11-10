@@ -1,4 +1,4 @@
-package svg
+package shape
 
 import (
 	"math"
@@ -52,9 +52,9 @@ func TestCurvesMatchD3(t *testing.T) {
 		{"natural", "M0,0C6.667,15.952,13.333,31.905,20,30C26.667,28.095,33.333,8.333,40,10C46.667,11.667,53.333,34.762,60,40C66.667,45.238,73.333,32.619,80,20"},
 		{"bundle", "M0,0L3.333,4.375C6.667,8.75,13.333,17.5,20,19.167C26.667,20.833,33.333,15.417,40,17.083C46.667,18.75,53.333,27.5,60,29.167C66.667,30.833,73.333,25.417,76.667,22.708L80,20"},
 	} {
-		got, err := curve(c.name, pts, true, 0)
-		if err != nil {
-			t.Fatal(err)
+		got, ok := Curve(c.name, pts, true, 0)
+		if !ok {
+			t.Fatalf("%s is not a curve", c.name)
 		}
 		if !same(t, got, c.want) {
 			t.Errorf("%s:\n got %s\nwant %s", c.name, got, c.want)
@@ -73,7 +73,7 @@ func TestArcsMatchD3(t *testing.T) {
 		{30, 50, 0, 2.1, 0.02, 4, "M0.583,-45.771A4,4,0,0,1,4.982,-49.751A50,50,0,0,1,45.461,20.817A4,4,0,0,1,39.804,22.604L29.376,16.505A4,4,0,0,1,27.701,11.516A30,30,0,0,0,4.044,-29.726A4,4,0,0,1,0.583,-33.69Z"},
 		{0, 50, 0, 1, 0, 4, "M0,-45.826A4,4,0,0,1,4.348,-49.811A50,50,0,0,1,39.565,-30.571A4,4,0,0,1,38.561,-24.76L0,0Z"},
 	} {
-		if got := arcPath(c.r0, c.r1, c.start, c.end, c.pad, c.corner); !same(t, got, c.want) {
+		if got := Arc(c.r0, c.r1, c.start, c.end, c.pad, c.corner); !same(t, got, c.want) {
 			t.Errorf("arc %v:\n got %s\nwant %s", c, got, c.want)
 		}
 	}
@@ -83,9 +83,9 @@ func TestArcsMatchD3(t *testing.T) {
 // coordinates and leaves the flags of an arc alone.
 func TestShapesScaleACustomPath(t *testing.T) {
 	t.Parallel()
-	got, err := shape("M-1,-1L1,1A1,1 0 1,0 0,1Z", 16)
-	if err != nil {
-		t.Fatal(err)
+	got, ok := Symbol("M-1,-1L1,1A1,1 0 1,0 0,1Z", 16)
+	if !ok {
+		t.Fatal("the custom shape is not a shape")
 	}
 	if want := "M-2 -2L2 2A2 2 0 1 0 0 2Z"; got != want {
 		t.Errorf("got %s, want %s", got, want)

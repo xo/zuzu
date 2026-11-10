@@ -114,8 +114,12 @@ scene graph and only the scene graph (D8):
 ```go
 s, report, err := chart.Render(ctx)
 err = svg.Write(w, s, svg.WithIndent("  "))
-pix, err := raster.Draw(s) // phase 6 (D11)
+pix, err := raster.Draw(s, raster.WithText(tr)) // phase 6 (D11)
 ```
+
+`raster.Draw` exists since phase 6 and draws every mark but text. A scene
+with text needs a `raster.TextRenderer`, which waits for the API of okage
+that gives the outlines of glyphs (D11).
 
 ### Options
 

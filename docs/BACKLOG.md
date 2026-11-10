@@ -89,6 +89,23 @@ the titles of `bar_grouped_thin`, has an order in vega.js that depends on the
 sort of JavaScript, which is not a total order on mixed types. zuzu sorts
 numbers before strings.
 
+## Phase 6
+
+### Draw text in the direct renderer
+
+`raster.Draw` draws every mark but text (D11). Text needs an API of okage
+that gives the outlines of the glyphs of a string, with the fonts, the
+fallback and the shaping of the package `svg` of okage. The okage peer
+asked the okage maintainers for a decision on 2026-11-11. When the API
+exists, write a `raster.TextRenderer` on it, add `Chart.Image`, and check
+the corpus with its text against okage, at most 1 percent of the pixels.
+
+### Require the fix of the arcs of okage
+
+okage v0.2.1 parses an arc about 40 times faster (phase 6 in
+`docs/PLAN.md`). When it is released, require it in both modules, and
+measure again with `test/cmd/rasterbench`.
+
 ## Themes
 
 ### Write the tool that converts upstream themes into schemes

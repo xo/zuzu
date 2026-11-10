@@ -22,6 +22,7 @@
 
 # The WebAssembly file that the TinyGo job of CI builds.
 /test/zuzu.wasm
+/test/rasterbench
 
 # The references that the oracle writes, about 174 MB, and the packages it
 # installs with npm. Run the oracle to make them, as test/README.md says.

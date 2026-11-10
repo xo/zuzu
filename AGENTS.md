@@ -11,7 +11,8 @@ color scheme that swaps apart from it (D14).
 On 2026-11-11 phases 0, 1 and 2 are done: a maintainer accepted
 `docs/targets/compare.html`. Phase 3 is done: zuzu runs static Vega
 specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is done: zuzu
-draws the charts of tiers 1 and 2. Code follows the plan (D3).
+draws the charts of tiers 1 and 2. Phase 6, the direct renderer, has
+started, and its text waits for an API of okage. Code follows the plan (D3).
 Every decision from D1 to D30 is decided. The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules
@@ -169,6 +170,8 @@ On 2026-11-10 the repository holds these files:
 | `scene/` | the scene graph and its JSON form (D8) |
 | `theme/` | the modes and the color schemes (D14) |
 | `svg/` | the SVG writer, with its golden files in `svg/testdata` (D10) |
+| `raster/` | the direct okage renderer (D11) |
+| `internal/shape/` | the geometry of the items as path data, which `svg` and `raster` share |
 | `text/` | the measurement of text and the bundled IBM Plex Sans, in `text/fonts` with its license (D11, D16) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
 | `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |
