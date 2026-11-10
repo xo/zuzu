@@ -46,6 +46,12 @@ type channelDef struct {
 	unitName string
 	// unitStep is the number of units of each interval, when it is not 1.
 	unitStep float64
+	// nested is the path of a field inside an object, which the data
+	// flattens into the field.
+	nested []string
+	// bracket says that the field ends with a bracket, as a['b'] does,
+	// after which a suffix is a part of its own.
+	bracket bool
 	utc      bool
 	// binnedUnit says that the data holds the start of each unit already.
 	binnedUnit bool
@@ -112,6 +118,13 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 			if r, ok := x["repeat"].(string); ok {
 				c.field = repeat[r]
 			}
+		}
+		c.bracket = strings.HasSuffix(c.field, "]")
+		if parts := dataflow.SplitField(c.field); len(parts) > 1 {
+			// A field inside an object becomes a flat field whose name
+			// joins the path with dots, which the compiler escapes.
+			c.nested = parts
+			c.field = escapeField(strings.Join(parts, "."))
 		}
 	}
 	c.typ = def.Type
@@ -407,6 +420,35 @@ func fieldRef(name string) string {
 	return b.String()
 }
 
+// literal returns the plain name of a field that the compiler names with
+// escapes, such as "a.b" for "a\\.b".
+func literal(name string) string {
+	if !strings.Contains(name, "\\") {
+		return name
+	}
+	return strings.Join(dataflow.SplitField(name), ".")
+}
+
+// escapeField escapes the dots and the brackets of a plain name, so that
+// Vega reads it as one field.
+func escapeField(name string) string {
+	r := strings.NewReplacer("\\", "\\\\", ".", "\\.", "[", "\\[", "]", "\\]")
+	return r.Replace(name)
+}
+
+// flattenExpr writes the expression that reads a field inside an object,
+// with a test of each object on the way.
+func flattenExpr(path []string) string {
+	var parts []string
+	ref := "datum"
+	for _, p := range path {
+		q, _ := json.Marshal(p)
+		ref += "[" + string(q) + "]"
+		parts = append(parts, ref)
+	}
+	return strings.Join(parts, " && ")
+}
+
 // predicate writes a predicate of a filter, such as {"field": "x",
 // "equal": 3}, as an expression.
 func predicate(p map[string]any) string {
@@ -620,4 +662,14 @@ func scaleTypeIn(def *FieldDef, types ...string) bool {
 	m, _ := valueOf(def.Scale).(map[string]any)
 	t, _ := m["type"].(string)
 	return t != "" && slices.Contains(types, t)
+}
+
+// stackName returns the name of the start or the end of the stack of a
+// channel, such as sum_x_start. After a field that ends with a bracket,
+// the suffix is a part of the path of its own, as in vega-lite.js.
+func (c *channelDef) stackName(suffix string) string {
+	if c.bracket && c.nested != nil {
+		return c.out + "\\._" + suffix
+	}
+	return c.out + "_" + suffix
 }

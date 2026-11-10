@@ -27,8 +27,10 @@ func (a *Accessor) Get(r Row) any {
 func FieldAccessor(name string) *Accessor {
 	path := SplitField(name)
 	if len(path) == 1 {
+		// A path of one field names the field without its escapes, as
+		// the field accessor of Vega does.
 		f := path[0]
-		return &Accessor{Name: name, get: func(r Row) any {
+		return &Accessor{Name: f, get: func(r Row) any {
 			if v, ok := r[f]; ok {
 				return v
 			}

@@ -75,6 +75,9 @@ type compiler struct {
 	shareSources bool
 	// shared holds the sources that several views share after a merge.
 	shared map[string]bool
+	// flattens are the expressions that flatten the fields inside objects
+	// before the transforms of a view.
+	flattens []string
 }
 
 // reservation is a number of a dataset that a layer over a dataset takes.
@@ -504,6 +507,21 @@ func (c *compiler) add(n *dataNode, ts ...vega.Transform) {
 // transform makes a Vega transform from its type and its parameters.
 func transform(typ string, params map[string]any) vega.Transform {
 	t := vega.Transform{Type: typ, Params: vega.Extra{}}
+	// The compiler names a field as Vega reads it, with each dot of a
+	// flat name escaped, and a transform writes it under its plain name.
+	switch as := params["as"].(type) {
+	case string:
+		params["as"] = literal(as)
+	case []any:
+		out := make([]any, len(as))
+		for i, a := range as {
+			if s, ok := a.(string); ok {
+				a = literal(s)
+			}
+			out[i] = a
+		}
+		params["as"] = out
+	}
 	keys := slices.Sorted(maps.Keys(params))
 	for _, k := range keys {
 		t.Params[k] = mustJSON(params[k])
@@ -664,6 +682,7 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 	// A merge of datasets can bring aggregates side by side, and a merge
 	// of aggregates can leave datasets that match.
 	c.mergeSources(out, read)
+	c.liftFlattens(read)
 	for range 10 {
 		c.liftBins(out, read)
 		a := c.mergeSiblingAggregates(out, read)

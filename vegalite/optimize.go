@@ -293,6 +293,46 @@ func (c *compiler) mergeSources(out *vega.Spec, read map[string]bool) {
 	}
 }
 
+// liftFlattens moves the formulas that flatten fields inside objects, at
+// the start of the datasets that derive from a source of a url, into the
+// source, once each, as vega-lite.js parses its data there.
+func (c *compiler) liftFlattens(read map[string]bool) {
+	if len(c.flattens) == 0 {
+		return
+	}
+	isFlatten := func(t vega.Transform) bool {
+		if t.Type != "formula" {
+			return false
+		}
+		var e string
+		_ = json.Unmarshal(t.Params["expr"], &e)
+		return slices.Contains(c.flattens, e)
+	}
+	for pi := range c.data {
+		if c.data[pi].URL.IsZero() {
+			continue
+		}
+		have := map[string]bool{}
+		for _, t := range c.data[pi].Transform {
+			have[string(t.Params["expr"])] = true
+		}
+		for k := range c.data {
+			if len(c.data[k].Source.List) != 1 || c.data[k].Source.List[0] != c.data[pi].Name {
+				continue
+			}
+			for len(c.data[k].Transform) > 0 && isFlatten(c.data[k].Transform[0]) {
+				t := c.data[k].Transform[0]
+				if key := string(t.Params["expr"]); !have[key] {
+					have[key] = true
+					c.data[pi].Transform = append(c.data[pi].Transform, t)
+				}
+				c.data[k].Transform = c.data[k].Transform[1:]
+			}
+		}
+	}
+	c.removeEmpty(read)
+}
+
 // liftBins moves the extents and the bins that start the datasets derived
 // from a dataset into that dataset, when two or more of them start so, as
 // vega-lite.js does: those of the last dataset first.

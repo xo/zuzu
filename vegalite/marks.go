@@ -302,12 +302,12 @@ func (u *unit) axis(e enc, ch, size string) {
 		return
 	}
 	if u.stack == ch {
-		u.v.addScale(u, ch, d, []string{d.out + "_start", d.out + "_end"})
+		u.v.addScale(u, ch, d, []string{d.stackName("start"), d.stackName("end")})
 		if sc := u.v.scales[u.v.key(ch)]; sc != nil && u.offset == "normalize" {
 			sc.normalized = true
 		}
-		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_end"})
-		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.out + "_start"})
+		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.stackName("end")})
+		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.stackName("start")})
 		return
 	}
 	fields := []string{d.out}
@@ -406,7 +406,7 @@ func (u *unit) pathDefined(e enc) {
 			if dd := u.ch[name]; dd != nil && dd.isField() && dd.continuous() {
 				f := dd.out
 				if u.stack == name {
-					f += "_end"
+					f = dd.stackName("end")
 				}
 				parts = append(parts, "isValid("+fieldRef(f)+") && isFinite(+"+fieldRef(f)+")")
 			}
@@ -431,12 +431,12 @@ func (u *unit) arc(e enc) {
 	if r := u.ch["radius"]; r != nil && r.isField() {
 		if u.stack == "radius" {
 			// Stacked rings: each spans from its start to its end.
-			u.v.addScale(u, "radius", r, []string{r.out + "_start", r.out + "_end"})
+			u.v.addScale(u, "radius", r, []string{r.stackName("start"), r.stackName("end")})
 			if sc := u.v.scales[u.v.key("radius")]; sc != nil && sc.props["type"] == nil {
 				sc.typ = "linear"
 			}
-			outer = map[string]any{"scale": u.v.sn("radius"), "field": r.out + "_end"}
-			inner = map[string]any{"scale": u.v.sn("radius"), "field": r.out + "_start"}
+			outer = map[string]any{"scale": u.v.sn("radius"), "field": r.stackName("end")}
+			inner = map[string]any{"scale": u.v.sn("radius"), "field": r.stackName("start")}
 		} else {
 			u.v.addScale(u, "radius", r, []string{r.out})
 			outer = map[string]any{"scale": u.v.sn("radius"), "field": r.out}
@@ -456,9 +456,9 @@ func (u *unit) arc(e enc) {
 		e.set("startAngle", map[string]any{"value": 0})
 		e.set("endAngle", map[string]any{"value": 6.283185307179586})
 	case u.stack == "theta":
-		u.v.addScale(u, "theta", t, []string{t.out + "_start", t.out + "_end"})
-		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out + "_end"})
-		e.set("endAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out + "_start"})
+		u.v.addScale(u, "theta", t, []string{t.stackName("start"), t.stackName("end")})
+		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.stackName("end")})
+		e.set("endAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.stackName("start")})
 	case t.isField():
 		u.v.addScale(u, "theta", t, []string{t.out})
 		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out})

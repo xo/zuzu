@@ -288,6 +288,9 @@ func (u *unit) dataflow(s *Spec) error {
 	}
 	needs := len(s.Transform) > 0
 	for _, d := range u.allChannels() {
+		if d.nested != nil {
+			needs = true
+		}
 		if d.bin != nil || d.units != nil || d.aggregate != "" {
 			needs = true
 		}
@@ -313,11 +316,29 @@ func (u *unit) dataflow(s *Spec) error {
 		return nil
 	}
 	n := c.derive(u.data)
+	// A field inside an object flattens before the transforms, or after
+	// them when a transform makes the object.
+	made := producedFields(s.Transform)
+	flat := map[string]bool{}
+	flatten := func(after bool) {
+		for _, d := range u.allChannels() {
+			if d.nested != nil && !flat[d.field] && made[d.nested[0]] == after {
+				flat[d.field] = true
+				e := flattenExpr(d.nested)
+				if !after {
+					c.flattens = append(c.flattens, e)
+				}
+				c.add(n, transform("formula", map[string]any{"expr": e, "as": d.field}))
+			}
+		}
+	}
+	flatten(false)
 	c.parseFields(n, dates, "date")
 	c.parseFields(n, numbers, "number")
 	if err := c.transforms(n, s.Transform, u.path+"/transform"); err != nil {
 		return err
 	}
+	flatten(true)
 	unitsDone := false
 	for _, d := range u.allChannels() {
 		if d.def != nil && len(d.units) > 0 {
@@ -364,7 +385,7 @@ func (u *unit) dataflow(s *Spec) error {
 			// A bar at the start of its interval spans from the middle of
 			// the interval before to the middle of its own.
 			unit := d.units[len(d.units)-1]
-			start, end := "datum['"+d.out+"']", "datum['"+d.outEnd+"']"
+			start, end := "datum['"+literal(d.out)+"']", "datum['"+literal(d.outEnd)+"']"
 			c.add(n, transform("formula", map[string]any{
 				"expr": "0.5 * timeOffset('" + unit + "', " + start + ", -1) + 0.5 * " + start, "as": d.out + "_offsetted_rect_start",
 			}))
@@ -535,7 +556,7 @@ func (u *unit) addSortIndex(n *dataNode) {
 		}
 		u.sortIndex[d.channel] = name
 		u.c.add(n, transform("formula", map[string]any{
-			"expr": "indexof(" + string(mustJSON(dom)) + ", datum['" + d.field + "'])",
+			"expr": "indexof(" + string(mustJSON(dom)) + ", datum['" + literal(d.field) + "'])",
 			"as":   name,
 		}))
 	}
@@ -640,8 +661,12 @@ func (u *unit) addTimeUnits(n *dataNode) {
 	for _, d := range u.allChannels() {
 		if d.binnedUnit {
 			unit := d.units[len(d.units)-1]
+			fn := "timeOffset"
+			if d.utc {
+				fn = "utcOffset"
+			}
 			u.c.add(n, transform("formula", map[string]any{
-				"expr": "timeOffset('" + unit + "', datum['" + d.field + "'], 1)", "as": d.outEnd,
+				"expr": fn + "('" + unit + "', datum['" + literal(d.field) + "'], 1)", "as": d.outEnd,
 			}))
 			continue
 		}
@@ -734,7 +759,7 @@ func (u *unit) addStack(n *dataNode) {
 	}
 	u.c.add(n, transform("stack", map[string]any{
 		"groupby": groupby, "field": m.out, "sort": map[string]any{"field": sortFields, "order": orders},
-		"as": []any{m.out + "_start", m.out + "_end"}, "offset": u.offset,
+		"as": []any{m.stackName("start"), m.stackName("end")}, "offset": u.offset,
 	}))
 }
 
@@ -880,7 +905,7 @@ func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
 	if u.stack == "x" {
 		along, across, size = "x", "y", "height"
 	}
-	start, end := measure.out+"_start", measure.out+"_end"
+	start, end := measure.stackName("start"), measure.stackName("end")
 	groupby := []string{dim.out}
 	if dim.units != nil || dim.bin != nil {
 		groupby = append(groupby, dim.outEnd)
@@ -994,4 +1019,40 @@ func (u *unit) pathSortField() string {
 		return ""
 	}
 	return d.field
+}
+
+// producedFields returns the fields that transforms make: every name under
+// a key "as", in the transform or in its lists of operations.
+func producedFields(ts []Transform) map[string]bool {
+	out := map[string]bool{}
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case map[string]any:
+			for k, e := range x {
+				if k != "as" {
+					walk(e)
+					continue
+				}
+				switch a := e.(type) {
+				case string:
+					out[a] = true
+				case []any:
+					for _, s := range a {
+						if name, ok := s.(string); ok {
+							out[name] = true
+						}
+					}
+				}
+			}
+		case []any:
+			for _, e := range x {
+				walk(e)
+			}
+		}
+	}
+	for _, t := range ts {
+		walk(t.fields())
+	}
+	return out
 }
