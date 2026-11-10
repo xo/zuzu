@@ -8,8 +8,9 @@ zuzu draws its own look, at the quality of nivo and visx, and does not
 reproduce the look of Vega (D12). A theme is a mode, light or dark, and a
 color scheme that swaps apart from it (D14).
 
-On 2026-11-10 phase 0 is done and phase 1 is in progress: the packages
-`scene`, `theme` and `svg` exist. Code follows the plan (D3). Every decision from D1 to D29 is
+On 2026-11-10 phases 0 and 2 are done, and phase 1 waits for a maintainer to
+accept `docs/targets/compare.html`. The packages `scene`, `theme`, `svg` and
+`text` exist. Code follows the plan (D3). Every decision from D1 to D29 is
 decided. The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules
@@ -158,6 +159,7 @@ On 2026-11-10 the repository holds these files:
 | `scene/` | the scene graph and its JSON form (D8) |
 | `theme/` | the modes and the color schemes (D14) |
 | `svg/` | the SVG writer, with its golden files in `svg/testdata` (D10) |
+| `text/` | the measurement of text and the bundled IBM Plex Sans, in `text/fonts` with its license (D11, D16) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
 | `test/` | the test module: the corpus, the inventory, the oracle and the TinyGo check. `test/README.md` says how to run each |
 

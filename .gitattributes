@@ -6,3 +6,4 @@
 # says how. A diff of them is noise, so git shows none.
 docs/survey/data.js linguist-generated -diff
 docs/survey/static/** linguist-generated -diff
+*.ttf binary

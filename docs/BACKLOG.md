@@ -44,12 +44,10 @@ against d3, in `svg/shapes_test.go`.
 
 ### Draw what the writer does not draw yet
 
-1. The writer does not cut a text to its `limit`, which needs the
-   measurement of text (D11).
-2. The mark `shape` returns an error. Vega draws it with a function that the
+1. The mark `shape` returns an error. Vega draws it with a function that the
    JSON of a scene graph cannot hold, so the runtime of zuzu writes a path
    mark in its place.
-3. The interpolations `basis-open`, `basis-closed`, `cardinal-open`,
+2. The interpolations `basis-open`, `basis-closed`, `cardinal-open`,
    `cardinal-closed`, `catmull-rom-open` and `catmull-rom-closed` return an
    error.
 
@@ -75,10 +73,12 @@ from a palette to the tokens of a scheme.
 Open question 12. A scheme can name a font that suits its theme. zuzu
 bundles only IBM Plex Sans (D16).
 
-### Embed IBM Plex Sans
+### Pass the bundled fonts to okage
 
-D16. Embed the weights 400, 500 and 600 and the license file, when the first
-code exists.
+D16. The package `text` embeds IBM Plex Sans, and `text.Fonts` returns the
+files. When the root package renders an image (D24), it loads them into the
+`FontDatabase` of okage and sets the family as the sans serif family, so that
+an image draws the same font that the layout measured.
 
 ## Survey
 

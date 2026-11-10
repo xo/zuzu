@@ -120,6 +120,9 @@ type Item struct {
 	Radius     float64 `json:"radius,omitzero"`
 	Theta      float64 `json:"theta,omitzero"`
 	LineHeight float64 `json:"lineHeight,omitzero"`
+	Limit      float64 `json:"limit,omitzero"`
+	Ellipsis   string  `json:"ellipsis,omitzero"`
+	Dir        string  `json:"dir,omitzero"`
 
 	// An image.
 	URL string `json:"url,omitzero"`

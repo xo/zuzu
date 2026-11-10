@@ -10,6 +10,7 @@ import (
 	_ "github.com/xo/zuzu"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/svg"
+	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/theme"
 )
 
@@ -23,6 +24,8 @@ func main() {
 			{X: 10, Y: 10, Width: 80, Height: 40, Fill: scene.Paint{Color: th.Category[0]}, CornerRadius: 4},
 		}},
 	}
+	f := text.Font{Family: text.Family, Size: 11, Weight: 400}
+	fmt.Fprintf(os.Stderr, "the width of zuzu is %.2f\n", text.NewEstimate().Width(f, "zuzu"))
 	if err := svg.Write(os.Stdout, s); err != nil {
 		fmt.Fprintln(os.Stderr, "wasm:", err)
 		os.Exit(1)

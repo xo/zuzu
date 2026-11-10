@@ -480,6 +480,19 @@
         "fill": "#9a6fd1"
        }
       ]
+     },
+     {
+      "marktype": "text",
+      "items": [
+       {
+        "x": 200,
+        "y": 296,
+        "text": "A long label that is cut to its limit",
+        "limit": 110,
+        "fontSize": 10,
+        "fill": "#5f6b7d"
+       }
+      ]
      }
     ]
    }

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/text"
 )
 
 // Error is an error of the package svg.
@@ -41,7 +42,7 @@ const DefaultFont = "'IBM Plex Sans', sans-serif"
 
 // Write writes a scene as SVG.
 func Write(w io.Writer, s *scene.Scene) error {
-	wr := &writer{}
+	wr := &writer{measure: text.NewEstimate()}
 	var body strings.Builder
 	wr.out = &body
 	if err := wr.mark(&s.Root); err != nil {
@@ -68,9 +69,10 @@ func Write(w io.Writer, s *scene.Scene) error {
 
 // writer holds the state of one call of Write.
 type writer struct {
-	out  *strings.Builder
-	defs strings.Builder
-	ids  int
+	out     *strings.Builder
+	defs    strings.Builder
+	ids     int
+	measure *text.Estimate
 }
 
 // id returns a new identifier for an element of the defs.
@@ -455,10 +457,11 @@ func (w *writer) text(it *scene.Item) {
 	}
 	w.style(it, "#000")
 	w.out.WriteString(">")
-	if len(it.Text) == 1 {
-		w.out.WriteString(esc(it.Text[0]))
+	lines := w.limit(it, size)
+	if len(lines) == 1 {
+		w.out.WriteString(esc(lines[0]))
 	} else {
-		for i, line := range it.Text {
+		for i, line := range lines {
 			dy := "0"
 			if i > 0 {
 				dy = num(lh)
@@ -467,6 +470,39 @@ func (w *writer) text(it *scene.Item) {
 		}
 	}
 	w.out.WriteString("</text>")
+}
+
+// limit cuts each line of a text item to its limit, in pixels, with its
+// ellipsis, as Vega does. It measures with the estimate of the package text
+// (D11). A text whose direction is rtl loses its start rather than its end.
+func (w *writer) limit(it *scene.Item, size float64) []string {
+	if it.Limit <= 0 {
+		return it.Text
+	}
+	f := text.Font{Family: it.Font, Size: size, Weight: text.Weight(string(it.FontWeight)), Italic: it.FontStyle == "italic"}
+	out := make([]string, len(it.Text))
+	for i, line := range it.Text {
+		if it.Dir == "rtl" {
+			out[i] = reverse(text.Truncate(w.measure, f, reverse(line), it.Limit))
+		} else {
+			out[i] = text.Truncate(w.measure, f, line, it.Limit)
+		}
+		if it.Ellipsis != "" && it.Ellipsis != text.Ellipsis {
+			if s, ok := strings.CutSuffix(out[i], text.Ellipsis); ok && out[i] != line {
+				out[i] = s + it.Ellipsis
+			}
+		}
+	}
+	return out
+}
+
+// reverse reverses the runes of a string.
+func reverse(s string) string {
+	r := []rune(s)
+	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
+	}
+	return string(r)
 }
 
 // multiline returns how far the first line of a text of several lines moves
