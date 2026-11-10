@@ -1,0 +1,98 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "From origin to fuel economy: 398 cars, by where they were made, their cylinders and their miles per gallon.",
+  "width": 640,
+  "height": 360,
+  "padding": 5,
+  "title": {"text": "From origin to fuel economy", "subtitle": "398 cars, by where they were made, their cylinders and their miles per gallon"},
+  "data": [
+    {
+      "name": "cars",
+      "url": "data/cars.json",
+      "transform": [
+        {"type": "filter", "expr": "isValid(datum.Miles_per_Gallon)"},
+        {"type": "formula", "as": "cyl", "expr": "datum.Cylinders + ' cylinders'"},
+        {"type": "formula", "as": "band", "expr": "datum.Miles_per_Gallon < 20 ? 'Under 20 mpg' : datum.Miles_per_Gallon < 30 ? '20 to 30 mpg' : '30 mpg or more'"}
+      ]
+    },
+    {
+      "name": "first",
+      "source": "cars",
+      "transform": [
+        {"type": "aggregate", "groupby": ["Origin", "cyl"]},
+        {"type": "project", "fields": ["Origin", "cyl", "count"], "as": ["source", "target", "value"]}
+      ]
+    },
+    {
+      "name": "second",
+      "source": "cars",
+      "transform": [
+        {"type": "aggregate", "groupby": ["cyl", "band"]},
+        {"type": "project", "fields": ["cyl", "band", "count"], "as": ["source", "target", "value"]}
+      ]
+    },
+    {"name": "links", "source": ["first", "second"]},
+    {
+      "name": "nodes",
+      "source": "links",
+      "transform": [
+        {"type": "zuzu.sankey", "extent": [[60, 0], [530, 360]], "nodeWidth": 10, "nodePadding": 16, "nodeSort": null}
+      ]
+    },
+    {
+      "name": "bands",
+      "source": "links",
+      "transform": [{"type": "zuzu.sankeylinks", "nodes": "nodes"}]
+    }
+  ],
+  "scales": [
+    {"name": "color", "type": "ordinal", "domain": ["Europe", "Japan", "USA"], "range": "category"}
+  ],
+  "marks": [
+    {
+      "type": "path",
+      "from": {"data": "bands"},
+      "encode": {
+        "enter": {
+          "path": {"field": "path"},
+          "fillOpacity": {"value": 0.32},
+          "fill": [
+            {"test": "indexof(domain('color'), datum.source) >= 0", "scale": "color", "field": "source"},
+            {"value": "#a0a7b4"}
+          ]
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "nodes"},
+      "encode": {
+        "enter": {
+          "x": {"field": "x0"},
+          "x2": {"field": "x1"},
+          "y": {"field": "y0"},
+          "y2": {"field": "y1"},
+          "cornerRadius": {"value": 3},
+          "fill": [
+            {"test": "indexof(domain('color'), datum.key) >= 0", "scale": "color", "field": "key"},
+            {"value": "#a0a7b4"}
+          ]
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "nodes"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "datum.x0 < 200 ? datum.x0 - 8 : datum.x1 + 8"},
+          "y": {"signal": "(datum.y0 + datum.y1) / 2"},
+          "align": {"signal": "datum.x0 < 200 ? 'right' : 'left'"},
+          "baseline": {"value": "middle"},
+          "fontWeight": {"value": 600},
+          "text": {"signal": "datum.key + '  ' + datum.value"}
+        }
+      }
+    }
+  ]
+}

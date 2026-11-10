@@ -8,6 +8,8 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `testdata/corpus/` | the specs of the corpus and the data they read, with the license of each source beside its files |
 | `testdata/corpus/inventory.tsv` | the features that each spec uses, which `cmd/inventory` writes |
 | `testdata/references/` | the references of vega.js, which the oracle writes and git ignores |
+| `testdata/targets/` | the Vega specs that draw the targets of tiers 1 and 2 with the transforms and the scale of D30, from the data of the corpus |
+| `targets/` | the test that runs those specs in the strict mode. Set `ZUZU_TARGETS_OUT` to a folder to write their SVG |
 | `cmd/inventory/` | the tool that writes the inventory |
 | `cmd/targets/` | the tool that compares the SVG writer with the targets and writes `docs/targets/compare.html` (D13) |
 | `cmd/wasm/` | a program that imports zuzu, so that CI can build it with TinyGo (D29) |

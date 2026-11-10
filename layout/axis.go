@@ -51,6 +51,11 @@ func (a *Axis) ticks() ([]any, []float64) {
 		count := a.Count
 		if count <= 0 {
 			count = math.Max(2, math.Min(MaxLabels, a.Length/40))
+			if a.Scale.Type() == scale.Trading {
+				// A label of a trading scale is short and marks a period,
+				// such as a week, so the axis takes one each 50 pixels.
+				count = math.Max(2, a.Length/50)
+			}
 		}
 		if !scale.Discrete(a.Scale.Type()) {
 			count = math.Min(count, MaxLabels)

@@ -43,4 +43,4 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D27](D027-time-is-in-the-time-zone-of-the-system-and-the-locale-is-us.md) | Time is in the time zone of the system, and the locale is US English | Decided |
 | [D28](D028-random-numbers-are-random-and-the-caller-can-give-a-source.md) | Random numbers are random, and the caller can give a source | Decided |
 | [D29](D029-zuzu-builds-with-tinygo-for-webassembly-and-has-no-size.md) | zuzu builds with TinyGo for WebAssembly, and has no size target | Decided |
-| [D30](D030-the-transforms-and-the-scale-that-zuzu-adds-for-tiers-1-and-2.md) | The transforms and the scale that zuzu adds for tiers 1 and 2 | Proposed |
+| [D30](D030-the-transforms-and-the-scale-that-zuzu-adds-for-tiers-1-and-2.md) | The transforms and the scale that zuzu adds for tiers 1 and 2 | Decided |

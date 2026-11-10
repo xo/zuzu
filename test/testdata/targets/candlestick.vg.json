@@ -1,0 +1,72 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "CBOE Volatility Index: daily open, high, low and close, June to August 2009. Weekends leave no gaps.",
+  "width": 600,
+  "height": 320,
+  "padding": 5,
+  "title": {"text": "CBOE Volatility Index", "subtitle": "Daily open, high, low and close, June to August 2009. Weekends leave no gaps"},
+  "data": [
+    {
+      "name": "days",
+      "url": "data/ohlc.json",
+      "format": {"type": "json", "parse": {"date": "date"}},
+      "transform": [
+        {"type": "window", "sort": {"field": "date"}, "ops": ["mean", "row_number"], "fields": ["close", null], "as": ["mean", "n"], "frame": [-4, 0]},
+        {"type": "formula", "as": "mean5", "expr": "datum.n >= 5 ? datum.mean : null"}
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "x", "type": "zuzu.trading", "domain": {"data": "days", "field": "date"}, "range": "width", "paddingInner": 0.3, "paddingOuter": 0.15},
+    {"name": "y", "type": "linear", "domain": {"data": "days", "fields": ["low", "high"]}, "range": "height", "zero": false, "nice": true},
+    {"name": "color", "type": "ordinal", "domain": ["Rose", "Fell", "5-day mean"], "range": ["#2a9d8f", "#e76f51", "#4c6ef5"]}
+  ],
+  "axes": [
+    {"orient": "bottom", "scale": "x", "format": "%b %-d"},
+    {"orient": "left", "scale": "y", "grid": true, "tickCount": 5}
+  ],
+  "legends": [{"fill": "color", "orient": "top", "direction": "horizontal"}],
+  "marks": [
+    {
+      "type": "rule",
+      "from": {"data": "days"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "date", "band": 0.5},
+          "y": {"scale": "y", "field": "low"},
+          "y2": {"scale": "y", "field": "high"},
+          "strokeWidth": {"value": 1.25},
+          "stroke": {"scale": "color", "signal": "datum.close >= datum.open ? 'Rose' : 'Fell'"}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "days"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "date"},
+          "width": {"scale": "x", "band": 1},
+          "y": {"scale": "y", "signal": "max(datum.open, datum.close)"},
+          "y2": {"scale": "y", "signal": "min(datum.open, datum.close)"},
+          "cornerRadius": {"value": 1.5},
+          "fill": {"scale": "color", "signal": "datum.close >= datum.open ? 'Rose' : 'Fell'"}
+        }
+      }
+    },
+    {
+      "type": "line",
+      "from": {"data": "days"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "date", "band": 0.5},
+          "y": {"scale": "y", "field": "mean5"},
+          "defined": {"signal": "isValid(datum.mean5)"},
+          "interpolate": {"value": "monotone"},
+          "stroke": {"scale": "color", "value": "5-day mean"},
+          "strokeWidth": {"value": 2}
+        }
+      }
+    }
+  ]
+}

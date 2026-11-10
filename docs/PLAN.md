@@ -649,8 +649,12 @@ zuzu chose these rules where the documents of Vega say nothing (D6):
   since zuzu draws a still image. Its nbody force sums over every pair,
   the exact form of the approximation of Barnes and Hut.
 
-The transform `label`, the sankey of zuzu and the time scale that skips
-days are not done.
+D30 named the transforms and the scale that zuzu adds. `zuzu.sankey`,
+`zuzu.sankeylinks`, `zuzu.chord`, `zuzu.chordribbons`, `zuzu.hexbin` and the
+scale `zuzu.trading` exist, and the specs in `test/testdata/targets` draw the
+sankey, the chord diagram, the hex bins and the candlestick from them in the
+strict mode. The transform `label` is not done, and the other targets of
+tiers 1 and 2 have no spec yet.
 
 ### Phase 6. The direct okage renderer
 
@@ -799,7 +803,7 @@ stays true.
     and D6 says that zuzu follows the documented behavior. The plan
     proposes the structure: the same datasets by name, the same scales by
     name and type, and the same marks by name and type.
-15. What are the names and the parameters of the transforms and the scale
+15. Answered on 2026-11-10 by D30. What are the names and the parameters of the transforms and the scale
     that zuzu adds for the charts of tiers 1 and 2 that Vega cannot draw?
     The plan says that zuzu adds a sankey and a time scale that skips the
     days with no trade, with names that start with `zuzu.` (D6). Tier 2
@@ -808,5 +812,4 @@ stays true.
     the fields of the source, the target and the value of a sankey, and
     the width and the padding of its nodes, or whether the time scale reads
     a list of the days to skip or a calendar of weekdays. Phase 5 waits for
-    this answer to draw those four targets from a spec. D30 proposes an
-    answer.
+    this answer to draw those four targets from a spec.

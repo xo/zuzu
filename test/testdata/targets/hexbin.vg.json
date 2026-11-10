@@ -1,0 +1,53 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Fifty years of fertility and life span: every country in every fifth year from 1955 to 2005. Darker cells hold more.",
+  "width": 580,
+  "height": 360,
+  "padding": 5,
+  "title": {"text": "Fifty years of fertility and life span", "subtitle": "Every country in every fifth year from 1955 to 2005. Darker cells hold more"},
+  "data": [
+    {
+      "name": "points",
+      "url": "data/gapminder.json",
+      "transform": [{"type": "filter", "expr": "isValid(datum.fertility) && isValid(datum.life_expect)"}]
+    },
+    {
+      "name": "cells",
+      "source": "points",
+      "transform": [
+        {
+          "type": "zuzu.hexbin",
+          "x": {"expr": "scale('x', datum.fertility)"},
+          "y": {"expr": "scale('y', datum.life_expect)"},
+          "radius": 12,
+          "extent": [[0, 0], [{"signal": "width"}, {"signal": "height"}]]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "x", "type": "linear", "domain": [1, 8.5], "range": "width", "zero": false},
+    {"name": "y", "type": "linear", "domain": [25, 90], "range": "height", "zero": false},
+    {"name": "color", "type": "linear", "domain": {"data": "cells", "field": "count"}, "range": "ramp", "zero": false}
+  ],
+  "axes": [
+    {"orient": "bottom", "scale": "x", "title": "Children per woman"},
+    {"orient": "left", "scale": "y", "title": "Life expectancy in years", "grid": true}
+  ],
+  "marks": [
+    {
+      "type": "path",
+      "from": {"data": "cells"},
+      "encode": {
+        "enter": {
+          "x": {"field": "x"},
+          "y": {"field": "y"},
+          "path": {"field": "path"},
+          "fill": {"scale": "color", "field": "count"},
+          "stroke": {"value": "#ffffff"},
+          "strokeWidth": {"value": 0.5}
+        }
+      }
+    }
+  ]
+}

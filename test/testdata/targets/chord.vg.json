@@ -1,0 +1,103 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Which packages of Flare use which: each ribbon is the imports between two packages of the toolkit.",
+  "width": 520,
+  "height": 480,
+  "padding": 5,
+  "title": {"text": "Which packages of Flare use which", "subtitle": "Each ribbon is the imports between two packages of the toolkit"},
+  "signals": [
+    {"name": "cx", "update": "width / 2"},
+    {"name": "cy", "update": "height / 2"},
+    {"name": "radius", "update": "min(width, height) / 2 - 40"}
+  ],
+  "data": [
+    {"name": "tree", "url": "data/flare.json"},
+    {
+      "name": "packages",
+      "url": "data/flare.json",
+      "transform": [
+        {"type": "lookup", "from": "tree", "key": "id", "fields": ["parent"], "as": ["p1"]},
+        {"type": "lookup", "from": "tree", "key": "id", "fields": ["p1.parent"], "as": ["p2"]},
+        {"type": "lookup", "from": "tree", "key": "id", "fields": ["p2.parent"], "as": ["p3"]},
+        {"type": "lookup", "from": "tree", "key": "id", "fields": ["p3.parent"], "as": ["p4"]},
+        {
+          "type": "formula",
+          "as": "top",
+          "expr": "datum.parent === 1 ? datum.name : datum.p1 && datum.p1.parent === 1 ? datum.p1.name : datum.p2 && datum.p2.parent === 1 ? datum.p2.name : datum.p3 && datum.p3.parent === 1 ? datum.p3.name : datum.p4 && datum.p4.parent === 1 ? datum.p4.name : null"
+        }
+      ]
+    },
+    {
+      "name": "imports",
+      "url": "data/flare-dependencies.json",
+      "transform": [
+        {"type": "lookup", "from": "packages", "key": "id", "fields": ["source", "target"], "values": ["top"], "as": ["from", "to"]},
+        {"type": "filter", "expr": "isValid(datum.from) && isValid(datum.to)"},
+        {"type": "aggregate", "groupby": ["from", "to"]}
+      ]
+    },
+    {
+      "name": "groups",
+      "source": "imports",
+      "transform": [
+        {"type": "zuzu.chord", "source": "from", "target": "to", "value": "count", "padAngle": 0.035, "sortSubgroups": "descending"}
+      ]
+    },
+    {
+      "name": "ribbons",
+      "source": "imports",
+      "transform": [
+        {"type": "zuzu.chordribbons", "groups": "groups", "source": "from", "target": "to", "value": "count", "sortSubgroups": "descending", "radius": {"signal": "radius - 2"}},
+        {"type": "filter", "expr": "isValid(datum.path)"}
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "color", "type": "ordinal", "domain": {"data": "groups", "field": "key"}, "range": "category"}
+  ],
+  "marks": [
+    {
+      "type": "path",
+      "from": {"data": "ribbons"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "cx"},
+          "y": {"signal": "cy"},
+          "path": {"field": "path"},
+          "fill": {"scale": "color", "field": "from"},
+          "fillOpacity": {"value": 0.55}
+        }
+      }
+    },
+    {
+      "type": "arc",
+      "from": {"data": "groups"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "cx"},
+          "y": {"signal": "cy"},
+          "startAngle": {"field": "startAngle"},
+          "endAngle": {"field": "endAngle"},
+          "innerRadius": {"signal": "radius"},
+          "outerRadius": {"signal": "radius + 10"},
+          "cornerRadius": {"value": 2},
+          "fill": {"scale": "color", "field": "key"}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "groups"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "cx + sin((datum.startAngle + datum.endAngle) / 2) * (radius + 22)"},
+          "y": {"signal": "cy - cos((datum.startAngle + datum.endAngle) / 2) * (radius + 22)"},
+          "align": {"signal": "sin((datum.startAngle + datum.endAngle) / 2) > 0.1 ? 'left' : sin((datum.startAngle + datum.endAngle) / 2) < -0.1 ? 'right' : 'center'"},
+          "baseline": {"value": "middle"},
+          "fontWeight": {"value": 600},
+          "text": {"field": "key"}
+        }
+      }
+    }
+  ]
+}

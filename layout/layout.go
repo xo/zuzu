@@ -145,6 +145,11 @@ func (s Style) itemBounds(typ string, it *scene.Item) Bounds {
 		b.add(it.X, it.Y)
 		b.add(it.X2, it.Y2)
 	case scene.Line, scene.Trail, scene.Area:
+		if it.Defined != nil && !*it.Defined {
+			// A point that is not defined is not drawn, and Vega leaves
+			// it out of the bounds.
+			return b
+		}
 		b.add(it.X, it.Y)
 		if typ == scene.Area {
 			if it.Orient == "horizontal" {

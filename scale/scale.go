@@ -98,6 +98,8 @@ func New(o Options) (Scale, error) {
 		return newContinuous(o)
 	case "band", "point":
 		return newBand(o), nil
+	case Trading:
+		return newTrading(o), nil
 	case "ordinal":
 		return newOrdinal(o), nil
 	case "quantize", "quantile", "threshold", "bin-ordinal":
@@ -117,7 +119,7 @@ func Defaults(typ string) Options {
 // Discrete reports whether a scale type has a discrete domain.
 func Discrete(typ string) bool {
 	switch typ {
-	case "band", "point", "ordinal":
+	case "band", "point", "ordinal", Trading:
 		return true
 	}
 	return false

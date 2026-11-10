@@ -120,7 +120,7 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 	}
 	ax.Overlap = overlap
 	bp := 0.0
-	if sc.Type() == "band" {
+	if sc.Type() == "band" || sc.Type() == scale.Trading {
 		bp = 0.5
 	}
 	if ax.BandPosition, err = s.num(a.BandPosition, bp); err != nil {
@@ -147,7 +147,7 @@ func (s *scope) labelFormat(sc scale.Scale, fv, ftv vega.Value, ax *layout.Axis)
 	if err != nil {
 		return nil, err
 	}
-	isTime := strings.HasSuffix(sc.Type(), "time") || strings.HasSuffix(sc.Type(), "utc")
+	isTime := strings.HasSuffix(sc.Type(), "time") || strings.HasSuffix(sc.Type(), "utc") || sc.Type() == scale.Trading
 	loc := s.rt.loc
 	if strings.HasSuffix(sc.Type(), "utc") || ftype == "utc" {
 		loc = time.UTC

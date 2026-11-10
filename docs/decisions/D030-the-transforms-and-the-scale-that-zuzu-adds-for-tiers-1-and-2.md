@@ -1,9 +1,10 @@
 # D30. The transforms and the scale that zuzu adds for tiers 1 and 2
 
-Status: Proposed.
+Status: Decided.
 
 On 2026-11-10 an agent proposed these names and parameters, in answer to
-open question 15 of the plan. Vega has no transform for a sankey, a chord
+open question 15 of the plan, and the maintainers accepted them the same
+day. Vega has no transform for a sankey, a chord
 diagram or hex bins, and no scale that skips the days with no trade. D6
 says that each feature that Vega does not have takes a name that starts
 with `zuzu.`. Gemini and DeepSeek reviewed a draft. "External review" in
@@ -74,15 +75,18 @@ It runs on a dataset of links and makes a row for each group, which the
 | `as` | see below | the names of the output fields |
 
 Each group row holds `key`, `index`, `startAngle`, `endAngle` and `value`.
-The angles follow the arc mark of Vega: 0 at the top, and clockwise. A link
-from A to B and a link from B to A are the two ends of one ribbon. Each end
-is as wide as the flow that leaves from it. With `directed`, the size of a
-group is only the flow out of it.
+The angles follow the arc mark of Vega: 0 at the top, and clockwise.
+Without `directed`, the size of a group is the flow out of it, and a link
+from A to B and a link from B to A are the two ends of one ribbon, each as
+wide as its own flow. With `directed`, the size of a group is the flow out
+of it and the flow into it, and each link is a ribbon of its own, as wide at
+both ends.
 
 ## zuzu.chordribbons
 
 It runs on the dataset of links, and the parameter `groups` names the
-dataset that `zuzu.chord` made. `radius` is the radius of the ends of the
+dataset that `zuzu.chord` made. The parameters `source`, `target`, `value`,
+`sortSubgroups` and `directed` are the same as those of `zuzu.chord`. `radius` is the radius of the ends of the
 ribbons, the inner radius of the arcs of the groups, with no default. Each
 link gets `sourceStartAngle`, `sourceEndAngle`, `targetStartAngle`,
 `targetEndAngle` and `path`, the ribbon around the center. A link from B to
