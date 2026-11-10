@@ -780,6 +780,7 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 		}
 	}
 	c.release(out, read)
+	c.numberBySource(out, read)
 }
 
 // mergeSiblingAggregates merges the aggregates of the datasets that derive
@@ -1065,5 +1066,64 @@ func (c *compiler) parseExplicit(src, n *dataNode) {
 		}
 		parsed[f] = true
 		c.add(n, transform("formula", map[string]any{"expr": e, "as": f}))
+	}
+}
+
+// numberBySource gives the derived datasets of each source their numbers
+// after those of the sources before it, as vega-lite.js numbers them. The
+// datasets of one source keep their order, and the numbers stay the same
+// set, with the gaps that the layers took.
+func (c *compiler) numberBySource(out *vega.Spec, read map[string]bool) {
+	children := map[string][]string{}
+	var roots []string
+	for _, d := range c.data {
+		if len(d.Source.List) == 0 {
+			roots = append(roots, d.Name)
+			continue
+		}
+		p := d.Source.List[0]
+		children[p] = append(children[p], d.Name)
+	}
+	// The datasets of each source keep the order of their numbers, and
+	// the sources come in their order.
+	var order []string
+	seen := map[string]bool{}
+	for _, r := range roots {
+		var group []string
+		var walk func(name string)
+		walk = func(name string) {
+			if seen[name] {
+				return
+			}
+			seen[name] = true
+			if _, ok := dataNumber(name); ok {
+				group = append(group, name)
+			}
+			for _, k := range children[name] {
+				walk(k)
+			}
+		}
+		walk(r)
+		slices.SortFunc(group, func(a, b string) int {
+			x, _ := dataNumber(a)
+			y, _ := dataNumber(b)
+			return x - y
+		})
+		order = append(order, group...)
+	}
+	var numbers []int
+	for _, n := range order {
+		m, _ := dataNumber(n)
+		numbers = append(numbers, m)
+	}
+	slices.Sort(numbers)
+	names := map[string]string{}
+	for i, n := range order {
+		if want := fmt.Sprintf("data_%d", numbers[i]); want != n {
+			names[n] = want
+		}
+	}
+	if len(names) > 0 {
+		c.renameAll(out, read, names)
 	}
 }
