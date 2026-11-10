@@ -10,9 +10,10 @@ color scheme that swaps apart from it (D14).
 
 On 2026-11-10 phases 0 and 2 are done, and phase 1 waits for a maintainer to
 accept `docs/targets/compare.html`. Phase 3 is done: zuzu runs static Vega
-specs. Phase 4, Vega-Lite, meets its share and waits for the maintainers to
-accept it. Code follows the plan (D3). Every decision from D1 to D29 is
-decided. The open questions are at the end of `docs/PLAN.md`.
+specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5, the charts of
+tiers 1 and 2, has started. Code follows the plan (D3).
+Every decision from D1 to D29 is decided. The open questions are at the end
+of `docs/PLAN.md`.
 
 ## Standing rules
 

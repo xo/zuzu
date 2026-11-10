@@ -574,8 +574,8 @@ measures it:
 | marks that draw data | 2460 (91.0%) | 2702 | 75% |
 | the structure of the compiled spec | 420 (89.4%) | 470 | 50% |
 
-Each check meets its exit. Phase 4 is done when the maintainers accept the
-share. `TestPhase4Share` in the test module fails when a share falls below
+Each check meets its exit. Phase 4 was done on 2026-11-10, when the
+maintainers accepted the share. `TestPhase4Share` in the test module fails when a share falls below
 its exit, and the conformance job of CI runs it.
 
 The composite marks `boxplot`, `errorbar` and `errorband` expand into
@@ -598,6 +598,20 @@ scale that skips days.
 
 Exit: a stated share of the whole corpus passes, and each chart of tiers 1
 and 2 draws its target from a spec.
+
+This plan proposes the share at the start of the phase, on 2026-11-10, as
+phases 3 and 4 did, for the maintainers to accept. The whole corpus holds
+679 specs. The 139 specs outside the first target bind events or lack their
+data, so they count as failures, and at most 540 specs, 79.5 percent, can
+pass. The exit is that 75 percent of the whole corpus, 510 specs, match in
+all three checks of `go run ./cmd/conform`, and that the Vega-Lite check
+of `-vl` stays above the exit of phase 4.
+
+On 2026-11-10, at the start of the phase, 474 specs match: 69.8 percent of
+the whole corpus. The features that the report names most often are the
+mark `shape` with the transforms `geojson`, `geopoint` and `graticule` and
+the format topojson, then `density` and `kde`, then the hierarchy
+transforms `stratify`, `tree`, `treelinks`, `pack` and `partition`.
 
 ### Phase 6. The direct okage renderer
 
