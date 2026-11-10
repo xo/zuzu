@@ -698,7 +698,7 @@ On 2026-11-11 the measurement came first. `test/cmd/rasterbench` times each
 step of the image of each of the 540 specs of the first target, on an AMD
 Ryzen 9 9950X:
 
-| Step | okage v0.2.0 | okage with the fix of its arcs |
+| Step | okage v0.2.0 | okage v0.2.1 |
 | --- | --- | --- |
 | the scene | 2.8 s | 2.8 s |
 | the SVG writer | 0.3 s | 0.3 s |
@@ -710,14 +710,13 @@ The parse was slow because okage computed the sine, the cosine and the
 other functions of an arc with math/big, at about 9 microseconds a call. A
 path with arcs took about 250 microseconds to parse, and a symbol, a slice
 of a pie and a rect with round corners each have arcs. The okage peer
-found the cause and staged the fix, as okage v0.2.1, which waits for its
-maintainers. The second column uses the staged fix.
+found the cause, and okage v0.2.1 holds the fix. zuzu requires v0.2.1.
 
 Either way the gain is larger than the 7 to 10 percent of the estimate
 above, so `raster` exists. It draws every mark but text with the drawing of
 okage, from the same geometry as the SVG writer, which `internal/shape`
 holds. Without text, the 540 specs draw in 2.9 s directly, against 18.4 s
-through SVG with okage v0.2.0, and 4.6 s with the fix: 37 percent less
+through SVG with okage v0.2.0, and 4.6 s with v0.2.1: 37 percent less
 time. No spec differs from its image through SVG in more than 1 percent of
 its pixels, by the metric of okage D31, and the worst differs in 0.5
 percent. A test of the test module checks this on the whole corpus.
@@ -734,9 +733,11 @@ These rules make the images match, because okage draws them so:
 
 Text is not done, so the exit is not met. The direct renderer needs the
 outlines of the glyphs, with the fonts, the fallback and the shaping of
-okage (D11). The okage peer asked the okage maintainers on 2026-11-11 for a
-decision on that API. Until it exists, `raster.Draw` takes a
-`TextRenderer`, and a scene with text and no `TextRenderer` is an error.
+okage (D11). The okage maintainers accepted that API on 2026-11-11 as okage
+D37: `svg.ShapeText` gives a run of text with its width and the outlines of
+its glyphs. It comes in okage v0.3.0, which is not released yet. Until then,
+`raster.Draw` takes a `TextRenderer`, and a scene with text and no
+`TextRenderer` is an error.
 
 ### Phase 7. DOT and Mermaid
 

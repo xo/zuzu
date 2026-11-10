@@ -93,18 +93,14 @@ numbers before strings.
 
 ### Draw text in the direct renderer
 
-`raster.Draw` draws every mark but text (D11). Text needs an API of okage
-that gives the outlines of the glyphs of a string, with the fonts, the
-fallback and the shaping of the package `svg` of okage. The okage peer
-asked the okage maintainers for a decision on 2026-11-11. When the API
-exists, write a `raster.TextRenderer` on it, add `Chart.Image`, and check
-the corpus with its text against okage, at most 1 percent of the pixels.
-
-### Require the fix of the arcs of okage
-
-okage v0.2.1 parses an arc about 40 times faster (phase 6 in
-`docs/PLAN.md`). When it is released, require it in both modules, and
-measure again with `test/cmd/rasterbench`.
+`raster.Draw` draws every mark but text (D11). Text needs the API of okage
+D37, `svg.ShapeText`, which gives the width of a run of text and the
+outlines of its glyphs, with the fonts, the fallback and the shaping of the
+package `svg` of okage. It comes in okage v0.3.0. When that is released,
+require it, write a `raster.TextRenderer` on it, add `Chart.Image`, and
+check the corpus with its text against okage, at most 1 percent of the
+pixels. `ShapeText` does not collapse white space, as a `text` element of
+SVG does, so the renderer collapses it first.
 
 ## Themes
 

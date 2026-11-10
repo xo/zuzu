@@ -119,7 +119,7 @@ pix, err := raster.Draw(s, raster.WithText(tr)) // phase 6 (D11)
 
 `raster.Draw` exists since phase 6 and draws every mark but text. A scene
 with text needs a `raster.TextRenderer`, which waits for the API of okage
-that gives the outlines of glyphs (D11).
+D37 that gives the outlines of glyphs, in okage v0.3.0 (D11).
 
 ### Options
 
