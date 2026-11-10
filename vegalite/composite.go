@@ -113,7 +113,7 @@ func composite(s *Spec) (*Spec, error) {
 	case "boxplot":
 		out = boxplot(cont, field, title, def, props, others, groupby)
 	default:
-		out = errorMark(s.Mark.Type, cont, field, title, def, props, others, groupby)
+		out = errorMark(s.Mark.Type, cont, field, title, def, props, others, groupby, enc)
 	}
 	if len(pre) > 0 {
 		ts, _ := out["transform"].([]any)
@@ -213,7 +213,7 @@ var position = []string{"x", "y", "xOffset", "yOffset", "detail", "row", "column
 // errorMark expands an error bar, a rule from the lower to the upper bound
 // with ticks at the ends if the mark asks, or an error band, an area from
 // the lower to the upper bound with lines at the edges if it asks.
-func errorMark(typ, cont, field, title string, def, props, others map[string]any, groupby []any) map[string]any {
+func errorMark(typ, cont, field, title string, def, props, others map[string]any, groupby []any, enc map[string]any) map[string]any {
 	extent := "stderr"
 	if e, ok := props["extent"].(string); ok {
 		extent = e
@@ -243,6 +243,32 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 		groupby = []any{}
 	}
 	transform := []any{map[string]any{"aggregate": agg, "groupby": groupby}}
+	ref := func(f string) string { return "datum['" + f + "']" }
+	fieldOf := func(ch string) string {
+		m, _ := enc[ch].(map[string]any)
+		f, _ := m["field"].(string)
+		return f
+	}
+	switch {
+	case fieldOf(cont+"2") != "":
+		// The data gives both bounds.
+		transform = nil
+		calcs = []any{
+			map[string]any{"calculate": ref(fieldOf(cont + "2")), "as": upper},
+			map[string]any{"calculate": ref(field), "as": lower},
+		}
+	case fieldOf(cont+"Error") != "":
+		// The data gives the center and the error on each side.
+		transform = nil
+		low := ref(field) + " - " + ref(fieldOf(cont+"Error"))
+		if e2 := fieldOf(cont + "Error2"); e2 != "" {
+			low = ref(field) + " + " + ref(e2)
+		}
+		calcs = []any{
+			map[string]any{"calculate": ref(field) + " + " + ref(fieldOf(cont+"Error")), "as": upper},
+			map[string]any{"calculate": low, "as": lower},
+		}
+	}
 	// The bounds that the formulas work out belong to the layers that
 	// draw them.
 	withCalcs := func(l map[string]any) map[string]any {
@@ -290,7 +316,11 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 			}
 		}
 	}
-	return map[string]any{"transform": transform, "layer": layers}
+	out := map[string]any{"layer": layers}
+	if transform != nil {
+		out["transform"] = transform
+	}
+	return out
 }
 
 // boxplot expands a box plot: a rule for each whisker, a bar from the

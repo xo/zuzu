@@ -568,11 +568,11 @@ measures it:
 
 | Check | Match | Of | Exit |
 | --- | --- | --- | --- |
-| specs, in all three checks | 297 (63.2%) | 470 | 60% |
-| datasets | 758 (70.7%) | 1072 | 70% |
-| scales | 1010 (84.7%) | 1193 | 80% |
-| marks that draw data | 2087 (77.2%) | 2702 | 75% |
-| the structure of the compiled spec | 364 (77.4%) | 470 | 50% |
+| specs, in all three checks | 363 (77.2%) | 470 | 60% |
+| datasets | 826 (77.1%) | 1072 | 70% |
+| scales | 1096 (91.9%) | 1193 | 80% |
+| marks that draw data | 2233 (82.6%) | 2702 | 75% |
+| the structure of the compiled spec | 398 (84.7%) | 470 | 50% |
 
 Each check meets its exit. Phase 4 is done when the maintainers accept the
 share. `TestPhase4Share` in the test module fails when a share falls below
@@ -584,8 +584,8 @@ layers over the aggregated fields that Vega-Lite names, such as
 datasets of sibling views that have the same transforms, and the
 aggregates of sibling views that have the same group by fields. The
 largest parts of what fails are the maps and the transforms of phase 5, a
-facet sorted across both rows and columns, the names that a named spec
-gives its scales and marks, and some names of the datasets of a layer.
+facet sorted across both rows and columns, nested field names such as
+`a.b`, and some names of the datasets of a layer.
 
 ### Phase 5. Tier 1 and tier 2
 
