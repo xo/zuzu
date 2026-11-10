@@ -728,6 +728,36 @@ measurements are under Rendering above. Its advice on text no longer
 applies, because the maintainers rejected the parse of an SVG fragment
 (D11).
 
+Gemini and DeepSeek reviewed a draft of D30 on 2026-11-10: the transforms
+and the scale that zuzu adds for the sankey, the chord diagram, the hex bins
+and the candlestick. D30 took these leads:
+
+1. Both asked for a key of the nodes, so that the links of a sankey find
+   their nodes. D30 adds `nodeKey`.
+2. Gemini asked what a cycle of links does. D30 makes it an error.
+3. Gemini asked whether a chord diagram is directed. D30 adds `directed`,
+   and says what a link each way draws.
+4. Gemini asked which radius the ribbons take. D30 says it is the inner
+   radius of the arcs.
+5. Both said that the domain of the trading scale must be the list of the
+   days, not an extent. D30 says so.
+6. Gemini asked where a tick goes when a boundary falls on a day with no
+   trade. D30 moves it to the next day of the domain.
+7. DeepSeek asked for `nodeSort` and `linkSort` in place of a plain `sort`,
+   and asked how a candlestick draws. D30 takes the names, and draws a
+   candlestick with a rule and a rect.
+
+D30 did not take these:
+
+1. DeepSeek said that a transform that reads another dataset by name is not
+   an idiom of Vega. It is: `lookup` and the link force of `force` do so.
+2. DeepSeek asked for names such as `zuzuSankey`. D6 sets the prefix
+   `zuzu.`.
+3. Gemini asked for the hex bins to read scales by name. `kde2d` of Vega
+   reads pixels through expressions, and D30 does the same.
+4. Gemini asked for the hours of a session inside a day. D30 leaves them
+   out, since no target needs them.
+
 ## Open questions for the maintainers
 
 A question keeps its number after it is answered, so that a reference to it
@@ -778,4 +808,5 @@ stays true.
     the fields of the source, the target and the value of a sankey, and
     the width and the padding of its nodes, or whether the time scale reads
     a list of the days to skip or a calendar of weekdays. Phase 5 waits for
-    this answer to draw those four targets from a spec.
+    this answer to draw those four targets from a spec. D30 proposes an
+    answer.
