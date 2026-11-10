@@ -46,6 +46,8 @@ const rows = readFileSync(join(corpus, "inventory.tsv"), "utf8").trim().split("\
 // the string "[ref]", and an array below the second level becomes its length,
 // which keeps the coordinates of a map from filling the file.
 function value(v, depth = 0, seen = new WeakSet()) {
+  // A typed array, such as the grid of a density, is an array.
+  if (ArrayBuffer.isView(v) && !(v instanceof DataView)) v = Array.from(v);
   if (v instanceof Date) return isNaN(v) ? null : v.toISOString();
   if (typeof v === "number") return Number.isFinite(v) ? v : String(v);
   if (v === undefined) return null;

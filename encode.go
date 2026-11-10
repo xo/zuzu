@@ -449,8 +449,16 @@ func setProp(st *itemState, name string, v any) {
 		it.Ellipsis = str()
 	case "dir":
 		it.Dir = str()
-	case "url":
+	case "url", "image":
+		// An image of Vega can also come from the field image, which the
+		// transform heatmap writes as a URL of data.
 		it.URL = str()
+	case "aspect":
+		b := expr.Truthy(v)
+		it.Aspect = &b
+	case "smooth":
+		b := expr.Truthy(v)
+		it.Smooth = &b
 	case "clip":
 		it.Clip = expr.Truthy(v)
 	}

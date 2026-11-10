@@ -388,8 +388,19 @@ func (w *writer) path(it *scene.Item) {
 
 // image writes an image item.
 func (w *writer) image(it *scene.Item) {
+	if it.URL == "" {
+		// An image with no URL draws nothing. An empty href names the
+		// document itself.
+		return
+	}
 	fmt.Fprintf(w.out, `<image x="%s" y="%s" width="%s" height="%s" href="%s"`,
 		num(it.X), num(it.Y), num(it.Width), num(it.Height), esc(it.URL))
+	if it.Aspect != nil && !*it.Aspect {
+		w.out.WriteString(` preserveAspectRatio="none"`)
+	}
+	if it.Smooth != nil && !*it.Smooth {
+		w.out.WriteString(` image-rendering="optimizeSpeed"`)
+	}
 	if it.Opacity != nil {
 		fmt.Fprintf(w.out, ` opacity="%s"`, num(*it.Opacity))
 	}

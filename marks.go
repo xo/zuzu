@@ -605,6 +605,8 @@ func itemRow(it *scene.Item) dataflow.Row {
 		"width": it.Width, "height": it.Height, "path": it.Path,
 		"angle": it.Angle, "startAngle": it.StartAngle, "endAngle": it.EndAngle,
 		"innerRadius": it.InnerRadius, "outerRadius": it.OuterRadius,
+		"text": textValue(it.Text), "font": it.Font, "fontSize": it.FontSize,
+		"fontStyle": it.FontStyle, "fontWeight": string(it.FontWeight),
 	}
 }
 
@@ -622,5 +624,29 @@ func setItem(it *scene.Item, r dataflow.Row) {
 	}
 	if v, ok := r["path"].(string); ok {
 		it.Path = v
+	}
+	if v, ok := r["image"].(string); ok {
+		it.URL = v
+	}
+	x, xok := r["x"].(float64)
+	y, yok := r["y"].(float64)
+	if xok && yok && (math.IsNaN(x) || math.IsNaN(y)) {
+		// A transform that gives no place, as a word cloud does for a
+		// word that does not fit, hides the item, which Vega does not
+		// draw.
+		zero := 0.0
+		it.Opacity = &zero
+	}
+	if v, ok := r["fontSize"].(float64); ok && !math.IsNaN(v) {
+		it.FontSize = v
+	}
+	if v, ok := r["font"].(string); ok {
+		it.Font = v
+	}
+	if v, ok := r["fontStyle"].(string); ok {
+		it.FontStyle = v
+	}
+	if v, ok := r["fontWeight"]; ok && v != nil {
+		it.FontWeight = scene.Weight(expr.String(v))
 	}
 }

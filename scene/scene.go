@@ -124,8 +124,12 @@ type Item struct {
 	Ellipsis   string  `json:"ellipsis,omitzero"`
 	Dir        string  `json:"dir,omitzero"`
 
-	// An image.
-	URL string `json:"url,omitzero"`
+	// An image: its URL, whether it keeps the ratio of its width to its
+	// height, which Vega does by default, and whether it smooths its pixels
+	// when it grows, which Vega also does by default.
+	URL    string `json:"url,omitzero"`
+	Aspect *bool  `json:"aspect,omitzero"`
+	Smooth *bool  `json:"smooth,omitzero"`
 
 	// A group: whether it clips its marks, and its marks.
 	Clip  bool   `json:"clip,omitzero"`
