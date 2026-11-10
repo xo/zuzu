@@ -15,6 +15,9 @@ type Summary struct {
 	Datasets, DatasetsOK int
 	Scales, ScalesOK     int
 	Marks, MarksOK       int
+	// Structure and Same count the Vega-Lite specs that zuzu compiled to
+	// the same structure and to the same JSON as vega-lite.js.
+	Structure, Same int
 	// Results holds the result of each spec, in the order of their paths.
 	Results []Result
 }
@@ -30,7 +33,7 @@ func Share(n, all int) float64 {
 // Summarize checks each reference in the folder testdata/references whose
 // path holds only, and counts what matched. It leaves out the reference of
 // a spec that failed in vega.js.
-func Summarize(ctx context.Context, testdata, only string) (*Summary, error) {
+func Summarize(ctx context.Context, testdata, only string, compile bool) (*Summary, error) {
 	paths, err := filepath.Glob(filepath.Join(testdata, "references", "*", "*.ref.json"))
 	if err != nil {
 		return nil, err
@@ -51,7 +54,10 @@ func Summarize(ctx context.Context, testdata, only string) (*Summary, error) {
 		if ref.Error != "" {
 			continue
 		}
-		res := Check(ctx, ref, filepath.Join(testdata, "corpus"))
+		if compile && len(ref.Compiled) == 0 {
+			continue
+		}
+		res := Check(ctx, ref, filepath.Join(testdata, "corpus"), compile)
 		s.Results = append(s.Results, res)
 		s.Specs++
 		s.Datasets += res.Datasets
@@ -60,6 +66,12 @@ func Summarize(ctx context.Context, testdata, only string) (*Summary, error) {
 		s.ScalesOK += res.ScalesOK
 		s.Marks += res.Marks
 		s.MarksOK += res.MarksOK
+		if res.Structure {
+			s.Structure++
+		}
+		if res.Same {
+			s.Same++
+		}
 		switch {
 		case res.Err != nil:
 			s.Errors++

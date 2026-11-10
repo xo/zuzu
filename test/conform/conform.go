@@ -23,6 +23,8 @@ import (
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/vega"
+	"github.com/xo/zuzu/vegalite"
 )
 
 // Reference is a reference that the oracle wrote.
@@ -65,6 +67,10 @@ type Result struct {
 	// same items. The marks of the guides are left out, since zuzu draws
 	// its own guides (D12).
 	Marks, MarksOK int
+	// Structure says that zuzu compiled a Vega-Lite spec to the same
+	// datasets, scales and marks as vega-lite.js, and Same that it
+	// compiled the same JSON.
+	Structure, Same bool
 	// Diffs says what differs.
 	Diffs []string
 }
@@ -89,10 +95,21 @@ func Read(path string) (*Reference, error) {
 
 // Check runs the spec of a reference in zuzu and compares the result. The
 // spec of a Vega-Lite reference is the Vega spec that vega-lite.js
-// compiled. corpus is the folder of the corpus, which the loader reads.
-func Check(ctx context.Context, ref *Reference, corpus string) Result {
+// compiled, unless compile is true, when zuzu compiles the Vega-Lite spec
+// itself. corpus is the folder of the corpus, which the loader reads.
+func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Result {
 	res := Result{Spec: ref.Spec, Datasets: len(ref.Datasets), Scales: len(ref.Scales)}
 	src := []byte(ref.Compiled)
+	dialect := zuzu.Vega
+	if compile && len(src) > 0 {
+		b, err := os.ReadFile(filepath.Join(corpus, ref.Spec))
+		if err != nil {
+			res.Err = err
+			return res
+		}
+		src, dialect = b, zuzu.VegaLite
+		res.Structure = compareStructure(&res, src, ref.Compiled)
+	}
 	if len(src) == 0 {
 		b, err := os.ReadFile(filepath.Join(corpus, ref.Spec))
 		if err != nil {
@@ -101,7 +118,7 @@ func Check(ctx context.Context, ref *Reference, corpus string) Result {
 		}
 		src = b
 	}
-	chart, _, err := zuzu.Parse(src, zuzu.WithDialect(zuzu.Vega))
+	chart, _, err := zuzu.Parse(src, zuzu.WithDialect(dialect))
 	if err != nil {
 		res.Err = err
 		return res
@@ -475,4 +492,62 @@ func write(b *strings.Builder, v any) {
 	default:
 		fmt.Fprintf(b, "%v", x)
 	}
+}
+
+// compareStructure compiles a Vega-Lite spec with zuzu and compares the
+// result with the spec that vega-lite.js compiled: the names of the
+// datasets, the names and the types of the scales, and the names and the
+// types of the marks. It sets Same when the JSON is the same.
+func compareStructure(res *Result, src []byte, want jsontext.Value) bool {
+	spec, err := vegalite.Parse(src)
+	if err != nil {
+		return false
+	}
+	got, _, err := vegalite.Compile(spec)
+	if err != nil {
+		return false
+	}
+	b, err := vega.Write(got)
+	if err != nil {
+		return false
+	}
+	var g, w map[string]any
+	if json.Unmarshal(b, &g) != nil || json.Unmarshal(want, &w) != nil {
+		return false
+	}
+	res.Same = canonical(g) == canonical(w)
+	return canonical(structure(g)) == canonical(structure(w))
+}
+
+// structure returns the datasets, the scales and the marks of a Vega spec,
+// by name and type.
+func structure(spec map[string]any) map[string]any {
+	names := func(key string, fields ...string) []any {
+		list, _ := spec[key].([]any)
+		var out []any
+		for _, e := range list {
+			m, _ := e.(map[string]any)
+			var parts []string
+			for _, f := range fields {
+				parts = append(parts, fmt.Sprint(m[f]))
+			}
+			out = append(out, strings.Join(parts, " "))
+		}
+		slices.SortFunc(out, func(a, b any) int { return strings.Compare(fmt.Sprint(a), fmt.Sprint(b)) })
+		return out
+	}
+	var marks []any
+	var walk func(list []any)
+	walk = func(list []any) {
+		for _, e := range list {
+			m, _ := e.(map[string]any)
+			marks = append(marks, fmt.Sprint(m["name"], " ", m["type"]))
+			if sub, ok := m["marks"].([]any); ok {
+				walk(sub)
+			}
+		}
+	}
+	list, _ := spec["marks"].([]any)
+	walk(list)
+	return map[string]any{"data": names("data", "name"), "scales": names("scales", "name", "type"), "marks": marks}
 }

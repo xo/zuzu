@@ -1,0 +1,429 @@
+package vegalite
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/vega"
+)
+
+// vegaMark is the Vega mark of each mark of Vega-Lite.
+var vegaMark = map[string]string{
+	"bar": "rect", "rect": "rect", "tick": "rect", "point": "symbol", "circle": "symbol",
+	"square": "symbol", "line": "line", "area": "area", "rule": "rule", "text": "text",
+	"arc": "arc", "trail": "trail", "image": "image",
+}
+
+// enc builds the encodings of a mark.
+type enc map[string]any
+
+// set sets a property to a value reference.
+func (e enc) set(name string, ref map[string]any) {
+	e[name] = ref
+}
+
+// markOf builds the Vega mark of the view, and registers its scales.
+func (u *unit) markOf() (*vega.Mark, error) {
+	typ, ok := vegaMark[u.mark]
+	if !ok {
+		return nil, u.c.issue(u.path+"/mark", "the mark %s", u.mark)
+	}
+	e := enc{}
+	u.color(e)
+	u.position(e)
+	u.others(e)
+	for k, v := range u.props {
+		switch k {
+		case "color", "fill", "stroke", "filled", "orient", "invalid", "type", "style", "tooltip", "point", "line", "clip", "thickness", "binSpacing", "cornerRadiusEnd", "aria", "width", "height", "x", "y", "x2", "y2", "size", "radius", "theta", "theta2", "radius2", "outerRadius", "innerRadius":
+			continue
+		}
+		if _, set := e[k]; !set {
+			e.set(k, map[string]any{"value": v})
+		}
+	}
+	m := &vega.Mark{Type: typ, Name: u.v.prefix + "marks", From: &vega.From{Data: u.c.name(u.data)}}
+	style := u.mark
+	if u.mark == "circle" || u.mark == "square" {
+		style = u.mark
+	}
+	m.Style = vega.List(style)
+	if c, ok := u.props["clip"].(bool); ok && c {
+		m.Clip = lit(true)
+	}
+	switch u.mark {
+	case "line", "trail":
+		field := "x"
+		if u.orient == "horizontal" && u.ch["x"] != nil && u.ch["x"].continuous() {
+			field = "y"
+		}
+		if o := u.ch["order"]; o != nil && o.isField() {
+			field = "datum[" + strconv.Quote(o.out) + "]"
+		}
+		m.Sort = &vega.Sort{Field: lit(field)}
+	case "area":
+		m.Sort = &vega.Sort{Field: lit("x")}
+		if u.orient == "horizontal" {
+			m.Sort = &vega.Sort{Field: lit("y")}
+		}
+	}
+	update := vega.Props{}
+	for k, v := range e {
+		update[k] = prod(v)
+	}
+	m.Encode = vega.Encode{"update": update}
+	return m, nil
+}
+
+// color sets the fill or the stroke of a mark from the channel color, or
+// from the color of the mark.
+func (u *unit) color(e enc) {
+	filled := true
+	switch u.mark {
+	case "point", "line", "rule", "trail":
+		filled = false
+	}
+	if u.mark == "trail" {
+		filled = true
+	}
+	if f, ok := u.props["filled"].(bool); ok {
+		filled = f
+	}
+	prop := "stroke"
+	if filled {
+		prop = "fill"
+	}
+	ref := map[string]any{"value": defaultColor}
+	if c, ok := u.props["color"].(string); ok {
+		ref = map[string]any{"value": c}
+	}
+	if c := u.channelRef("color"); c != nil {
+		ref = c
+	}
+	e.set(prop, ref)
+	if u.mark == "point" && !filled {
+		e.set("fill", map[string]any{"value": "transparent"})
+	}
+	if u.mark == "point" || u.mark == "circle" || u.mark == "square" {
+		if _, ok := u.ch["opacity"]; !ok {
+			e.set("opacity", map[string]any{"value": 0.7})
+		}
+	}
+	for _, name := range []string{"fill", "stroke"} {
+		if c := u.channelRef(name); c != nil {
+			e.set(name, c)
+		} else if v, ok := u.props[name]; ok {
+			e.set(name, map[string]any{"value": v})
+		}
+	}
+	if u.mark == "text" {
+		if _, ok := e["fill"]; !ok || u.ch["color"] == nil && u.props["color"] == nil {
+			e.set("fill", map[string]any{"value": "black"})
+		}
+	}
+}
+
+// channelRef returns the value reference of a channel through its scale,
+// or nil if the view does not have the channel.
+func (u *unit) channelRef(name string) map[string]any {
+	d := u.ch[name]
+	if d == nil {
+		return nil
+	}
+	scaleName := name
+	if name == "fill" || name == "stroke" {
+		scaleName = name
+	}
+	var base map[string]any
+	switch {
+	case d.hasValue:
+		if m, ok := d.value.(map[string]any); ok && m["expr"] != nil {
+			base = map[string]any{"signal": m["expr"]}
+		} else {
+			base = map[string]any{"value": d.value}
+		}
+	case d.hasDatum:
+		if u.v.addScale(u, scaleName, d, nil) {
+			base = map[string]any{"scale": scaleName, "value": d.datum}
+		} else {
+			base = map[string]any{"value": d.datum}
+		}
+	case d.isField():
+		if u.v.addScale(u, scaleName, d, []string{d.out}) {
+			base = map[string]any{"scale": scaleName, "field": d.out}
+		} else {
+			base = map[string]any{"field": d.out}
+		}
+	default:
+		return nil
+	}
+	if len(d.cond) == 0 {
+		return base
+	}
+	return u.conditional(d, base)
+}
+
+// conditional returns a list of rules for a channel with a condition: the
+// condition first, then the channel.
+func (u *unit) conditional(d *channelDef, base map[string]any) map[string]any {
+	c := d.cond[0]
+	rule := map[string]any{"test": c.test}
+	switch {
+	case c.hasValue:
+		rule["value"] = c.value
+	case c.field != "":
+		rule["field"] = c.field
+	}
+	return map[string]any{"__rules": []any{rule, base}}
+}
+
+// position sets the position and the size of a mark from its positional
+// channels.
+func (u *unit) position(e enc) {
+	if u.mark == "arc" {
+		u.arc(e)
+		return
+	}
+	u.axis(e, "x", "width")
+	u.axis(e, "y", "height")
+}
+
+// axis sets the position along one axis: x and x2, or y and y2, with the
+// width or the height of a band.
+func (u *unit) axis(e enc, ch, size string) {
+	d := u.ch[ch]
+	d2 := u.ch[ch+"2"]
+	p, p2, pc := ch, ch+"2", ch+"c"
+	if d == nil {
+		switch {
+		case ch == "x" && (u.mark == "bar" || u.mark == "rect" || u.mark == "rule" && u.ch["y"] != nil && u.ch["x2"] == nil):
+			if u.mark == "rule" {
+				e.set(p, map[string]any{"value": 0})
+				e.set(p2, map[string]any{"field": map[string]any{"group": "width"}})
+				return
+			}
+			e.set(p, map[string]any{"value": 0})
+			e.set(size, map[string]any{"field": map[string]any{"group": "width"}})
+		case ch == "y" && (u.mark == "bar" || u.mark == "rect" || u.mark == "rule" && u.ch["x"] != nil && u.ch["y2"] == nil):
+			if u.mark == "rule" {
+				e.set(p, map[string]any{"value": 0})
+				e.set(p2, map[string]any{"field": map[string]any{"group": "height"}})
+				return
+			}
+			e.set(p, map[string]any{"value": 0})
+			e.set(size, map[string]any{"field": map[string]any{"group": "height"}})
+		case ch == "x":
+			e.set(p, map[string]any{"signal": "width", "mult": 0.5})
+		default:
+			e.set(p, map[string]any{"signal": "height", "mult": 0.5})
+		}
+		return
+	}
+	if d.hasValue {
+		e.set(p, map[string]any{"value": d.value})
+		if d2 != nil && d2.hasValue {
+			e.set(p2, map[string]any{"value": d2.value})
+		}
+		return
+	}
+	discrete := !d.continuous() || (d.units != nil && d.typ != temporal)
+	if d.bin != nil {
+		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
+		e.set(p, map[string]any{"scale": ch, "field": d.out, "offset": 0.5})
+		e.set(p2, map[string]any{"scale": ch, "field": d.outEnd, "offset": -0.5})
+		if u.mark != "bar" && u.mark != "rect" {
+			e.set(p, map[string]any{"signal": "scale(\"" + ch + "\", 0.5 * " + fieldRef(d.out) + " + 0.5 * " + fieldRef(d.outEnd) + ")"})
+			delete(e, p2)
+		}
+		return
+	}
+	if u.stack == ch {
+		u.v.addScale(u, ch, d, []string{d.out + "_start", d.out + "_end"})
+		e.set(p, map[string]any{"scale": ch, "field": d.out + "_end"})
+		e.set(p2, map[string]any{"scale": ch, "field": d.out + "_start"})
+		return
+	}
+	fields := []string{d.out}
+	if d2 != nil && d2.isField() {
+		fields = append(fields, d2.out)
+	}
+	hasScale := u.v.addScale(u, ch, d, fields)
+	ref := func(field string) map[string]any {
+		if hasScale {
+			return map[string]any{"scale": ch, "field": field}
+		}
+		return map[string]any{"field": field}
+	}
+	if d.hasDatum {
+		ref = func(string) map[string]any { return map[string]any{"scale": ch, "value": d.datum} }
+	}
+	switch {
+	case discrete && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick" && false):
+		if sz := u.ch["size"]; sz != nil && sz.hasValue && u.mark == "bar" {
+			r := ref(d.out)
+			r["band"] = 0.5
+			e.set(pc, r)
+			e.set(size, map[string]any{"value": sz.value})
+			return
+		}
+		e.set(p, ref(d.out))
+		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + ch + "'))"})
+	case discrete && u.v.scaleType(ch) == "band":
+		r := ref(d.out)
+		r["band"] = 0.5
+		e.set(pc, r)
+		if u.mark == "tick" {
+			e.set(size, map[string]any{"value": 1})
+		}
+	default:
+		e.set(p, ref(d.out))
+		switch {
+		case d2 != nil && d2.isField():
+			e.set(p2, ref(d2.out))
+		case d2 != nil && d2.hasValue:
+			e.set(p2, map[string]any{"value": d2.value})
+		case (u.mark == "bar" || u.mark == "area") && u.measure() == ch && hasScale:
+			e.set(p2, map[string]any{"scale": ch, "value": 0})
+		case u.mark == "rule" && u.ch[ch+"2"] == nil:
+		}
+	}
+	if u.mark == "line" || u.mark == "area" || u.mark == "trail" {
+		var parts []string
+		for _, name := range []string{"x", "y"} {
+			if dd := u.ch[name]; dd != nil && dd.isField() && dd.continuous() {
+				f := dd.out
+				if u.stack == name {
+					f += "_end"
+				}
+				parts = append(parts, "isValid("+fieldRef(f)+") && isFinite(+"+fieldRef(f)+")")
+			}
+		}
+		if len(parts) > 0 {
+			e.set("defined", map[string]any{"signal": joinAnd(parts)})
+		}
+	}
+	if u.mark == "area" && u.measure() == ch {
+		e.set("orient", map[string]any{"value": u.orient})
+	}
+}
+
+// joinAnd joins expressions with &&.
+func joinAnd(parts []string) string {
+	return strings.Join(parts, " && ")
+}
+
+// arc sets the angles and the radii of an arc from theta and radius.
+func (u *unit) arc(e enc) {
+	e.set("x", map[string]any{"signal": "width", "mult": 0.5})
+	e.set("y", map[string]any{"signal": "height", "mult": 0.5})
+	outer := map[string]any{"signal": "min(width,height)/2"}
+	if r := u.ch["radius"]; r != nil && r.isField() {
+		u.v.addScale(u, "radius", r, []string{r.out})
+		outer = map[string]any{"scale": "radius", "field": r.out}
+	}
+	if v, ok := u.props["outerRadius"]; ok {
+		outer = map[string]any{"value": v}
+	}
+	e.set("outerRadius", outer)
+	inner := map[string]any{"value": 0}
+	if v, ok := u.props["innerRadius"]; ok {
+		inner = map[string]any{"value": v}
+	}
+	e.set("innerRadius", inner)
+	t := u.ch["theta"]
+	switch {
+	case t == nil:
+		e.set("startAngle", map[string]any{"value": 0})
+		e.set("endAngle", map[string]any{"value": 6.283185307179586})
+	case u.stack == "theta":
+		u.v.addScale(u, "theta", t, []string{t.out + "_start", t.out + "_end"})
+		e.set("startAngle", map[string]any{"scale": "theta", "field": t.out + "_end"})
+		e.set("endAngle", map[string]any{"scale": "theta", "field": t.out + "_start"})
+	case t.isField():
+		u.v.addScale(u, "theta", t, []string{t.out})
+		e.set("startAngle", map[string]any{"scale": "theta", "field": t.out})
+		if u.v.scaleType("theta") == "band" {
+			e.set("endAngle", map[string]any{"scale": "theta", "field": t.out, "band": 1})
+		}
+	}
+}
+
+// others sets the channels that are not positions or colors: size, shape,
+// opacity, text and the like.
+func (u *unit) others(e enc) {
+	for _, name := range []string{"opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "strokeDash", "angle", "shape"} {
+		if r := u.channelRef(name); r != nil {
+			e.set(name, r)
+		}
+	}
+	if r := u.channelRef("size"); r != nil {
+		switch u.mark {
+		case "text":
+			e.set("fontSize", r)
+		case "point", "circle", "square", "trail":
+			e.set("size", r)
+		case "line", "rule":
+			e.set("strokeWidth", r)
+		}
+	} else if s, ok := u.props["size"]; ok {
+		switch u.mark {
+		case "text":
+			e.set("fontSize", map[string]any{"value": s})
+		case "point", "circle", "square":
+			e.set("size", map[string]any{"value": s})
+		}
+	}
+	switch u.mark {
+	case "circle", "square":
+		e.set("shape", map[string]any{"value": u.mark})
+	case "point":
+		if s, ok := u.props["shape"]; ok {
+			e.set("shape", map[string]any{"value": s})
+		}
+	}
+	if d := u.ch["text"]; d != nil {
+		switch {
+		case d.hasValue:
+			e.set("text", map[string]any{"value": d.value})
+		case d.isField():
+			var ref map[string]any
+			switch d.typ {
+			case quantitative:
+				spec := ""
+				if !d.def.Format.IsZero() {
+					spec = str(d.def.Format)
+				}
+				ref = map[string]any{"signal": "format(" + fieldRef(d.out) + ", " + strconv.Quote(spec) + ")"}
+			case temporal:
+				spec := "%b %d, %Y"
+				if !d.def.Format.IsZero() {
+					spec = str(d.def.Format)
+				}
+				ref = map[string]any{"signal": "timeFormat(" + fieldRef(d.out) + ", " + strconv.Quote(spec) + ")"}
+			default:
+				ref = map[string]any{"signal": "isValid(" + fieldRef(d.out) + ") ? " + fieldRef(d.out) + " : \"\"+" + fieldRef(d.out)}
+			}
+			if len(d.cond) > 0 {
+				ref = u.conditional(d, ref)
+			}
+			e.set("text", ref)
+		}
+	} else if t, ok := u.props["text"]; ok {
+		e.set("text", map[string]any{"value": t})
+	}
+	if d := u.ch["url"]; d != nil && d.isField() {
+		e.set("url", map[string]any{"field": d.out})
+	}
+	if u.mark == "tick" {
+		thick := 1.0
+		if v, ok := u.props["thickness"].(float64); ok {
+			thick = v
+		}
+		if u.orient == "vertical" || u.ch["x"] != nil && u.ch["x"].continuous() {
+			if _, ok := e["width"]; !ok {
+				e.set("width", map[string]any{"value": thick})
+			}
+		}
+	}
+	_ = expr.String
+}

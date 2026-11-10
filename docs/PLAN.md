@@ -481,12 +481,13 @@ share is set at the start of the phase, from the inventory.
 
 Do not build signals that bind events.
 
-No share was set at the start of the phase. This plan proposes one, and
-open question 13 asks the maintainers to accept it. The check runs over the
-540 specs of the first target: the 70 Vega specs, and the Vega specs that
-vega-lite.js compiled from the 470 Vega-Lite specs, which the references
-hold. The transforms of tiers 1 and 2, the projections and topojson come in
-phase 5, so the specs that need them fail here. The proposed exit is that 80
+No share was set at the start of the phase. This plan proposed one, and
+the maintainers accepted it on 2026-11-10 (open question 13). The check
+runs over the 540 specs of the first target: the 70 Vega specs, and the
+Vega specs that vega-lite.js compiled from the 470 Vega-Lite specs, which
+the references hold. The transforms of tiers 1 and 2, the projections and
+topojson come in phase 5, so the specs that need them fail here. The exit
+is that 80
 percent of the specs match in all three checks, and that 85 percent of the
 datasets, 90 percent of the scales and 90 percent of the marks that draw
 data match.
@@ -523,7 +524,9 @@ The phase holds these packages:
 5. `scale` holds the scales of Vega and their ticks.
 6. `layout` draws the axes, the legends and the titles in the look of zuzu.
    The conformance job of CI runs the oracle and fails when a share falls
-   below the proposed exit.
+   below the exit.
+
+Phase 3 was done on 2026-11-10, when the maintainers accepted the share.
 7. The root package runs a spec: it works out each signal, dataset and scale
    when something first asks for it, builds the marks and the facets, and
    grows the canvas to hold the guides, as the autosize `pad` of Vega does.
@@ -536,6 +539,41 @@ selections and parameters that a person changes.
 Exit: the compiled spec matches the reference of vega-lite.js, and the
 datasets, the scales and the bound items match (D17), for a stated share of
 the Vega-Lite specs in the first target.
+
+The share is set at the start, on 2026-11-10, over the 470 Vega-Lite specs
+of the first target. zuzu compiles each spec itself, runs its own Vega spec,
+and compares the result with the references, as phase 3 does:
+
+1. 60 percent of the specs match in all three checks.
+2. 70 percent of the datasets, 80 percent of the scales and 75 percent of
+   the marks that draw data match.
+3. The compiled spec has the same structure as the one of vega-lite.js for
+   50 percent of the specs: the same datasets by name, the same scales by
+   name and type, and the same marks by name and type. The share of specs
+   whose JSON is the same is reported, with no exit, until open question 14
+   is answered.
+
+The specs that need the transforms of phase 5 count against the share, as
+in phase 3.
+
+On 2026-11-10 the package `vegalite` reads every Vega-Lite spec of the
+corpus and writes it back with the same JSON. Its compiler handles a single
+view and a layer: the data, the transforms of Vega-Lite, the bins, the time
+units, the aggregate, the stack, the marks, the scales, the axes and the
+legends, with the names of the fields that Vega-Lite gives. `go run
+./cmd/conform -vl` in the test module measures it:
+
+| Check | Match | Of |
+| --- | --- | --- |
+| specs, in all three checks | 145 (30.9%) | 470 |
+| datasets | 387 (36.1%) | 1072 |
+| scales | 689 (57.8%) | 1193 |
+| marks that draw data | 1184 (44.2%) | 2676 |
+| the structure of the compiled spec | 238 (50.6%) | 470 |
+
+The facets, the repeats, the concatenations and the composite marks
+`boxplot`, `errorbar` and `errorband` are not compiled yet, and they are the
+largest part of what fails.
 
 ### Phase 5. Tier 1 and tier 2
 
@@ -652,8 +690,14 @@ stays true.
 12. Which fonts suit the schemes from editor themes, and does zuzu list a
     font for each? The fonts must be under the Open Font License or a
     license like it, and zuzu bundles none of them (D15, D16).
-13. Is the share of phase 3 accepted? Phase 3 above proposes that 80 percent
-    of the 540 specs of the first target match in all three checks of D17,
-    and that 85 percent of the datasets, 90 percent of the scales and 90
-    percent of the marks that draw data match. On 2026-11-10 the code meets
-    it.
+13. Answered on 2026-11-10: the share of phase 3 is accepted. 80 percent of
+    the 540 specs of the first target match in all three checks of D17, and
+    85 percent of the datasets, 90 percent of the scales and 90 percent of
+    the marks that draw data match.
+14. Does the first check of D17 ask for the same JSON as vega-lite.js, or
+    for the same structure? Phase 4 below states the share of both. The
+    JSON of vega-lite.js holds the names of its internal signals and the
+    order of its optimizations, which no document of Vega-Lite describes,
+    and D6 says that zuzu follows the documented behavior. The plan
+    proposes the structure: the same datasets by name, the same scales by
+    name and type, and the same marks by name and type.

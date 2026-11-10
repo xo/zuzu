@@ -90,7 +90,7 @@ linters:
         - '^[-+*/%<>=!&|^~?:]+$'
         # A name of the grammar of Vega, such as left, linear or utc, reads
         # best as itself, as the spec writes it.
-        - '^[a-z][a-z0-9-]*$'
+        - '^[a-z][a-zA-Z0-9-]*$'
     errcheck:
       exclude-functions:
         - (*os.File).Close

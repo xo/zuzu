@@ -19,7 +19,7 @@ const (
 // skips without them. The conformance job of CI runs the oracle first.
 func TestPhase3Share(t *testing.T) {
 	t.Parallel()
-	s, err := Summarize(t.Context(), "../testdata", "")
+	s, err := Summarize(t.Context(), "../testdata", "", false)
 	if errors.Is(err, ErrNoReferences) {
 		t.Skip("no references: run the oracle, as test/README.md says")
 	}

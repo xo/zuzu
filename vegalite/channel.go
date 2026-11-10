@@ -1,0 +1,504 @@
+package vegalite
+
+import (
+	"encoding/json/v2"
+	"fmt"
+	"regexp"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/vega"
+)
+
+// The types of a field.
+const (
+	quantitative = "quantitative"
+	nominal      = "nominal"
+	ordinal      = "ordinal"
+	temporal     = "temporal"
+)
+
+// channelDef is the definition of a channel after the compiler has read
+// it: the field that it reads, the field that the marks draw, and how.
+type channelDef struct {
+	channel string
+	def     *FieldDef
+	// field is the field of the data, and typ its type.
+	field string
+	typ   string
+	// aggregate is the op of an aggregate, such as sum or count.
+	aggregate string
+	// bin holds the parameters of a bin, and binned says that the data is
+	// already binned.
+	bin    map[string]any
+	binned bool
+	// units are the units of time of a time unit, and utc says that they
+	// are in UTC.
+	units    []string
+	unitName string
+	utc      bool
+	// out is the field that the marks draw, and outEnd the end of a bin or
+	// of a time unit.
+	out, outEnd string
+	// value is a constant value of the channel, and hasValue says that it
+	// has one.
+	value    any
+	hasValue bool
+	// datum is a constant of the data, which goes through the scale.
+	datum    any
+	hasDatum bool
+	// cond is the condition of the channel, if it has one.
+	cond []condition
+}
+
+// condition is one condition of a channel: a test and the value or the
+// field it gives.
+type condition struct {
+	test     string
+	value    any
+	hasValue bool
+	field    string
+}
+
+// isField reports whether the channel reads a field of the data.
+func (c *channelDef) isField() bool {
+	return c.field != "" || c.aggregate == "count"
+}
+
+// continuous reports whether the channel draws on a continuous scale.
+func (c *channelDef) continuous() bool {
+	switch c.typ {
+	case quantitative:
+		return true
+	case temporal:
+		return true
+	}
+	return false
+}
+
+// readChannel reads the definition of a channel. repeat names the field of
+// a repeat, for a field {"repeat": "row"}.
+func readChannel(channel string, def *FieldDef, repeat map[string]string) (*channelDef, error) {
+	c := &channelDef{channel: channel, def: def}
+	if !def.Field.IsZero() {
+		var f any
+		if err := def.Field.Decode(&f); err != nil {
+			return nil, err
+		}
+		switch x := f.(type) {
+		case string:
+			c.field = x
+		case map[string]any:
+			if r, ok := x["repeat"].(string); ok {
+				c.field = repeat[r]
+			}
+		}
+	}
+	c.typ = def.Type
+	if !def.Aggregate.IsZero() {
+		var a any
+		if err := def.Aggregate.Decode(&a); err != nil {
+			return nil, err
+		}
+		switch x := a.(type) {
+		case string:
+			c.aggregate = x
+		case map[string]any:
+			for _, op := range []string{"argmin", "argmax"} {
+				if v, ok := x[op]; ok {
+					c.aggregate = op
+					if c.field == "" {
+						c.field = expr.String(v)
+					}
+				}
+			}
+		}
+	}
+	if !def.Bin.IsZero() {
+		var b any
+		if err := def.Bin.Decode(&b); err != nil {
+			return nil, err
+		}
+		switch x := b.(type) {
+		case bool:
+			if x {
+				c.bin = map[string]any{}
+			}
+		case string:
+			c.binned = x == "binned"
+		case map[string]any:
+			if x["binned"] == true {
+				c.binned = true
+			} else {
+				c.bin = x
+			}
+		}
+	}
+	if !def.TimeUnit.IsZero() {
+		var tu any
+		if err := def.TimeUnit.Decode(&tu); err != nil {
+			return nil, err
+		}
+		name := ""
+		switch x := tu.(type) {
+		case string:
+			name = x
+		case map[string]any:
+			name = expr.String(x["unit"])
+		}
+		c.units, c.utc = timeUnits(name)
+		c.unitName = strings.TrimPrefix(name, "utc")
+		if c.utc {
+			c.unitName = name
+		}
+	}
+	if !def.Value.IsZero() {
+		c.hasValue = true
+		if def.Value.Signal != "" {
+			c.value = map[string]any{"signal": def.Value.Signal}
+		} else if err := def.Value.Decode(&c.value); err != nil {
+			return nil, err
+		}
+	}
+	if !def.Datum.IsZero() {
+		c.hasDatum = true
+		if err := def.Datum.Decode(&c.datum); err != nil {
+			return nil, err
+		}
+	}
+	if len(def.Condition) > 0 {
+		conds, err := readConditions(def.Condition)
+		if err != nil {
+			return nil, err
+		}
+		c.cond = conds
+	}
+	if c.typ == "" {
+		switch {
+		case c.aggregate != "" && c.aggregate != "argmin" && c.aggregate != "argmax":
+			c.typ = quantitative
+		case c.bin != nil || c.binned:
+			c.typ = quantitative
+		case c.units != nil:
+			c.typ = temporal
+		case channel == "theta" || channel == "radius" || channel == "size" || channel == "opacity":
+			c.typ = quantitative
+		case c.hasDatum:
+			switch c.datum.(type) {
+			case float64:
+				c.typ = quantitative
+			default:
+				c.typ = nominal
+			}
+		default:
+			c.typ = nominal
+		}
+	}
+	c.out = c.outputField()
+	switch {
+	case c.bin != nil:
+		c.outEnd = c.out + "_end"
+	case c.units != nil:
+		c.outEnd = c.out + "_end"
+	}
+	return c, nil
+}
+
+// readConditions reads the condition of a channel: one condition or a
+// list. A condition with a param of a selection is not drawn, since a
+// person cannot change a static chart (D7).
+func readConditions(raw []byte) ([]condition, error) {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+	list, ok := v.([]any)
+	if !ok {
+		list = []any{v}
+	}
+	var out []condition
+	for _, e := range list {
+		m, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		c := condition{}
+		switch t := m["test"].(type) {
+		case string:
+			c.test = t
+		case map[string]any:
+			c.test = predicate(t)
+		}
+		if _, ok := m["param"]; ok {
+			// An empty selection selects every item, so the condition holds.
+			c.test = "true"
+		}
+		if v, ok := m["value"]; ok {
+			c.value, c.hasValue = v, true
+		}
+		if f, ok := m["field"].(string); ok {
+			c.field = f
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
+// outputField returns the name of the field that the marks draw, as
+// Vega-Lite names it: sum_price for an aggregate, bin_maxbins_10_price for
+// a bin, month_date for a time unit, and `__count` for a count.
+func (c *channelDef) outputField() string {
+	switch {
+	case c.aggregate == "count":
+		return "__count"
+	case c.aggregate != "":
+		return c.aggregate + "_" + c.field
+	case c.bin != nil:
+		return binPrefix(c.bin) + "_" + c.field
+	case c.units != nil:
+		return c.unitName + "_" + c.field
+	}
+	return c.field
+}
+
+// binPrefix names a bin by its parameters, as bin_maxbins_10 for the
+// default of 10 bins.
+func binPrefix(b map[string]any) string {
+	keys := make([]string, 0, len(b))
+	for k := range b {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, k+"_"+binValue(b[k]))
+	}
+	if _, ok := b["maxbins"]; !ok && b["step"] == nil && b["steps"] == nil {
+		parts = append([]string{"maxbins_10"}, parts...)
+	}
+	return "bin_" + strings.Join(parts, "_")
+}
+
+// binValue writes a parameter of a bin in its name.
+func binValue(v any) string {
+	switch x := v.(type) {
+	case []any:
+		parts := make([]string, len(x))
+		for i, e := range x {
+			parts[i] = binValue(e)
+		}
+		return strings.Join(parts, "_")
+	case map[string]any:
+		if s, ok := x["param"].(string); ok {
+			return s
+		}
+	}
+	return expr.String(v)
+}
+
+// unitOrder is the order of the units of time in a name such as
+// yearmonthdate.
+var unitOrder = []string{"year", "quarter", "month", "week", "day", "dayofyear", "date", "hours", "minutes", "seconds", "milliseconds"}
+
+// timeUnits splits the name of a time unit, such as yearmonth or
+// utcmonthdate, into its units, and reports whether it is in UTC.
+func timeUnits(name string) ([]string, bool) {
+	utc := strings.HasPrefix(name, "utc")
+	rest := strings.TrimPrefix(name, "utc")
+	var units []string
+	for rest != "" {
+		found := false
+		// The longest name first, so that dayofyear wins over day.
+		names := slices.Clone(unitOrder)
+		sort.SliceStable(names, func(i, j int) bool { return len(names[i]) > len(names[j]) })
+		for _, u := range names {
+			if strings.HasPrefix(rest, u) {
+				units = append(units, u)
+				rest = rest[len(u):]
+				found = true
+				break
+			}
+		}
+		if !found {
+			break
+		}
+	}
+	slices.SortStableFunc(units, func(a, b string) int {
+		return slices.Index(unitOrder, a) - slices.Index(unitOrder, b)
+	})
+	return units, utc
+}
+
+// varName turns a name into a name that a signal can have.
+var varRE = regexp.MustCompile(`\W`)
+
+// varName returns a name with every character that a name of a signal
+// cannot hold as an underscore.
+func varName(s string) string {
+	return varRE.ReplaceAllString(s, "_")
+}
+
+// fieldRef writes a field as an expression reads it, datum["name"].
+func fieldRef(name string) string {
+	b, _ := json.Marshal(name)
+	return "datum[" + string(b) + "]"
+}
+
+// predicate writes a predicate of a filter, such as {"field": "x",
+// "equal": 3}, as an expression.
+func predicate(p map[string]any) string {
+	if v, ok := p["and"].([]any); ok {
+		return joinPredicates(v, " && ")
+	}
+	if v, ok := p["or"].([]any); ok {
+		return joinPredicates(v, " || ")
+	}
+	if v, ok := p["not"]; ok {
+		return "!(" + predicateOf(v) + ")"
+	}
+	field, _ := p["field"].(string)
+	f := fieldRef(field)
+	if tu, ok := p["timeUnit"]; ok {
+		name := expr.String(tu)
+		if m, ok := tu.(map[string]any); ok {
+			name = expr.String(m["unit"])
+		}
+		units, utc := timeUnits(name)
+		f = timeFloorExpr(units, utc, f)
+	}
+	lit := func(v any) string {
+		if m, ok := v.(map[string]any); ok {
+			if _, ok := m["year"]; ok {
+				return dateTimeExpr(m)
+			}
+		}
+		b, _ := json.Marshal(v)
+		return string(b)
+	}
+	switch {
+	case p["equal"] != nil:
+		return f + "===" + lit(p["equal"])
+	case p["lt"] != nil:
+		return f + "<" + lit(p["lt"])
+	case p["lte"] != nil:
+		return f + "<=" + lit(p["lte"])
+	case p["gt"] != nil:
+		return f + ">" + lit(p["gt"])
+	case p["gte"] != nil:
+		return f + ">=" + lit(p["gte"])
+	case p["range"] != nil:
+		r, _ := p["range"].([]any)
+		var parts []string
+		if len(r) > 0 && r[0] != nil {
+			parts = append(parts, lit(r[0])+" <= "+f)
+		}
+		if len(r) > 1 && r[1] != nil {
+			parts = append(parts, f+" <= "+lit(r[1]))
+		}
+		return strings.Join(parts, " && ")
+	case p["oneOf"] != nil:
+		return "indexof(" + lit(p["oneOf"]) + ", " + f + ") !== -1"
+	case p["in"] != nil:
+		return "indexof(" + lit(p["in"]) + ", " + f + ") !== -1"
+	case p["valid"] != nil:
+		if p["valid"] == true {
+			return f + "!==null && !isNaN(" + f + ")"
+		}
+		return f + "===null || isNaN(" + f + ")"
+	}
+	return "true"
+}
+
+// predicateOf writes a predicate that is an expression or an object.
+func predicateOf(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case map[string]any:
+		if p, ok := x["param"]; ok {
+			_ = p
+			return "true"
+		}
+		return predicate(x)
+	}
+	return "true"
+}
+
+// joinPredicates joins predicates with an operator.
+func joinPredicates(list []any, op string) string {
+	parts := make([]string, len(list))
+	for i, v := range list {
+		parts[i] = "(" + predicateOf(v) + ")"
+	}
+	return strings.Join(parts, op)
+}
+
+// timeFloorExpr writes the start of the time unit of a field.
+func timeFloorExpr(units []string, utc bool, f string) string {
+	fn := "datetime"
+	pre := ""
+	if utc {
+		fn, pre = "utc", "utc"
+	}
+	has := func(u string) bool { return slices.Contains(units, u) }
+	part := func(u, getter, def string) string {
+		if has(u) {
+			return pre + getter + "(" + f + ")"
+		}
+		return def
+	}
+	args := []string{
+		part("year", "year", "2012"),
+		part("month", "month", "0"),
+		part("date", "date", "1"),
+		part("hours", "hours", "0"),
+		part("minutes", "minutes", "0"),
+		part("seconds", "seconds", "0"),
+		part("milliseconds", "milliseconds", "0"),
+	}
+	return "time(" + fn + "(" + strings.Join(args, ", ") + "))"
+}
+
+// dateTimeExpr writes a date time object of Vega-Lite, such as {"year":
+// 2000, "month": 1}, as an expression.
+func dateTimeExpr(m map[string]any) string {
+	fn := "datetime"
+	if m["utc"] == true {
+		fn = "utc"
+	}
+	month := "0"
+	if v, ok := m["month"]; ok {
+		if s, ok := v.(string); ok {
+			month = strconv.Itoa(monthIndex(s))
+		} else {
+			month = fmt.Sprintf("%v-1", expr.String(v))
+		}
+	}
+	get := func(k, def string) string {
+		if v, ok := m[k]; ok {
+			return expr.String(v)
+		}
+		return def
+	}
+	return "time(" + fn + "(" + strings.Join([]string{get("year", "2012"), month, get("date", "1"), get("hours", "0"), get("minutes", "0"), get("seconds", "0"), get("milliseconds", "0")}, ", ") + "))"
+}
+
+// monthIndex returns the index from 0 of a month by its name.
+func monthIndex(s string) int {
+	names := []string{"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"}
+	s = strings.ToLower(s)
+	for i, n := range names {
+		if strings.HasPrefix(s, n) {
+			return i
+		}
+	}
+	return 0
+}
+
+// lit returns a Value that holds a literal.
+func lit(v any) vega.Value {
+	return vega.Lit(v)
+}

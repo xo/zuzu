@@ -19,6 +19,7 @@ import (
 	"github.com/xo/zuzu/svg"
 	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
+	"github.com/xo/zuzu/vegalite"
 )
 
 // Error is an error of the package zuzu.
@@ -104,6 +105,9 @@ func WithLogger(l *slog.Logger) Option {
 type Chart struct {
 	spec *vega.Spec
 	opts options
+	// report holds the issues of the compile of a Vega-Lite spec, which
+	// each render reports again.
+	report Report
 }
 
 // Parse reads a Vega or a Vega-Lite spec. The $schema field decides which.
@@ -136,7 +140,11 @@ func Parse(src []byte, opts ...Option) (*Chart, Report, error) {
 		}
 		return FromVega(spec, opts...)
 	case VegaLite:
-		return nil, nil, vega.Issue{Err: vega.ErrUnsupported, Message: "Vega-Lite compiles to Vega in phase 4"}
+		spec, err := vegalite.Parse(src)
+		if err != nil {
+			return nil, nil, err
+		}
+		return FromVegaLite(spec, opts...)
 	}
 	return nil, nil, fmt.Errorf("a spec with no $schema: %w", ErrUnknownDialect)
 }
@@ -157,6 +165,26 @@ func FromVega(spec *vega.Spec, opts ...Option) (*Chart, Report, error) {
 		return nil, nil, err
 	}
 	return &Chart{spec: cp, opts: o}, nil, nil
+}
+
+// FromVegaLite takes a Vega-Lite spec that a program built as Go values,
+// and compiles it to Vega. The report names each part that zuzu did not
+// compile, in the loose mode.
+func FromVegaLite(spec *vegalite.Spec, opts ...Option) (*Chart, Report, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	v, report, err := vegalite.Compile(spec, vegalite.WithStrict(o.strict))
+	if err != nil {
+		return nil, report, err
+	}
+	c, _, err := FromVega(v, opts...)
+	if err != nil {
+		return nil, report, err
+	}
+	c.report = report
+	return c, report, nil
 }
 
 // Spec returns a copy of the Vega spec, to read or to debug.

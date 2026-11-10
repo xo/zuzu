@@ -108,8 +108,10 @@ func (s Style) entries(l *Legend, x float64) scene.Mark {
 		if l.Format != nil {
 			label = l.Format(v)
 		}
-		if f, ok := v.(float64); ok && math.IsInf(f, -1) {
-			label = "< " + l.Format(scale.Thresholds(l.color())[0])
+		if f, ok := v.(float64); ok && math.IsInf(f, -1) && l.color() != nil {
+			if t := scale.Thresholds(l.color()); len(t) > 0 {
+				label = "< " + l.Format(t[0])
+			}
 		}
 		w := swatch + swatchGap + s.width(LabelSize, 400, label)
 		if l.Width > 0 && x > start && x+w > l.Width {

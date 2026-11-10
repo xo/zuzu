@@ -411,6 +411,10 @@ type Title struct {
 	Encode jsontext.Value `json:"encode,omitzero"`
 
 	Extra Extra `json:",embed"`
+
+	// short says that the spec gave the title as a string, so that it
+	// writes back as one.
+	short bool
 }
 
 // titleObject is Title without its methods, to decode the object form.
@@ -423,7 +427,7 @@ func (t *Title) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		if err != nil {
 			return err
 		}
-		*t = Title{Text: Value{JSON: raw}}
+		*t = Title{Text: Value{JSON: raw}, short: true}
 		return nil
 	}
 	var o titleObject
@@ -434,9 +438,23 @@ func (t *Title) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return nil
 }
 
-// MarshalJSONTo writes the title as an object.
+// MarshalJSONTo writes a title that the spec gave as a string as a string,
+// and any other title as an object.
 func (t Title) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if t.short && t.Text.Signal == "" {
+		cp := t
+		cp.Text, cp.short = Value{}, false
+		if isZeroTitle(cp) {
+			return t.Text.MarshalJSONTo(enc)
+		}
+	}
 	return json.MarshalEncode(enc, titleObject(t))
+}
+
+// isZeroTitle reports whether a title sets nothing.
+func isZeroTitle(t Title) bool {
+	b, err := json.Marshal(titleObject(t))
+	return err == nil && string(b) == "{}"
 }
 
 // Mark is a mark: a group, or a rect, a line, a symbol and so on, with one

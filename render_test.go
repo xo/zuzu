@@ -185,3 +185,27 @@ func TestDialect(t *testing.T) {
 		t.Errorf("Parse with another $schema = %v, want %v", err, ErrUnknownDialect)
 	}
 }
+
+func TestRenderVegaLite(t *testing.T) {
+	t.Parallel()
+	src := []byte(`{"$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+		"data": {"values": [{"a": "A", "b": 28}, {"a": "B", "b": 55}, {"a": "C", "b": 43}]},
+		"mark": "bar",
+		"encoding": {"x": {"field": "a", "type": "nominal"}, "y": {"field": "b", "type": "quantitative"}}}`)
+	c, report, err := Parse(src)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("Parse = %v, %v", report, err)
+	}
+	v, _, err := c.NewView(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := v.Data("data_0")
+	if err != nil || len(rows) != 3 || rows[1]["b_end"] != 55.0 {
+		t.Errorf("data_0 = %v, %v", rows, err)
+	}
+	var b bytes.Buffer
+	if _, err := c.SVG(t.Context(), &b); err != nil || !bytes.Contains(b.Bytes(), []byte("<svg")) {
+		t.Errorf("SVG = %v", err)
+	}
+}

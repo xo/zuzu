@@ -20,17 +20,18 @@ func main() {
 	verbose := flag.Bool("v", false, "print what differs")
 	only := flag.String("only", "", "check only the specs whose path holds this text")
 	dir := flag.String("testdata", "testdata", "the testdata folder")
+	vl := flag.Bool("vl", false, "compile the Vega-Lite specs with zuzu, and check only them")
 	flag.Parse()
 	ctx := context.Background() //nolint:forbidigo // main owns the context of the program.
-	if err := run(ctx, *dir, *only, *verbose); err != nil {
+	if err := run(ctx, *dir, *only, *verbose, *vl); err != nil {
 		fmt.Fprintln(os.Stderr, "conform:", err)
 		os.Exit(1)
 	}
 }
 
 // run checks every reference and prints a summary.
-func run(ctx context.Context, dir, only string, verbose bool) error {
-	s, err := conform.Summarize(ctx, dir, only)
+func run(ctx context.Context, dir, only string, verbose, vl bool) error {
+	s, err := conform.Summarize(ctx, dir, only, vl)
 	if err != nil {
 		return err
 	}
@@ -57,6 +58,9 @@ func run(ctx context.Context, dir, only string, verbose bool) error {
 	fmt.Printf("datasets: %d of %d match (%.1f%%)\n", s.DatasetsOK, s.Datasets, conform.Share(s.DatasetsOK, s.Datasets))
 	fmt.Printf("scales:   %d of %d match (%.1f%%)\n", s.ScalesOK, s.Scales, conform.Share(s.ScalesOK, s.Scales))
 	fmt.Printf("marks:    %d of %d match (%.1f%%)\n", s.MarksOK, s.Marks, conform.Share(s.MarksOK, s.Marks))
+	if vl {
+		fmt.Printf("compiled: %d of %d have the structure of vega-lite.js (%.1f%%), %d the same JSON\n", s.Structure, s.Specs, conform.Share(s.Structure, s.Specs), s.Same)
+	}
 	printTop("errors", errCounts)
 	printTop("issues", issues)
 	return nil

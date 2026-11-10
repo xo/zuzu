@@ -13,6 +13,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `cmd/wasm/` | a program that imports zuzu, so that CI can build it with TinyGo (D29) |
 | `cmd/conform/` | the tool that compares zuzu with the references (D17) |
 | `cmd/gallery/` | the tool that draws the specs of the corpus with zuzu, on a page |
+| `cmd/compile/` | the tool that prints the Vega spec that zuzu compiles from a Vega-Lite spec |
 | `conform/` | the comparison of datasets, scales and marks that `cmd/conform` runs |
 | `oracle/` | the oracles, which run vega.js, vega-lite.js and d3 in Node.js |
 
@@ -81,6 +82,11 @@ compiled, which its reference holds. Add `-v` to print what differs, and
 states the share that phase 3 must reach, and `TestPhase3Share` in
 `conform` fails below it. That test skips when the references are not
 there. The conformance job of CI writes them and runs it.
+
+Add `-vl` to compile each Vega-Lite spec with zuzu rather than run the Vega
+spec of vega-lite.js. It also prints the share of the specs whose compiled
+spec has the structure of the one of vega-lite.js, which phase 4 measures.
+`go run ./cmd/compile spec.vl.json` prints the Vega spec that zuzu compiles.
 
 ## Look at what zuzu draws
 

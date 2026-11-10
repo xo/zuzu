@@ -51,6 +51,7 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
 		opt(&o)
 	}
 	rt := &runtime{ctx: ctx, chart: c, opts: o, progs: map[string]*expr.Program{}, measure: text.NewEstimate()}
+	rt.report = append(rt.report, c.report...)
 	rt.loc = o.loc
 	if rt.loc == nil {
 		rt.loc = time.Local //nolint:gosmopolitan // The zone of the system is the default (D27).

@@ -9,9 +9,8 @@ reproduce the look of Vega (D12). A theme is a mode, light or dark, and a
 color scheme that swaps apart from it (D14).
 
 On 2026-11-10 phases 0 and 2 are done, and phase 1 waits for a maintainer to
-accept `docs/targets/compare.html`. The code of phase 3 runs static Vega
-specs, and its exit waits for the maintainers to accept the share that
-open question 13 proposes. Code follows the plan (D3).
+accept `docs/targets/compare.html`. Phase 3 is done: zuzu runs static Vega
+specs. Phase 4, Vega-Lite, has started. Code follows the plan (D3).
 Every decision from D1 to D29 is decided. The open questions are at the end
 of `docs/PLAN.md`.
 
@@ -159,6 +158,7 @@ On 2026-11-10 the repository holds these files:
 | `docs/targets/` | the script that draws the target SVGs and their gallery, which git ignores (D13) |
 | `*.go`, `testdata/` | the package `zuzu`: the API of D24 and the runtime that runs a spec, with its golden files, and the tests of the documents |
 | `vega/` | the Go types of a Vega spec, read from JSON and written back (D21) |
+| `vegalite/` | the Go types of a Vega-Lite spec and its compiler to Vega (D21) |
 | `expr/` | the expression language of Vega, with its oracle cases in `expr/testdata` (D9) |
 | `format/` | the formats of numbers and times of d3, the units of time and the dates that JavaScript reads, with their oracle cases in `format/testdata` (D27) |
 | `dataflow/` | the reading of data and the transforms |
