@@ -568,11 +568,11 @@ measures it:
 
 | Check | Match | Of | Exit |
 | --- | --- | --- | --- |
-| specs, in all three checks | 292 (62.1%) | 470 | 60% |
-| datasets | 753 (70.2%) | 1072 | 70% |
-| scales | 1009 (84.6%) | 1193 | 80% |
-| marks that draw data | 2084 (77.1%) | 2702 | 75% |
-| the structure of the compiled spec | 359 (76.4%) | 470 | 50% |
+| specs, in all three checks | 297 (63.2%) | 470 | 60% |
+| datasets | 758 (70.7%) | 1072 | 70% |
+| scales | 1010 (84.7%) | 1193 | 80% |
+| marks that draw data | 2087 (77.2%) | 2702 | 75% |
+| the structure of the compiled spec | 364 (77.4%) | 470 | 50% |
 
 Each check meets its exit. Phase 4 is done when the maintainers accept the
 share. `TestPhase4Share` in the test module fails when a share falls below

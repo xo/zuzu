@@ -191,6 +191,9 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 			s.dimension = true
 		}
 	}
+	if d.sortBy != "" && !s.hasSort {
+		s.sortVal, s.hasSort = map[string]any{"field": d.sortBy, "op": "min"}, true
+	}
 	if d.def != nil && !d.def.Sort.IsZero() && !s.hasSort && !s.listSorted {
 		s.sortVal, s.hasSort = valueOf(d.def.Sort), true
 	}

@@ -49,6 +49,9 @@ type channelDef struct {
 	// out is the field that the marks draw, and outEnd the end of a bin or
 	// of a time unit.
 	out, outEnd string
+	// label is the field of the text of each bin of a discrete channel,
+	// such as "1 – 2", and sortBy the field that orders those texts.
+	label, sortBy string
 	// value is a constant value of the channel, and hasValue says that it
 	// has one.
 	value    any

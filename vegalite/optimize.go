@@ -4,6 +4,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -162,6 +163,32 @@ func (c *compiler) renameAll(out *vega.Spec, read map[string]bool, names map[str
 	}
 	clear(read)
 	maps.Copy(read, next)
+}
+
+// release frees the number that a layer over a dataset took when the
+// datasets of its layers merged into one: the datasets numbered after it
+// take the numbers one less.
+func (c *compiler) release(out *vega.Spec, read map[string]bool) {
+	for _, r := range slices.Backward(c.reserved) {
+		kids := 0
+		for _, d := range c.data {
+			if len(d.Source.List) == 1 && d.Source.List[0] == r.data {
+				kids++
+			}
+		}
+		if kids >= 2 {
+			continue
+		}
+		names := map[string]string{}
+		for _, d := range c.data {
+			if m, ok := dataNumber(d.Name); ok && m > r.number {
+				names[d.Name] = "data_" + strconv.Itoa(m-1)
+			}
+		}
+		c.nData--
+		c.renameAll(out, read, names)
+	}
+	c.reserved = nil
 }
 
 // dataNumber returns the number of a dataset named data_N.

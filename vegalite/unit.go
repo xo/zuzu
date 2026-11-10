@@ -126,6 +126,13 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 	if err := u.dataflow(s); err != nil {
 		return err
 	}
+	for _, d := range u.allChannels() {
+		if d.label != "" {
+			// The marks and the scale read the text of the range of each
+			// bin, in the order of the bins.
+			d.out, d.sortBy, d.outEnd, d.bin = d.label, d.out, "", nil
+		}
+	}
 	return u.marks()
 }
 
@@ -278,6 +285,11 @@ func (u *unit) dataflow(s *Spec) error {
 	if u.stack != "" || len(u.invalidFields()) > 0 {
 		needs = true
 	}
+	if u.data != nil && u.data.values && len(dates) > 0 {
+		// Inline values parse their dates with formulas, in a dataset that
+		// derives from them.
+		needs = true
+	}
 	if !needs {
 		c.parseFields(u.data, dates, "date")
 		return nil
@@ -303,6 +315,15 @@ func (u *unit) dataflow(s *Spec) error {
 	for _, d := range u.allChannels() {
 		if d.bin != nil {
 			c.addBin(n, d.field, d.bin, []any{d.out, d.outEnd})
+			if (d.channel == "x" || d.channel == "y") && (d.typ == ordinal || d.typ == nominal) {
+				// A discrete channel draws a bin as the text of its range.
+				d.label = d.out + "_range"
+				start, end := fieldRef(d.out), fieldRef(d.outEnd)
+				c.add(n, transform("formula", map[string]any{
+					"expr": "!isValid(" + start + ") || !isFinite(+" + start + ") ? \"null\" : format(" + start + ", \"\") + \" – \" + format(" + end + ", \"\")",
+					"as":   d.label,
+				}))
+			}
 		}
 	}
 	for _, d := range u.allChannels() {
@@ -471,6 +492,9 @@ func (u *unit) addAggregate(n *dataNode) {
 		case d.bin != nil:
 			group(d.out)
 			group(d.outEnd)
+			if d.label != "" {
+				group(d.label)
+			}
 		case d.units != nil && d.typ == temporal && u.spans(d):
 			group(d.out)
 			group(d.outEnd)

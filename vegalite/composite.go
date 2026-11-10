@@ -68,7 +68,7 @@ func composite(s *Spec) (*Spec, error) {
 		title = ""
 	}
 	// The group by fields are the fields of the other channels.
-	var groupby []any
+	var groupby, pre []any
 	others := map[string]any{}
 	for _, k := range sortedChannels(enc) {
 		v := enc[k]
@@ -76,11 +76,37 @@ func composite(s *Spec) (*Spec, error) {
 			continue
 		}
 		others[k] = v
-		if m, ok := v.(map[string]any); ok {
-			if f, ok := m["field"].(string); ok && m["aggregate"] == nil {
-				groupby = append(groupby, f)
+		m, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		f, ok := m["field"].(string)
+		if !ok || m["aggregate"] != nil {
+			continue
+		}
+		if tu, ok := m["timeUnit"]; ok {
+			// The time unit applies before the aggregate, which groups by
+			// it, and the layers draw the field it gives.
+			d, err := unitField(k, s.Encoding[k])
+			if err != nil {
+				return nil, err
+			}
+			if d != nil && d.units != nil {
+				pre = append(pre, map[string]any{"timeUnit": tu, "field": f, "as": d.out})
+				def := maps.Clone(m)
+				delete(def, "timeUnit")
+				def["field"] = d.out
+				if def["type"] == nil {
+					def["type"] = temporal
+				}
+				if _, ok := def["title"]; !ok {
+					def["title"] = titleOf(d)
+				}
+				others[k] = def
+				f = d.out
 			}
 		}
+		groupby = append(groupby, f)
 	}
 	var out map[string]any
 	switch s.Mark.Type {
@@ -89,9 +115,14 @@ func composite(s *Spec) (*Spec, error) {
 	default:
 		out = errorMark(s.Mark.Type, cont, field, title, def, props, others, groupby)
 	}
-	if layers, ok := out["layer"].([]any); ok && len(layers) == 1 {
-		// A composite mark of one part is a single view, with the
-		// transforms of the layer before its own.
+	if len(pre) > 0 {
+		ts, _ := out["transform"].([]any)
+		out["transform"] = append(pre, ts...)
+	}
+	if layers, ok := out["layer"].([]any); ok && len(layers) == 1 && s.Mark.Type != "errorband" {
+		// An error bar or a box plot of one part is a single view, with
+		// the transforms of the layer before its own. An error band stays
+		// a layer.
 		one, _ := layers[0].(map[string]any)
 		ts, _ := out["transform"].([]any)
 		if own, ok := one["transform"].([]any); ok {
@@ -346,4 +377,14 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 			"layer":     []any{boxLayer, median},
 		},
 	}}
+}
+
+// unitField reads a channel of a composite mark, to find the field that
+// its time unit gives.
+func unitField(name string, ch Channel) (*channelDef, error) {
+	def := ch.Def()
+	if def == nil {
+		return nil, nil
+	}
+	return readChannel(name, def, nil)
 }

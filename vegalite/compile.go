@@ -66,6 +66,15 @@ type compiler struct {
 	// signalNames their names.
 	signals     []vega.Signal
 	signalNames map[string]bool
+	// reserved holds the numbers of datasets that layers over inline
+	// values take.
+	reserved []reservation
+}
+
+// reservation is a number of a dataset that a layer over a dataset takes.
+type reservation struct {
+	data   string
+	number int
 }
 
 // issue handles a feature that the compiler does not support.
@@ -200,7 +209,8 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 		if src != nil && !src.open && !s.expanded && len(s.Layer) > 1 && len(s.Transform) == 0 {
 			// A layer over inline values has a dataset of its own, which
 			// vega-lite.js names and later removes, so its number is
-			// taken.
+			// taken, unless the layers end up with one dataset.
+			c.reserved = append(c.reserved, reservation{data: c.name(src), number: c.nData})
 			c.nData++
 		}
 		if src != nil && len(s.Layer) > 1 {
@@ -649,6 +659,7 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 	}
 	c.removeEmpty(read)
 	c.mergeIdentical(out, read)
+	c.release(out, read)
 }
 
 // removeEmpty removes each dataset that derives from one other dataset
