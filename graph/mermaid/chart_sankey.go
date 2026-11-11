@@ -115,6 +115,9 @@ func sankeyChart(c *chart) (map[string]any, bool, error) {
 				"type": "zuzu.sankey", "extent": []any{[]any{0, 0}, []any{width, height}},
 				"nodeWidth": settingNumber(cfg, "nodeWidth", 10), "nodePadding": settingNumber(cfg, "nodePadding", 12),
 				"align": align,
+			}, map[string]any{
+				"type": "zuzu.sankeylabels", "extent": []any{[]any{0, 0}, []any{width, height}},
+				"text": map[string]any{"expr": text}, "fontSize": 11, "fontWeight": "600",
 			}}},
 			map[string]any{"name": "bands", "source": "links", "transform": []any{map[string]any{
 				"type": "zuzu.sankeylinks", "nodes": "nodes",
@@ -131,15 +134,15 @@ func sankeyChart(c *chart) (map[string]any, bool, error) {
 				"y": map[string]any{"field": "y0"}, "y2": map[string]any{"field": "y1"},
 				"fill": colorOf("key"),
 			}}},
-			// A label goes on the inner side of its node: at the right of a
-			// node in the left half, and at the left of the others.
+			// zuzu.sankeylabels places each label clear of the other labels
+			// and of the nodes.
 			map[string]any{"type": "text", "name": "labels", "from": map[string]any{"data": "nodes"}, "style": []any{"zuzu.nodeLabel"}, "encode": map[string]any{"update": map[string]any{
-				"x":          map[string]any{"signal": "datum.x0 < width / 2 ? datum.x1 + 6 : datum.x0 - 6"},
-				"y":          map[string]any{"signal": "(datum.y0 + datum.y1) / 2"},
-				"align":      map[string]any{"signal": "datum.x0 < width / 2 ? 'left' : 'right'"},
+				"x":          map[string]any{"field": "labelX"},
+				"y":          map[string]any{"field": "labelY"},
+				"align":      map[string]any{"field": "labelAlign"},
 				"baseline":   map[string]any{"value": "middle"},
 				"fontWeight": map[string]any{"value": 600},
-				"text":       map[string]any{"signal": text},
+				"text":       map[string]any{"field": "label"},
 			}}},
 		},
 	}

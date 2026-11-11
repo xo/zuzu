@@ -281,7 +281,7 @@ and checks that each value of the source draws once, with its label.
 | `gantt` | bars of Vega-Lite on a time axis, with the plan worked out in Go |
 | `journey` | points of Vega-Lite of the score of each step |
 | `wardley-beta` | points, lines and text of Vega-Lite |
-| `sankey`, `sankey-beta` | Vega with `zuzu.sankey` and `zuzu.sankeylinks` |
+| `sankey`, `sankey-beta` | Vega with `zuzu.sankey`, `zuzu.sankeylinks` and `zuzu.sankeylabels` |
 | `radar-beta` | Vega, polygons on radial axes |
 | `treemap`, `treemap-beta` | Vega with `stratify` and `treemap` |
 
@@ -370,6 +370,14 @@ reads `sankey.width`, `height`, `nodeAlignment`, `nodeWidth`,
 `nodePadding`, `showValues`, `prefix`, `suffix`, `nodeColors` and
 `linkColor`. A `linkColor` of `gradient` draws in the color of the source,
 and the report says so.
+
+A label goes on the inner side of its node, as Mermaid puts it: at the
+right of a node in the left half, and at the left of the others. Mermaid
+draws a label over another label or a node when they meet. zuzu does not.
+The transform `zuzu.sankeylabels` measures each label, and moves a label
+that hits to the other side, then up or down beside its node. As a last
+step, it cuts the end of the label off with an ellipsis. D30 gives the
+rule.
 
 #### radar-beta
 

@@ -746,8 +746,8 @@ zuzu chose these rules where the documents of Vega say nothing (D6):
   the exact form of the approximation of Barnes and Hut.
 
 D30 named the transforms and the scale that zuzu adds. `zuzu.sankey`,
-`zuzu.sankeylinks`, `zuzu.chord`, `zuzu.chordribbons`, `zuzu.hexbin` and the
-scale `zuzu.trading` exist. Each of the 22 targets of tiers 1 and 2 has a
+`zuzu.sankeylinks`, `zuzu.sankeylabels`, `zuzu.chord`, `zuzu.chordribbons`,
+`zuzu.hexbin` and the scale `zuzu.trading` exist. Each of the 22 targets of tiers 1 and 2 has a
 Vega spec in `test/testdata/targets`, which zuzu draws in the strict mode
 with no issue, and a test runs them. A spec follows its target where Vega
 has the means. The streamgraph stacks around the middle, because Vega has

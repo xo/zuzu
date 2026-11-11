@@ -13,7 +13,9 @@ import (
 
 	"github.com/xo/zuzu"
 	"github.com/xo/zuzu/graph/mermaid"
+	"github.com/xo/zuzu/layout"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -153,8 +155,10 @@ func TestSankeyFixtures(t *testing.T) {
 			}
 			for _, name := range nodes {
 				rects := countDrawn(items, scene.Rect, func(it drawnItem) bool { return it.datum["key"] == name })
+				// A label that has no room loses its end to an ellipsis.
 				labels := countDrawn(items, scene.Text, func(it drawnItem) bool {
-					return it.datum["key"] == name && strings.HasPrefix(it.text, name)
+					short, cut := strings.CutSuffix(it.text, "…")
+					return it.datum["key"] == name && (strings.HasPrefix(it.text, name) || cut && strings.HasPrefix(name, short))
 				})
 				if rects != 1 || labels != 1 {
 					t.Errorf("the node %q draws %d boxes and %d labels", name, rects, labels)
@@ -175,6 +179,60 @@ func TestSankeyLabels(t *testing.T) {
 	items, _ = drawFixture(t, "testdata/sankey/03-quotes.mmd")
 	if textDrawn(items, `Heating and cooling, "homes" 212.29`) != 1 {
 		t.Error("the label of a node in quotes is not drawn")
+	}
+}
+
+func TestSankeyLabelsApart(t *testing.T) {
+	t.Parallel()
+	style := layout.Style{Measure: text.NewEstimate()}
+	for _, path := range fixtures(t, "sankey") {
+		items, _ := drawFixture(t, path)
+		var labels, nodes []layout.Bounds
+		var names []string
+		for _, it := range items {
+			switch {
+			case it.mark == scene.Text:
+				labels = append(labels, style.ItemBounds(scene.Text, it.item))
+				names = append(names, it.text)
+			case it.mark == scene.Rect && it.datum["key"] != nil:
+				nodes = append(nodes, style.ItemBounds(scene.Rect, it.item))
+			}
+		}
+		overlap := func(a, b layout.Bounds) bool {
+			return a.X1 < b.X2 && b.X1 < a.X2 && a.Y1 < b.Y2 && b.Y1 < a.Y2
+		}
+		for i, a := range labels {
+			for j := i + 1; j < len(labels); j++ {
+				if overlap(a, labels[j]) {
+					t.Errorf("%s: the label %q overlaps the label %q", path, names[i], names[j])
+				}
+			}
+			for _, n := range nodes {
+				if overlap(a, n) {
+					t.Errorf("%s: the label %q overlaps a node", path, names[i])
+				}
+			}
+		}
+	}
+	// A plain sankey keeps each label whole, on the inner side of its
+	// node, at the middle of the node.
+	items, _ := drawFixture(t, "testdata/sankey/01-basic.mmd")
+	for _, it := range items {
+		if it.mark != scene.Text {
+			continue
+		}
+		num := func(k string) float64 {
+			f, _ := it.datum[k].(float64)
+			return f
+		}
+		x0, x1, mid := num("x0"), num("x1"), (num("y0")+num("y1"))/2
+		wantX, wantAlign := x1+6, "left"
+		if x0 >= 300 {
+			wantX, wantAlign = x0-6, "right"
+		}
+		if strings.HasSuffix(it.text, "…") || it.item.X != wantX || it.item.Y != mid || it.item.Align != wantAlign {
+			t.Errorf("the label %q is at %v, %v, %s, not at %v, %v, %s", it.text, it.item.X, it.item.Y, it.item.Align, wantX, mid, wantAlign)
+		}
 	}
 }
 

@@ -63,6 +63,7 @@ var transforms = map[string]transformFunc{
 	"zuzu.hexbin":       hexbin,
 	"zuzu.sankey":       sankey,
 	"zuzu.sankeylinks":  sankeylinks,
+	"zuzu.sankeylabels": sankeylabels,
 }
 
 // filter keeps the rows for which an expression is true.

@@ -52,6 +52,37 @@ func TestSankey(t *testing.T) {
 	}
 }
 
+func TestSankeyLabels(t *testing.T) {
+	t.Parallel()
+	// The test env measures 6 for each byte of a text.
+	tests := []struct {
+		name, nodes string
+		want        []Row
+	}{
+		{"inner sides", `[{"key":"a","x0":0,"x1":10,"y0":0,"y1":60,"value":2},{"key":"b","x0":90,"x1":100,"y0":20,"y1":40,"value":1}]`,
+			[]Row{{"labelX": 16.0, "labelY": 30.0, "labelAlign": "left", "label": "a"}, {"labelX": 84.0, "labelY": 30.0, "labelAlign": "right", "label": "b"}}},
+		{"move down", `[{"key":"aaaaaaaaaaa","x0":0,"x1":10,"y0":0,"y1":60,"value":2},{"key":"b","x0":40,"x1":50,"y0":20,"y1":40,"value":1}]`,
+			[]Row{{"labelX": 16.0, "labelY": 47.5, "labelAlign": "left", "label": "aaaaaaaaaaa"}, {"labelX": 56.0, "labelY": 30.0, "labelAlign": "left", "label": "b"}}},
+		{"ellipsis", `[{"key":"aaaaaaaaaaa","x0":0,"x1":10,"y0":0,"y1":10,"value":2},{"key":"b","x0":61,"x1":71,"y0":0,"y1":60,"value":1}]`,
+			[]Row{{"labelX": 16.0, "labelY": 5.0, "labelAlign": "left", "label": "aaaa…"}, {"labelX": 55.0, "labelY": 30.0, "labelAlign": "right", "label": "b"}}},
+		{"other side", `[{"key":"aaaaa","x0":40,"x1":50,"y0":25,"y1":35,"value":2},{"key":"b","x0":60,"x1":70,"y0":20,"y1":40,"value":1}]`,
+			[]Row{{"labelX": 34.0, "labelY": 30.0, "labelAlign": "right", "label": "aaaaa"}, {"labelX": 76.0, "labelY": 30.0, "labelAlign": "left", "label": "b"}}},
+	}
+	for _, test := range tests {
+		out, err := Run(newEnv(), rowsOf(t, test.nodes), transformsOf(t, `[{"type":"zuzu.sankeylabels","size":[100,60]}]`), "/transform")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, w := range test.want {
+			for k, v := range w {
+				if got := out[i][k]; got != v {
+					t.Errorf("%s: the %s of node %d is %v, want %v", test.name, k, i, got, v)
+				}
+			}
+		}
+	}
+}
+
 func TestChord(t *testing.T) {
 	t.Parallel()
 	links := `[{"source":"a","target":"b","value":3},{"source":"b","target":"a","value":1},{"source":"a","target":"c","value":4}]`

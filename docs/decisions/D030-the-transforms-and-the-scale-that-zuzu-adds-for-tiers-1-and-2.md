@@ -60,6 +60,45 @@ its target, `y0` and `y1`, the middle of its band at each end, `width`, and
 at a node stack in the order of `linkSort`, from the places of the nodes, so
 the transform does not run the layout again.
 
+## zuzu.sankeylabels
+
+On 2026-11-11 this transform joined the decision, so that the labels of a
+large sankey do not overlap. It runs on the dataset that `zuzu.sankey`
+made, and reads the fields `x0`, `x1`, `y0`, `y1` and `value` of each node.
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `text` | `key` | the text of a label, as a field or an expression |
+| `extent` or `size` | none, one is required | the extent of the nodes. A label stays inside it from left to right |
+| `offset` | 6 | the space between a node and its label |
+| `font`, `fontSize`, `fontWeight` | the theme, 11, `normal` | the font that measures a label |
+| `as` | see below | the names of the output fields |
+
+Each node gets `labelX`, `labelY`, `labelAlign` and `label`, which a
+`text` mark draws with the baseline `middle`. A label is as tall as its
+font size. It keeps a gap of 2 from a node and of 1 from another label.
+The transform places the labels in four steps:
+
+1. The labels of the larger nodes go first. A label goes on the inner
+   side of its node: at the right of a node in the left half of the
+   extent, and at the left of the others. If the label hits a label or a
+   node there, it goes on the other side. If it hits on both sides, it
+   stays on the first side that is inside the extent and clear of the
+   nodes, or else on the inner side.
+2. A label that hits a node moves up or down, away from the node. A label
+   stays beside its node: its box stays within the height of the node, or
+   its middle moves at most half its height from the middle of the node.
+   If no such move clears the node, the label loses the end of its text to
+   an ellipsis, at the side and the height that keep the most of it.
+3. Labels that hit each other move apart, up and down, within the same
+   reach.
+4. A label that still hits loses the end of its text in the same way.
+   The labels of the smaller nodes lose their ends first. A label that
+   cannot keep one letter keeps all of its text where it is.
+
+A sankey with few nodes keeps each label whole, at the middle of its node,
+on the inner side.
+
 ## zuzu.chord
 
 It runs on a dataset of links and makes a row for each group, which the
