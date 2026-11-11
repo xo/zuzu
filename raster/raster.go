@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"cmp"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"math"
@@ -16,10 +17,12 @@ import (
 	"strings"
 
 	"github.com/xo/okage"
+	okagesvg "github.com/xo/okage/svg"
 
 	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/text"
 )
 
 // Error is an error of the package raster.
@@ -43,27 +46,18 @@ const (
 	ErrUnsupportedShape Error = "unsupported symbol shape"
 	// ErrSize is the error of a scene whose size gives no image.
 	ErrSize Error = "invalid image size"
-	// ErrText is the error of a text item when the renderer has no way to
-	// draw text.
-	ErrText Error = "no text renderer"
 )
-
-// TextRenderer draws the text items of a scene. okage gives the outlines of
-// the glyphs (D11).
-type TextRenderer interface {
-	// DrawText draws a text item onto a pixmap, with the transform of its
-	// group.
-	DrawText(pm *okage.Pixmap, it *scene.Item, ts okage.Transform) error
-}
 
 // Option is an option of Draw.
 type Option func(*drawer)
 
-// WithText sets the renderer of the text items. Without it, a scene that
-// has text is an error.
-func WithText(t TextRenderer) Option {
+// WithRenderer sets the renderer of okage whose fonts draw the text, with
+// the layout of text of okage (okage D37). Make one renderer and share it,
+// because it loads the fonts of the system on its first use (okage D36).
+// Without it, Draw makes a renderer for a scene that has text.
+func WithRenderer(r *okagesvg.Renderer) Option {
 	return func(d *drawer) {
-		d.text = t
+		d.fonts = r
 	}
 }
 
@@ -79,7 +73,7 @@ func Draw(s *scene.Scene, opts ...Option) (*image.RGBA, error) {
 	if !ok {
 		return nil, ErrSize
 	}
-	d := &drawer{pm: pm}
+	d := &drawer{pm: pm, measure: text.NewEstimate()}
 	for _, o := range opts {
 		o(d)
 	}
@@ -95,8 +89,11 @@ func Draw(s *scene.Scene, opts ...Option) (*image.RGBA, error) {
 
 // drawer holds the state of one call of Draw.
 type drawer struct {
-	pm   *okage.Pixmap
-	text TextRenderer
+	pm *okage.Pixmap
+	// fonts shapes the text, and measure measures a line for its limit, as
+	// the SVG writer measures it.
+	fonts   *okagesvg.Renderer
+	measure *text.Estimate
 }
 
 // mark draws one mark and its items, with the transform of its group.
@@ -159,13 +156,7 @@ func (d *drawer) mark(m *scene.Mark, ts okage.Transform) error {
 		}
 	case scene.Text:
 		for i := range m.Items {
-			if len(m.Items[i].Text) == 0 {
-				continue
-			}
-			if d.text == nil {
-				return ErrText
-			}
-			if err := d.text.DrawText(d.pm, &m.Items[i], ts); err != nil {
+			if err := d.text(&m.Items[i], ts); err != nil {
 				return err
 			}
 		}
@@ -310,6 +301,12 @@ func (d *drawer) path(data string, it *scene.Item, fill string, ts okage.Transfo
 // draw fills and strokes a path with the paint of an item. fill is the
 // color of a fill that the item does not set, empty for none.
 func (d *drawer) draw(pb *okage.PathBuilder, it *scene.Item, fill string, ts okage.Transform) {
+	d.paintPath(pb, it, fill, ts, false)
+}
+
+// paintPath fills and strokes a path with the paint of an item, the stroke
+// first when strokeFirst is true, as SVG draws the halo of a text.
+func (d *drawer) paintPath(pb *okage.PathBuilder, it *scene.Item, fill string, ts okage.Transform, strokeFirst bool) {
 	p, ok := pb.Finish()
 	if !ok {
 		return
@@ -339,15 +336,24 @@ func (d *drawer) draw(pb *okage.PathBuilder, it *scene.Item, fill string, ts oka
 			opacity = 1
 		}
 	}
-	if hasFill {
+	fillIt := func() {
 		if paint, ok := d.paint(fillPaint, opacityOf(it.FillOpacity)*opacity, p); ok {
 			target.FillPath(p, paint, okage.FillRuleWinding, ts, nil)
 		}
 	}
-	if hasStroke {
+	strokeIt := func() {
 		if paint, ok := d.paint(it.Stroke, opacityOf(it.StrokeOpacity)*opacity, p); ok {
 			target.StrokePath(p, paint, stroke(it), ts, nil)
 		}
+	}
+	if hasStroke && strokeFirst {
+		strokeIt()
+	}
+	if hasFill {
+		fillIt()
+	}
+	if hasStroke && !strokeFirst {
+		strokeIt()
 	}
 	if target != d.pm {
 		pp := okage.DefaultPixmapPaint()
@@ -572,4 +578,49 @@ func dataURL(u string) ([]byte, bool) {
 		return nil, false
 	}
 	return bytes.Clone([]byte(s)), true
+}
+
+// text draws a text item: the outlines of the glyphs of each line, from the
+// layout of text of okage, at the place that shape.TextOf gives, as the SVG
+// writer writes it and okage draws it. A stroke is a halo under the fill. A
+// line that no font draws draws nothing, as in SVG.
+func (d *drawer) text(it *scene.Item, ts okage.Transform) error {
+	if len(it.Text) == 0 {
+		return nil
+	}
+	t := shape.TextOf(it, d.measure)
+	if d.fonts == nil {
+		d.fonts = okagesvg.New()
+	}
+	family := it.Font
+	if family == "" {
+		family = shape.DefaultFont
+	}
+	style := okagesvg.TextStyle{Family: family, Size: float32(t.Size), Weight: uint16(min(1000, max(1, text.Weight(string(it.FontWeight)))))}
+	switch it.FontStyle {
+	case "italic":
+		style.Style = okagesvg.FontStyleItalic
+	case "oblique":
+		style.Style = okagesvg.FontStyleOblique
+	}
+	pb := okage.NewPathBuilder()
+	for i, line := range t.Lines {
+		run, err := d.fonts.ShapeText(shape.Collapse(line), style)
+		if errors.Is(err, okage.ErrSVGTextNoFont) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("drawing the text %q: %w", line, err)
+		}
+		x := 0.0
+		switch t.Anchor {
+		case "middle":
+			x = -float64(run.Width()) / 2
+		case "end":
+			x = -float64(run.Width())
+		}
+		run.AppendPath(pb, float32(x), float32(float64(i)*t.LineHeight))
+	}
+	d.paintPath(pb, it, "#000", place(ts, t.X, t.Y, t.Angle), true)
+	return nil
 }

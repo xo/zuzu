@@ -11,7 +11,10 @@ import (
 	"testing"
 	"time"
 
+	okagesvg "github.com/xo/okage/svg"
+
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -285,5 +288,45 @@ func TestLabelMarks(t *testing.T) {
 	}
 	if s := points.Items[0].Stroke; !s.IsZero() {
 		t.Errorf("the symbol has the stroke %v, want none", s)
+	}
+}
+
+// TestImage draws the bar chart as an image and compares it with the image
+// that okage draws from its SVG, at most 1 percent of the pixels apart, the
+// gate of okage D31 (D11).
+func TestImage(t *testing.T) {
+	t.Parallel()
+	c := chart(t, "bar.vg.json")
+	img, report, err := c.Image(t.Context(), WithLocation(time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("report = %v, want none", report)
+	}
+	var b bytes.Buffer
+	if _, err := c.SVG(t.Context(), &b, WithLocation(time.UTC)); err != nil {
+		t.Fatal(err)
+	}
+	r := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
+	want, err := r.Render(b.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.Bounds() != want.Bounds() {
+		t.Fatalf("the size is %v, want %v", img.Bounds(), want.Bounds())
+	}
+	n := 0
+	for i := 0; i < len(img.Pix); i += 4 {
+		for k := range 4 {
+			if d := int(img.Pix[i+k]) - int(want.Pix[i+k]); d > 1 || d < -1 {
+				n++
+				break
+			}
+		}
+	}
+	if share := float64(n) / float64(len(img.Pix)/4); share > 0.01 {
+		t.Errorf("%.2f%% of the pixels differ, more than 1%%", 100*share)
 	}
 }

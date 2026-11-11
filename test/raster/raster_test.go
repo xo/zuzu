@@ -1,5 +1,5 @@
 // Package raster checks the direct renderer of zuzu against okage on the
-// corpus (D11).
+// corpus, with the text (D11).
 package raster
 
 import (
@@ -15,13 +15,13 @@ import (
 
 	"github.com/xo/zuzu"
 	"github.com/xo/zuzu/raster"
-	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/svg"
 	"github.com/xo/zuzu/test/conform"
+	"github.com/xo/zuzu/text"
 )
 
-// TestCorpusMatchesOkage draws each spec of the first target without its
-// text, directly and through SVG and okage, and checks that at most 1
+// TestCorpusMatchesOkage draws each spec of the first target directly and
+// through SVG and okage, with the bundled fonts, and checks that at most 1
 // percent of the pixels differ, the gate of okage D31 for a file with text.
 func TestCorpusMatchesOkage(t *testing.T) {
 	t.Parallel()
@@ -35,7 +35,8 @@ func TestCorpusMatchesOkage(t *testing.T) {
 	if len(paths) == 0 {
 		t.Skip("no references: run the oracle first")
 	}
-	r := okagesvg.New(okagesvg.WithLoadSystemFonts(false))
+	r := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
 	corpus := filepath.Join("..", "testdata", "corpus")
 	for _, p := range paths {
 		ref, err := conform.Read(p)
@@ -61,16 +62,15 @@ func TestCorpusMatchesOkage(t *testing.T) {
 			if err != nil {
 				t.Skip(err)
 			}
-			bare := withoutText(s)
 			var b bytes.Buffer
-			if err := svg.Write(&b, bare); err != nil {
+			if err := svg.Write(&b, s); err != nil {
 				t.Fatal(err)
 			}
 			want, err := r.Render(b.Bytes())
 			if err != nil {
 				t.Fatalf("okage: %v", err)
 			}
-			got, err := raster.Draw(bare)
+			got, err := raster.Draw(s, raster.WithRenderer(r))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -79,32 +79,6 @@ func TestCorpusMatchesOkage(t *testing.T) {
 			}
 		})
 	}
-}
-
-// withoutText returns a copy of a scene with no text mark.
-func withoutText(s *scene.Scene) *scene.Scene {
-	out := *s
-	out.Root = stripText(s.Root)
-	return &out
-}
-
-func stripText(m scene.Mark) scene.Mark {
-	if m.Type != scene.Group {
-		return m
-	}
-	items := make([]scene.Item, len(m.Items))
-	for i, it := range m.Items {
-		marks := make([]scene.Mark, 0, len(it.Items))
-		for _, c := range it.Items {
-			if c.Type != scene.Text {
-				marks = append(marks, stripText(c))
-			}
-		}
-		it.Items = marks
-		items[i] = it
-	}
-	m.Items = items
-	return m
 }
 
 // differ returns the share of the pixels that differ, by the metric of

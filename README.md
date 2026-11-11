@@ -50,7 +50,9 @@ those of vega.js for 99 percent of the specs. zuzu compiles a Vega-Lite spec
 itself (phase 4), and its result matches for 98 percent of the 470
 Vega-Lite specs. Phase 5 added the transforms of statistics, hierarchies,
 maps, contours and labels, and the transforms and the scale of zuzu for
-sankeys, chord diagrams, hex bins and trading days.
+sankeys, chord diagrams, hex bins and trading days. Phase 6 added
+`raster`, which draws a chart with okage directly, without SVG, and
+`Chart.Image`.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.
 

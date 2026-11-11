@@ -12,7 +12,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `targets/` | the test that runs those specs in the strict mode. Set `ZUZU_TARGETS_OUT` to a folder to write their SVG |
 | `testdata/topojson/` | a small topology, and the meshes that the reader of vega.js gives, which `oracle/topojson.mjs` writes |
 | `topojson/` | the test that compares the mesh of zuzu with those meshes |
-| `raster/` | the test that compares the direct renderer with okage on the corpus, without text (D11). It needs the references |
+| `raster/` | the test that compares the direct renderer with okage on the corpus, with the bundled fonts (D11). It needs the references |
 | `cmd/rasterbench/` | the tool that times each step of the image of each spec, through SVG and directly (D11) |
 | `cmd/inventory/` | the tool that writes the inventory |
 | `cmd/targets/` | the tool that compares the SVG writer with the targets and writes `docs/targets/compare.html` (D13) |
@@ -155,8 +155,8 @@ node oracle/topojson.mjs testdata
 `cmd/rasterbench` times each step of the image of each spec of the first
 target: the scene, the SVG writer, the parse and the rasterization of okage,
 and the direct renderer. It also counts the pixels that differ between the
-two images of each spec without text, by the metric of okage D31. Run it in
-this folder after the oracle:
+two images of each spec, by the metric of okage D31. It draws the text with
+the bundled fonts. Run it in this folder after the oracle:
 
 ```bash
 go run ./cmd/rasterbench

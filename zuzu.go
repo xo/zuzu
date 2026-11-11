@@ -5,18 +5,23 @@ import (
 	"context"
 	"encoding/json/v2"
 	"fmt"
+	"image"
 	"io"
 	"log/slog"
 	"math/rand/v2"
 	"strings"
 	"time"
 
+	okagesvg "github.com/xo/okage/svg"
+
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/raster"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/svg"
+	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 	"github.com/xo/zuzu/vegalite"
@@ -342,4 +347,23 @@ func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Rep
 	}
 	_, err = w.Write(b.Bytes())
 	return report, err
+}
+
+// Image renders the chart and draws it with the direct renderer of okage
+// (D11). The text draws in the bundled IBM Plex Sans (D16), and in no font
+// of the system, so that a chart gives the same pixels on every machine. A
+// character that the bundled font lacks draws nothing. The pixels are
+// premultiplied, as image.RGBA expects.
+func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, Report, error) {
+	s, report, err := c.Render(ctx, opts...)
+	if err != nil {
+		return nil, report, err
+	}
+	fonts := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
+	img, err := raster.Draw(s, raster.WithRenderer(fonts))
+	if err != nil {
+		return nil, report, fmt.Errorf("drawing the image: %w", err)
+	}
+	return img, report, nil
 }

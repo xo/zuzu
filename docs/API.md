@@ -98,7 +98,8 @@ func (v *View) Scale(name string) (scale.Scale, error)
 
 On 2026-11-10 the code of phase 3 has all of the above but these:
 
-1. `Image` and `WithFonts`, which come with the fonts of okage (BACKLOG).
+1. `WithFonts`. Since phase 6, `Image` draws with the bundled IBM Plex
+   Sans and no font of the system (BACKLOG).
 2. `WithEvaluator`, which comes with the package `script` (D9).
 3. `Update`, which comes with live data in phase 8.
 4. The whole of Vega-Lite. Since phase 4 started, `Parse` and
@@ -114,12 +115,13 @@ scene graph and only the scene graph (D8):
 ```go
 s, report, err := chart.Render(ctx)
 err = svg.Write(w, s, svg.WithIndent("  "))
-pix, err := raster.Draw(s, raster.WithText(tr)) // phase 6 (D11)
+pix, err := raster.Draw(s, raster.WithRenderer(fonts)) // phase 6 (D11)
 ```
 
-`raster.Draw` exists since phase 6 and draws every mark but text. A scene
-with text needs a `raster.TextRenderer`, which waits for the API of okage
-D37 that gives the outlines of glyphs, in okage v0.3.0 (D11).
+`raster.Draw` exists since phase 6. `raster.WithRenderer` names the
+renderer of okage whose fonts draw the text, with the layout of text of
+okage D37. A program makes one and shares it, because it loads the fonts of
+the system on its first use (okage D36).
 
 ### Options
 

@@ -89,19 +89,6 @@ the titles of `bar_grouped_thin`, has an order in vega.js that depends on the
 sort of JavaScript, which is not a total order on mixed types. zuzu sorts
 numbers before strings.
 
-## Phase 6
-
-### Draw text in the direct renderer
-
-`raster.Draw` draws every mark but text (D11). Text needs the API of okage
-D37, `svg.ShapeText`, which gives the width of a run of text and the
-outlines of its glyphs, with the fonts, the fallback and the shaping of the
-package `svg` of okage. It comes in okage v0.3.0. When that is released,
-require it, write a `raster.TextRenderer` on it, add `Chart.Image`, and
-check the corpus with its text against okage, at most 1 percent of the
-pixels. `ShapeText` does not collapse white space, as a `text` element of
-SVG does, so the renderer collapses it first.
-
 ## Themes
 
 ### Write the tool that converts upstream themes into schemes
@@ -121,9 +108,12 @@ bundles only IBM Plex Sans (D16).
 ### Pass the bundled fonts to okage
 
 D16. The package `text` embeds IBM Plex Sans, and `text.Fonts` returns the
-files. When the root package renders an image (D24), it loads them into the
-`FontDatabase` of okage and sets the family as the sans serif family, so that
-an image draws the same font that the layout measured.
+files. Since phase 6, `Chart.Image` loads them into a renderer of okage
+with no font of the system, and sets the family as the sans serif family,
+so that an image draws the same font that the layout measured. A character
+that IBM Plex Sans lacks draws nothing. The option `WithFonts` of API.md,
+which gives other fonts, and a fallback to the fonts of the system, are not
+done.
 
 ## Survey
 

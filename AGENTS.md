@@ -11,8 +11,8 @@ color scheme that swaps apart from it (D14).
 On 2026-11-11 phases 0, 1 and 2 are done: a maintainer accepted
 `docs/targets/compare.html`. Phase 3 is done: zuzu runs static Vega
 specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is done: zuzu
-draws the charts of tiers 1 and 2. Phase 6, the direct renderer, has
-started, and its text waits for an API of okage. Code follows the plan (D3).
+draws the charts of tiers 1 and 2. Phase 6 is done: `raster` draws a scene
+with okage directly. Code follows the plan (D3).
 Every decision from D1 to D30 is decided. The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules

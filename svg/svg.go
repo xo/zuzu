@@ -41,7 +41,7 @@ const (
 
 // DefaultFont is the font family of a text item that names none. zuzu bundles
 // IBM Plex Sans (D16).
-const DefaultFont = "'IBM Plex Sans', sans-serif"
+const DefaultFont = shape.DefaultFont
 
 // Write writes a scene as SVG.
 func Write(w io.Writer, s *scene.Scene) error {
@@ -291,56 +291,21 @@ func (w *writer) image(it *scene.Item) {
 	w.out.WriteString("/>")
 }
 
-// The baselines and the alignments of Vega that the writer reads.
-const (
-	baselineTop    = "top"
-	baselineMiddle = "middle"
-	baselineBottom = "bottom"
-)
-
-// baselines are the offsets of the baselines of Vega, as fractions of the
-// size of the font, from the alphabetic baseline that SVG draws on.
-var baselines = map[string]float64{
-	baselineTop:    0.79,
-	baselineMiddle: 0.3,
-	baselineBottom: -0.21,
-}
-
-// anchors are the alignments of Vega as the text-anchor of SVG.
-var anchors = map[string]string{
-	"center": baselineMiddle,
-	"right":  "end",
-}
-
 // text writes a text item. A stroke on text is a halo, which SVG draws under
 // the fill (docs/STYLE.md).
 func (w *writer) text(it *scene.Item) {
 	if len(it.Text) == 0 {
 		return
 	}
-	size := it.FontSize
-	if size == 0 {
-		size = 11
-	}
-	x, y := it.X, it.Y
-	if it.Radius != 0 {
-		x += it.Radius * math.Sin(it.Theta)
-		y -= it.Radius * math.Cos(it.Theta)
-	}
-	lh := it.LineHeight
-	if lh == 0 {
-		lh = size
-	}
-	y += it.Dy + baselines[it.Baseline]*size - lh*float64(len(it.Text)-1)*multiline(it.Baseline)
-	x += it.Dx
-	fmt.Fprintf(w.out, `<text transform="%s"`, transform(x, y, it.Angle))
-	if a, ok := anchors[it.Align]; ok {
-		fmt.Fprintf(w.out, ` text-anchor="%s"`, a)
+	t := shape.TextOf(it, w.measure)
+	fmt.Fprintf(w.out, `<text transform="%s"`, transform(t.X, t.Y, t.Angle))
+	if t.Anchor != "start" {
+		fmt.Fprintf(w.out, ` text-anchor="%s"`, t.Anchor)
 	}
 	if it.Font != "" {
 		fmt.Fprintf(w.out, ` font-family="%s"`, esc(it.Font))
 	}
-	fmt.Fprintf(w.out, ` font-size="%s"`, num(size))
+	fmt.Fprintf(w.out, ` font-size="%s"`, num(t.Size))
 	if it.FontWeight != "" {
 		fmt.Fprintf(w.out, ` font-weight="%s"`, esc(string(it.FontWeight)))
 	}
@@ -352,65 +317,18 @@ func (w *writer) text(it *scene.Item) {
 	}
 	w.style(it, "#000")
 	w.out.WriteString(">")
-	lines := w.limit(it, size)
-	if len(lines) == 1 {
-		w.out.WriteString(esc(lines[0]))
+	if len(t.Lines) == 1 {
+		w.out.WriteString(esc(t.Lines[0]))
 	} else {
-		for i, line := range lines {
+		for i, line := range t.Lines {
 			dy := "0"
 			if i > 0 {
-				dy = num(lh)
+				dy = num(t.LineHeight)
 			}
 			fmt.Fprintf(w.out, `<tspan x="0" dy="%s">%s</tspan>`, dy, esc(line))
 		}
 	}
 	w.out.WriteString("</text>")
-}
-
-// limit cuts each line of a text item to its limit, in pixels, with its
-// ellipsis, as Vega does. It measures with the estimate of the package text
-// (D11). A text whose direction is rtl loses its start rather than its end.
-func (w *writer) limit(it *scene.Item, size float64) []string {
-	if it.Limit <= 0 {
-		return it.Text
-	}
-	f := text.Font{Family: it.Font, Size: size, Weight: text.Weight(string(it.FontWeight)), Italic: it.FontStyle == "italic"}
-	out := make([]string, len(it.Text))
-	for i, line := range it.Text {
-		if it.Dir == "rtl" {
-			out[i] = reverse(text.Truncate(w.measure, f, reverse(line), it.Limit))
-		} else {
-			out[i] = text.Truncate(w.measure, f, line, it.Limit)
-		}
-		if it.Ellipsis != "" && it.Ellipsis != text.Ellipsis {
-			if s, ok := strings.CutSuffix(out[i], text.Ellipsis); ok && out[i] != line {
-				out[i] = s + it.Ellipsis
-			}
-		}
-	}
-	return out
-}
-
-// reverse reverses the runes of a string.
-func reverse(s string) string {
-	r := []rune(s)
-	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
-		r[i], r[j] = r[j], r[i]
-	}
-	return string(r)
-}
-
-// multiline returns how far the first line of a text of several lines moves
-// up, in lines, for a baseline: none for the top, half for the middle and all
-// of them for the bottom.
-func multiline(baseline string) float64 {
-	switch baseline {
-	case baselineMiddle:
-		return 0.5
-	case baselineBottom, "alphabetic", "":
-		return 1
-	}
-	return 0
 }
 
 // style writes the paint of an item. fill is the fill to write when the item

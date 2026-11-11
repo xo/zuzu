@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xo/okage"
 	okagesvg "github.com/xo/okage/svg"
 
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/svg"
+	"github.com/xo/zuzu/text"
 )
 
 // scenes reads the test scenes of the SVG writer: the marks, and the tier 0
@@ -109,60 +109,68 @@ func demultiply(img *image.RGBA, x, y int) [4]int {
 	return [4]int{f(p[0]), f(p[1]), f(p[2]), a}
 }
 
-// TestDrawMatchesOkage draws each test scene without its text directly and
-// through SVG and okage, and checks that at most 1 percent of the pixels
-// differ, the gate of okage D31 for a file with text (D11).
+// fonts returns a renderer of okage with only the bundled fonts, so that a
+// test draws the same text on every machine.
+func fonts() *okagesvg.Renderer {
+	return okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
+}
+
+// TestDrawMatchesOkage draws each test scene directly and through SVG and
+// okage, with and without its text, and checks that at most 1 percent of
+// the pixels differ, the gate of okage D31 for a file with text (D11).
 func TestDrawMatchesOkage(t *testing.T) {
 	t.Parallel()
-	r := okagesvg.New(okagesvg.WithLoadSystemFonts(false))
+	r := fonts()
 	for name, s := range scenes(t) {
-		bare := withoutText(s)
-		var b bytes.Buffer
-		if err := svg.Write(&b, bare); err != nil {
-			t.Fatal(err)
-		}
-		want, err := r.Render(b.Bytes())
-		if err != nil {
-			t.Fatalf("%s: okage: %v", name, err)
-		}
-		got, err := Draw(bare)
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if got.Bounds() != want.Bounds() {
-			t.Errorf("%s: the size is %v, want %v", name, got.Bounds(), want.Bounds())
-			continue
-		}
-		if d := differ(got, want); d > 0.01 {
-			t.Errorf("%s: %.2f%% of the pixels differ, more than 1%%", name, 100*d)
+		for _, c := range []struct {
+			kind string
+			s    *scene.Scene
+		}{{"with text", s}, {"without text", withoutText(s)}} {
+			var b bytes.Buffer
+			if err := svg.Write(&b, c.s); err != nil {
+				t.Fatal(err)
+			}
+			want, err := r.Render(b.Bytes())
+			if err != nil {
+				t.Fatalf("%s %s: okage: %v", name, c.kind, err)
+			}
+			got, err := Draw(c.s, WithRenderer(r))
+			if err != nil {
+				t.Fatalf("%s %s: %v", name, c.kind, err)
+			}
+			if got.Bounds() != want.Bounds() {
+				t.Errorf("%s %s: the size is %v, want %v", name, c.kind, got.Bounds(), want.Bounds())
+				continue
+			}
+			if d := differ(got, want); d > 0.01 {
+				t.Errorf("%s %s: %.2f%% of the pixels differ, more than 1%%", name, c.kind, 100*d)
+			}
 		}
 	}
 }
 
-// textRenderer counts the text items that it draws.
-type textRenderer struct {
-	n int
-}
-
-func (r *textRenderer) DrawText(_ *okage.Pixmap, _ *scene.Item, _ okage.Transform) error {
-	r.n++
-	return nil
-}
-
+// TestDrawText checks that a text draws, with the renderer of the option or
+// with a renderer of its own.
 func TestDrawText(t *testing.T) {
 	t.Parallel()
-	s := &scene.Scene{Width: 10, Height: 10, Root: scene.Mark{Type: scene.Group, Items: []scene.Item{{
-		Items: []scene.Mark{{Type: scene.Text, Items: []scene.Item{{Text: scene.Lines{"a"}}, {Text: scene.Lines{"b"}}}}},
+	s := &scene.Scene{Width: 40, Height: 20, Root: scene.Mark{Type: scene.Group, Items: []scene.Item{{
+		Items: []scene.Mark{{Type: scene.Text, Items: []scene.Item{{X: 2, Y: 15, Text: scene.Lines{"Ab"}, FontSize: 14}}}},
 	}}}}
-	if _, err := Draw(s); !errors.Is(err, ErrText) {
-		t.Errorf("a text with no text renderer gives %v, want %v", err, ErrText)
-	}
-	tr := &textRenderer{}
-	if _, err := Draw(s, WithText(tr)); err != nil {
-		t.Fatal(err)
-	}
-	if tr.n != 2 {
-		t.Errorf("the text renderer drew %d items, want 2", tr.n)
+	for _, opts := range [][]Option{{WithRenderer(fonts())}, nil} {
+		img, err := Draw(s, opts...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inked := 0
+		for i := 3; i < len(img.Pix); i += 4 {
+			if img.Pix[i] != 0 {
+				inked++
+			}
+		}
+		if inked == 0 {
+			t.Errorf("the text with %d options draws nothing", len(opts))
+		}
 	}
 }
 
