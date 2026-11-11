@@ -1,0 +1,21 @@
+flowchart LR
+  start@{ shape: subprocess, label: "Start" }
+  f1@{ shape: fork }
+  h1@{ shape: hourglass, label: "Collate" }
+  b1@{ shape: bolt }
+  x1@{ shape: cross-circ }
+  s1@{ shape: fr-circ }
+  j1@{ shape: join }
+  act@{ shape: bpmn-activity, label: "Activity" }
+  ann@{ shape: bpmn-annotation, label: "A note" }
+  dir@{ shape: directory, label: "Folder" }
+  start --> f1
+  f1 --> h1
+  f1 --> b1
+  h1 --> x1
+  b1 --> x1
+  x1 --> j1
+  j1 --> act
+  act --> dir
+  dir --> s1
+  ann --> act

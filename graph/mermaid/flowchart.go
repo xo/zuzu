@@ -614,7 +614,35 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 	if media.Icon != "" || media.Image != "" {
 		n.Media = media
 	}
+	f.bare(n)
 	return nil
+}
+
+// bare gives a node of a shape that draws no text, as Mermaid does, its
+// size and no label: a fork or a join, a bar across the ranks, an
+// hourglass, a bolt, a crossed circle and a framed circle.
+func (f *flowchart) bare(n *graph.Node) {
+	kind, _ := graph.ShapeOf(n.Shape)
+	var w, h float64
+	switch kind {
+	case "bar":
+		w, h = 70, 10
+		if d := f.g.Direction; d == graph.LR || d == graph.RL {
+			w, h = 10, 70
+		}
+		n.Style["fillOpacity"] = "1"
+	case "hourglass":
+		w, h = 30, 30
+	case "bolt":
+		w, h = 35, 70
+	case "cross-circ":
+		w, h = 40, 40
+	case "fr-circ":
+		w, h = 14, 14
+	default:
+		return
+	}
+	n.Label, n.Width, n.Height = "", w, h
 }
 
 // inlineMap reads a map of the properties of a node: key: value, by commas

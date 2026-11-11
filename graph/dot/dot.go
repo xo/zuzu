@@ -768,6 +768,13 @@ func (p *parser) finish() error {
 			}
 			n.Label = strings.Join(parts, " | ")
 		}
+		if n.Shape == "polygon" {
+			s, err := p.polygon(a, path)
+			if err != nil {
+				return err
+			}
+			n.Shape = s
+		}
 		if _, ok := graph.ShapeOf(n.Shape); !ok {
 			if err := p.issues.Add(path, "the shape %s", n.Shape); err != nil {
 				return err
@@ -800,6 +807,21 @@ func (p *parser) finish() error {
 		for k := range a {
 			switch k {
 			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle":
+			case "sides", "skew", "distortion":
+				// Only a polygon reads these. Graphviz draws every other
+				// shape without them.
+			case "orientation", "regular":
+				// A polygon reads these. Graphviz turns another shape too,
+				// or makes it regular, and zuzu does not.
+				if a["shape"] == "polygon" || (k == "regular" && a[k] == "false") {
+					break
+				}
+				if x, err := strconv.ParseFloat(a[k], 64); k == "orientation" && err == nil && x == 0 {
+					break
+				}
+				if err := p.issues.Add(path, "the attribute %s of a node of the shape %s", k, n.Shape); err != nil {
+					return err
+				}
 			default:
 				if err := p.issues.Add(path, "the attribute %s of a node", k); err != nil {
 					return err
@@ -828,6 +850,41 @@ func (p *parser) finish() error {
 		}
 	}
 	return nil
+}
+
+// polygon returns the name of the shape of a node of the shape polygon,
+// from its attributes sides, skew, distortion, orientation and regular. A
+// value that is not a number is an issue, and draws as the default.
+func (p *parser) polygon(a map[string]string, path string) (string, error) {
+	sides, skew, distortion, orientation := 4, 0.0, 0.0, 0.0
+	if v, ok := a["sides"]; ok {
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			if err := p.issues.Add(path, "the sides %s", v); err != nil {
+				return "", err
+			}
+		} else {
+			sides = n
+		}
+	}
+	for _, f := range []struct {
+		name string
+		v    *float64
+	}{{"skew", &skew}, {"distortion", &distortion}, {"orientation", &orientation}} {
+		v, ok := a[f.name]
+		if !ok {
+			continue
+		}
+		x, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		if err != nil || math.IsNaN(x) || math.IsInf(x, 0) {
+			if err := p.issues.Add(path, "the %s %s", f.name, v); err != nil {
+				return "", err
+			}
+			continue
+		}
+		*f.v = x
+	}
+	return graph.Polygon(sides, skew, distortion, orientation, a["regular"] == "true"), nil
 }
 
 // paint sets the paint of a node, an edge or a cluster from the attributes

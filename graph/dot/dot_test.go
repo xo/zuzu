@@ -176,3 +176,37 @@ func TestArrows(t *testing.T) {
 		t.Error("expected an error in the strict mode")
 	}
 }
+
+func TestPolygon(t *testing.T) {
+	t.Parallel()
+	src := `digraph {
+	node [shape=polygon, sides=4, skew="0.0", orientation="0.0"]
+	a [sides=7, skew=0.25, distortion=-0.5, orientation=30]
+	b [regular=true]
+	c [sides=2]
+	d [sides=x]
+	e [shape=Mdiamond]
+	f [shape=box, skew=0.5, orientation=20]
+}`
+	g, report, err := Parse(src, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, n := range g.Nodes {
+		got = append(got, n.Shape)
+	}
+	want := []string{"polygon 7 0.25 -0.5 30", "polygon 4 0 0 0 regular", "ellipse", "polygon 4 0 0 0", "Mdiamond", "box"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	// The sides x, and the orientation of the box. A box draws without a
+	// skew, as in Graphviz.
+	var msgs []string
+	for _, is := range report {
+		msgs = append(msgs, is.Message)
+	}
+	if len(msgs) != 2 || msgs[0] != "the sides x" || msgs[1] != "the attribute orientation of a node of the shape box" {
+		t.Errorf("got the issues %q", msgs)
+	}
+}

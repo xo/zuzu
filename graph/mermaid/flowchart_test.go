@@ -118,6 +118,38 @@ func TestShapes(t *testing.T) {
 	}
 }
 
+func TestNamedShapes(t *testing.T) {
+	t.Parallel()
+	src := `flowchart LR
+  a@{ shape: lined-document, label: "Doc" }
+  b@{ shape: comment, label: "Note" }
+  c@{ shape: braces }
+  d@{ shape: fork, label: "hidden" }
+  e@{ shape: hourglass }
+  f@{ shape: fr-circ }`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("expected no issues, got %v", report)
+	}
+	var got []string
+	for _, n := range g.Nodes {
+		got = append(got, fmt.Sprintf("%s %s %q %vx%v", n.ID, n.Shape, n.Label, n.Width, n.Height))
+	}
+	// A fork, an hourglass and a framed circle draw no text, at the size
+	// of Mermaid. A fork across a flowchart LR stands up.
+	want := `a lined-document "Doc" 0x0|b comment "Note" 0x0|c braces "c" 0x0|d fork "" 10x70|e hourglass "" 30x30|f fr-circ "" 14x14`
+	if s := strings.Join(got, "|"); s != want {
+		t.Errorf("got  %s\nwant %s", s, want)
+	}
+}
+
 func TestFlowchart(t *testing.T) {
 	t.Parallel()
 	src := `---

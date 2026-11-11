@@ -1,0 +1,13 @@
+digraph G {
+  start [shape=Mdiamond];
+  end [shape=Msquare];
+  check [shape=Mcircle, label="Check"];
+  subgraph cluster_0 {
+    label = "process";
+    a0 -> a1 -> a2;
+  }
+  start -> a0;
+  start -> check;
+  a2 -> end;
+  check -> end;
+}

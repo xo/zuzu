@@ -583,11 +583,15 @@ func clip(n NodePlace, kind string, px, py float64) (float64, float64) {
 	hw, hh := n.Width/2, n.Height/2
 	var t float64
 	switch kind {
-	case "ellipse", "circle", "doublecircle", "oval", "point", "bullseye":
+	case "ellipse", "circle", "doublecircle", "oval", "point", "bullseye", mcircle, "fr-circ", "cross-circ", "cloud", "bang":
 		t = 1 / math.Sqrt(dx*dx/(hw*hw)+dy*dy/(hh*hh))
-	case "diamond", "rhombus":
+	case "diamond", "rhombus", mdiamond:
 		t = 1 / (math.Abs(dx)/hw + math.Abs(dy)/hh)
 	default:
+		if p, ok := readPolygon(kind); ok {
+			t = cross(p.scaled(n.Width, n.Height), dx, dy)
+			break
+		}
 		t = math.Inf(1)
 		if dx != 0 {
 			t = hw / math.Abs(dx)

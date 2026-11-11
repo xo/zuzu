@@ -1,0 +1,179 @@
+{
+  "name": "unix",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,712.65,279.17",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "5th Edition",
+      "color": "salmon",
+      "distortion": "0.936354",
+      "height": "0.62845",
+      "label": "\\N",
+      "orientation": "28",
+      "pos": "500.82,256.55",
+      "shape": "polygon",
+      "sides": "9",
+      "skew": "-0.126818",
+      "style": "filled",
+      "width": "2.38"
+    },
+    {
+      "_gvid": 1,
+      "name": "6th Edition",
+      "color": "deepskyblue",
+      "distortion": "0.238792",
+      "height": "0.53832",
+      "label": "\\N",
+      "orientation": "11",
+      "pos": "366.82,178.54",
+      "shape": "polygon",
+      "sides": "5",
+      "skew": "0.995935",
+      "style": "filled",
+      "width": "2.9414"
+    },
+    {
+      "_gvid": 2,
+      "name": "PWB 1.0",
+      "color": "goldenrod",
+      "distortion": "0.019636",
+      "height": "0.5066",
+      "label": "\\N",
+      "orientation": "79",
+      "pos": "661.82,18.238",
+      "shape": "polygon",
+      "sides": "8",
+      "skew": "-0.440424",
+      "style": "filled",
+      "width": "1.412"
+    },
+    {
+      "_gvid": 3,
+      "name": "LSX",
+      "color": "burlywood",
+      "distortion": "-0.698271",
+      "height": "0.53598",
+      "label": "\\N",
+      "orientation": "22",
+      "pos": "45.824,97.819",
+      "shape": "polygon",
+      "sides": "9",
+      "skew": "-0.195492",
+      "style": "filled",
+      "width": "1.2729"
+    },
+    {
+      "_gvid": 4,
+      "name": "1 BSD",
+      "color": "gold",
+      "distortion": "0.265084",
+      "height": "0.54133",
+      "label": "\\N",
+      "orientation": "26",
+      "pos": "153.82,97.819",
+      "shape": "polygon",
+      "sides": "7",
+      "skew": "0.403659",
+      "style": "filled",
+      "width": "1.2172"
+    },
+    {
+      "_gvid": 5,
+      "name": "Mini Unix",
+      "color": "greenyellow",
+      "distortion": "0.039386",
+      "height": "0.5",
+      "label": "\\N",
+      "orientation": "2",
+      "pos": "286.82,97.819",
+      "shape": "polygon",
+      "sides": "4",
+      "skew": "-0.461120",
+      "style": "filled",
+      "width": "1.9771"
+    },
+    {
+      "_gvid": 6,
+      "name": "Wollongong",
+      "color": "darkseagreen",
+      "distortion": "0.228564",
+      "height": "0.5333",
+      "label": "\\N",
+      "orientation": "63",
+      "pos": "445.82,97.819",
+      "shape": "polygon",
+      "sides": "5",
+      "skew": "-0.062846",
+      "style": "filled",
+      "width": "1.9389"
+    },
+    {
+      "_gvid": 7,
+      "name": "Interdata",
+      "color": "dodgerblue",
+      "distortion": "0.624013",
+      "height": "0.704",
+      "label": "\\N",
+      "orientation": "56",
+      "pos": "609.82,97.819",
+      "shape": "polygon",
+      "sides": "4",
+      "skew": "0.101396",
+      "style": "filled",
+      "width": "2.1088"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 0,
+      "head": 1,
+      "pos": "e,398.13,197.3 473.71,240.17 454.83,229.46 429.3,214.98 407.93,202.86"
+    },
+    {
+      "_gvid": 1,
+      "tail": 0,
+      "head": 2,
+      "pos": "e,675.81,36.286 536.79,243.12 583.08,224.95 661.49,186.26 694.82,123.16 705.35,103.24 700.99,94.142 694.82,72.475 692.16,63.107 687.31,53.776 682.15,45.604"
+    },
+    {
+      "_gvid": 2,
+      "tail": 1,
+      "head": 3,
+      "pos": "e,70.027,110.88 289.16,166.2 235.51,157.26 162.9,142.99 100.82,123.16 94.036,120.99 86.957,118.25 80.227,115.4"
+    },
+    {
+      "_gvid": 3,
+      "tail": 1,
+      "head": 4,
+      "pos": "e,187.24,114.8 311.52,160.3 280.46,150.23 241.17,136.84 206.82,123.16 203.83,121.97 200.75,120.69 197.67,119.38"
+    },
+    {
+      "_gvid": 4,
+      "tail": 1,
+      "head": 5,
+      "pos": "e,304.03,115.75 351.78,162.74 340.64,151.77 325.2,136.58 312.17,123.76"
+    },
+    {
+      "_gvid": 5,
+      "tail": 1,
+      "head": 6,
+      "pos": "e,431.28,113.31 380.23,164.19 391.96,152.49 409.27,135.25 423.16,121.41"
+    },
+    {
+      "_gvid": 6,
+      "tail": 1,
+      "head": 7,
+      "pos": "e,580.44,108.34 404.53,165.33 449.35,150.81 523.86,126.67 569.72,111.81"
+    },
+    {
+      "_gvid": 7,
+      "tail": 7,
+      "head": 2,
+      "pos": "e,650.57,36.036 619.85,81.861 626.79,71.507 636.21,57.455 644.37,45.285"
+    }
+  ]
+}

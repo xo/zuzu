@@ -1,0 +1,17 @@
+digraph G {
+  node [shape=polygon];
+  square [label="Four sides"];
+  tri [sides=3, label="Three"];
+  pent [sides=5, label="Five sides"];
+  oct [sides=8, regular=true, label="Eight"];
+  skewed [sides=4, skew=0.4, label="Skew 0.4"];
+  left [sides=4, skew=-0.6, label="Skew -0.6"];
+  wide [sides=4, distortion=0.5, label="Distortion 0.5"];
+  narrow [sides=6, distortion=-0.4, label="Distortion -0.4"];
+  turned [sides=5, orientation=30, label="Turned 30"];
+  mixed [sides=7, skew=0.3, distortion=-0.3, orientation=15, label="All three"];
+  square -> tri -> skewed -> wide -> turned;
+  square -> pent -> left -> narrow -> mixed;
+  oct -> pent;
+  tri -> left;
+}

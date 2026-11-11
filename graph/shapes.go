@@ -7,13 +7,20 @@ import (
 	"github.com/xo/zuzu/internal/shape"
 )
 
+// The shapes of DOT with lines across their corners.
+const (
+	mdiamond = "Mdiamond"
+	msquare  = "Msquare"
+	mcircle  = "Mcircle"
+)
+
 // shapes are the shapes of a node that zuzu draws, by their names in DOT
 // and in Mermaid. A name maps to the shape that draws it.
 var shapes = map[string]string{
 	"rect": "rect", "box": "rect", "square": "rect", "rectangle": "rect", "record": "rect", "process": "rect", "proc": "rect",
 	"rounded": "rounded", "Mrecord": "rounded", "event": "rounded",
 	"stadium": "stadium", "pill": "stadium", "terminal": "stadium",
-	"subroutine": "subroutine", "subproc": "subroutine", "fr-rect": "subroutine", "framed-rectangle": "subroutine",
+	"subroutine": "subroutine", "subproc": "subroutine", "fr-rect": "subroutine", "framed-rectangle": "subroutine", "subprocess": "subroutine",
 	"cylinder": "cylinder", "cyl": "cylinder", "database": "cylinder", "db": "cylinder",
 	"circle": "circle", "circ": "circle", "sm-circ": "circle", "small-circle": "circle", "start": "circle",
 	"doublecircle": "doublecircle", "dbl-circ": "doublecircle", "double-circle": "doublecircle",
@@ -28,17 +35,50 @@ var shapes = map[string]string{
 	"triangle": "triangle", "tri": "triangle", "extract": "triangle",
 	"invtriangle": "invtriangle", "flip-tri": "invtriangle", "flipped-triangle": "invtriangle", "manual-file": "invtriangle",
 	"octagon": "octagon", "pentagon": "pentagon", "house": "house", "invhouse": "invhouse",
-	"note": "note", "doc": "doc", "document": "doc", "folder": "folder", "tab": "folder",
+	"note": "note", "doc": "doc", "document": "doc", "folder": "folder", "tab": "folder", "directory": "folder",
 	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point",
 	"bullseye": "bullseye", "bar": "bar",
 	"plaintext": "none", "plain": "none", "none": "none", "text": "none", "underline": "none",
+	// The shapes of DOT with lines across their corners.
+	mdiamond: mdiamond, msquare: msquare, mcircle: mcircle,
+	// The other shapes of Mermaid, which shapes_more.go draws.
+	"lin-doc": "lin-doc", "lined-document": "lin-doc",
+	"tag-doc": "tag-doc", "tagged-document": "tag-doc",
+	"docs": "docs", "documents": "docs", "st-doc": "docs", "stacked-document": "docs",
+	"brace": "brace-l", "brace-l": "brace-l", "comment": "brace-l", "brace-r": "brace-r", "braces": "braces",
+	"bpmn-annotation": "bracket", "bpmn-activity": "rounded",
+	"notch-rect": "card", "card": "card", "notched-rectangle": "card",
+	"notch-pent": "notch-pent", "loop-limit": "notch-pent", "notched-pentagon": "notch-pent",
+	"lin-rect": "lin-rect", "lined-rectangle": "lin-rect", "lined-process": "lin-rect", "lin-proc": "lin-rect", "shaded-process": "lin-rect",
+	"div-rect": "div-rect", "div-proc": "div-rect", "divided-rectangle": "div-rect", "divided-process": "div-rect",
+	"win-pane": "win-pane", "internal-storage": "win-pane", "window-pane": "win-pane",
+	"tag-rect": "tag-rect", "tagged-rectangle": "tag-rect", "tag-proc": "tag-rect", "tagged-process": "tag-rect",
+	"st-rect": "st-rect", "procs": "st-rect", "processes": "st-rect", "stacked-rectangle": "st-rect",
+	"sl-rect": "sl-rect", "manual-input": "sl-rect", "sloped-rectangle": "sl-rect",
+	"datastore": "datastore", "data-store": "datastore",
+	"delay": "delay", "half-rounded-rectangle": "delay",
+	"curv-trap": "curv-trap", "curved-trapezoid": "curv-trap", "display": "curv-trap",
+	"bow-rect": "bow-rect", "stored-data": "bow-rect", "bow-tie-rectangle": "bow-rect",
+	"h-cyl": "h-cyl", "das": "h-cyl", "horizontal-cylinder": "h-cyl",
+	"lin-cyl": "lin-cyl", "disk": "lin-cyl", "lined-cylinder": "lin-cyl",
+	"flag": "paper-tape", "paper-tape": "paper-tape",
+	"bucket": "bucket", "console": "console", "browser": "browser", "cloud": "cloud", "bang": "bang",
+	"fork": "bar", "join": "bar",
+	"hourglass": "hourglass", "collate": "hourglass",
+	"bolt": "bolt", "com-link": "bolt", "lightning-bolt": "bolt",
+	"cross-circ": "cross-circ", "summary": "cross-circ", "crossed-circle": "cross-circ",
+	"fr-circ": "fr-circ", "stop": "fr-circ", "framed-circle": "fr-circ",
 }
 
 // ShapeOf returns the shape that draws a name of a shape, and false for a
-// name that zuzu does not draw. An empty name is a rect.
+// name that zuzu does not draw. An empty name is a rect. The name of a
+// polygon is as Polygon writes it.
 func ShapeOf(name string) (string, bool) {
 	if name == "" {
 		return "rect", true
+	}
+	if p, ok := readPolygon(name); ok {
+		return p.name(), true
 	}
 	s, ok := shapes[name]
 	return s, ok
@@ -48,9 +88,22 @@ func ShapeOf(name string) (string, bool) {
 // with a padding.
 func NodeSize(kind string, tw, th, pad float64) (float64, float64) {
 	w, h := tw+2*pad, th+2*pad*1.2
+	if p, ok := readPolygon(kind); ok {
+		w, h = p.size(w, h)
+		return math.Max(w, 40), math.Max(h, 30)
+	}
 	w = math.Max(w, 40)
 	h = math.Max(h, 30)
+	if mw, mh, ok := moreSize(kind, w, h); ok {
+		return mw, mh
+	}
 	switch kind {
+	case msquare, mcircle:
+		d := math.Max(w, h)
+		return d, d
+	case mdiamond:
+		d := tw + th + 2*pad
+		return math.Max(d, 40), math.Max(d, 40)
 	case "circle":
 		d := math.Max(w, h)
 		return d, d
@@ -216,6 +269,30 @@ func shapePath(kind string, w, h float64) string {
 		return poly([2]float64{-x, -y}, [2]float64{-x + w*0.4, -y}, [2]float64{-x + w*0.4 + t, -y + t}, [2]float64{x, -y + t}, [2]float64{x, y}, [2]float64{-x, y})
 	case "none":
 		return ""
+	case mdiamond:
+		// A line across each corner, a little way in from its tip.
+		t := math.Min(0.25, 9/math.Hypot(x, y))
+		return poly([2]float64{0, -y}, [2]float64{x, 0}, [2]float64{0, y}, [2]float64{-x, 0}) +
+			stroke([2]float64{-t * x, -y + t*y}, [2]float64{t * x, -y + t*y}) +
+			stroke([2]float64{x - t*x, -t * y}, [2]float64{x - t*x, t * y}) +
+			stroke([2]float64{-t * x, y - t*y}, [2]float64{t * x, y - t*y}) +
+			stroke([2]float64{-x + t*x, -t * y}, [2]float64{-x + t*x, t * y})
+	case msquare:
+		c := math.Min(10, math.Min(w, h)/4)
+		return poly([2]float64{-x, -y}, [2]float64{x, -y}, [2]float64{x, y}, [2]float64{-x, y}) +
+			stroke([2]float64{-x + c, -y}, [2]float64{-x, -y + c}) + stroke([2]float64{x - c, -y}, [2]float64{x, -y + c}) +
+			stroke([2]float64{x, y - c}, [2]float64{x - c, y}) + stroke([2]float64{-x, y - c}, [2]float64{-x + c, y})
+	case mcircle:
+		// A line across the top and the bottom, at three quarters of the
+		// radius from the center.
+		a, b := 0.75*x, x*math.Sqrt(1-0.75*0.75)
+		return ellipse(x, x) + stroke([2]float64{-b, -a}, [2]float64{b, -a}) + stroke([2]float64{-b, a}, [2]float64{b, a})
+	}
+	if p, ok := readPolygon(kind); ok {
+		return p.path(w, h)
+	}
+	if s, ok := morePath(kind, w, h); ok {
+		return s
 	}
 	return shape.RoundRect(-x, -y, w, h, 6, 6, 6, 6)
 }

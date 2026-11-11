@@ -1,0 +1,19 @@
+digraph unix {
+  node [shape=polygon, sides=4, distortion="0.0", orientation="0.0", skew="0.0", color=white, style=filled];
+  "5th Edition" [sides=9, distortion="0.936354", orientation=28, skew="-0.126818", color=salmon];
+  "6th Edition" [sides=5, distortion="0.238792", orientation=11, skew="0.995935", color=deepskyblue];
+  "PWB 1.0" [sides=8, distortion="0.019636", orientation=79, skew="-0.440424", color=goldenrod];
+  "LSX" [sides=9, distortion="-0.698271", orientation=22, skew="-0.195492", color=burlywood];
+  "1 BSD" [sides=7, distortion="0.265084", orientation=26, skew="0.403659", color=gold];
+  "Mini Unix" [distortion="0.039386", orientation=2, skew="-0.461120", color=greenyellow];
+  "Wollongong" [sides=5, distortion="0.228564", orientation=63, skew="-0.062846", color=darkseagreen];
+  "Interdata" [distortion="0.624013", orientation=56, skew="0.101396", color=dodgerblue];
+  "5th Edition" -> "6th Edition";
+  "5th Edition" -> "PWB 1.0";
+  "6th Edition" -> "LSX";
+  "6th Edition" -> "1 BSD";
+  "6th Edition" -> "Mini Unix";
+  "6th Edition" -> "Wollongong";
+  "6th Edition" -> "Interdata";
+  "Interdata" -> "PWB 1.0";
+}

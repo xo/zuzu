@@ -1,0 +1,30 @@
+flowchart LR
+  a@{ shape: notch-rect, label: "Card" }
+  b@{ shape: lin-rect, label: "Lined process" }
+  c@{ shape: div-rect, label: "Divided process" }
+  d@{ shape: win-pane, label: "Internal storage" }
+  e@{ shape: notch-pent, label: "Loop limit" }
+  f@{ shape: sl-rect, label: "Manual input" }
+  g@{ shape: st-rect, label: "Processes" }
+  h@{ shape: tag-rect, label: "Tagged process" }
+  i@{ shape: datastore, label: "Data store" }
+  j@{ shape: delay, label: "Delay" }
+  k@{ shape: curv-trap, label: "Display" }
+  l@{ shape: bow-rect, label: "Stored data" }
+  m@{ shape: h-cyl, label: "Direct access" }
+  n@{ shape: lin-cyl, label: "Disk" }
+  o@{ shape: flag, label: "Paper tape" }
+  p@{ shape: bucket, label: "Bucket" }
+  q@{ shape: console, label: "Console" }
+  r@{ shape: browser, label: "Browser" }
+  s@{ shape: cloud, label: "Cloud" }
+  t@{ shape: bang, label: "Bang" }
+  a --> b --> c --> d
+  e --> f --> g --> h
+  i --> j --> k --> l
+  m --> n --> o --> p
+  q --> r --> s --> t
+  a --> e
+  e --> i
+  i --> m
+  m --> q

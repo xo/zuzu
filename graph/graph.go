@@ -63,7 +63,8 @@ type Node struct {
 	// Label is the text of the node. An empty label draws the id, except
 	// on a node with a Width and a Height, which draws no text.
 	Label string
-	// Shape names the shape of the node, such as rect or ellipse.
+	// Shape names the shape of the node, such as rect or ellipse. The
+	// shape polygon of DOT has the name that Polygon writes.
 	Shape string
 	// Cluster is the id of the cluster that holds the node, or empty.
 	Cluster string
