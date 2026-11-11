@@ -1072,13 +1072,9 @@ stays true.
     the 540 specs of the first target match in all three checks of D17, and
     85 percent of the datasets, 90 percent of the scales and 90 percent of
     the marks that draw data match.
-14. Does the first check of D17 ask for the same JSON as vega-lite.js, or
-    for the same structure? Phase 4 below states the share of both. The
-    JSON of vega-lite.js holds the names of its internal signals and the
-    order of its optimizations, which no document of Vega-Lite describes,
-    and D6 says that zuzu follows the documented behavior. The plan
-    proposes the structure: the same datasets by name, the same scales by
-    name and type, and the same marks by name and type.
+14. Answered on 2026-11-12 by D32: the first check of D17 compares the
+    structure, the datasets, the scales and the marks by name and type, not
+    the JSON of vega-lite.js.
 15. Answered on 2026-11-10 by D30. What are the names and the parameters of the transforms and the scale
     that zuzu adds for the charts of tiers 1 and 2 that Vega cannot draw?
     The plan says that zuzu adds a sankey and a time scale that skips the
@@ -1092,52 +1088,23 @@ stays true.
 
 16. Answered on 2026-11-11 by D31: the design of the diagrams of DOT and
     Mermaid and of the transform `zuzu.layered` is accepted.
-17. In which order does zuzu add the kinds of Mermaid that it does not draw
-    yet? On 2026-11-11 zuzu draws the flowchart, the sequence, state, class
-    and ER diagrams, the mindmap, the architecture diagram and the charts
-    of D31. The kinds that programs give it next are gitGraph, timeline,
-    C4, block and requirement diagrams. D31 keeps the order of the survey
-    until the maintainers answer. On 2026-11-12 the corpus of
-    mermaid-go-renderer held these files of the kinds that zuzu does not
-    draw: requirement 182, gitGraph 170, block 88, swimlane 59, usecase 57,
-    agentflow 50, timeline 44, C4 37, venn 29, treeView 28, railroad 23,
-    eventmodeling 18, zenuml 17, cynefin 15, ishikawa 14, kanban 14,
-    packet 10 and info 3.
-18. Which color do the edges of a diagram take? The edges, the arrowheads
-    and the messages of a sequence take the token Axis of `docs/STYLE.md`,
-    `#cfd5de` in the light mode. At the size of a terminal, iv finds them
-    hard to see. One choice is a darker token for edges. Another is the
-    look of Graphviz, black lines and no fill, for a DOT graph that sets no
-    color.
-19. What does zuzu do with `fontname` of DOT? zuzu draws only IBM Plex Sans
-    (D16), so each file of the gallery of Graphviz fails in the strict mode
-    on `fontname` alone. zuzu can keep the issue, drop it, or read only a
-    weight or a style from the name, such as `Helvetica-Bold`.
-20. What does zuzu draw for a character that its fonts do not have, such as
-    an emoji? It draws a box today, and the report says nothing. zuzu can
-    draw nothing and add an issue, or bundle a font of emoji, which makes
-    the module larger.
-21. Does zuzu read the `theme` of Mermaid? It is an issue today. zuzu can
-    map `dark` to the dark mode, and the other themes, such as `forest`, to
-    color schemes of zuzu.
-22. Does zuzu read `description` in the front matter of Mermaid? Mermaid
-    ignores the key, and zuzu reports it. zuzu can write it as the
-    description of the spec, under a name that starts with `zuzu.` (D6).
-    Mermaid 12 reads only `title`, `displayMode` and `config` of the front
-    matter and ignores every other key. On 2026-11-12, 741 files of the
-    corpus of mermaid-go-renderer failed in the strict mode only on
-    `description`.
-23. A maintainer has to review the change to D30 that adds
-    `zuzu.sankeylabels`. An agent wrote it on 2026-11-11. On 2026-11-12 an
-    agent added its parameter `side`.
-24. Does `animate` on a link of Mermaid stay an issue? zuzu draws a still
-    image, and Mermaid moves the dashes of the link.
-25. A maintainer has to review the changes to D31 of 2026-11-12. An agent
-    changed how the layout breaks a cycle, from the heuristic of Eades,
-    Lin and Smyth to the search of dot and dagre. It also made the order in
-    a rank keep the edges in that rank, and the places across the ranks
-    count the weight of an edge. It added `wrap` and `breakWords`.
-26. Does the scene graph carry a link and a tooltip? `URL` and `tooltip` of
-    DOT, and `click`, `callback` and `link` of Mermaid, are issues, because
-    the scene has no field for them and the SVG writer writes neither. A
-    link draws nothing in a PNG.
+17. Answered on 2026-11-12 by D32: zuzu adds the kinds of Mermaid in the
+    order of their files in the corpus of mermaid-go-renderer, about five
+    at a time, from requirement, gitGraph and block.
+18. Answered on 2026-11-12 by D32: the edges of a diagram take a token Edge
+    of `docs/STYLE.md`, darker than Axis.
+19. Answered on 2026-11-12 by D32: zuzu reads a weight or a style from
+    `fontname` and `fontFamily`, and accepts the rest of the name.
+20. Answered on 2026-11-12 by D32: an emoji draws in color from Noto Color
+    Emoji, in a package that a caller imports. Another missing character
+    draws nothing and goes in the report.
+21. Answered on 2026-11-12 by D32: the `theme` of Mermaid selects the dark
+    mode or a color scheme of zuzu with the colors of that theme.
+22. Answered on 2026-11-12 by D32: zuzu reads `description` as the
+    description of the spec.
+23. Answered on 2026-11-12 by D32: the changes to D30 are accepted.
+24. Answered on 2026-11-12 by D32: `animate` draws the link dashed, with no
+    issue.
+25. Answered on 2026-11-12 by D32: the changes to D31 are accepted.
+26. Answered on 2026-11-12 by D32: an item of the scene carries a link and a
+    tooltip, and the SVG writer writes them.

@@ -14,7 +14,7 @@ specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is done: zuzu
 draws the charts of tiers 1 and 2. Phase 6 is done: `raster` draws a scene
 with okage directly. Phase 7 is done: zuzu draws the diagrams of DOT
 and Mermaid of D31. Code follows the plan (D3).
-Every decision from D1 to D31 is decided. The open questions are at the end of `docs/PLAN.md`.
+Every decision from D1 to D32 is decided. The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules
 

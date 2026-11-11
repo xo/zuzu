@@ -1,6 +1,6 @@
 # D31. Diagrams of DOT and Mermaid, and the transform zuzu.layered
 
-Status: Decided.
+Status: Decided. Amended by D32.
 
 D18 says that DOT, the language of Graphviz, and the flowchart of Mermaid
 compile into the same spec as a chart, with a layered layout that zuzu adds

@@ -1,6 +1,6 @@
 # D12. zuzu draws its own design and does not reproduce the look of Vega
 
-Status: Decided.
+Status: Decided. Amended by D32.
 
 The maintainers decided on 2026-11-10 that zuzu does not reproduce the
 output of Vega. It reads the specs of Vega and Vega-Lite with their meaning

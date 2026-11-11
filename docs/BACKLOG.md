@@ -51,15 +51,14 @@ mode: `gradient`, `copy`, `geoShape`, `treePath`, `treeAncestors`,
 `geoBounds` and `geoCentroid` measure in the plane of a projection. With no
 projection, Vega measures on the sphere, and zuzu does not.
 
-### Decide whether to share rows between datasets as Vega does
+### Share rows between datasets as Vega does
 
 A transform of Vega, such as `formula` or `stack`, changes the rows in
 place, and the datasets that derive from the same source share those rows.
 So a dataset of vega.js can hold fields that a transform of another dataset
 added, and `facet_bullet` and `pancake-spider-chart` differ for this reason.
-zuzu copies a row before a transform changes it, which keeps each dataset to
-its own transforms. The maintainers can decide whether zuzu follows Vega
-here. Until then, the conformance counts these as differences.
+zuzu copies a row before a transform changes it. D32 says that zuzu follows
+vega.js here.
 
 ### Make the order of mixed values the same as vega.js
 
@@ -70,21 +69,60 @@ numbers before strings.
 
 ## Phase 7
 
+### Do the work of D32
+
+D32 records the answers of the maintainers of 2026-11-12. Each item names
+its part of D32.
+
+1. Read `description` in the front matter of Mermaid as the description of
+   the spec (1).
+2. Accept `look: handDrawn` and `layout: elk` with no issue (2).
+3. Draw a link with `animate` or `animation` dashed, with no issue (3).
+4. Map the `theme` of Mermaid to the dark mode or to a color scheme with
+   the colors of that theme. Add each scheme to `docs/STYLE.md` first
+   (4).
+5. Read a weight or a style from `fontname` of DOT and `fontFamily` of
+   Mermaid, and accept the rest of the name (5).
+6. Bundle Noto Color Emoji in a package of its own that a caller passes
+   with an option, and draw an emoji in color in the PNG. A character that
+   no font has draws nothing and goes in the report. Ask the okage peer
+   how its fallback of fonts takes a second font (6).
+7. Scale the width of a wrap of Mermaid by 11/14 (7).
+8. Add the token Edge to `docs/STYLE.md`, then to
+   `docs/targets/gen-targets.mjs`, and draw the targets again. Use it for
+   the edges, the arrowheads and the messages of every diagram (8).
+9. Add the token Band in the same way, for the sections of a gantt (9).
+10. Add a link and a tooltip to an item of the scene, write them in the
+    SVG as `<a>` and `<title>`, and fill them from `URL`, `href` and
+    `tooltip` of DOT and `click` and `link` of Mermaid (10).
+11. Draw the kinds of Mermaid in the order of D32, about five at a time:
+    requirement, gitGraph, block, swimlane and usecase first (11).
+
+### Draw a look by hand
+
+D32 accepts `look: handDrawn` of Mermaid with no issue. zuzu can draw a
+look of its own by hand later, modeled on the look of xkcd: lines that
+wobble, and a font that looks written by hand.
+
+### Add an ELK layout
+
+D32 accepts `layout: elk` of Mermaid with no issue, and zuzu draws such a
+diagram with `zuzu.layered`. An ELK layout routes edges at right angles
+and places nodes in another way.
+
 ### Draw the parts of Mermaid that draw another way
 
 1. The shape `person` and the shapes of BPMN that put the label under the
    shape, such as `bpmn-start` and `bpmn-gateway`, draw as rounded
    rectangles. zuzu always puts a label in the middle of its node.
-2. The properties of a link, such as `animate`, are issues. Open question
-   24 asks what to do.
-3. A subgraph without a direction, inside a subgraph with a direction,
+2. A subgraph without a direction, inside a subgraph with a direction,
    lays out in the direction of the subgraph that holds it. Mermaid 12
    draws some of these in another direction. In a `flowchart LR`, a
    subgraph inside a subgraph with `direction TB` draws LR in Mermaid.
-4. `f-circ`, `junction`, `sm-circ` and `start` keep their label, and
+3. `f-circ`, `junction`, `sm-circ` and `start` keep their label, and
    `start` draws as a full circle. Mermaid draws them as small circles with
    no text.
-5. The shape `subroutine` is too narrow for a short label, so the label
+4. The shape `subroutine` is too narrow for a short label, so the label
    covers its two inner lines.
 
 ### Fix the Mermaid bugs that the test files of iv found
@@ -102,8 +140,8 @@ The corpus of `github.com/bvolpato/mermaid-go-renderer` at commit 9af8f11
 holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
 zuzu drew 1947 of them, and 450 with no issue. Of the files that zuzu does
 not draw, 862 are of kinds that it does not draw. Of the files with an
-issue, 741 fail only on `description` in the front matter (open question
-22).
+issue, 741 fail only on `description` in the front matter, which D32
+reads.
 
 1. A top-level `direction LR` in a flowchart is dropped with no issue.
    Mermaid sets the direction of the graph with it.
@@ -129,8 +167,6 @@ issue, 741 fail only on `description` in the front matter (open question
     reads `0` as a date of 2000 and the end as a time of the day of the
     render. It needs the time of the render (see "Give a chart of Mermaid
     the time of the render").
-12. `click`, `callback` and `link` are issues, as `URL` of DOT is. Open
-    question 26 asks about links in the scene.
 
 ### Draw more of Mermaid
 
@@ -151,26 +187,25 @@ issue, 741 fail only on `description` in the front matter (open question
    the right of the names of the sections, because a title takes the bounds
    of the axes.
 6. zuzu does not draw 18 kinds of Mermaid 12, which hold 862 files of the
-   corpus of mermaid-go-renderer. Open question 17 asks for their order.
+   corpus of mermaid-go-renderer. D32 gives their order, in "Do the work
+   of D32".
 
 ### Draw more of DOT
 
 The DOT files come from the gallery of Graphviz, in `testdata/zuzu` of iv.
 
-1. `URL`, `href` and `tooltip` are issues. The scene graph has no field for
-   a link or a tooltip, and the SVG writer writes neither.
-2. In LR or RL, a record that is one group in braces lies one field under
+1. In LR or RL, a record that is one group in braces lies one field under
    another. Graphviz puts the fields side by side. A group inside a group
    is flat. `\l` in a plain record label centers the line.
-3. A record drops an empty field that has no port: `<f0> a| | |2` draws 2
+2. A record drops an empty field that has no port: `<f0> a| | |2` draws 2
    fields, and Graphviz draws 4.
-4. `weight=0` counts as 1, because the graph and the transform read 0 as
+3. `weight=0` counts as 1, because the graph and the transform read 0 as
    the default weight.
-5. In LR, Graphviz draws a loop above its node. zuzu draws it below.
-6. `label=""` draws the id of the node. Graphviz draws no text.
-7. An edge with a list of colors, such as `color="a:b"`, draws only the
+4. In LR, Graphviz draws a loop above its node. zuzu draws it below.
+5. `label=""` draws the id of the node. Graphviz draws no text.
+6. An edge with a list of colors, such as `color="a:b"`, draws only the
    first color, with no issue. Graphviz draws a line in each color.
-8. `bgcolor` of the graph is an issue. Graphviz fills the page with it.
+7. `bgcolor` of the graph is an issue. Graphviz fills the page with it.
 
 ### Give a chart of Mermaid the time of the render
 

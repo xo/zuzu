@@ -1,6 +1,6 @@
 # D17. Conformance with vega.js measures meaning, not look
 
-Status: Decided.
+Status: Decided. Amended by D32.
 
 The corpus of `vegagoja` holds 579 Vega-Lite specs, the 578 Vega specs that
 vega-lite.js compiled from them, and 87 Vega specs, with the SVGs that vega.js

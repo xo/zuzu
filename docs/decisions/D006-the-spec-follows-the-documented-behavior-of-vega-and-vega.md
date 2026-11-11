@@ -1,6 +1,6 @@
 # D6. The spec follows the documented behavior of Vega and Vega-Lite, and zuzu is not a port
 
-Status: Decided.
+Status: Decided. Amended by D32.
 
 The maintainers decided on 2026-11-10 that zuzu reads the JSON of Vega and of
 Vega-Lite, with the same names and the same meaning for each field, and that
