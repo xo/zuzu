@@ -22,9 +22,9 @@ func isHTML(v string) (string, bool) {
 
 // html reads a label of HTML with the package html of okage (D31), and
 // adds an issue for each part that it does not read and each color that
-// zuzu does not know. zuzu reads the gradientangle and the style radial of
-// a table or a cell itself.
-func (p *parser) html(src, path string) (*html.Label, error) {
+// zuzu does not know in the color scheme. zuzu reads the gradientangle and
+// the style radial of a table or a cell itself.
+func (p *parser) html(src, scheme, path string) (*html.Label, error) {
 	src, _, _ = graph.HTMLGradients(src)
 	l, issues, err := html.Parse(src)
 	if err != nil {
@@ -53,7 +53,7 @@ func (p *parser) html(src, path string) (*html.Label, error) {
 			colors = colors[:2]
 		}
 		for _, c := range colors {
-			if _, ok := graph.Color(c); !ok {
+			if _, ok := graph.ColorIn(c, scheme); !ok {
 				if err := p.issues.Add(path, "the color %s", c); err != nil {
 					return nil, err
 				}
@@ -134,17 +134,18 @@ func htmlText(l *html.Label) string {
 // label returns the text of a label of an edge, a cluster, the graph or an
 // xlabel, and the source of its HTML when it is a label of HTML. The
 // label of HTML draws through the package html of okage, as the label of
-// a node does, and its text is the text of the label.
-func (p *parser) label(v, id, path string) (string, string, error) {
+// a node does, and its text is the text of the label. A color of the
+// label of HTML reads in the color scheme.
+func (p *parser) label(v, id, scheme, path string) (string, string, error) {
 	src, ok := isHTML(v)
 	if !ok {
 		return label(v, id), "", nil
 	}
-	l, err := p.html(src, path)
+	l, err := p.html(src, scheme, path)
 	if err != nil {
 		return "", "", err
 	}
-	return htmlText(l), src, nil
+	return htmlText(l), graph.HTMLInScheme(src, scheme), nil
 }
 
 // htmlRecord reads the label of HTML of a record, as Graphviz does: the
@@ -153,13 +154,13 @@ func (p *parser) label(v, id, path string) (string, string, error) {
 // when each of its lines ends with <br align="left"/>. A table in a field,
 // a line in more than one font, a font with a color, a size or a face, and
 // a line at the right are issues.
-func (p *parser) htmlRecord(src, path string) ([]graph.Field, error) {
+func (p *parser) htmlRecord(src, scheme, path string) ([]graph.Field, error) {
 	var out []graph.Field
 	for _, part := range splitRecord(src) {
 		if strings.TrimSpace(part) == "" {
 			continue
 		}
-		l, err := p.html(part, path)
+		l, err := p.html(part, scheme, path)
 		if err != nil {
 			return nil, err
 		}

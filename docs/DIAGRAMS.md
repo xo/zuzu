@@ -54,6 +54,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `newrank` | nothing. zuzu always ranks the nodes of a cluster with the nodes of the whole graph, as dot does with `newrank=true` |
 | the graph | `splines` | curved or straight edges. Another value is an issue |
 | the graph | `layout` | `dot`. Another layout is an issue |
+| the graph, a node, an edge, a cluster | `colorscheme` | the color scheme of its colors, as below |
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
 | a node | `shape` | the shape, as below |
 | a node | `sides`, `skew`, `distortion`, `orientation`, `regular` | the polygon of the shape `polygon`, as below. Another shape draws without `sides`, `skew` and `distortion`, as in Graphviz. An `orientation` that is not 0, or `regular=true`, on another shape is an issue |
@@ -83,6 +84,30 @@ adds the numbered colors, such as `salmon2` and `lightblue4`, `gray0` to
 CSS also has, such as `gray`, `green`, `maroon` or `purple`, keeps its
 color of CSS, as the SVG of Graphviz does. The case of a name does not
 matter.
+
+### Color schemes
+
+zuzu reads the color schemes of Graphviz 16.1.1: `x11`, `svg`, and the 265
+schemes of ColorBrewer, such as `blues9`, `rdylgn11` and `set312`. A color
+of a scheme of ColorBrewer is its index from 1.
+
+| Form | What zuzu reads |
+| --- | --- |
+| `/rdylgn11/1` | the first color of the scheme `rdylgn11` |
+| `colorscheme=blues9` and `color=3` | the third color of `blues9` |
+| `colorscheme=blues9` and `color=red` | `red`, a color of the default scheme |
+| `/x11/green` | `green` of X11, which differs from `green` of CSS |
+| `/svg/green` | `green` of CSS |
+| `colorscheme=svg` | the names of CSS only, so that `salmon2` is an issue |
+
+The `colorscheme` of a node, an edge or a cluster sets the scheme of its
+colors and of the colors of its label of HTML. A cluster takes the
+`colorscheme` of the graph around it. A node does not take the
+`colorscheme` of its graph or its cluster, as in Graphviz. Use
+`node [colorscheme=...]` for that. An index outside its scheme, a scheme
+that zuzu does not know in the form `/scheme/index`, and a name that is not
+in its named scheme, such as `/greens3/red`, are issues. A list of colors,
+such as `/blues9/2:/reds9/8` or `1:2`, reads each color in this way.
 
 ### Gradients
 

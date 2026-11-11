@@ -35,3 +35,24 @@ func TestDOTPaint(t *testing.T) {
 		t.Error("the record draws its braces or its tags as text")
 	}
 }
+
+func TestDOTColorSchemes(t *testing.T) {
+	t.Parallel()
+	src := `digraph {
+	a [shape=none, colorscheme=reds9, label=<<table bgcolor="/rdylgn11/1:/rdylgn11/11" gradientangle="315"><tr><td bgcolor="2" style="radial">x</td><td bgcolor="3:/blues9/4">y</td></tr></table>>]
+	b [style=filled, colorscheme=greens9, fillcolor=6]
+	a -> b
+}`
+	s, report, err := svgOf(t, src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{
+		`stop-color="#a50026"`, `stop-color="#006837"`, `fill="#fee0d2"`,
+		`stop-color="#fcbba1"`, `stop-color="#9ecae1"`, `fill="#41ab5d"`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the SVG has no %s", want)
+		}
+	}
+}

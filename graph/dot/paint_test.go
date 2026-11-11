@@ -39,7 +39,7 @@ func TestGradients(t *testing.T) {
 	style := func(st map[string]string) string {
 		return st["fill"] + " " + st["gradient"] + " " + st["gradientAngle"] + " " + st["gradientType"]
 	}
-	want := []string{"red red;0.3:blue 90 ", "red red:blue  radial", "lightgrey   ", "red red:blue:green  ", "red red:blue  "}
+	want := []string{"red red;0.3:blue 90 ", "red red:blue  radial", "lightgrey   ", "red red:blue  ", "red red:blue  "}
 	for i, w := range want {
 		if got := style(g.Nodes[i].Style); got != w {
 			t.Errorf("node %s: got %q, want %q", g.Nodes[i].ID, got, w)
@@ -48,7 +48,7 @@ func TestGradients(t *testing.T) {
 	if got := style(g.Clusters[0].Style); got != "yellow yellow:green 270 " {
 		t.Errorf("cluster x: %q", got)
 	}
-	if got := style(g.Clusters[1].Style); got != "white white:lightblue2  radial" {
+	if got := style(g.Clusters[1].Style); got != "white white:#b2dfee  radial" {
 		t.Errorf("cluster y: %q", got)
 	}
 	// The third color, the angle up and the color a1. The gradientangle
@@ -110,5 +110,47 @@ func TestHTMLRecord(t *testing.T) {
 	}
 	if lr.Nodes[0].Stack {
 		t.Error("a group in braces in LR is stacked")
+	}
+}
+
+func TestColorSchemes(t *testing.T) {
+	t.Parallel()
+	// The colors follow the SVG of dot 16.1.1 for the same source.
+	src := `digraph {
+	colorscheme=blues9
+	subgraph cluster_x { style=filled; fillcolor=3; label=<<font color="5">T</font>>; p }
+	t [shape=none, colorscheme=reds9, label=<<table bgcolor="2"><tr><td bgcolor="4:/greens9/6" color="9"><font color="8">x</font></td></tr></table>>]
+	node [colorscheme=greens9]
+	u [style=filled, fillcolor="6:/x11/gray", gradientangle=90]
+	u -> t [colorscheme=purples9, color=7, fontcolor=9, label=e, labelfontcolor=2, headlabel=h]
+}`
+	g, report, err := Parse(src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	c := g.Clusters[0]
+	if c.Style["fill"] != "#c6dbef" || c.HTML != `<font color="/blues9/5">T</font>` {
+		t.Errorf("cluster: %v %q", c.Style, c.HTML)
+	}
+	if n := g.Nodes[1]; n.HTML != `<table bgcolor="/reds9/2"><tr><td bgcolor="/reds9/4:/greens9/6" color="/reds9/9"><font color="/reds9/8">x</font></td></tr></table>` {
+		t.Errorf("node t: %q", n.HTML)
+	}
+	if st := g.Nodes[2].Style; st["fill"] != "#41ab5d" || st["gradient"] != "#41ab5d:#c0c0c0" {
+		t.Errorf("node u: %v", st)
+	}
+	e := g.Edges[0]
+	if e.Style["stroke"] != "#6a51a3" || e.Style["color"] != "#3f007d" || e.LabelStyle["color"] != "#efedf5" {
+		t.Errorf("edge: %v %v", e.Style, e.LabelStyle)
+	}
+	// A colorscheme of a graph does not reach its nodes, and that of a
+	// cluster does not reach the nodes in it, as in dot.
+	for _, src := range []string{
+		`digraph { colorscheme=blues9; a [color=3] }`,
+		`digraph { subgraph cluster_a { colorscheme=blues9; a [color=3] } }`,
+		`digraph { a [colorscheme=set13, color=4] }`,
+	} {
+		if _, _, err := Parse(src, true); err == nil {
+			t.Errorf("%s: expected an error in the strict mode", src)
+		}
 	}
 }

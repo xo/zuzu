@@ -95,3 +95,56 @@ func TestHTMLGradients(t *testing.T) {
 		t.Errorf("tables %v, cells %v", tables, cells)
 	}
 }
+
+func TestColorScheme(t *testing.T) {
+	t.Parallel()
+	// The values and the colors that do not read follow dot 16.1.1.
+	tests := []struct {
+		in, scheme, exp string
+	}{
+		{"/rdylgn11/1", "", "#a50026"},
+		{"/RdYlGn11/2", "", "#d73027"},
+		{"/rdylgn11/11", "", "#006837"},
+		{"/set312/12", "", "#ffed6f"},
+		{"/blues9/2:/reds9/8", "", "#deebf7"},
+		{"3", "reds9", "#fcbba1"},
+		{"red", "reds9", "red"},
+		{"salmon2", "blues9", "#ee8262"},
+		{"/x11/green", "", "#00ff00"},
+		{"/x11/salmon2", "", "#ee8262"},
+		{"/svg/green", "", "green"},
+		{"green", "x11", "green"},
+		{"//red", "", "red"},
+		{"/blues9/3", "reds9", "#c6dbef"},
+		{"4", "nosuchscheme", ""},
+		{"3", "", ""},
+		{"10", "reds9", ""},
+		{"0", "reds9", ""},
+		{"/greens3/red", "", ""},
+		{"/accent3/x", "", ""},
+		{"salmon2", "svg", ""},
+		{"/svg/salmon2", "", ""},
+		{"/nosuchscheme/1", "", ""},
+	}
+	for _, test := range tests {
+		got, ok := ColorIn(test.in, test.scheme)
+		if got != test.exp || ok != (test.exp != "") {
+			t.Errorf("ColorIn(%q, %q) = %q, %v, want %q", test.in, test.scheme, got, ok, test.exp)
+		}
+	}
+	if n := len(brewer); n != 265 {
+		t.Errorf("expected the 265 schemes of Graphviz, got %d", n)
+	}
+}
+
+func TestHTMLInScheme(t *testing.T) {
+	t.Parallel()
+	src := `<table bgcolor="2" color='red'><tr><td bgcolor="1;0.3:/blues9/9"><font color="9">x</font></td></tr></table>`
+	exp := `<table bgcolor="/reds9/2" color='red'><tr><td bgcolor="/reds9/1;0.3:/blues9/9"><font color="/reds9/9">x</font></td></tr></table>`
+	if got := HTMLInScheme(src, "reds9"); got != exp {
+		t.Errorf("got  %s\nwant %s", got, exp)
+	}
+	if got := HTMLInScheme(src, ""); got != src {
+		t.Errorf("no scheme changed the source: %s", got)
+	}
+}

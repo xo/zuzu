@@ -110,6 +110,96 @@ func HTMLGradients(src string) (string, []HTMLGradient, []HTMLGradient) {
 		}
 	}
 	var tables, cells []HTMLGradient
+	var g HTMLGradient
+	attr := func(a htmlAttr) {
+		if a.tag != "table" && a.tag != "td" {
+			return
+		}
+		switch a.name {
+		case "gradientangle":
+			if f, err := strconv.ParseFloat(strings.TrimSpace(src[a.vs:a.ve]), 64); err == nil {
+				g.Angle = f
+				blank(a.start, a.ve+1)
+			}
+		case "style":
+			for w := a.vs; w < a.ve; {
+				e := w
+				for e < a.ve && src[e] != ',' && src[e] != ' ' {
+					e++
+				}
+				if strings.EqualFold(src[w:e], "radial") {
+					g.Radial = true
+					blank(w, e)
+				}
+				w = e + 1
+			}
+		}
+	}
+	tag := func(name string) {
+		switch name {
+		case "table":
+			tables = append(tables, g)
+		case "td":
+			cells = append(cells, g)
+		}
+		g = HTMLGradient{}
+	}
+	scanHTML(src, attr, tag)
+	return string(out), tables, cells
+}
+
+// HTMLInScheme writes each color of the attributes color and bgcolor of a
+// label of HTML that reads in another way in a color scheme, such as 3 in
+// the scheme blues9, with its scheme, as `/blues9/3`. A label of HTML
+// takes the colorscheme of its node, edge, cluster or graph, as in
+// Graphviz.
+func HTMLInScheme(src, scheme string) string {
+	if scheme == "" {
+		return src
+	}
+	var b strings.Builder
+	at := 0
+	attr := func(a htmlAttr) {
+		if a.name != "color" && a.name != "bgcolor" {
+			return
+		}
+		var parts []string
+		changed := false
+		for part := range strings.SplitSeq(src[a.vs:a.ve], ":") {
+			c, w, _ := strings.Cut(part, ";")
+			in, inOK := ColorIn(c, scheme)
+			out, outOK := Color(c)
+			if in != out || inOK != outOK {
+				part, changed = "/"+scheme+"/"+strings.TrimSpace(c), true
+				if w != "" {
+					part += ";" + w
+				}
+			}
+			parts = append(parts, part)
+		}
+		if changed {
+			b.WriteString(src[at:a.vs])
+			b.WriteString(strings.Join(parts, ":"))
+			at = a.ve
+		}
+	}
+	scanHTML(src, attr, func(string) {})
+	b.WriteString(src[at:])
+	return b.String()
+}
+
+// htmlAttr is an attribute of a start tag of a label of HTML: the name of
+// the tag and of the attribute, in lower case, the start of the attribute,
+// and the start and the end of its value in quotes.
+type htmlAttr struct {
+	tag, name     string
+	start, vs, ve int
+}
+
+// scanHTML calls attr for each attribute in quotes of each start tag of a
+// label of HTML, in the order of the source, and then tag with the name of
+// the tag.
+func scanHTML(src string, attr func(htmlAttr), tag func(string)) {
 	for i := 0; i < len(src); i++ {
 		if src[i] != '<' {
 			continue
@@ -117,7 +207,7 @@ func HTMLGradients(src string) (string, []HTMLGradient, []HTMLGradient) {
 		if strings.HasPrefix(src[i:], "<!--") {
 			end := strings.Index(src[i:], "-->")
 			if end < 0 {
-				break
+				return
 			}
 			i += end + 2
 			continue
@@ -127,7 +217,6 @@ func HTMLGradients(src string) (string, []HTMLGradient, []HTMLGradient) {
 			j++
 		}
 		name := strings.ToLower(src[i+1 : j])
-		var g HTMLGradient
 		// The attributes, up to the end of the tag.
 		for j < len(src) && src[j] != '>' {
 			if !isNameByte(src[j]) {
@@ -138,7 +227,7 @@ func HTMLGradients(src string) (string, []HTMLGradient, []HTMLGradient) {
 			for j < len(src) && isNameByte(src[j]) {
 				j++
 			}
-			attr := strings.ToLower(src[start:j])
+			a := strings.ToLower(src[start:j])
 			k := j
 			for k < len(src) && isSpace(src[k]) {
 				k++
@@ -156,42 +245,17 @@ func HTMLGradients(src string) (string, []HTMLGradient, []HTMLGradient) {
 			}
 			end := strings.IndexByte(src[k+1:], src[k])
 			if end < 0 {
-				break
+				return
 			}
 			vs, ve := k+1, k+1+end
 			j = ve + 1
-			if name != "table" && name != "td" {
-				continue
-			}
-			switch attr {
-			case "gradientangle":
-				if f, err := strconv.ParseFloat(strings.TrimSpace(src[vs:ve]), 64); err == nil {
-					g.Angle = f
-					blank(start, j)
-				}
-			case "style":
-				for w := vs; w < ve; {
-					e := w
-					for e < ve && src[e] != ',' && src[e] != ' ' {
-						e++
-					}
-					if strings.EqualFold(src[w:e], "radial") {
-						g.Radial = true
-						blank(w, e)
-					}
-					w = e + 1
-				}
-			}
+			attr(htmlAttr{tag: name, name: a, start: start, vs: vs, ve: ve})
 		}
-		switch name {
-		case "table":
-			tables = append(tables, g)
-		case "td":
-			cells = append(cells, g)
+		if name != "" {
+			tag(name)
 		}
 		i = j
 	}
-	return string(out), tables, cells
 }
 
 // isNameByte reports whether a byte can be part of the name of a tag or an

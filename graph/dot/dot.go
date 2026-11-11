@@ -179,12 +179,15 @@ type scope struct {
 	cluster    string
 	nodes      []string // the nodes that the subgraph names, in order
 	// rank is the rank that a subgraph that starts here takes by default.
-	rank   string
+	rank string
+	// scheme is the colorscheme of the graph or the subgraph, which a
+	// subgraph takes from the graph around it.
+	scheme string
 	parent *scope
 }
 
 func (s *scope) child() *scope {
-	c := &scope{node: map[string]string{}, edge: map[string]string{}, cluster: s.cluster, rank: s.rank, parent: s}
+	c := &scope{node: map[string]string{}, edge: map[string]string{}, cluster: s.cluster, rank: s.rank, scheme: s.scheme, parent: s}
 	maps.Copy(c.node, s.node)
 	maps.Copy(c.edge, s.edge)
 	return c
@@ -312,6 +315,9 @@ func (p *parser) stmt(s *scope, graphAttrs map[string]string) error {
 			if r, ok := a["rank"]; ok {
 				s.rank = r
 			}
+			if v, ok := a["colorscheme"]; ok {
+				s.scheme = v
+			}
 		case "node":
 			maps.Copy(s.node, a)
 		case "edge":
@@ -330,6 +336,9 @@ func (p *parser) stmt(s *scope, graphAttrs map[string]string) error {
 		}
 		if t.text == "rank" {
 			s.rank = v.text
+		}
+		if t.text == "colorscheme" {
+			s.scheme = v.text
 		}
 		return nil
 	}
@@ -441,7 +450,11 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 	}
 	if cl != nil {
 		var err error
-		if cl.Label, cl.HTML, err = p.label(attrs["label"], name, "subgraph "+name); err != nil {
+		// A cluster takes the colorscheme of the graph around it.
+		if sub.scheme != "" {
+			attrs["colorscheme"] = sub.scheme
+		}
+		if cl.Label, cl.HTML, err = p.label(attrs["label"], name, sub.scheme, "subgraph "+name); err != nil {
 			return nil, err
 		}
 		if attrs["label"] == "" {
@@ -467,7 +480,7 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 	}
 	for _, k := range slices.Sorted(maps.Keys(attrs)) {
 		switch k {
-		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "penwidth", "pencolor", "gradientangle":
+		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "penwidth", "pencolor", "gradientangle", "colorscheme":
 		default:
 			if err := p.issues.Add("subgraph "+name, "the attribute %s of a subgraph", k); err != nil {
 				return nil, err
@@ -577,7 +590,7 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 		case "label", "headlabel", "taillabel", "xlabel":
 			var err error
 			l := labels[k]
-			if l[0], l[1], err = p.label(v, "", path); err != nil {
+			if l[0], l[1], err = p.label(v, "", a["colorscheme"], path); err != nil {
 				return err
 			}
 		case "labeldistance", "labelangle", "arrowsize", "labelfontsize":
@@ -600,7 +613,7 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 				e.LabelStyle = labelStyle(e.LabelStyle, "fontSize", v)
 			}
 		case "labelfontcolor":
-			c, ok := graph.Color(v)
+			c, ok := graph.ColorIn(v, a["colorscheme"])
 			if !ok {
 				if err := p.issues.Add(path, "the color %s", v); err != nil {
 					return err
@@ -625,7 +638,7 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 			e.TargetPort = v
 		case "tailport":
 			e.SourcePort = v
-		case "color", "penwidth", "style", "fontcolor", "fontsize":
+		case "color", "penwidth", "style", "fontcolor", "fontsize", "colorscheme":
 		default:
 			if err := p.issues.Add(path, "the attribute %s of an edge", k); err != nil {
 				return err
@@ -684,9 +697,10 @@ func (p *parser) graphAttrs(a map[string]string) error {
 		switch k {
 		case "label":
 			var err error
-			if p.g.Title, p.g.TitleHTML, err = p.label(v, "", "graph"); err != nil {
+			if p.g.Title, p.g.TitleHTML, err = p.label(v, "", a["colorscheme"], "graph"); err != nil {
 				return err
 			}
+		case "colorscheme":
 		case "rankdir":
 			switch strings.ToUpper(v) {
 			case "TB", "BT", "LR", "RL":
@@ -751,7 +765,7 @@ func (p *parser) finish() error {
 				// The braces and the bars split a label of HTML into the
 				// fields of the record, and the text of each field is
 				// HTML.
-				fields, err := p.htmlRecord(src, path)
+				fields, err := p.htmlRecord(src, a["colorscheme"], path)
 				if err != nil {
 					return err
 				}
@@ -783,15 +797,15 @@ func (p *parser) finish() error {
 			}
 		}
 		if isHTMLLabel {
-			l, err := p.html(src, path)
+			l, err := p.html(src, a["colorscheme"], path)
 			if err != nil {
 				return err
 			}
-			n.HTML, n.Label, n.Fields = src, htmlText(l), nil
+			n.HTML, n.Label, n.Fields = graph.HTMLInScheme(src, a["colorscheme"]), htmlText(l), nil
 		}
 		if v, ok := a["xlabel"]; ok {
 			var err error
-			if n.XLabel, n.XHTML, err = p.label(v, n.ID, path); err != nil {
+			if n.XLabel, n.XHTML, err = p.label(v, n.ID, a["colorscheme"], path); err != nil {
 				return err
 			}
 		}
@@ -808,7 +822,7 @@ func (p *parser) finish() error {
 		}
 		for _, k := range slices.Sorted(maps.Keys(a)) {
 			switch k {
-			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle":
+			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle", "colorscheme":
 			case "sides", "skew", "distortion":
 				// Only a polygon reads these. Graphviz draws every other
 				// shape without them.
@@ -897,7 +911,7 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 	// strict mode.
 	var err error
 	col := func(v string) (string, bool) {
-		c, ok := graph.Color(v)
+		c, ok := graph.ColorIn(v, a["colorscheme"])
 		if !ok && err == nil {
 			err = p.issues.Add(path, "the color %s", v)
 		}
@@ -974,10 +988,11 @@ func hasStyle(style, word string) bool {
 }
 
 // gradient sets the gradient of a fill of two colors, `a:b` or `a;0.3:b`, with
-// the angle of gradientangle. Each color of the list must read. A color
-// after the second and a weight that does not read are issues.
+// the angle of gradientangle. Each color of the list must read, and the
+// gradient holds them as CSS, with their weights. A color after the second
+// and a weight that does not read are issues.
 func (p *parser) gradient(st map[string]string, v string, a map[string]string, radial bool, path string) error {
-	colors, _, ok := graph.ColorList(v)
+	colors, weights, ok := graph.ColorList(v)
 	if !ok {
 		if err := p.issues.Add(path, "the weights of the colors %s", v); err != nil {
 			return err
@@ -986,15 +1001,23 @@ func (p *parser) gradient(st map[string]string, v string, a map[string]string, r
 	if len(colors) < 2 {
 		return nil
 	}
-	if _, ok := graph.Color(colors[1]); !ok {
-		return p.issues.Add(path, "the color %s", colors[1])
-	}
 	if len(colors) > 2 {
 		if err := p.issues.Add(path, "the colors after the second of the gradient %s", v); err != nil {
 			return err
 		}
 	}
-	st["gradient"] = v
+	list := make([]string, 2)
+	for i := range list {
+		c, ok := graph.ColorIn(colors[i], a["colorscheme"])
+		if !ok {
+			return p.issues.Add(path, "the color %s", colors[i])
+		}
+		list[i] = c
+		if weights[i] >= 0 {
+			list[i] += ";" + strconv.FormatFloat(weights[i], 'g', -1, 64)
+		}
+	}
+	st["gradient"] = strings.Join(list, ":")
 	if radial {
 		st["gradientType"] = "radial"
 	}

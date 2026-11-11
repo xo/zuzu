@@ -11,21 +11,68 @@ import (
 )
 
 // Color reads a color of DOT: a name of CSS or of the X11 scheme of
-// Graphviz, #rrggbb, #rrggbbaa, or hue, saturation and value from 0 to 1.
-// A list of colors takes its first.
+// Graphviz, #rrggbb, #rrggbbaa, hue, saturation and value from 0 to 1, or
+// a color of a named scheme, as `/rdylgn11/1`, `/x11/salmon2` or
+// `/svg/green`. A list of colors takes its first.
 func Color(v string) (string, bool) {
+	return ColorIn(v, "")
+}
+
+// ColorIn reads a color of DOT in the color scheme that colorscheme names.
+// In a scheme of ColorBrewer, such as blues9, a number is the color at
+// that index from 1, and a name is a color of the default scheme, as in
+// Graphviz. In the scheme svg, a name is a name of CSS. A color that names
+// its scheme, as `/blues9/3`, takes that scheme. A name of the X11 scheme
+// that CSS also has, such as green, keeps its color of CSS, except in the
+// form `/x11/green`.
+func ColorIn(v, scheme string) (string, bool) {
 	v = strings.TrimSpace(v)
 	if i := strings.IndexAny(v, ":;"); i > 0 {
 		v = v[:i]
 	}
-	if c, ok := x11[strings.ToLower(v)]; ok {
+	explicit := false
+	if rest, ok := strings.CutPrefix(v, "/"); ok {
+		s, name, ok := strings.Cut(rest, "/")
+		if !ok {
+			return "", false
+		}
+		v, scheme, explicit = name, s, true
+	}
+	scheme = strings.ToLower(scheme)
+	switch scheme {
+	case "", "x11":
+		if c, ok := x11Differs[strings.ToLower(v)]; ok && explicit {
+			return fmt.Sprintf("#%06x", c), true
+		}
+		return plainColor(v, true)
+	case "svg":
+		return plainColor(v, false)
+	}
+	if cs, ok := brewer[scheme]; ok {
+		if i, err := strconv.Atoi(v); err == nil {
+			if i < 1 || i > len(cs) {
+				return "", false
+			}
+			return fmt.Sprintf("#%06x", cs[i-1]), true
+		}
+	}
+	if explicit {
+		return "", false
+	}
+	return plainColor(v, true)
+}
+
+// plainColor reads a color with no scheme: a name of CSS, and of the X11
+// scheme of Graphviz when x11 is set, #rrggbb, #rrggbbaa, or hue,
+// saturation and value.
+func plainColor(v string, x11Names bool) (string, bool) {
+	if c, ok := x11[strings.ToLower(v)]; ok && x11Names {
 		return fmt.Sprintf("#%06x", c), true
 	}
 	if c, ok := color.Parse(v); ok {
 		if len(v) == 9 && v[0] == '#' {
 			return fmt.Sprintf("rgba(%d,%d,%d,%s)", int(c.R), int(c.G), int(c.B), strconv.FormatFloat(c.A, 'f', 3, 64)), true
 		}
-		_ = c
 		return v, true
 	}
 	f := strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == ' ' })

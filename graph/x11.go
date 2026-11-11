@@ -190,3 +190,10 @@ var x11 = map[string]uint32{
 	"wheat4": 0x8b7e66, "yellow1": 0xffff00, "yellow2": 0xeeee00,
 	"yellow3": 0xcdcd00, "yellow4": 0x8b8b00,
 }
+
+// x11Differs holds the colors of the X11 scheme whose names CSS also has
+// with another color. Only the form `/x11/green` takes them.
+var x11Differs = map[string]uint32{
+	"gray": 0xc0c0c0, "grey": 0xc0c0c0, "green": 0x00ff00,
+	"maroon": 0xb03060, "purple": 0xa020f0,
+}
