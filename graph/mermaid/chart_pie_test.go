@@ -331,3 +331,30 @@ func TestPieOutsideLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestPieLeaderColor(t *testing.T) {
+	t.Parallel()
+	items := renderMermaid(t, "pie\n\"Dogs\" : 386\n\"Cats\" : 85\n\"Rats\" : 15")
+	fill := ""
+	for _, it := range items {
+		if it.mark == scene.Arc && it.datum != nil && it.datum["label"] == "Rats" {
+			fill = it.item.Fill.Color
+		}
+	}
+	n := 0
+	for _, it := range items {
+		if it.mark != scene.Rule || it.datum == nil || it.datum["label"] != "Rats" {
+			continue
+		}
+		n++
+		if it.item.Stroke.Color != fill {
+			t.Errorf("expected the leader line in the color %s of its slice, got %s", fill, it.item.Stroke.Color)
+		}
+	}
+	if n != 2 || fill == "" {
+		t.Errorf("expected two parts of a leader line and a slice, got %d and %q", n, fill)
+	}
+	if textCount(items, "Dogs") != 1 {
+		t.Error("expected the legend to name Dogs once")
+	}
+}

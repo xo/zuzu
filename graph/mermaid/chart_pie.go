@@ -210,8 +210,8 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 					},
 				},
 			},
-			pieLeader("px", "py", "ex", "ey"),
-			pieLeader("ex", "ey", "lx", "ly"),
+			pieLeader("px", "py", "ex", "ey", pieScale(domain, colors)),
+			pieLeader("ex", "ey", "lx", "ly", pieScale(domain, colors)),
 			map[string]any{
 				"mark":      map[string]any{"type": "text", "fontWeight": 600, "align": "center", "baseline": "middle"},
 				"transform": []any{map[string]any{"filter": "datum.percent != ''"}},
@@ -364,8 +364,9 @@ func placeOutside(labels []*pieLabel, cx, cy, ro, height float64) {
 
 // pieLeader returns a layer that draws one part of the leader lines of the
 // labels outside a pie, from the point of two fields to the point of two
-// others, in the color of the slice.
-func pieLeader(x, y, x2, y2 string) map[string]any {
+// others, in the color of the slice. The layer takes the color scale of
+// the slices, so that a line has the color of its own slice.
+func pieLeader(x, y, x2, y2 string, colors map[string]any) map[string]any {
 	pos := func(f string) map[string]any {
 		return map[string]any{"field": f, "type": "quantitative", "scale": nil}
 	}
@@ -374,7 +375,7 @@ func pieLeader(x, y, x2, y2 string) map[string]any {
 		"transform": []any{map[string]any{"filter": "datum.outside === true"}},
 		"encoding": map[string]any{
 			"x": pos(x), "y": pos(y), "x2": pos(x2), "y2": pos(y2),
-			"color": map[string]any{"field": "name", "type": "nominal"},
+			"color": map[string]any{"field": "name", "type": "nominal", "scale": colors},
 		},
 	}
 }
