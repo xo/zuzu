@@ -1,0 +1,19 @@
+sequenceDiagram
+    Alice->>Bob: Hello Bob, how are you ?
+    Bob->>Alice: Fine, thank you. And you?
+    create participant Carl
+    Alice->>Carl: Hi Carl!
+    create actor D as Donald
+    Carl->>D: Hi!
+    destroy Carl
+    Alice-xCarl: We are too many
+    destroy Bob
+    Bob->>Alice: I agree
+    activate Alice
+    Alice->>D: Busy
+    activate Alice
+    D->>Alice: Nested
+    deactivate Alice
+    deactivate Alice
+    D->>+D: Think
+    D-->>-Alice: Done

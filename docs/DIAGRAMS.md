@@ -284,6 +284,7 @@ and checks that each value of the source draws once, with its label.
 | `sankey`, `sankey-beta` | Vega with `zuzu.sankey`, `zuzu.sankeylinks` and `zuzu.sankeylabels` |
 | `radar-beta` | Vega, polygons on radial axes |
 | `treemap`, `treemap-beta` | Vega with `stratify` and `treemap` |
+| `sequenceDiagram` | Vega, with the layout worked out in Go: rects, rules, paths, symbols and text |
 
 #### pie
 
@@ -413,6 +414,69 @@ on a leaf, `"Leaf": 12`. `classDef` and `:::class` style a node with
 `showValues`, `padding`, `diagramPadding`, `labelFontSize` and
 `valueFontSize`. A value on a section with children, and a leaf with no
 value, are issues.
+
+#### sequenceDiagram
+
+zuzu lays out a sequence diagram in Go. Each participant has a lifeline,
+and the messages, the notes and the blocks go down the page in the order of
+the source. The spec holds the place of each part as rows of data.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `participant A`, `actor B`, `participant A as Alice` | a participant as a box, or an actor as a figure over its name. An alias is the label, and `<br/>` starts a new line |
+| `participant A@{ "type": "database" }` | `boundary`, `control` and `entity` as icons over the name, and `database`, `collections` and `queue` as boxes of their shape. The key `alias` gives the label, and `as` wins over it |
+| `create participant B`, `destroy B` | the head of B at the message that creates it, and its foot at the message that destroys it. The next message after `create` goes to B, and the next message after `destroy` names B |
+| `box Aqua Title`, then `end` | a panel behind its participants, with its title. The color is the first word: a name of CSS, `rgb()`, `rgba()`, `hsl()` or `hsla()` |
+| `A->>B: Text` | a line with its text above it, as the next table says |
+| `A->>+B`, `B-->>-A`, `activate A`, `deactivate A` | an activation, a narrow bar on the lifeline. An activation inside another moves to the right |
+| `Note right of A`, `Note left of A`, `Note over A`, `Note over A,B` | a note in a panel |
+| `loop`, `alt` and `else`, `opt`, `par` and `and`, `critical` and `option`, `break` | a frame with its keyword in a tab and its text in brackets. A section is a dashed line across the frame |
+| `rect rgb(191, 223, 255)`, then `end` | a band of the color behind its messages |
+| `autonumber`, `autonumber 10 5`, `autonumber off` | the number of each message in a circle at its start |
+| `title Text`, `title: Text` | the title |
+| `%% Text`, `# Text` | nothing, since each is a comment |
+| `#35;`, `#infin;` | the character of the entity code. `#59;` puts a semicolon in a text |
+
+A semicolon ends a statement. The text of a message, a note or a label can
+start with `wrap:` or `nowrap:`.
+
+| Arrow | Line | End |
+| --- | --- | --- |
+| `->`, `-->` | solid, dotted | none |
+| `->>`, `-->>` | solid, dotted | a filled arrowhead |
+| `<<->>`, `<<-->>` | solid, dotted | a filled arrowhead at each end |
+| `-x`, `--x` | solid, dotted | a cross |
+| `-)`, `--)` | solid, dotted | an open arrowhead |
+| `-\|\`, `-\|/`, `--\|\`, `--\|/` | solid, dotted | the top or the bottom half of an arrowhead |
+| `-\\`, `-//`, `--\\`, `--//` | solid, dotted | one stroke of an arrowhead, at the top or at the bottom |
+| a reverse arrow, such as `//-` | solid, dotted | the same halves and strokes at the sender |
+| `A->>()B`, `A()->>B`, `A()->>()B` | as the arrow says | a dot where the line meets the lifeline, a central connection |
+
+The reverse arrows are `/|-`, `\|-`, `//-` and `\\-`, and `/|--`, `\|--`,
+`//--` and `\\--` with a dotted line.
+
+zuzu reads these settings of `sequence`: `mirrorActors`, which is true by
+default, `showSequenceNumbers`, `hideUnusedParticipants`, `rightAngles`,
+`wrap`, `wrapPadding`, `actorMargin`, `messageMargin`, `noteMargin`,
+`boxMargin`, `boxTextMargin`, `activationWidth`, `width` and `height` as
+the least size of a box, `labelBoxWidth`, `labelBoxHeight`,
+`diagramMarginX`, `diagramMarginY`, `messageAlign`, `noteAlign`, and the
+size and the weight of the fonts of the actors, the messages and the notes.
+It reads the `wrap` of the top level too. A size is in pixels, and the
+default sizes are those of the look of zuzu, which are smaller than those
+of Mermaid. The families of the fonts are issues, as are the other
+settings.
+
+The menus of a participant, `link`, `links`, `properties` and `details`,
+are issues, and so are `accTitle` and `accDescr`. A type or a key of the
+metadata that zuzu does not know is an issue, and the participant draws as
+a box. A color of a rect that does not read is an issue, and the rect draws
+as a panel.
+
+Each participant takes the next color of the scheme. A message is an edge,
+and a note, a frame and a box without a color are panels. A color that the
+source gives to a box or a rect draws at its own opacity, or at 0.25 when
+it is opaque, so that the text on it reads in both modes.
 
 ### Other kinds
 

@@ -1,0 +1,13 @@
+sequenceDiagram
+    %% Numbers start at 1 and go up by 1.
+    autonumber
+    Alice->>John: First
+    John-->>Alice: Second # a comment after a hash
+    autonumber 10 5
+    Alice->>John: Ten
+    John->>John: Fifteen
+    autonumber off
+    Alice->>John: No number
+    autonumber 1.5 0.25
+    John->>Alice: One and a half
+    Alice->>John: One and three quarters

@@ -1,0 +1,20 @@
+sequenceDiagram
+    box Aqua Group Description
+    participant A
+    participant B
+    end
+    box Group without color
+    participant C
+    end
+    box rgb(255, 230, 200)
+    actor D
+    end
+    box transparent Aqua
+    participant E
+    end
+    participant F
+    A->>C: Hello C
+    C->>D: Hello D
+    D->>E: Hello E
+    E->>F: Hello F
+    F->>A: Back to A

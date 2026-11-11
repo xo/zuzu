@@ -1,0 +1,22 @@
+---
+title: Settings
+config:
+  sequence:
+    mirrorActors: false
+    showSequenceNumbers: true
+    actorMargin: 80
+    messageAlign: left
+    noteAlign: left
+    rightAngles: true
+    hideUnusedParticipants: true
+    wrap: true
+    width: 120
+---
+sequenceDiagram
+    participant Alice
+    participant Ghost
+    participant Bob
+    Alice->>Bob: A long message that wraps onto more than one line at the width
+    Bob->>Bob: Think about it
+    Note over Bob: A note that also wraps when it is long enough
+    Bob-->>Alice: nowrap: This text stays on one line

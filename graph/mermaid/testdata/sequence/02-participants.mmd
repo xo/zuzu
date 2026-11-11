@@ -1,0 +1,17 @@
+sequenceDiagram
+    title Participants of each type
+    participant A as Alice<br/>Johnson
+    actor B as Bob
+    participant API@{ "type": "boundary" } as Public API
+    participant Ctl@{ "type": "control" }
+    participant Ent@{ "type": "entity", "alias": "Order entity" }
+    participant DB@{ "type": "database" }
+    participant Col@{ "type": "collections" }
+    participant Q@{ "type": "queue" } as Jobs
+    A->>B: Hi Bob
+    B->>API: Call
+    API->>Ctl: Route
+    Ctl->>Ent: Load
+    Ent->>DB: Select
+    DB-->>Col: Rows
+    Col->>Q: Enqueue

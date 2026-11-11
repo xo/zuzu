@@ -1,0 +1,39 @@
+sequenceDiagram
+    participant Alice
+    participant Bob
+    participant Service
+    participant DB
+    loop Every minute
+        Alice->>Bob: Ping
+    end
+    alt is sick
+        Bob->>Alice: Not so good
+    else is well
+        Bob->>Alice: Feeling fresh
+    end
+    opt Extra response
+        Bob->>Alice: Thanks for asking
+    end
+    par Alice to Bob
+        Alice->>Bob: Hello Bob
+    and Alice to Service
+        Alice->>Service: Hello Service
+    end
+    critical Establish a connection to the DB
+        Service-->DB: connect
+    option Network timeout
+        Service-->Service: Log error
+    option Credentials rejected
+        Service-->Service: Log different error
+    end
+    break when the booking process fails
+        Service-->Alice: show failure
+    end
+    rect rgb(191, 223, 255)
+        Alice->>Bob: In a rect
+        rect rgba(0, 0, 255, .1)
+            loop Nested
+                Bob->>Service: Deep
+            end
+        end
+    end

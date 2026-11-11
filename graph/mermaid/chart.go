@@ -52,6 +52,8 @@ var charts = map[string]compiler{
 	"radar-beta":    radarChart,
 	"treemap":       treemapChart,
 	"treemap-beta":  treemapChart,
+
+	"sequenceDiagram": sequenceChart,
 }
 
 // IsChart reports whether a kind of diagram is a chart that Chart
