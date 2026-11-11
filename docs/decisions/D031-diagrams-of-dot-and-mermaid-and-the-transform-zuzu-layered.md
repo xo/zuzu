@@ -206,8 +206,35 @@ as Mermaid does. A diagram names an icon as `name:icon`.
    since CC BY 4.0 asks the one who shares an image for the credit.
 5. zuzu bundles no icon of a cloud vendor and no logo of a brand. The terms
    of AWS, of Azure and of the CNCF limit a change and a copy, and a logo
-   is a trademark. A program loads such a pack itself, under the terms of
-   its owner.
+   is a trademark. A program loads such icons itself, under the terms of
+   their owner, with a pack or with an icon loader.
+6. A program can also give an icon loader, with the option `WithIconLoader`.
+   It works as the loader of data does (D25): zuzu asks it for each icon
+   that no pack holds, by its prefix and its name, and the loader gives the
+   bytes from wherever it chooses: a folder, a store of its own, or a
+   download. zuzu itself still reads no file and makes no request.
+
+   ```go
+   type IconLoader interface {
+       LoadIcon(ctx context.Context, req IconRequest) (io.ReadCloser, error)
+   }
+
+   type IconRequest struct {
+       Prefix, Name string // aws and lambda, for aws:lambda
+   }
+   ```
+
+   The bytes are an SVG document, an icon of Iconify, or a pack of
+   Iconify that holds the icon. zuzu asks once for each icon in a render,
+   and the loader keeps what it fetched from one render to the next. An
+   error, or a context that ends, draws the box with a question mark, as
+   for a missing icon. zuzu cleans the SVG of a loaded icon as it cleans an
+   image, and draws an icon of several colors as it is, so that it keeps
+   the colors of its owner. `FSIconLoader` reads `<prefix>/<name>.svg` or
+   `<prefix>.json` from a file system that the caller gives, as
+   `FSLoader` does for data. So a program that downloads the icons of AWS
+   once, under the terms of AWS, draws `aws:lambda` from that folder, and
+   zuzu bundles none of them.
 
 ## The charts of Mermaid
 
