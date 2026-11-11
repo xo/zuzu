@@ -1,0 +1,14 @@
+architecture-beta
+    title Edges
+    service a(server)[A]
+    service b(database)[B]
+    service c(disk)[C]
+    service d(internet)[D]
+    service e(cloud)[E]
+    service f(server)[F]
+
+    a:R --> L:b
+    b:R <-[writes]-> L:c
+    a:B -- T:d
+    d:R --> T:e
+    c:R -- R:f

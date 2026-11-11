@@ -285,6 +285,8 @@ and checks that each value of the source draws once, with its label.
 | `radar-beta` | Vega, polygons on radial axes |
 | `treemap`, `treemap-beta` | Vega with `stratify` and `treemap` |
 | `sequenceDiagram` | Vega, with the layout worked out in Go: rects, rules, paths, symbols and text |
+| `mindmap` | Vega paths and text, laid out in Go: the root in the center and a tidy tree on each side |
+| `architecture-beta` | Vega rects, paths, text and icons, laid out in Go on a grid by the sides of the edges |
 
 #### pie
 
@@ -477,6 +479,138 @@ Each participant takes the next color of the scheme. A message is an edge,
 and a note, a frame and a box without a color are panels. A color that the
 source gives to a box or a rect draws at its own opacity, or at 0.25 when
 it is opaque, so that the text on it reads in both modes.
+
+#### mindmap
+
+The indent of each line makes the tree. The first node is the root. Each
+other node is a child of the last node above it with a smaller indent. A
+node with no such node above it is a second root, which is an error. A tab
+counts as 4 spaces.
+
+| Source | Shape |
+| --- | --- |
+| `text` | the default shape: a tint with a line under it |
+| `id[text]` | a square |
+| `id(text)` | a rounded square |
+| `id((text))` | a circle |
+| `id))text((` | a bang |
+| `id)text(` | a cloud |
+| `id{{text}}` | a hexagon |
+
+The text of a node can be in double quotes, or a string of markdown in
+double quotes and backquotes, which can run over more lines. In every
+label, as in Mermaid, `**bold**` and `__bold__` draw in a bold font, and
+`*italic*` and `_italic_` in an italic font. An underscore inside a word is
+text. `<br>` and a new line in a string of markdown start a new line. A
+label wraps at the spaces to fit `mindmap.maxNodeWidth`, 200 by default.
+
+| Line after a node | What zuzu does |
+| --- | --- |
+| `::icon(fa fa-book)` | the icon of the node, at the left of its label |
+| `:::urgent large` | an issue for each class |
+
+zuzu reads the classes of a font of icons as the name of an icon:
+`fa fa-book` is `fa:book`, `fas fa-book` is `fas:book`, and `mdi mdi-home`
+is `mdi:home`. A name with a colon, such as `carbon:cloud`, stays as it is.
+The icon comes from the packs and the icon loader of the render, as in a
+flowchart. An icon that does not load draws as a box with a question mark,
+and the report names it. An icon whose classes name no pack is an issue.
+The classes of a node are classes of CSS that the page of a site gives.
+zuzu reads no CSS, so each class is an issue.
+
+zuzu reads `mindmap.padding`, `mindmap.maxNodeWidth`, `mindmap.colorBy`,
+which is `branch` or `depth`, and `mindmap.layoutAlgorithm` and `layout`,
+which are `cose-bilkent` or `tidy-tree`. Both draw with the layout of zuzu.
+
+Mermaid lays a mindmap out with cose-bilkent, a layout of forces around
+the root. zuzu uses a tidy tree on two sides instead. The layout is the
+same on each run, it keeps the order of the source, and each label stays
+level, so that no two labels overlap. A radial tree puts long labels at a
+slant or lets them overlap. The root is in the center. Its first branches
+go to its right side, from the top down, and the rest go to its left side,
+from the bottom up, so that the branches read clockwise. The split makes
+the heights of the two sides as close as it can. On each side, each
+subtree takes a band of the height, and a node is in the middle of the band
+of its subtree. A child is at a fixed space from the side of its parent.
+zuzu measures the labels with the bundled font, as the render does.
+
+The root takes the first color of the category scheme of the theme. Each
+branch of the root takes the next color, and each node and edge of the
+branch takes the color of the branch. With `colorBy: depth`, each depth
+takes a color. A node is a tint of its color with an outline, and a node of
+the default shape has a line under it in place of the outline. An edge is
+a curve in the color of its branch, and it gets thinner at each depth.
+
+#### architecture-beta
+
+| Statement | Example |
+| --- | --- |
+| a group, with an icon, a title and a parent group | `group api(cloud)[API] in cloud` |
+| a service, with an icon, a title and a group | `service db(database)[Database] in api` |
+| a service with a text in place of an icon | `service erp "ERP"[Legacy system]` |
+| a junction | `junction hub in api` |
+| an edge, with the sides it joins | `db:L -- R:server` |
+| an arrow at an end | `a:R --> L:b`, `a:R <-- L:b`, `a:R <--> L:b` |
+| a title on an edge | `a:R -[reads]- L:b` |
+| an edge from the box of a group | `api{group}:B --> T:db{group}` |
+| an alignment | `align row a b c`, `align column a b` |
+| a title | `title Services` |
+
+A side is `L`, `R`, `T` or `B`. A title in brackets can be in quotes. An
+edge joins two services or junctions. These are errors, as in Mermaid: a
+second item with an id, a parent that is not a group, a parent that no
+group statement declares, a group in a group that comes after it, an edge
+to a group or to an id that does not exist,
+`{group}` on an edge whose two ends are in one group, and an alignment of
+fewer than two services or junctions. `{group}` on a service in no group,
+`accTitle` and `accDescr` are issues.
+
+zuzu draws the built-in icons `cloud`, `database`, `disk`, `internet` and
+`server` in its own look, with no pack (D31). Another icon is `pack:name`.
+It comes from the packs and the icon loader of the render, as in a
+flowchart. zuzu bundles no pack `logos`, because its logos of AWS and of
+other vendors are trademarks (D31). A program that has the right to use
+them gives them with `WithIcons` or an icon loader. An icon that does not
+load draws as a box with a question mark, and the report names it. In the
+strict mode, it is an error.
+
+Mermaid lays the diagram out with fcose, a layout of forces, with the
+sides of the edges as constraints. zuzu places the items on a grid instead,
+so that the layout is the same on each run and each edge leaves and enters
+the sides it names:
+
+1. `a:R -- L:b` puts b in the column to the right of a, and `a:B -- T:b`
+   puts b in the row below a.
+2. An edge between a side across and a side up or down, such as
+   `a:R -- T:b`, puts b to the right of a and below it, so that the edge
+   enters the top of b. Mermaid places b above a for this edge.
+3. Two ends on the same side, such as `a:R -- R:b`, put b below a, and the
+   edge goes around. `T` and `B` put b to the right of a.
+4. `align row` puts its items in a row, in their order, and
+   `align column` puts them in a column.
+
+zuzu walks the items that the edges join in depth, from the first item of
+the source, so that a chain of items stays together. If the cell of an item
+is full, the item goes on to the next free cell: down for an edge to a
+side, to the right for an edge up or down, and on up or down for an edge
+at a slant. Each set of joined items goes to the right of the set before.
+A group is a box around a grid of its own, and it takes one cell in the
+grid of its parent. An edge from an item in the group to an item outside
+it places the group in that grid. A column takes the width of its widest
+item, and the tiles of a row line up on their centers. An edge leaves its
+side straight, and turns at right angles with round corners. An edge with
+`{group}` ends on the box of the group.
+
+A service is a square tile with a tint of the first color of the scheme
+and an outline, with its icon in that color and its title below it. A
+group is a panel with its icon and its title at the top left. A junction is
+a dot. An edge and its arrows are in the color of the axis, and the title
+of an edge sits on its middle. zuzu reads `architecture.iconSize`, the size
+of a tile, 56 by default, `architecture.fontSize`, 11 by default,
+`architecture.padding`, the space inside a group, 16 by default, and
+`architecture.nodeSeparation`, the space between two cells, 40 by default.
+A title on an edge widens that space to fit. The other settings, which
+tune fcose, such as `numIter` and `seed`, are issues.
 
 ### Other kinds
 

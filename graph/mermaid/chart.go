@@ -40,20 +40,21 @@ type compiler func(c *chart) (spec map[string]any, lite bool, err error)
 // charts are the compilers of the charts of Mermaid, by the first word of
 // the source (D31).
 var charts = map[string]compiler{
-	"pie":           pieChart,
-	"xychart":       xyChart,
-	"xychart-beta":  xyChart,
-	"quadrantChart": quadrantChart,
-	"gantt":         ganttChart,
-	"journey":       journeyChart,
-	"wardley-beta":  wardleyChart,
-	"sankey":        sankeyChart,
-	"sankey-beta":   sankeyChart,
-	"radar-beta":    radarChart,
-	"treemap":       treemapChart,
-	"treemap-beta":  treemapChart,
-
-	"sequenceDiagram": sequenceChart,
+	"pie":               pieChart,
+	"xychart":           xyChart,
+	"xychart-beta":      xyChart,
+	"quadrantChart":     quadrantChart,
+	"gantt":             ganttChart,
+	"journey":           journeyChart,
+	"wardley-beta":      wardleyChart,
+	"sankey":            sankeyChart,
+	"sankey-beta":       sankeyChart,
+	"radar-beta":        radarChart,
+	"treemap":           treemapChart,
+	"treemap-beta":      treemapChart,
+	"mindmap":           mindmapChart,
+	"architecture-beta": architectureChart,
+	"sequenceDiagram":   sequenceChart,
 }
 
 // IsChart reports whether a kind of diagram is a chart that Chart

@@ -1,0 +1,18 @@
+---
+title: Groups
+---
+architecture-beta
+    group cloud(cloud)[Cloud]
+    group private(server)[Private subnet] in cloud
+    group public(internet)[Public subnet] in cloud
+
+    service web(internet)[Web] in public
+    service api(server)[API] in public
+    service db(database)[Database] in private
+    service disk(disk)[Backups] in private
+    service user(internet)[User]
+
+    user:R --> L:web
+    web:R -- L:api
+    db:R -- L:disk
+    api{group}:B --> T:db{group}

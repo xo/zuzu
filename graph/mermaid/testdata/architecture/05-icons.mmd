@@ -1,0 +1,13 @@
+architecture-beta
+    group k8s(k8s:namespace)[Cluster]
+
+    service queue(mdi:tray-full)[Queue] in k8s
+    service worker(carbon:bare-metal-server)[Worker] in k8s
+    service store(fa:hard-drive)[Store] in k8s
+    service legacy "ERP"[Legacy system]
+    service blank[No icon]
+
+    queue:R -- L:worker
+    worker:R -- L:store
+    legacy:T -- B:worker
+    align row legacy blank
