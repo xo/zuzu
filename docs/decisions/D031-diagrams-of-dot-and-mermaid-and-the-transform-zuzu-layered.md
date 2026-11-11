@@ -61,10 +61,15 @@ the output of another.
 | `rankSep`, `nodeSep`, `clusterPadding` | 40, 24, 12 | the space between the ranks, between the nodes of a rank, and inside a cluster |
 | `width`, `height` | none | the fields of the size of a node |
 | `label`, `fontSize`, `padding` | none, 11 and 8 | the field of the label of a node, which the transform measures, when the node has no size |
+| `breakWords` | false | breaks a word that is wider than the width of a wrap between its letters. Otherwise the word stays whole |
 | `as` | see below | the names of the output fields |
 
+A node or an edge of the input can hold the field `wrap`: the width, in
+pixels, where its label wraps at its spaces, or 0 for no wrap.
+
 A node row holds its fields and `x`, `y`, `width`, `height`, `rank` and
-`order`, with x and y at its center. An edge row holds its fields and
+`order`, with x and y at its center, and `lines`, the lines of a label that
+wraps. An edge row holds its fields and
 `path`, a path of SVG, the place of its label `labelX` and `labelY`, and
 the place and the angle of each arrowhead. A cluster row holds `x`, `y`,
 `width`, `height`, `depth` and the place of its title.
@@ -75,23 +80,29 @@ The layout follows the published algorithms, in the order of Gansner,
 Koutsofios, North and Vo, "A technique for drawing directed graphs", 1993
 (D6):
 
-1. An edge that closes a cycle turns around, by the greedy heuristic of
-   Eades, Lin and Smyth, in the order of the source, so that the result is
-   the same each time. An edge of `constraint=false` takes no part in the
-   ranks.
+1. An edge that closes a cycle turns around. A depth-first search starts
+   from the nodes in the order of the source and follows the edges in the
+   order of the source. Each edge back to a node on the path of the search
+   turns around. dot and dagre break cycles the same way, so a node with no
+   edge in stays in the first rank, and the result is the same each time.
+   An edge of `constraint=false` takes no part in the ranks.
 2. The ranks come from network simplex, with `minlen`, `weight` and the
    groups of the same rank.
 3. A long edge splits into a chain of dummy nodes, one in each rank.
 4. The order in each rank comes from the weighted median, with sweeps down
    and up and the swap of neighbors, for 24 passes or until a pass gains
-   nothing.
+   nothing. An edge between two nodes of the same rank keeps its tail
+   before its head, and a tie keeps the order of the source.
 5. A cluster is a box of nodes. In each rank, its nodes and the nodes of
    the clusters inside it stay together, and the order moves a cluster as a
    block. A cluster keeps room for its padding and its title. An edge that
    leaves a cluster crosses its border at a dummy node on the border, so
    that it does not cut through another cluster.
 6. The places across the ranks come from Brandes and Köpf, 2001: four
-   alignments, balanced, with the space between nodes and clusters.
+   alignments, balanced, with the space between nodes and clusters. The
+   median neighbor of a node counts each edge by its weight, and the
+   heaviest edges align first, so that an edge of a large weight stays
+   straight.
 7. An edge is a line through its dummy nodes, drawn as a cubic B-spline,
    which ends at the border of the shape of each node. An edge from a node
    to itself is a loop at the side of the node. Edges between the same two

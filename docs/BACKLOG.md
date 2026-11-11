@@ -72,15 +72,69 @@ numbers before strings.
 
 ### Draw the parts of Mermaid that draw another way
 
-1. A named shape that zuzu does not draw yet, such as a shape of BPMN, draws
-   as a rounded rectangle.
-2. The properties of a link, such as `animate`, are issues.
-3. The error of the first line of a diagram says line 1, even after front
-   matter, because `Diagram` does not keep the number of that line.
-4. A subgraph without a direction, inside a subgraph with a direction,
+1. The shape `person` and the shapes of BPMN that put the label under the
+   shape, such as `bpmn-start` and `bpmn-gateway`, draw as rounded
+   rectangles. zuzu always puts a label in the middle of its node.
+2. The properties of a link, such as `animate`, are issues. Open question
+   24 asks what to do.
+3. A subgraph without a direction, inside a subgraph with a direction,
    lays out in the direction of the subgraph that holds it. Mermaid 12
    draws some of these in another direction. In a `flowchart LR`, a
    subgraph inside a subgraph with `direction TB` draws LR in Mermaid.
+4. `f-circ`, `junction`, `sm-circ` and `start` keep their label, and
+   `start` draws as a full circle. Mermaid draws them as small circles with
+   no text.
+5. The shape `subroutine` is too narrow for a short label, so the label
+   covers its two inner lines.
+
+### Fix the Mermaid bugs that the test files of iv found
+
+The test files of iv are in `testdata/zuzu` of the iv repository. Most of
+them come from the corpus of `github.com/bvolpato/mermaid-go-renderer`.
+
+1. The front matter skips a list of YAML, and the other parts of YAML that
+   it does not read, with no issue.
+2. `gantt foo` ignores `foo` with no issue.
+
+### Draw more of Mermaid
+
+1. A label wraps at the width of Mermaid in the pixels of zuzu. zuzu draws
+   a label at 11 pixels and Mermaid at 14, so a line of zuzu holds about 30
+   percent more words.
+2. `flowchart.minNodeWidth`, 120 by default in Mermaid 12.3.0, is not read,
+   so a node with a short label is narrower than in Mermaid.
+3. The title of a subgraph that is wider than its nodes draws past the box
+   of the subgraph. Mermaid makes the box wider. Only a subgraph that lays
+   out on its own, in `graph/nest.go`, reads the width of its title.
+4. A chart of `xyChart` reports `tickLength`, `tickWidth`, `labelPadding`
+   and `titlePadding` of an axis, the width of the line of an axis of
+   numbers, and `plotReservedSpacePercent`. The look of zuzu has no ticks
+   and no line on an axis of numbers, and the runtime has no padding of the
+   labels or of the title of an axis.
+5. The title of a gantt with sections starts at the names of the tasks, to
+   the right of the names of the sections, because a title takes the bounds
+   of the axes.
+6. zuzu does not draw a gitGraph, a timeline, a C4 diagram, a block diagram
+   or a requirement diagram. Open question 17 asks for their order.
+
+### Draw more of DOT
+
+The DOT files come from the gallery of Graphviz, in `testdata/zuzu` of iv.
+
+1. `URL`, `href` and `tooltip` are issues. The scene graph has no field for
+   a link or a tooltip, and the SVG writer writes neither.
+2. In LR or RL, a record that is one group in braces lies one field under
+   another. Graphviz puts the fields side by side. A group inside a group
+   is flat. `\l` in a plain record label centers the line.
+3. A record drops an empty field that has no port: `<f0> a| | |2` draws 2
+   fields, and Graphviz draws 4.
+4. `weight=0` counts as 1, because the graph and the transform read 0 as
+   the default weight.
+5. In LR, Graphviz draws a loop above its node. zuzu draws it below.
+6. `label=""` draws the id of the node. Graphviz draws no text.
+7. An edge with a list of colors, such as `color="a:b"`, draws only the
+   first color, with no issue. Graphviz draws a line in each color.
+8. `bgcolor` of the graph is an issue. Graphviz fills the page with it.
 
 ### Give a chart of Mermaid the time of the render
 
@@ -105,12 +159,19 @@ The compilers of the charts work around each of these:
    stroke in the color of the background.
 7. A rule of Vega-Lite with one item takes the look of a reference, and its
    label writes a time as a number.
+8. `x2: {"value": "width"}` is dropped with no issue, and the rect does not
+   draw.
+9. The axis of an encoding reports `zindex`, `labelFontSize`,
+   `labelPadding`, `titleFontSize`, `titlePadding`, `tickSize`, `tickWidth`
+   and `domainWidth`. `config.axisX` and `config.axisY` apply some of them.
 
 ### Fix the text of the direct renderer
 
 A rotated text whose mark holds a glyph that the font lacks, such as ❤,
 also draws a mirrored copy of each text. `dx` and `dy` on a rotated text
 move it on the page, not along the text as in Vega.
+An empty `ellipsis` writes the default "…", because the field of the scene
+item drops an empty value. A text cannot be cut with no mark.
 
 ### Give the look a color of a critical task
 

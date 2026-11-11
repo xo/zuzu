@@ -1098,3 +1098,32 @@ stays true.
     of D31. The kinds that programs give it next are gitGraph, timeline,
     C4, block and requirement diagrams. D31 keeps the order of the survey
     until the maintainers answer.
+18. Which color do the edges of a diagram take? The edges, the arrowheads
+    and the messages of a sequence take the token Axis of `docs/STYLE.md`,
+    `#cfd5de` in the light mode. At the size of a terminal, iv finds them
+    hard to see. One choice is a darker token for edges. Another is the
+    look of Graphviz, black lines and no fill, for a DOT graph that sets no
+    color.
+19. What does zuzu do with `fontname` of DOT? zuzu draws only IBM Plex Sans
+    (D16), so each file of the gallery of Graphviz fails in the strict mode
+    on `fontname` alone. zuzu can keep the issue, drop it, or read only a
+    weight or a style from the name, such as `Helvetica-Bold`.
+20. What does zuzu draw for a character that its fonts do not have, such as
+    an emoji? It draws a box today, and the report says nothing. zuzu can
+    draw nothing and add an issue, or bundle a font of emoji, which makes
+    the module larger.
+21. Does zuzu read the `theme` of Mermaid? It is an issue today. zuzu can
+    map `dark` to the dark mode, and the other themes, such as `forest`, to
+    color schemes of zuzu.
+22. Does zuzu read `description` in the front matter of Mermaid? Mermaid
+    ignores the key, and zuzu reports it. zuzu can write it as the
+    description of the spec, under a name that starts with `zuzu.` (D6).
+23. A maintainer has to review the change to D30 that adds
+    `zuzu.sankeylabels`. An agent wrote it on 2026-11-11.
+24. Does `animate` on a link of Mermaid stay an issue? zuzu draws a still
+    image, and Mermaid moves the dashes of the link.
+25. A maintainer has to review the changes to D31 of 2026-11-12. An agent
+    changed how the layout breaks a cycle, from the heuristic of Eades,
+    Lin and Smyth to the search of dot and dagre. It also made the order in
+    a rank keep the edges in that rank, and the places across the ranks
+    count the weight of an edge. It added `wrap` and `breakWords`.
