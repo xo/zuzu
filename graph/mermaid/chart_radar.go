@@ -42,6 +42,7 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 		return nil, false, err
 	}
 	if c.d.Header != "" {
+		c.line = c.d.N
 		return nil, false, c.errorf("the text %q after %s", c.d.Header, c.d.Kind)
 	}
 	spec := map[string]any{}

@@ -35,7 +35,7 @@ func xyChart(c *chart) (map[string]any, bool, error) {
 	case "vertical":
 		horizontal = false
 	default:
-		c.line = 1
+		c.line = c.d.N
 		return nil, false, c.errorf("the header %q of an xychart", c.d.Header)
 	}
 	if err := c.unreadSettings("xyChart.width", "xyChart.height", "xyChart.chartOrientation",

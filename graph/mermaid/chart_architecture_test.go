@@ -306,6 +306,13 @@ func TestArchitectureIssues(t *testing.T) {
 	if report, err := chartOf(src, true); err != nil || len(report) != 0 {
 		t.Errorf("%q: the report %v and the error %v", src, report, err)
 	}
+	// The layout uses no random numbers, so randomize is no issue.
+	for _, v := range []string{"true", "false"} {
+		src := "---\nconfig:\n  architecture:\n    randomize: " + v + "\n---\n" + body
+		if report, err := chartOf(src, true); err != nil || len(report) != 0 {
+			t.Errorf("%q: the report %v and the error %v", src, report, err)
+		}
+	}
 	// An icon that no pack holds, as a logo of a vendor that zuzu does not
 	// bundle, draws as a box with a question mark, and the report names it.
 	src = "---\nconfig:\n  theme: dark\n---\narchitecture-beta\n" +

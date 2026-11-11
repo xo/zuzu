@@ -199,7 +199,12 @@ version that bundles Mermaid 12.3.0.
 
 The `title` of the front matter is the title of the diagram. Its `config`
 and each directive merge into one config. A setting of the config that a
-kind does not read is an issue.
+kind does not read is an issue. The front matter is YAML. zuzu reads maps
+by their indent, and a value in quotes or plain. A value can run over more
+lines, indented under its key. A block after `|` keeps its new lines, and a
+block after `>` joins its lines with spaces. A `-` or a `+` after either
+sets the new lines at its end, as in YAML. The other parts of YAML, such as
+lists and anchors, do not read.
 
 ### Flowchart
 
@@ -262,7 +267,12 @@ The links:
 
 The text of a label can hold `<br>` as a new line, an entity such as
 `#quot;` or `#35;`, and a string of markdown in backquotes, which draws as
-plain text without its marks.
+plain text without its marks. A text in double quotes, such as a string of
+markdown, can run over more lines, and each new line in it starts a new
+line of the label. This holds for a node, a link and the title of a
+subgraph. The value of a property in `A@{ ... }` can be in double quotes or
+in single quotes, and zuzu takes the quotes off. In single quotes, `''` is
+one quote, as in YAML.
 
 A subgraph with a direction lays out in that direction, as Mermaid does,
 when no edge links a node inside it to a node outside it. zuzu lays out
@@ -610,6 +620,14 @@ A cycle of `after` and `until` is an error. `click`, the mode `compact`,
 and `todayMarker` with a style are issues. A render has no time of its own,
 so zuzu draws no marker of today.
 
+As in Mermaid, the value of a statement is all the text after its keyword.
+In `dateFormat :YYYY-MM-DD`, the colon is part of the format, so no date
+of the source reads in it. A start date then reads as the Date of
+JavaScript reads it. An end date that is not a duration does not read, so
+the task has no length, and that is an issue. An item of `excludes` or
+`includes` that is not a date, a day of the week or `weekends` excludes or
+includes no day. Each statement with such items is one issue.
+
 #### journey
 
 `title`, `section`, and steps, `Name: score: actor, actor`, with a score
@@ -677,6 +695,7 @@ the source. The spec holds the place of each part as rows of data.
 | `rect rgb(191, 223, 255)`, then `end` | a band of the color behind its messages |
 | `autonumber`, `autonumber 10 5`, `autonumber off` | the number of each message in a circle at its start |
 | `title Text`, `title: Text` | the title |
+| `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` | the description of the Vega spec, the texts joined in order |
 | `%% Text`, `# Text` | nothing, since each is a comment |
 | `#35;`, `#infin;` | the character of the entity code. `#59;` puts a semicolon in a text |
 
@@ -850,8 +869,10 @@ of an edge sits on its middle. zuzu reads `architecture.iconSize`, the size
 of a tile, 56 by default, `architecture.fontSize`, 11 by default,
 `architecture.padding`, the space inside a group, 16 by default, and
 `architecture.nodeSeparation`, the space between two cells, 40 by default.
-A title on an edge widens that space to fit. The other settings, which
-tune fcose, such as `numIter` and `seed`, are issues.
+A title on an edge widens that space to fit. The layout of zuzu uses no
+random numbers, so it is the same on each run. zuzu accepts
+`architecture.randomize`, true or false, and it changes nothing. The other
+settings, which tune fcose, such as `numIter` and `seed`, are issues.
 
 ### Other kinds
 

@@ -415,8 +415,6 @@ func TestSequenceIssues(t *testing.T) {
 		{"sequenceDiagram\nA->>B: hi\nlinks A: {\"Wiki\": \"https://example.com\"}", "links"},
 		{"sequenceDiagram\nA->>B: hi\nproperties A: {\"class\": \"x\"}", "properties"},
 		{"sequenceDiagram\nA->>B: hi\ndetails A: id", "details"},
-		{"sequenceDiagram\naccTitle: Hi\nA->>B: hi", "accTitle"},
-		{"sequenceDiagram\naccDescr {\nA talk\n}\nA->>B: hi", "accDescr"},
 		{"sequenceDiagram\nparticipant A@{ \"type\": \"robot\" }\nA->>B: hi", "robot"},
 		{"sequenceDiagram\nparticipant A@{ \"type\": \"queue\", \"icon\": \"x\" }\nA->>B: hi", "icon"},
 		{"sequenceDiagram\nrect nocolor\nA->>B: hi\nend", "nocolor"},
@@ -444,5 +442,28 @@ func TestSequenceUserExample(t *testing.T) {
 	report, err := compileMermaid(t, mmdFiles(t, "sequence")["01-basic.mmd"], false)
 	if err != nil || len(report) != 0 {
 		t.Errorf("the example of the user: %v, %v", err, report)
+	}
+}
+
+func TestSequenceAccessibility(t *testing.T) {
+	t.Parallel()
+	src := "sequenceDiagram\n  accTitle: The talk\n  accDescr {\n    Alice asks\n    Bob\n  }\n  accDescr: and Bob answers\n  Alice->>Bob: hi"
+	d, err := mermaid.Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, report, err := mermaid.Chart(d, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	if want := `"description":"The talk Alice asks Bob and Bob answers"`; !strings.Contains(string(b), want) {
+		t.Errorf("the spec has no %s", want)
+	}
+	d, err = mermaid.Read("sequenceDiagram\naccDescr {\nnever ends\nA->>B: hi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := mermaid.Chart(d, false); !errors.Is(err, mermaid.ErrSyntax) {
+		t.Errorf("an accDescr with no end: the error %v", err)
 	}
 }

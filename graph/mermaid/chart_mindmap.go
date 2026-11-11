@@ -98,6 +98,7 @@ func mindmapChart(c *chart) (map[string]any, bool, error) {
 		maxWidth = v
 	}
 	if c.d.Header != "" {
+		c.line = c.d.N
 		return nil, false, c.errorf("the text %q after %s", c.d.Header, c.d.Kind)
 	}
 	nodes, err := c.mindmapNodes()

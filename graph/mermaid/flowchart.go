@@ -91,7 +91,7 @@ func (f *flowchart) config() error {
 	if h := strings.Fields(f.d.Header); len(h) > 0 {
 		dir, err := direction(h[0])
 		if err != nil {
-			return err
+			return fmt.Errorf("line %d: %w", f.d.N, err)
 		}
 		f.g.Direction = dir
 	}
@@ -131,9 +131,11 @@ func statements(s string) []string {
 	return append(out, s[start:])
 }
 
-// parse reads the statements of the body.
+// parse reads the statements of the body. A text in double quotes, such
+// as a string of markdown, can run over more lines, and each new line in it
+// starts a new line of the label.
 func (f *flowchart) parse() error {
-	for _, l := range f.d.Lines {
+	for _, l := range joinOpen(f.d.Lines, `"`) {
 		f.line = l.N
 		for _, st := range statements(l.Text) {
 			st = strings.TrimSpace(st)
@@ -228,7 +230,7 @@ func (f *flowchart) subgraph(rest string) error {
 	id, title := rest, rest
 	switch {
 	case strings.HasPrefix(rest, `"`):
-		title = unquote(rest)
+		title = label(rest)
 		f.anon++
 		id = fmt.Sprintf("subgraph%d", f.anon)
 	case strings.Contains(rest, "["):
@@ -310,7 +312,7 @@ func (sc *scanner) id() string {
 // it. textLinkRE matches a link with its text in its middle.
 var (
 	linkRE     = regexp.MustCompile(`^([<ox])?(-{2,}|={2,}|-\.+-|~{3,})(>|[ox](?:[^A-Za-z0-9_]|$))?`)
-	textLinkRE = regexp.MustCompile(`^([<ox])?(--|==|-\.)\s*([^-=.>].*?)\s*(-{2,}|={2,}|\.+-)([>ox])?(?:\s|$)`)
+	textLinkRE = regexp.MustCompile(`(?s)^([<ox])?(--|==|-\.)\s*([^-=.>].*?)\s*(-{2,}|={2,}|\.+-)([>ox])?(?:\s|$)`)
 	edgeIDRE   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)@([-=~<ox.])`)
 )
 
@@ -599,20 +601,35 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 }
 
 // inlineMap reads a map of the properties of a node: key: value, by commas
-// or new lines, with values in quotes or plain.
+// or new lines, with values in double quotes, in single quotes or plain. In
+// single quotes, two single quotes are one, as in YAML.
 func inlineMap(body string) map[string]string {
 	out := map[string]string{}
 	var parts []string
-	quote, start := false, 0
-	for i := range len(body) {
-		switch body[i] {
-		case '"':
-			quote = !quote
-		case ',', '\n':
-			if !quote {
-				parts = append(parts, body[start:i])
-				start = i + 1
+	double, single, start := false, false, 0
+	// value reports whether only blanks come between the colon of the
+	// current part and i, so that a single quote at i opens a value.
+	value := func(i int) bool {
+		return strings.HasSuffix(strings.TrimRight(body[start:i], " \t"), ":")
+	}
+	for i := 0; i < len(body); i++ {
+		switch c := body[i]; {
+		case single:
+			if c == '\'' {
+				if i+1 < len(body) && body[i+1] == '\'' {
+					i++
+					continue
+				}
+				single = false
 			}
+		case c == '"':
+			double = !double
+		case double:
+		case c == '\'' && value(i):
+			single = true
+		case c == ',' || c == '\n':
+			parts = append(parts, body[start:i])
+			start = i + 1
 		}
 	}
 	parts = append(parts, body[start:])
@@ -622,8 +639,11 @@ func inlineMap(body string) map[string]string {
 			continue
 		}
 		v = strings.TrimSpace(v)
-		if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
+		switch {
+		case len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"':
 			v = v[1 : len(v)-1]
+		case len(v) >= 2 && v[0] == '\'' && v[len(v)-1] == '\'':
+			v = strings.ReplaceAll(v[1:len(v)-1], "''", "'")
 		}
 		out[strings.TrimSpace(k)] = v
 	}

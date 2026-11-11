@@ -125,7 +125,9 @@ type arch struct {
 // a group is a box around a grid of its own.
 func architectureChart(c *chart) (map[string]any, bool, error) {
 	a := &arch{c: c, byID: map[string]any{}, tile: 56, font: 11, pad: 16, gap: 40, m: text.NewEstimate()}
-	if err := c.unreadSettings("architecture.iconSize", "architecture.fontSize", "architecture.padding", "architecture.nodeSeparation"); err != nil {
+	// The layout uses no random numbers, so architecture.randomize changes
+	// nothing and is not an issue.
+	if err := c.unreadSettings("architecture.iconSize", "architecture.fontSize", "architecture.padding", "architecture.nodeSeparation", "architecture.randomize"); err != nil {
 		return nil, false, err
 	}
 	for _, s := range []struct {
@@ -137,6 +139,7 @@ func architectureChart(c *chart) (map[string]any, bool, error) {
 		}
 	}
 	if c.d.Header != "" {
+		c.line = c.d.N
 		return nil, false, c.errorf("the text %q after %s", c.d.Header, c.d.Kind)
 	}
 	spec := map[string]any{}

@@ -126,9 +126,12 @@ type seqBox struct {
 
 // sequence is a sequence diagram as the compiler reads it.
 type sequence struct {
-	c            *chart
-	title        string
-	hasTitle     bool
+	c        *chart
+	title    string
+	hasTitle bool
+	// acc holds the texts of accTitle and accDescr, which join into the
+	// description of the spec.
+	acc          []string
 	participants []*seqParticipant
 	byID         map[string]*seqParticipant
 	boxes        []seqBox
@@ -188,7 +191,7 @@ func sequenceChart(c *chart) (map[string]any, bool, error) {
 		return nil, false, err
 	}
 	if c.d.Header != "" {
-		c.line = 1
+		c.line = c.d.N
 		return nil, false, c.errorf("the text %q after %s", c.d.Header, c.d.Kind)
 	}
 	s := &sequence{c: c, byID: map[string]*seqParticipant{}, active: map[string]int{}}
@@ -200,6 +203,9 @@ func sequenceChart(c *chart) (map[string]any, bool, error) {
 	if s.hasTitle {
 		spec["title"] = map[string]any{"text": s.title, "anchor": "start"}
 	}
+	if len(s.acc) > 0 {
+		spec["description"] = strings.Join(s.acc, " ")
+	}
 	return spec, false, nil
 }
 
@@ -208,12 +214,13 @@ func (s *sequence) parse() error {
 	lines := s.c.d.Lines
 	for i := 0; i < len(lines); i++ {
 		s.c.line = lines[i].N
-		next, ok, err := s.c.skipAccessibility(lines, i)
-		if err != nil {
-			return err
-		}
-		if ok {
-			i = next
+		if accRE.MatchString(lines[i].Text) {
+			text, n, ok := ganttAccText(lines, i)
+			if !ok {
+				return s.c.errorf("an accDescr block with no end brace")
+			}
+			i = n
+			s.acc = append(s.acc, text)
 			continue
 		}
 		for _, st := range s.statements(lines[i].Text) {
@@ -222,7 +229,7 @@ func (s *sequence) parse() error {
 			}
 		}
 	}
-	s.c.line = 1
+	s.c.line = s.c.d.N
 	if len(lines) > 0 {
 		s.c.line = lines[len(lines)-1].N
 	}

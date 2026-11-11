@@ -69,7 +69,7 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 	if header != "" {
 		rest, ok := keyword(header, "title")
 		if !ok {
-			c.line = 1
+			c.line = c.d.N
 			return nil, false, c.errorf("the header %q of a pie chart", c.d.Header)
 		}
 		title = rest

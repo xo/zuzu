@@ -184,7 +184,7 @@ func TestGanttIssues(t *testing.T) {
 		src, exp string
 	}{
 		{"gantt\ndateFormat YYYY-MM-DD\na : a1, 2024-01-01, 1d\nclick a1 href \"https://example.com\"", "click"},
-		{"gantt\ndateFormat YYYY-MM-DD\na : 2024-01-01, 3dX", "not a date or a duration"},
+		{"gantt\ndateFormat YYYY-MM-DD\na : 2024-01-01, 3dX", `not a date of the format "YYYY-MM-DD" or a duration`},
 		{"gantt\ndateFormat YYYY-MM-DD\na : after zz, 1d", "after names no task"},
 		{"gantt\ndateFormat YYYY-MM-DD\na : 2024-01-01, until zz", "until names no task"},
 		{"gantt\ntodayMarker stroke-width:5px\na : 2024-01-01, 1d", "todayMarker"},
@@ -216,6 +216,66 @@ func TestGanttIssues(t *testing.T) {
 	}
 	if _, err := g.spec(); err != nil || !hasIssue(c.issues.Report, "tickInterval") {
 		t.Errorf("expected an issue of tickInterval, got %v and %v", err, c.issues.Report)
+	}
+}
+
+// TestGanttColonFormat follows Mermaid 12.3.0 and mmdc: the value of
+// dateFormat is all the text after the keyword, so the colon is part of the
+// format. A start date reads as the Date of JavaScript reads it, and an end
+// date does not read, so its task has no length.
+func TestGanttColonFormat(t *testing.T) {
+	t.Parallel()
+	src := "gantt\n dateFormat                :YYYY-MM-DD\n" +
+		" excludes                  :excludes the named days\n" +
+		" Completed task            :done,    des1, 2014-01-06,2014-01-08\n" +
+		" Active task               :active,  des2, 2014-01-09, 3d\n" +
+		" Describe                  :a1, after des1, 3d"
+	g, c, err := ganttOf(t, src, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.dateFormat != ":YYYY-MM-DD" {
+		t.Errorf("the format %q", g.dateFormat)
+	}
+	day := func(tm time.Time) string { return tm.UTC().Format(time.DateOnly) }
+	exp := []string{"2014-01-06 2014-01-06", "2014-01-09 2014-01-12", "2014-01-06 2014-01-09"}
+	for i, task := range g.tasks {
+		if got := day(task.start) + " " + day(task.end); got != exp[i] {
+			t.Errorf("task %q: expected %s, got %s", task.name, exp[i], got)
+		}
+	}
+	if len(c.issues.Report) != 2 {
+		t.Fatalf("expected 2 issues, got %v", c.issues.Report)
+	}
+	for i, want := range []string{
+		`line 3: excludes ":excludes the named days" holds no dates, days of the week or weekends`,
+		`line 4: the end "2014-01-08" of the task "Completed task" is not a date of the format ":YYYY-MM-DD"`,
+	} {
+		if got := c.issues.Report[i].Error(); !strings.Contains(got, want) {
+			t.Errorf("issue %d: expected %q, got %q", i, want, got)
+		}
+	}
+}
+
+func TestGanttListIssues(t *testing.T) {
+	t.Parallel()
+	src := "gantt\ndateFormat YYYY-MM-DD\nexcludes weekends, sunday, 2024-01-03, nope, never\n" +
+		"excludes saturday\nincludes 2024-01-06 friday\na : 2024-01-01, 1d"
+	_, c, err := ganttOf(t, src, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		`line 3: the items "nope", "never" of excludes are not dates, days of the week or weekends`,
+		`line 5: the items "friday" of includes are not dates`,
+	}
+	if len(c.issues.Report) != 2 {
+		t.Fatalf("expected 2 issues, got %v", c.issues.Report)
+	}
+	for i, w := range want {
+		if got := c.issues.Report[i].Error(); !strings.Contains(got, w) {
+			t.Errorf("issue %d: expected %q, got %q", i, w, got)
+		}
 	}
 }
 

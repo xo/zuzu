@@ -34,7 +34,7 @@ func quadrantChart(c *chart) (map[string]any, bool, error) {
 		return nil, false, err
 	}
 	if c.d.Header != "" {
-		c.line = 1
+		c.line = c.d.N
 		return nil, false, c.errorf("the header %q of a quadrant chart", c.d.Header)
 	}
 	var title string

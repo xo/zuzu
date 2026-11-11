@@ -37,6 +37,9 @@ type Diagram struct {
 	Kind string
 	// Header is the rest of the first line, such as LR.
 	Header string
+	// N is the number of the first line in the source, after the front
+	// matter, the directives and the comments.
+	N int
 	// Title is the title of the front matter.
 	Title string
 	// Config is the config of the front matter and of the directives.
@@ -107,6 +110,7 @@ func Read(src string) (*Diagram, error) {
 			f := strings.Fields(t)
 			d.Kind = strings.TrimSuffix(f[0], ";")
 			d.Header = strings.TrimSpace(strings.TrimPrefix(t, f[0]))
+			d.N = n0 + k + 1
 			continue
 		}
 		// A comment runs to the end of the line.
@@ -201,7 +205,8 @@ func relaxedJSON(s string) string {
 }
 
 // yamlMap reads the subset of YAML of a front matter: maps by indent, with
-// scalar values.
+// scalar values. A scalar can be a block, after | or >, or a plain or
+// quoted text that goes on in the lines indented under its key.
 func yamlMap(lines []string) map[string]any {
 	type level struct {
 		indent int
@@ -209,12 +214,13 @@ func yamlMap(lines []string) map[string]any {
 	}
 	root := map[string]any{}
 	stack := []level{{-1, root}}
-	for _, l := range lines {
-		if strings.TrimSpace(l) == "" || strings.HasPrefix(strings.TrimSpace(l), "#") {
+	for i := 0; i < len(lines); i++ {
+		t := strings.TrimSpace(lines[i])
+		if t == "" || strings.HasPrefix(t, "#") {
 			continue
 		}
-		indent := len(l) - len(strings.TrimLeft(l, " "))
-		k, v, ok := strings.Cut(strings.TrimSpace(l), ":")
+		indent := yamlIndent(lines[i])
+		k, v, ok := yamlKey(t)
 		if !ok {
 			continue
 		}
@@ -222,16 +228,157 @@ func yamlMap(lines []string) map[string]any {
 			stack = stack[:len(stack)-1]
 		}
 		cur := stack[len(stack)-1].m
-		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
-		if v == "" {
+		// The lines under the key, more indented than it, with the blank
+		// lines between them.
+		end := i + 1
+		for end < len(lines) && (strings.TrimSpace(lines[end]) == "" || yamlIndent(lines[end]) > indent) {
+			end++
+		}
+		under := lines[i+1 : end]
+		switch {
+		case yamlBlockHeader(v):
+			cur[k] = yamlBlock(v, under)
+			i = end - 1
+		case v == "" && !yamlNested(under):
+			if s := yamlPlain(under); s != "" {
+				cur[k] = s
+				i = end - 1
+				continue
+			}
 			m := map[string]any{}
 			cur[k] = m
 			stack = append(stack, level{indent, m})
-			continue
+		case v == "":
+			m := map[string]any{}
+			cur[k] = m
+			stack = append(stack, level{indent, m})
+		default:
+			if more := yamlPlain(under); more != "" {
+				v += " " + more
+				i = end - 1
+			}
+			cur[k] = scalar(v)
 		}
-		cur[k] = scalar(v)
 	}
 	return root
+}
+
+// yamlIndent returns the number of spaces before the text of a line.
+func yamlIndent(l string) int {
+	return len(l) - len(strings.TrimLeft(l, " "))
+}
+
+// yamlKey splits a line of a map into its key and its value. The colon of a
+// key ends the line or has a space after it, so the colon of a text such as
+// fa:fa-cogs is not a key.
+func yamlKey(t string) (string, string, bool) {
+	for i := range len(t) {
+		if t[i] == ':' && (i+1 == len(t) || t[i+1] == ' ' || t[i+1] == '\t') {
+			return strings.TrimSpace(t[:i]), strings.TrimSpace(t[i+1:]), true
+		}
+	}
+	return "", "", false
+}
+
+// yamlNested reports whether the first line under a key with no value is a
+// key of a map, so that the key holds a map.
+func yamlNested(under []string) bool {
+	for _, l := range under {
+		t := strings.TrimSpace(l)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		_, _, ok := yamlKey(t)
+		return ok
+	}
+	return false
+}
+
+// yamlPlain joins the lines of a plain text that goes on under its key: the
+// lines join with a space, and a blank line is a new line.
+func yamlPlain(under []string) string {
+	var b strings.Builder
+	blank := false
+	for _, l := range under {
+		t := strings.TrimSpace(l)
+		switch {
+		case t == "":
+			blank = b.Len() > 0
+			if blank {
+				b.WriteByte('\n')
+			}
+			continue
+		case b.Len() > 0 && !blank:
+			b.WriteByte(' ')
+		}
+		blank = false
+		b.WriteString(t)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// yamlBlockRe matches the header of a block scalar: | or >, then a digit of
+// indent and a sign of chomping, in either order.
+var yamlBlockRe = regexp.MustCompile(`^([|>])([1-9]?)([+-]?)([1-9]?)(?:\s+#.*)?$`)
+
+// yamlBlockHeader reports whether a value starts a block scalar.
+func yamlBlockHeader(v string) bool {
+	return yamlBlockRe.MatchString(v)
+}
+
+// yamlBlock reads a block scalar. A literal block, after |, keeps its new
+// lines. A folded block, after >, joins its lines with a space, except a
+// blank line and a line indented more than the block. The chomping sign
+// sets the new lines at the end: - for none, + for all of them, and one
+// by default.
+func yamlBlock(header string, under []string) string {
+	m := yamlBlockRe.FindStringSubmatch(header)
+	literal, chomp := m[1] == "|", m[3]
+	// The indent of the block is the indent of its first line with text.
+	indent := -1
+	for _, l := range under {
+		if strings.TrimSpace(l) != "" {
+			indent = yamlIndent(l)
+			break
+		}
+	}
+	if indent < 0 {
+		return ""
+	}
+	var rows []string
+	for _, l := range under {
+		if strings.TrimSpace(l) == "" {
+			rows = append(rows, "")
+			continue
+		}
+		rows = append(rows, l[min(indent, yamlIndent(l)):])
+	}
+	trailing := 0
+	for len(rows) > 0 && rows[len(rows)-1] == "" {
+		rows = rows[:len(rows)-1]
+		trailing++
+	}
+	var b strings.Builder
+	for i, r := range rows {
+		if i > 0 {
+			prev := rows[i-1]
+			switch {
+			case literal, r == "", strings.HasPrefix(r, " "), strings.HasPrefix(prev, " "):
+				b.WriteByte('\n')
+			case prev != "":
+				b.WriteByte(' ')
+			}
+		}
+		b.WriteString(r)
+	}
+	switch chomp {
+	case "-":
+	case "+":
+		b.WriteString(strings.Repeat("\n", trailing+1))
+	default:
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 // scalar reads a scalar of YAML: a quoted string, a number, a boolean, or

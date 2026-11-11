@@ -122,7 +122,7 @@ func sectionConfig(d *Diagram, is *graph.Issues, section string, known ...string
 		}
 	}
 	if strings.TrimSpace(d.Header) != "" {
-		return fmt.Errorf("%q after %s: %w", d.Header, d.Kind, ErrSyntax)
+		return fmt.Errorf("line %d: %q after %s: %w", d.N, d.Header, d.Kind, ErrSyntax)
 	}
 	return nil
 }
@@ -131,8 +131,20 @@ func sectionConfig(d *Diagram, is *graph.Issues, section string, known ...string
 // backticks and does not close it with the lines after it, up to the line
 // that closes it, with a new line between them.
 func joinQuoted(lines []Line) []Line {
+	return joinOpen(lines, "\"`")
+}
+
+// joinOpen joins a line that opens a text with one of the marks and does
+// not close it with the lines after it, up to the line that closes it, with
+// a new line between them.
+func joinOpen(lines []Line, marks string) []Line {
 	open := func(s string) bool {
-		return strings.Count(s, `"`)%2 == 1 || strings.Count(s, "`")%2 == 1
+		for _, m := range marks {
+			if strings.Count(s, string(m))%2 == 1 {
+				return true
+			}
+		}
+		return false
 	}
 	var out []Line
 	for i := 0; i < len(lines); i++ {
