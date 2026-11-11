@@ -1,6 +1,6 @@
-// Package diagrams checks the fixtures of DOT, and of the flowcharts and
-// the state diagrams of Mermaid, against the references of dot and of mmdc
-// (D31). zuzu lays out a graph its own way, so the check does not ask for
+// Package diagrams checks the fixtures of DOT, and of the flowcharts, the
+// state diagrams and the class diagrams of Mermaid, against the references
+// of dot and of mmdc (D31). zuzu lays out a graph its own way, so the check does not ask for
 // the places of the reference. It asks that every node, edge, cluster and
 // label of the reference exists, that the hard rules of the layout hold,
 // and that the crossings and the span of the edges are no worse than those
@@ -168,6 +168,8 @@ func readMermaid(t *testing.T, path, dir string) *ref {
 			Source string       `json:"source"`
 			Target string       `json:"target"`
 			Label  string       `json:"label"`
+			Head   string       `json:"head"`
+			Tail   string       `json:"tail"`
 			Points [][2]float64 `json:"points"`
 		} `json:"edges"`
 		Clusters []struct {
@@ -192,7 +194,7 @@ func readMermaid(t *testing.T, path, dir string) *ref {
 		r.clusters[c.ID] = c.Label
 	}
 	for _, e := range doc.Edges {
-		r.edges = append(r.edges, refEdge{source: e.Source, target: e.Target, label: e.Label})
+		r.edges = append(r.edges, refEdge{source: e.Source, target: e.Target, label: e.Label, head: e.Head, tail: e.Tail})
 		r.routes = append(r.routes, e.Points)
 	}
 	r.rank = ranks(across)

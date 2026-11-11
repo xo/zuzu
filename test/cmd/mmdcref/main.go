@@ -1,6 +1,6 @@
-// Command mmdcref reads the SVG of a flowchart or a state diagram that mmdc
-// drew, and writes the nodes, the edges and the clusters that it holds as
-// JSON, the reference of the check of D31. Run test/oracle/diagrams.sh to draw the
+// Command mmdcref reads the SVG of a flowchart, a state diagram or a class
+// diagram that mmdc drew, and writes the nodes, the edges and the clusters
+// that it holds as JSON, the reference of the check of D31. Run test/oracle/diagrams.sh to draw the
 // SVGs and to write the references.
 package main
 
@@ -31,11 +31,14 @@ type Node struct {
 	Y     float64 `json:"y"`
 }
 
-// Edge is an edge: its ends, its label and the points of its route.
+// Edge is an edge: its ends, its label, the labels at its head and at its
+// tail, and the points of its route.
 type Edge struct {
 	Source string       `json:"source"`
 	Target string       `json:"target"`
 	Label  string       `json:"label,omitempty"`
+	Head   string       `json:"head,omitempty"`
+	Tail   string       `json:"tail,omitempty"`
 	Points [][2]float64 `json:"points"`
 }
 
@@ -86,6 +89,10 @@ func main() {
 	s := string(b)
 	ref := Ref{Nodes: []Node{}, Edges: []Edge{}, Clusters: []Cluster{}}
 	ids := map[string]bool{}
+	if strings.Contains(s, `aria-roledescription="classDiagram"`) {
+		write(classRef(s))
+		return
+	}
 	ns, marks := nodes(s)
 	if strings.Contains(s, `aria-roledescription="stateDiagram"`) {
 		ref = stateRef(s, ns, marks)

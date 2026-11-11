@@ -124,6 +124,16 @@ func RecordPath(kind string, w, h float64, across bool, sizes []float64) string 
 	return b.String()
 }
 
+// ColumnPath returns the lines between the columns of a row of a record:
+// a line from top to bottom at each x, around the center of the node.
+func ColumnPath(xs []float64, top, bottom float64) string {
+	var b strings.Builder
+	for _, x := range xs {
+		b.WriteString("M" + num(x) + "," + num(top) + "L" + num(x) + "," + num(bottom))
+	}
+	return b.String()
+}
+
 // shapePath returns the path of a shape.
 func shapePath(kind string, w, h float64) string {
 	x, y := w/2, h/2

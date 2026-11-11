@@ -1,0 +1,16 @@
+classDiagram
+  classA <|-- classB : Inheritance
+  classC *-- classD : Composition
+  classE o-- classF : Aggregation
+  classG <-- classH : Association
+  classI -- classJ : Link
+  classK <.. classL : Dependency
+  classM <|.. classN : Realization
+  classO .. classP : Dashed
+  Customer "1" --> "*" Ticket
+  Student "1" --> "1..*" Course : enrolls
+  Galaxy --> "many" Star : contains
+  Animal <|--|> Zebra
+  Cat *--* Kitten
+  bar ()-- foo
+  foo --() baz

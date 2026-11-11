@@ -141,6 +141,31 @@ func TestDiagrams(t *testing.T) {
 	}
 }
 
+func TestClassDiagrams(t *testing.T) {
+	t.Parallel()
+	class := `classDiagram
+  class Shape{
+    <<interface>>
+    +area()$ double
+    +draw()*
+  }
+  Shape <|-- Square
+  Square "1" --> "*" Side : has`
+	s, report, err := svgOf(t, class, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{">«interface»<", ">Shape<", ">+area() : double<", ">+draw()<", `font-style="italic"`, `font-weight="600"`, ">1<", ">*<", ">has<"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the class diagram has no %s", want)
+		}
+	}
+	// The line under the static method is a thin box under it.
+	if !strings.Contains(s, `height="1"`) {
+		t.Error("the class diagram has no line under its static method")
+	}
+}
+
 func TestHTMLLabels(t *testing.T) {
 	t.Parallel()
 	src := `digraph {

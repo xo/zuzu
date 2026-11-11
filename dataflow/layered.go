@@ -152,11 +152,6 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	// ranks run down, and one under another when they run across. A record
 	// with the field stack lays them one under another in every direction.
 	across := dir == graph.TB || dir == graph.BT
-	type record struct {
-		across       bool
-		texts, ports []string
-		sizes        []float64
-	}
 	records := map[int]*record{}
 	medias := map[int]*media{}
 	htmls := map[int]*htmlLabel{}
@@ -165,22 +160,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	xhtmls := map[int]*htmlLabel{}
 	edgeHTMLs := map[int]map[string]*htmlLabel{}
 	for i, r := range rows {
-		fs, ok := r["fields"].([]any)
-		if !ok || len(fs) == 0 {
-			continue
+		if rec := readRecord(r, across); rec != nil {
+			records[i] = rec
 		}
-		stack, _ := r["stack"].(bool)
-		rec := &record{across: across && !stack}
-		ps, _ := r["ports"].([]any)
-		for j, f := range fs {
-			rec.texts = append(rec.texts, expr.String(f))
-			port := ""
-			if j < len(ps) && ps[j] != nil {
-				port = expr.String(ps[j])
-			}
-			rec.ports = append(rec.ports, port)
-		}
-		records[i] = rec
 	}
 	for i, r := range rows {
 		n := graph.LayoutNode{ID: text(r, fields["key"]), Cluster: text(r, fields["cluster"]), Rank: text(r, fields["rank"])}
@@ -201,20 +183,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			}
 		}
 		if rec, ok := records[i]; ok {
-			n.Width, n.Height = 0, 0
-			for _, t := range rec.texts {
-				tw, th := measureRow(r, t)
-				fw, fh := math.Max(tw+2*padding, 24), math.Max(th+1.6*padding, 24)
-				if rec.across {
-					rec.sizes = append(rec.sizes, fw)
-					n.Width += fw
-					n.Height = math.Max(n.Height, fh)
-				} else {
-					rec.sizes = append(rec.sizes, fh)
-					n.Height += fh
-					n.Width = math.Max(n.Width, fw)
-				}
-			}
+			n.Width, n.Height = rec.size(func(v any, weight string) (float64, float64) {
+				return measureAt(v, sizeOf(r, "fontSize"), weight)
+			}, padding)
 		}
 		if m, ok := mediaOf(r, padding); ok {
 			medias[i] = m
@@ -264,20 +235,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	// height from its center.
 	boxes := map[int]map[string][4]float64{}
 	for i, rec := range records {
-		n := in.Nodes[i]
-		m := map[string][4]float64{}
-		at := 0.0
-		for j, name := range rec.ports {
-			if name != "" {
-				if rec.across {
-					m[name] = [4]float64{at - n.Width/2, -n.Height / 2, rec.sizes[j], n.Height}
-				} else {
-					m[name] = [4]float64{-n.Width / 2, at - n.Height/2, n.Width, rec.sizes[j]}
-				}
-			}
-			at += rec.sizes[j]
-		}
-		boxes[i] = m
+		boxes[i] = rec.boxes(in.Nodes[i].Width, in.Nodes[i].Height)
 	}
 	for i, h := range htmls {
 		boxes[i] = h.ports()
@@ -420,28 +378,10 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if h, ok := xhtmls[i]; ok {
 			out = append(out, h.rows(Row{"key": r["key"], "textColor": r["textColor"]}, np.XLabelX, np.XLabelY, "")...)
 		}
-		rec, ok := records[i]
-		if !ok {
-			continue
-		}
-		o["path"] = graph.RecordPath(in.Nodes[i].Shape, np.Width, np.Height, rec.across, rec.sizes)
-		at := 0.0
-		for j, t := range rec.texts {
-			f := clone(r)
-			f["kind"] = "field"
-			c := at + rec.sizes[j]/2
-			if rec.across {
-				f["x"], f["y"] = np.X-np.Width/2+c, np.Y
-			} else {
-				f["x"], f["y"] = np.X, np.Y-np.Height/2+c
-			}
-			lines := []any{}
-			for l := range strings.SplitSeq(t, "\n") {
-				lines = append(lines, l)
-			}
-			f["lines"] = lines
-			at += rec.sizes[j]
-			out = append(out, f)
+		if rec, ok := records[i]; ok {
+			var fs []Row
+			o["path"], fs = rec.rows(r, np, in.Nodes[i].Shape, padding, fontSize)
+			out = append(out, fs...)
 		}
 	}
 	for i, r := range edges {

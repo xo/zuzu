@@ -1,0 +1,20 @@
+classDiagram
+  direction LR
+  namespace BaseShapes {
+    class Triangle
+    class Rectangle {
+      double width
+      double height
+    }
+  }
+  namespace Things {
+    class Box
+  }
+  note "Shapes and things"
+  note for Box "A box holds shapes"
+  Box o-- Triangle
+  Box o-- Rectangle
+  Box --> Lid
+  %% a comment
+  accTitle: Shapes in boxes
+  accDescr: A box holds triangles and rectangles

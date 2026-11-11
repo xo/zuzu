@@ -1,11 +1,17 @@
 package mermaid
 
 import (
+	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
 )
+
+// dashed is the dash of a dashed line: a dashed relation of a class or
+// an entity, and the border of a region of a state.
+const dashed = "4,3"
 
 // lookSetting reports a setting of the config that a graph draws in its
 // own way: the layout, the look and the theme. It returns false for any
@@ -83,4 +89,91 @@ func classStyle(classes map[string]map[string]string, names []string, own ...map
 		maps.Copy(st, o)
 	}
 	return st
+}
+
+// sectionConfig reads the config of a diagram whose own section of the
+// config, such as state or class, sets only the spacing and the look of
+// Mermaid, so each setting of it is an issue, except the settings that
+// known names, which the caller reads. A diagram of such a kind has
+// nothing after its keyword.
+func sectionConfig(d *Diagram, is *graph.Issues, section string, known ...string) error {
+	cfg := d.Config
+	for _, k := range slices.Sorted(maps.Keys(cfg)) {
+		v := cfg[k]
+		if ok, err := lookSetting(is, k, v); ok || err != nil {
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		if m, ok := v.(map[string]any); ok && k == section {
+			for _, sk := range slices.Sorted(maps.Keys(m)) {
+				if slices.Contains(known, sk) {
+					continue
+				}
+				if err := is.Add("config", "the setting %s.%s", section, sk); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if err := is.Add("config", "the setting %s", k); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(d.Header) != "" {
+		return fmt.Errorf("%q after %s: %w", d.Header, d.Kind, ErrSyntax)
+	}
+	return nil
+}
+
+// joinQuoted joins a line that opens a text in double quotes or in
+// backticks and does not close it with the lines after it, up to the line
+// that closes it, with a new line between them.
+func joinQuoted(lines []Line) []Line {
+	open := func(s string) bool {
+		return strings.Count(s, `"`)%2 == 1 || strings.Count(s, "`")%2 == 1
+	}
+	var out []Line
+	for i := 0; i < len(lines); i++ {
+		l := lines[i]
+		for open(l.Text) && i+1 < len(lines) {
+			i++
+			l.Text += "\n" + lines[i].Text
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+// readStatements reads the lines of the body of a class diagram or of an
+// entity relationship diagram, joined by joinQuoted. It sets line to the
+// number of each line, joins the text for a screen reader into acc, and
+// passes each other line to body while inBody reports true, or else to
+// stmt.
+func readStatements(d *Diagram, line *int, acc *[]string, inBody func() bool, body, stmt func(string) error) error {
+	lines := joinQuoted(d.Lines)
+	for i := 0; i < len(lines); i++ {
+		*line = lines[i].N
+		t := lines[i].Text
+		if inBody() {
+			if err := body(t); err != nil {
+				return err
+			}
+			continue
+		}
+		if accRE.MatchString(t) {
+			text, n, ok := ganttAccText(lines, i)
+			if !ok {
+				return fmt.Errorf("line %d: an accDescr with no end brace: %w", *line, ErrSyntax)
+			}
+			i = n
+			*acc = append(*acc, text)
+			continue
+		}
+		if err := stmt(t); err != nil {
+			return err
+		}
+	}
+	return nil
 }

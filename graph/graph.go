@@ -73,7 +73,9 @@ type Node struct {
 	Fields []Field
 	// Stack lays the fields of a record one under another in every
 	// direction, as the title and the descriptions of a state of Mermaid.
-	// Otherwise the fields lie across the ranks.
+	// Otherwise the fields lie across the ranks. A field of a stacked
+	// record with no text and no cells is a thin empty band, as an empty
+	// compartment of a class is.
 	Stack bool
 	// HTML is the source of a label of HTML of DOT, with no < and > around
 	// it, or empty. The package html of okage reads it and lays it out
@@ -116,6 +118,23 @@ type Media struct {
 // Field is a field of a record: its text and its port.
 type Field struct {
 	Text, Port string
+	// Cells are the cells of a row of a table, in the place of Text. The
+	// cells of a column of a record line up, a line divides two columns,
+	// and a column with no text in any row takes no space. A cell starts
+	// at the left of its column.
+	Cells []string
+	// Align puts each line of the text at the left of the field, l, or at
+	// its center, the default.
+	Align string
+	// Fonts holds the font of each line of the text, or nil for the font
+	// of the node.
+	Fonts []Font
+}
+
+// Font is the font of a line of a field: bold, italic, or with a line
+// under it.
+type Font struct {
+	Bold, Italic, Underline bool
 }
 
 // Edge is an edge of a graph.

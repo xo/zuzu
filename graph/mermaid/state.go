@@ -104,31 +104,7 @@ func (s *stateDiagram) errorf(format string, args ...any) error {
 // settings of the section state set the spacing and the look of Mermaid,
 // so each one is an issue.
 func (s *stateDiagram) config() error {
-	cfg := s.d.Config
-	for _, k := range slices.Sorted(maps.Keys(cfg)) {
-		v := cfg[k]
-		if ok, err := lookSetting(s.issues, k, v); ok || err != nil {
-			if err != nil {
-				return err
-			}
-			continue
-		}
-		if m, ok := v.(map[string]any); ok && k == "state" {
-			for _, sk := range slices.Sorted(maps.Keys(m)) {
-				if err := s.issues.Add("config", "the setting state.%s", sk); err != nil {
-					return err
-				}
-			}
-			continue
-		}
-		if err := s.issues.Add("config", "the setting %s", k); err != nil {
-			return err
-		}
-	}
-	if strings.TrimSpace(s.d.Header) != "" {
-		return fmt.Errorf("%q after %s: %w", s.d.Header, s.d.Kind, ErrSyntax)
-	}
-	return nil
+	return sectionConfig(s.d, s.issues, "state")
 }
 
 // top returns the scope that holds the current line.
@@ -455,7 +431,7 @@ func regions(lines []Line, i int) bool {
 func (s *stateDiagram) openRegion(parent string) {
 	s.regions++
 	id := fmt.Sprintf("divider-id-%d", s.regions)
-	c := &graph.Cluster{ID: id, Parent: parent, Style: map[string]string{"strokeDash": "4,3"}}
+	c := &graph.Cluster{ID: id, Parent: parent, Style: map[string]string{"strokeDash": dashed}}
 	s.g.Clusters = append(s.g.Clusters, c)
 	s.scopes = append(s.scopes, &scope{name: id, cluster: id, region: true})
 }

@@ -36,6 +36,34 @@ var paintKeys = []string{"fill", "fillOpacity", "stroke", "strokeWidth", "stroke
 // textKeys are the keys of a style of a label.
 var textKeys = []string{"textColor", "fontSize", "fontWeight"}
 
+// TextSignature writes the keys of the style of a label that a row sets
+// into its field _text, and returns them. The transform zuzu.layered calls
+// it for the rows of the fields of a record, whose fonts can differ from
+// the font of their node.
+func TextSignature(r map[string]any) string {
+	return signature(r, textKeys, "_text")
+}
+
+// fontCode writes a font of a line of a field as letters: b for bold, i
+// for italic and u for a line under it.
+func fontCode(f Font) string {
+	var s string
+	if f.Bold {
+		s += "b"
+	}
+	if f.Italic {
+		s += "i"
+	}
+	if f.Underline {
+		s += "u"
+	}
+	return s
+}
+
+// BoldWeight is the weight of a bold line of a field, the weight of the
+// title of a cluster.
+const BoldWeight = "600"
+
 // signature writes the keys of a list that a row holds, in order, and the
 // row holds it in a field, so that a mark for each signature draws the
 // rows that set the same keys.
@@ -125,11 +153,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			r["rank"] = n.Rank
 		}
 		if len(n.Fields) > 0 {
-			var texts, ports []any
-			for _, f := range n.Fields {
-				texts, ports = append(texts, f.Text), append(ports, f.Port)
-			}
-			r["fields"], r["ports"], r["lines"] = texts, ports, []any{}
+			fieldRow(r, n)
 			if n.Stack {
 				r["stack"] = true
 			}
@@ -161,6 +185,23 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		add("node", signature(r, paintKeys, "_paint"))
 		text := signature(r, textKeys, "_text")
 		add("nodeText", text)
+		if len(n.Fields) > 0 {
+			// A bold line of a field has a weight of its own, and a line
+			// under a line of text takes the color of the text.
+			add("fieldText", text)
+			for _, f := range n.Fields {
+				for _, ft := range f.Fonts {
+					if ft.Bold {
+						c := maps.Clone(r)
+						c["fontWeight"] = BoldWeight
+						add("fieldText", signature(c, textKeys, "_text"))
+					}
+					if ft.Underline {
+						add("fieldDeco", signature(r, []string{"textColor"}, "_deco"))
+					}
+				}
+			}
+		}
 		if _, ok := r["xLines"]; ok {
 			add("nodeXText", text)
 		}
@@ -422,20 +463,26 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	if html {
 		marks = append(marks, htmlMarks(&data)...)
 	}
-	records := slices.ContainsFunc(g.Nodes, func(n *Node) bool { return len(n.Fields) > 0 })
 	for _, sig := range paints["nodeText"] {
-		for _, from := range []string{"layoutNodes", "layoutFields"} {
-			if from == "layoutFields" && !records {
-				continue
-			}
-			x, y := "textX", "textY"
-			if from == "layoutFields" {
-				x, y = "x", "y"
-			}
-			marks = append(marks, mark("text", from, "_text", sig, []string{StyleNodeLabel}, map[string]any{
-				"x": field(x), "y": field(y), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
-			}, map[string]string{"textColor": "fill"}))
-		}
+		marks = append(marks, mark("text", "layoutNodes", "_text", sig, []string{StyleNodeLabel}, map[string]any{
+			"x": field("textX"), "y": field("textY"), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
+		}, map[string]string{"textColor": "fill"}))
+	}
+	// The text of the fields of a record: each row sets its alignment and
+	// its style of font, and a line under a line of text is a thin box.
+	for _, sig := range paints["fieldText"] {
+		marks = append(marks, mark("text", "layoutFields", "_text", sig, []string{StyleNodeLabel}, map[string]any{
+			"x": field("x"), "y": field("y"), "text": field("lines"), "align": field("align"), "baseline": map[string]any{"value": "middle"},
+			"fontStyle": field("fontStyle"),
+		}, map[string]string{"textColor": "fill"}))
+	}
+	if len(paints["fieldDeco"]) > 0 {
+		data = append(data, filter("layoutFieldDecos", "layout", "datum.kind === 'fieldDeco'"))
+	}
+	for _, sig := range paints["fieldDeco"] {
+		marks = append(marks, mark("rect", "layoutFieldDecos", "_deco", sig, []string{StyleNodeLabel}, map[string]any{
+			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
+		}, map[string]string{"textColor": "fill"}))
 	}
 	spec := map[string]any{
 		"$schema":  "https://vega.github.io/schema/vega/v5.json",
@@ -455,6 +502,41 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		return nil, fmt.Errorf("writing the spec of a graph: %w", err)
 	}
 	return vega.Parse(b)
+}
+
+// fieldRow writes the fields of a record into the row of its node: the
+// text and the port of each field, and the cells, the alignment and the
+// fonts of the fields when any field sets them.
+func fieldRow(r map[string]any, n *Node) {
+	var texts, ports, cells, aligns, fonts []any
+	table, align, font := false, false, false
+	for _, f := range n.Fields {
+		texts, ports = append(texts, f.Text), append(ports, f.Port)
+		var cs []any
+		for _, c := range f.Cells {
+			cs = append(cs, c)
+		}
+		cells = append(cells, cs)
+		aligns = append(aligns, f.Align)
+		var fs []any
+		for _, ft := range f.Fonts {
+			fs = append(fs, fontCode(ft))
+		}
+		fonts = append(fonts, fs)
+		table = table || len(f.Cells) > 0
+		align = align || f.Align != ""
+		font = font || len(f.Fonts) > 0
+	}
+	r["fields"], r["ports"], r["lines"] = texts, ports, []any{}
+	if table {
+		r["cells"] = cells
+	}
+	if align {
+		r["aligns"] = aligns
+	}
+	if font {
+		r["fonts"] = fonts
+	}
 }
 
 // htmlMarks returns the marks that draw the labels of HTML that the

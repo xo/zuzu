@@ -1,7 +1,7 @@
-// Package mermaid reads diagrams of Mermaid 12.3.0 (D31): the flowchart and
-// the state diagram into a graph, and the charts into specs of Vega-Lite
-// and Vega. It reads the subset that docs/DIAGRAMS.md lists, and reports
-// the rest.
+// Package mermaid reads diagrams of Mermaid 12.3.0 (D31): the flowchart, the
+// state diagram and the class diagram into a graph, and the charts into
+// specs of Vega-Lite and Vega. It reads the subset that docs/DIAGRAMS.md
+// lists, and reports the rest.
 package mermaid
 
 import (
@@ -267,7 +267,8 @@ func str(cfg map[string]any, keys ...string) string {
 	return s
 }
 
-// Graph reads a flowchart or a state diagram into a graph. The report
+// Graph reads a flowchart, a state diagram or a class diagram into a
+// graph. The report
 // names each part that zuzu does not draw, and in the strict mode such a
 // part is an error.
 func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
@@ -275,6 +276,8 @@ func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	case "flowchart", "graph", "flowchart-elk":
 	case "stateDiagram", "stateDiagram-v2":
 		return stateGraph(d, strict)
+	case "classDiagram", "classDiagram-v2":
+		return classGraph(d, strict)
 	default:
 		return nil, nil, fmt.Errorf("%s: %w", d.Kind, ErrKind)
 	}

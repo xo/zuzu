@@ -1,0 +1,17 @@
+classDiagram-v2
+  class Animal:::hot
+  class Mineral
+  class Plant:::cool {
+    +grow()
+  }
+  Animal --> Mineral
+  Animal --> Plant
+  Vegetable --> Plant
+  classDef hot fill:#f96,stroke:#333
+  classDef cool fill:#9cf
+  classDef pale fill:#eee
+  cssClass "Mineral,Vegetable" pale
+  style Animal stroke:#c00
+  link Animal "https://example.com" "A link"
+  click Mineral href "https://example.com"
+  callback Plant "grow" "A callback"

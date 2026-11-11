@@ -380,6 +380,75 @@ and `join`, which draws as a state, the settings of the section `state` of
 the config, the layout `elk`, the look `handDrawn`, the `theme` and the
 `themeVariables` of Mermaid, and a style that a flowchart does not read.
 
+### Class diagram
+
+The keywords are `classDiagram` and `classDiagram-v2`. Both read the same
+statements. The direction is `TB` by default, and `direction LR` on a line
+of its own sets it. A statement ends at a new line.
+
+| Part | Example |
+| --- | --- |
+| a class | `class Animal`, or a line that names it, such as `Animal --> Duck` |
+| a class with a label | `class Animal["An animal"]` |
+| a class in backticks | `` class `Animal Class` `` |
+| a generic class | `class Square~Shape~`, which draws as `Square<Shape>` |
+| a member on a line of its own | `Animal : +int age`, `Animal : +isMammal()` |
+| members in a body | `class Duck {`, then a member on each line, then `}` |
+| a method | a member with parentheses, `+swim()`, with a return type after them, `+getPoints() List~int~` |
+| the visibility of a member | `+`, `-`, `#` and `~` before it, drawn as written |
+| a static member | `$` after the member or after the parentheses, `+area()$ double` |
+| an abstract member | `*` after the member or after the parentheses, `+draw()*` |
+| an annotation | `<<interface>>` in a body, or `<<interface>> Shape` on a line of its own |
+| a relation | `A <\|-- B`, with an end on each side or none |
+| the ends of a relation | `<\|` and `\|>`, `*`, `o`, `<` and `>`, and `()` for a lollipop |
+| the line of a relation | `--` for a solid line and `..` for a dashed line |
+| a relation both ways | `A <\|--\|> B`, `A *--* B` |
+| a cardinality | `A "1" --> "*" B` |
+| the label of a relation | `A --> B : uses` |
+| a namespace | `namespace Shapes {`, then classes, then `}` |
+| a note | `note "text"`, and `note for Duck "text"` |
+| a class of style | `classDef hot fill:#f96`, then `cssClass "A,B" hot`, `class A:::hot` or `A:::hot` |
+| a style of a class | `style Animal fill:#f9f,stroke:#333` |
+| the setting `class.hideEmptyMembersBox` | `true` draws a class with no members as its name alone |
+| a comment | `%% a comment` |
+| the text for a screen reader | `accTitle: Zoo`, `accDescr: The animals`, `accDescr { ... }` |
+
+A text in double quotes or in backticks can run over more lines, and each
+new line draws. The text of a member can hold an entity of HTML, such as
+`&lt;`, and the entities of a label, such as `#lt;`.
+
+zuzu draws each part in its own look:
+
+| Part | Draws as |
+| --- | --- |
+| a class | a box of three parts with a line between each two: the name, the attributes and the methods. An empty part is a thin band |
+| the name | the annotations, each as `«interface»`, over the name in bold |
+| a member | a line of text from the left. A static member has a line under it, and an abstract member is italic |
+| a method | its name and its parentheses, then ` : ` and its return type when it has one |
+| the end `<\|` or `\|>` | the open triangle `empty`, for inheritance and realization |
+| the end `*` | the filled diamond `diamond`, for composition |
+| the end `o` | the open diamond `odiamond`, for aggregation |
+| the end `<` or `>` | the open arrowhead `vee`, for association and dependency |
+| the end `()` | an open circle, `odot`, at an interface. The interface draws as its name with no box |
+| a relation | an edge from the class on the left to the class on the right, solid or dashed, with its label in the middle |
+| a cardinality | a label at its end of the edge, beside the line |
+| a namespace | a cluster with its title |
+| a note | a node of the shape note. A note for a class has a dotted line from the note to the class |
+
+The ends of a relation draw at 1.4 times the size of an arrowhead of a
+flowchart, so that the marks of UML read at the size of a label. The
+layout puts the class on the left of a relation in the rank before the
+class on the right, as Mermaid does. A class that a `class` statement
+names inside a namespace moves into it. `classDef`, `cssClass`, `:::` and
+`style` read the same styles as a flowchart, and `classDef default`
+styles every class. `accTitle` and `accDescr` join into the description
+of the Vega spec.
+
+These parts are issues: `click`, `link` and `callback`, the settings of
+the section `class` of the config other than `hideEmptyMembersBox`, the
+layout `elk`, the look `handDrawn`, the `theme` and the `themeVariables` of
+Mermaid, and a style that a flowchart does not read.
+
 ### Charts
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
@@ -730,13 +799,17 @@ tune fcose, such as `numIter` and `seed`, are issues.
 
 ### Other kinds
 
-Every other kind of Mermaid is an error that wraps `mermaid.ErrKind`. D31
-names the order of the next kinds.
+zuzu draws the flowchart, the state diagram, the class diagram, and the
+charts above. Every other kind of Mermaid is
+an error that wraps `mermaid.ErrKind`. D31 names the order of the next
+kinds.
 
 ## The look
 
 A node is a shape with a tint of its color and an outline of 1.25. An edge
 is a line of 1.25 in the color of the axis, with a small arrowhead. A label
 is 11 pixels. A cluster is a panel with its title at the top left. A color
-that the source gives replaces the color of the theme. The styles are in
+that the source gives replaces the color of the theme. A node with an
+opaque fill from the source and no color of text takes the text color of
+the light theme or of the dark theme, whichever reads on the fill. The styles are in
 `theme/config.go`, from `zuzu.node` to `zuzu.icon`.
