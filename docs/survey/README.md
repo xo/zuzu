@@ -14,6 +14,7 @@ person who reviews what other libraries do.
 | `static/` | the Matplotlib images of `compare.html`. `gen-static.py` generates them |
 | `gen-static.py` | writes the Matplotlib images |
 | `LICENSE-data.txt` | the license and the source of each file of data |
+| `mermaid.md` | the kinds of diagram of Mermaid 12 and 13 alpha, the programs that draw them without mermaid.js, which kinds compile to a Vega spec, and the packs of icons, as surveyed on 2026-11-11 for D31 |
 
 ## Open the comparison
 
