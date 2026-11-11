@@ -60,8 +60,15 @@ func lines(s string) []any {
 	return out
 }
 
-// style copies the paint of a style into a row, with the names of Vega.
+// style copies the paint of a style into a row, with the names of Vega. A
+// solid fill with no color of text gets the color of text of the light or
+// the dark theme that reads on it, so that its label reads in both modes.
 func style(r map[string]any, st map[string]string) {
+	if _, ok := st["color"]; !ok && st["fill"] != "" && st["fillOpacity"] == "1" {
+		if c := Contrast(st["fill"]); c != "" {
+			r["textColor"] = c
+		}
+	}
 	for k, v := range st {
 		switch k {
 		case "fill", "stroke", "color", "fontWeight":

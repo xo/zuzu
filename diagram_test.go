@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"io"
 	"math"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/xo/zuzu/icon"
 	"github.com/xo/zuzu/icons/fa"
+	"github.com/xo/zuzu/theme"
 )
 
 func TestSniffDiagram(t *testing.T) {
@@ -361,6 +363,32 @@ func TestScale(t *testing.T) {
 	for _, s := range []float64{0, -1, math.Inf(1), math.NaN()} {
 		if _, _, err := c.Image(t.Context(), WithScale(s)); err == nil {
 			t.Errorf("expected an error of the scale %v", s)
+		}
+	}
+}
+
+func TestFillContrast(t *testing.T) {
+	t.Parallel()
+	src := "flowchart LR\n A[Light] --> B[Dark] --> C[Own]\n style A fill:#99ccff\n style B fill:#123456\n style C fill:#99ccff,color:#ff0000"
+	label := regexp.MustCompile(`<text[^>]* fill="([^"]+)"[^>]*>(Light|Dark|Own)<`)
+	for _, mode := range []theme.Mode{theme.Light, theme.Dark} {
+		s, _, err := svgOf(t, src, true, WithMode(mode))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]string{}
+		for _, m := range label.FindAllStringSubmatch(s, -1) {
+			got[m[2]] = m[1]
+		}
+		exp := map[string]string{
+			"Light": theme.New(theme.Light, theme.Zuzu).Text,
+			"Dark":  theme.New(theme.Dark, theme.Zuzu).Text,
+			"Own":   "#ff0000",
+		}
+		for k, v := range exp {
+			if got[k] != v {
+				t.Errorf("mode %v: expected the label %s in %s, got %q", mode, k, v, got[k])
+			}
 		}
 	}
 }
