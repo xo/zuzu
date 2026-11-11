@@ -19,9 +19,12 @@ import (
 	gotext "github.com/go-text/typesetting/font"
 )
 
-// fonts holds the bundled weights of IBM Plex Sans and their license.
+// fonts holds the bundled weights of IBM Plex Sans, upright and italic,
+// and their license.
 //
-//go:embed fonts/IBMPlexSans-Regular.ttf fonts/IBMPlexSans-Medium.ttf fonts/IBMPlexSans-SemiBold.ttf fonts/LICENSE.txt
+//go:embed fonts/IBMPlexSans-Regular.ttf fonts/IBMPlexSans-Medium.ttf fonts/IBMPlexSans-SemiBold.ttf
+//go:embed fonts/IBMPlexSans-Italic.ttf fonts/IBMPlexSans-MediumItalic.ttf fonts/IBMPlexSans-SemiBoldItalic.ttf
+//go:embed fonts/LICENSE.txt
 var fonts embed.FS
 
 // Family is the family of the bundled font.
@@ -108,7 +111,7 @@ func (e *Estimate) Width(f Font, s string) float64 {
 			return 0
 		}
 		for _, pf := range fonts {
-			e.faces = append(e.faces, face{gotext.NewFace(pf.font), pf.weight})
+			e.faces = append(e.faces, face{gotext.NewFace(pf.font), pf.weight, pf.italic})
 		}
 	}
 	w := measure(e.faces, f, s)
@@ -119,10 +122,12 @@ func (e *Estimate) Width(f Font, s string) float64 {
 	return w
 }
 
-// face is one weight of the bundled font, as a face that measures.
+// face is one weight of the bundled font, upright or italic, as a face that
+// measures.
 type face struct {
 	face   *gotext.Face
 	weight int
+	italic bool
 }
 
 // parsedFont is one parsed weight of the bundled font. A font of go-text does
@@ -130,6 +135,7 @@ type face struct {
 type parsedFont struct {
 	font   *gotext.Font
 	weight int
+	italic bool
 }
 
 // parsed parses the bundled weights once.
@@ -138,7 +144,11 @@ var parsed = sync.OnceValues(func() ([]parsedFont, error) {
 	for _, f := range []struct {
 		file   string
 		weight int
-	}{{"IBMPlexSans-Regular.ttf", 400}, {"IBMPlexSans-Medium.ttf", 500}, {"IBMPlexSans-SemiBold.ttf", 600}} {
+		italic bool
+	}{
+		{"IBMPlexSans-Regular.ttf", 400, false}, {"IBMPlexSans-Medium.ttf", 500, false}, {"IBMPlexSans-SemiBold.ttf", 600, false},
+		{"IBMPlexSans-Italic.ttf", 400, true}, {"IBMPlexSans-MediumItalic.ttf", 500, true}, {"IBMPlexSans-SemiBoldItalic.ttf", 600, true},
+	} {
 		b, err := fonts.ReadFile("fonts/" + f.file)
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", f.file, err)
@@ -147,18 +157,26 @@ var parsed = sync.OnceValues(func() ([]parsedFont, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", f.file, err)
 		}
-		out = append(out, parsedFont{ft.Font, f.weight})
+		out = append(out, parsedFont{ft.Font, f.weight, f.italic})
 	}
 	return out, nil
 })
 
-// nearest returns the bundled weight closest to a weight.
-func nearest(fs []face, weight int) *gotext.Face {
-	best := fs[0]
-	for _, f := range fs[1:] {
-		if abs(f.weight-weight) < abs(best.weight-weight) {
+// nearest returns the bundled face of a style, upright or italic, with the
+// weight closest to a weight.
+func nearest(fs []face, weight int, italic bool) *gotext.Face {
+	var best *face
+	for i := range fs {
+		f := &fs[i]
+		if f.italic != italic {
+			continue
+		}
+		if best == nil || abs(f.weight-weight) < abs(best.weight-weight) {
 			best = f
 		}
+	}
+	if best == nil {
+		best = &fs[0]
 	}
 	return best.face
 }
@@ -178,7 +196,7 @@ func measure(fs []face, f Font, s string) float64 {
 	if len(fs) == 0 || f.Size <= 0 || s == "" {
 		return 0
 	}
-	ft := nearest(fs, f.Weight)
+	ft := nearest(fs, f.Weight, f.Italic)
 	upm := float64(ft.Upem())
 	var units float64
 	for _, r := range s {

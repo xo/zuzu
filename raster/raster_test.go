@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	okagesvg "github.com/xo/okage/svg"
 
@@ -171,6 +173,40 @@ func TestDrawText(t *testing.T) {
 		if inked == 0 {
 			t.Errorf("the text with %d options draws nothing", len(opts))
 		}
+	}
+}
+
+// TestDrawItalic checks that a text in the italic style draws with the
+// bundled italic face, and not with the upright face.
+func TestDrawItalic(t *testing.T) {
+	t.Parallel()
+	draw := func(style string, r *okagesvg.Renderer) *image.RGBA {
+		s := &scene.Scene{Width: 160, Height: 30, Root: scene.Mark{Type: scene.Group, Items: []scene.Item{{
+			Items: []scene.Mark{{Type: scene.Text, Items: []scene.Item{{X: 4, Y: 20, Text: scene.Lines{"Italic flag"}, FontSize: 16, FontStyle: style}}}},
+		}}}}
+		img, err := Draw(s, WithRenderer(r))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return img
+	}
+	if d := differ(draw("italic", fonts()), draw("", fonts())); d < 0.01 {
+		t.Errorf("the italic text differs from the upright text in only %.4f of the pixels", d)
+	}
+	// Without the italic faces, okage draws the text upright or slants the
+	// upright face. Either differs from the italic face.
+	upright := fstest.MapFS{}
+	for _, f := range []string{"IBMPlexSans-Regular.ttf", "IBMPlexSans-Medium.ttf", "IBMPlexSans-SemiBold.ttf"} {
+		b, err := fs.ReadFile(text.Fonts(), "fonts/"+f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upright[f] = &fstest.MapFile{Data: b}
+	}
+	r := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(upright),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
+	if d := differ(draw("italic", fonts()), draw("italic", r)); d < 0.01 {
+		t.Errorf("the italic text with the italic faces differs from the italic text without them in only %.4f of the pixels", d)
 	}
 }
 

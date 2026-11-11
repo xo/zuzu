@@ -170,7 +170,7 @@ The module also embeds files that are not Go packages:
 
 | Files | License | Why |
 | --- | --- | --- |
-| IBM Plex Sans, weights 400, 500 and 600 | SIL Open Font License 1.1 | the bundled font (D16) |
+| IBM Plex Sans, weights 400, 500 and 600, upright and italic | SIL Open Font License 1.1 | the bundled font (D16) |
 | the color schemes, one JSON file each | the license of each upstream theme, MIT or compatible | the schemes of D15, with the license file of each source |
 
 The test module adds Node.js with vega.js and vega-lite.js as the oracle
