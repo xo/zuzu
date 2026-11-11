@@ -975,6 +975,37 @@ D31 did not take this:
    grammar in a document holds the subset. A lexer with modes handles the
    text of a link.
 
+The maintainers then asked for a survey of Mermaid, which is in
+`docs/survey/mermaid.md`, and D31 took its leads: Mermaid 12.3.0, the shapes,
+the icons and the images of its flowchart, its front matter, and its charts.
+Gemini 3.1 Pro and DeepSeek V4 Flash reviewed those additions on the same
+day. D31 took these leads:
+
+1. Both said that an icon as an image costs a parse each time and grows the
+   SVG. D31 draws an icon of one color and of paths alone as a path mark,
+   writes each other icon once in the definitions of the SVG, and keeps it
+   in the direct renderer.
+2. Both said to set the color of an icon by reading its SVG, not by
+   replacing text, and to clean every SVG of an icon or of an image of
+   scripts, `foreignObject`, handlers of events and references outside it.
+3. Both said that `layout: elk` must not pass in silence, since ELK routes
+   edges in its own way. D31 reports it.
+4. DeepSeek said that an SVG that names the URL of an image makes its
+   viewer fetch it. D31 draws a box with the label instead, and never writes
+   a URL from outside.
+5. Both said that a gantt is a plan to work out, not marks. D31 works out
+   the start and the end of each task in Go, and checks them against
+   mermaid.js.
+6. DeepSeek said that the attribution of CC BY 4.0 must reach the one who
+   shares an image. The package `icons/fa` gives it as a value, and the SVG
+   names it in its metadata.
+
+D31 did not take this:
+
+1. Gemini said to bundle no Font Awesome, since its license asks for
+   credit. The flowcharts of Mermaid name `fa:` most often, so D31 keeps it
+   as a package that a program imports by choice.
+
 ## Open questions for the maintainers
 
 A question keeps its number after it is answered, so that a reference to it

@@ -8,6 +8,11 @@ as `zuzu.layered`. This decision proposes how, for phase 7. An agent wrote
 it on 2026-11-11, and Gemini and DeepSeek reviewed a draft. "External
 review" in `docs/PLAN.md` says what each said and what this decision took.
 
+The maintainers then asked for a survey of the kinds of diagram of Mermaid,
+of the programs that draw them without mermaid.js, and of icons.
+`docs/survey/mermaid.md` holds it, and this decision follows its leads:
+Mermaid 12.3.0, the shapes and the icons of its flowchart, and its charts.
+
 ## Packages and the API
 
 1. The package `graph` holds the model of a diagram and the layout. A
@@ -20,10 +25,12 @@ review" in `docs/PLAN.md` says what each said and what this decision took.
    strict mode, and a line of the report in the loose mode (D26).
 3. `graph` compiles a graph into a Vega spec. `zuzu.Parse` takes the
    dialects `DOT` and `Mermaid`. It finds them by the first word of the
-   source: `strict`, `graph` or `digraph` and then a name or `{` for DOT,
-   and `flowchart`, or `graph` and then a direction, for Mermaid.
-   `WithDialect` names one. `Chart.Spec` returns the Vega spec, as it does
-   for Vega-Lite.
+   source, after the front matter, the directives and the comments of
+   Mermaid: `strict`, `graph` or `digraph` and then a name or `{` for DOT,
+   and the keyword of a kind of Mermaid, such as `flowchart`, `pie` or
+   `xychart`, or `graph` and then a direction, for Mermaid. `WithDialect`
+   names one. `Chart.Spec` returns the Vega spec, as it does for
+   Vega-Lite.
 
 ## The compiled spec
 
@@ -114,24 +121,129 @@ issues.
 
 ## Mermaid
 
-zuzu reads:
+zuzu follows Mermaid 12.3.0, the stable version of 2026-11-11. A later
+version is a change of this decision. Version 13 is an alpha, and waits.
+
+zuzu reads the front matter, between two lines of `---`, and the directive
+`%%{init: ...}%%`: the `title`, and in the `config` the `layout`, the
+`look`, the `theme` and the `curve` of a flowchart. Both layouts draw with
+`zuzu.layered`, which follows the method of `dagre`, so `layout: elk`,
+which also routes edges in its own way, is an issue. The looks `classic`
+and `neo` draw in the look of zuzu, as every look does (D12). The look
+`handDrawn`, another layout, and a theme, which zuzu does not draw, are
+issues.
+
+For the flowchart, zuzu reads:
 
 - `flowchart` and `graph` with the directions `TB`, `TD`, `BT`, `LR` and
   `RL`
 - the shapes of a node `[ ]`, `( )`, `([ ])`, `[[ ]]`, `[( )]`, `(( ))`,
   `> ]`, `{ }`, `{{ }}`, `[/ /]`, `[\ \]`, `[/ \]`, `[\ /]` and `((( )))`
+- a node with properties, `A@{ shape: name, label: "..." }`, with the
+  named shapes of 12.3.0, which `docs/DIAGRAMS.md` lists. A shape that zuzu
+  does not draw yet, such as a shape of BPMN, draws as a rounded rectangle,
+  and the report says so
+- a node of an icon, `A@{ icon: "fa:user", form: square, label: "...",
+  pos: t, h: 48 }`, and an icon in a label, `fa:fa-user`
+- a node of an image, `A@{ img: "url", label: "...", pos: t, w: 60, h:
+  60, constraint: on }`
 - the links `-->`, `---`, `-.->`, `==>`, `--o` and `--x`, with text in
   either form, and longer links as `minlen`
+- the id of a link, `e1@-->`, and its properties `e1@{ curve: linear }`.
+  An animation draws still, and the report says so
 - chains, and lists with `&`
 - `subgraph` and `end`, with a title and a direction of its own
 - `classDef`, `class`, `:::`, `style` and `linkStyle`
 - comments with `%%`
 
 A string of markdown draws as plain text, without its marks, and the
-report says so. `click`, a callback, front matter and every other kind of
-diagram are issues. The pie, the xychart, the sankey, the radar and the
-treemap of Mermaid are charts, which compile later to the same specs as
-Vega-Lite.
+report says so. `click`, a callback and every kind of diagram that this
+decision does not name are issues.
+
+An image of a node comes through the loader that the caller gives (D25),
+and draws from a URL of data, with its `w` and `h`, and with its aspect
+kept for `constraint: on`. zuzu reads a PNG, a JPEG and an SVG, and cleans
+an SVG first: it drops scripts, `foreignObject`, handlers of events, and
+every reference outside the image, such as an `href`, a `url()` or an
+`@import`. With no loader, or for a URL that the loader does not give,
+the node draws a box with its label, and the report says so. zuzu never
+writes a URL from outside into its SVG, so that no viewer of the SVG
+fetches it.
+
+## Icons
+
+The package `icon` reads packs of icons in the JSON format of Iconify: the
+body of each icon, an inside of an SVG element, its view box, its rotation
+and its flips, and the aliases. A program gives packs with the option of a
+render `WithIcons`, each under a name that replaces the prefix of the pack,
+as Mermaid does. A diagram names an icon as `name:icon`.
+
+1. An icon of one color that holds only paths, as most icons do, draws as
+   a path mark, scaled into its box, in the color that the diagram gives
+   it. Another icon, with several colors, a gradient or text, draws as an
+   image, an SVG of the icon in a URL of data. zuzu sets its color on the
+   elements that name `currentColor`, by reading the SVG and not by
+   replacing text, and cleans it as it cleans an image. The SVG writer
+   writes each image once, in its definitions, and uses it where it draws,
+   and the direct renderer draws each image once, with okage, and keeps
+   it.
+2. zuzu draws the five icons of the architecture diagram of Mermaid,
+   `cloud`, `database`, `disk`, `internet` and `server`, in its own look.
+3. A missing pack or icon draws as a box with a question mark, as in
+   Mermaid. It is an error in the strict mode, and a line of the report in
+   the loose mode.
+4. zuzu bundles four packs, each in a package of its own under `icons/`,
+   so that a program that draws no icon does not carry them:
+   `icons/carbon`, the icons of IBM under Apache-2.0, which suit IBM Plex,
+   `icons/fa`, the solid icons of Font Awesome Free under CC BY 4.0, under
+   the names `fa` and `fas` that the flowcharts of Mermaid use, which holds
+   no regular icon and no brand, `icons/mdi`, Material Design Icons under Apache-2.0, and
+   `icons/k8s`, the icons of Kubernetes under Apache-2.0, without the logo
+   of Kubernetes, which is a trademark. Each package holds the license of
+   its pack, and pins its version. A program imports a package to use it.
+   The package `icons/fa` gives its attribution as a value, and the SVG
+   writer names it in the metadata of a chart that draws one of its icons,
+   since CC BY 4.0 asks the one who shares an image for the credit.
+5. zuzu bundles no icon of a cloud vendor and no logo of a brand. The terms
+   of AWS, of Azure and of the CNCF limit a change and a copy, and a logo
+   is a trademark. A program loads such a pack itself, under the terms of
+   its owner.
+
+## The charts of Mermaid
+
+The charts of Mermaid compile to the specs that zuzu already draws, with
+the values of the source as the values of a dataset:
+
+| Keyword | Compiles to |
+| --- | --- |
+| `pie` | an arc of Vega-Lite, with `showData` as the values in the labels |
+| `xychart` | bars and lines of Vega-Lite, with the axes that the source names |
+| `quadrantChart` | points of Vega-Lite on two axes from 0 to 1, with the four quadrants and their names |
+| `gantt` | bars of Vega-Lite on a time axis, by section, and milestones as points |
+| `journey` | points of Vega-Lite of the score of each step, by section, with the actors |
+| `wardley` | points, lines and text on the two axes of evolution and visibility |
+| `sankey` | a Vega spec with `zuzu.sankey` and `zuzu.sankeylinks` |
+| `radar` | a Vega spec of polygons on radial axes |
+| `treemap` | a Vega spec with `stratify` and `treemap` |
+
+A setting of a chart that zuzu does not read is an issue.
+
+The compiler works out the plan of a gantt in Go, and gives Vega-Lite only
+the start and the end of each task as times. It reads `dateFormat`,
+`axisFormat`, `tickInterval`, the durations, `after` and `until` with one
+task or more, `excludes` with weekends and dates, `weekend`, milestones,
+and the tags `done`, `active` and `crit`. A cycle of `after` is an error.
+The dates are local time (D27). `todayMarker` needs the time of the render,
+which comes from the caller, and with none it draws no marker.
+
+## The other kinds
+
+The survey found about 33 kinds of diagram in Mermaid 12.3.0. Phase 7 holds
+the flowchart and the charts above. A later decision names the next kinds,
+in the order of the survey: first the sequence, the state, the class and
+the ER diagrams, which the most programs draw, then the rest. The state,
+the class and the ER diagrams lay out with `zuzu.layered`, and a node of a
+class or of an entity is a table of fields, as a record of DOT is.
 
 ## The look
 
@@ -144,7 +256,8 @@ that the source gives replaces the color of the theme.
 ## The tests and the exit of phase 7
 
 Each language has about 30 fixtures, with a reference from `dot -Tjson`
-for DOT and from the SVG of `mmdc` for Mermaid. zuzu lays out a graph its
+for DOT and from the SVG of `mmdc` for Mermaid, the version that bundles
+Mermaid 12.3.0. zuzu lays out a graph its
 own way (D12), so a check does not ask for the places or the ranks of the
 reference. It checks:
 
@@ -157,5 +270,15 @@ reference. It checks:
    percent and 1, and the sum of the ranks that the edges span is at most
    that of the reference, plus 10 percent and 1.
 
-The exit of phase 7 is that the fixtures of both languages pass these
-checks.
+Each chart of Mermaid has about 5 fixtures. Its check is that each value of
+the source draws once, as a slice, a bar, a point or a task, with its label,
+as `mmdc` draws it. A gantt has about 15 fixtures, and its oracle reads the
+start and the end of each task from mermaid.js in Node, and zuzu must give
+the same.
+
+The icons have fixtures of their own: the oracle of the test module draws
+each icon of each bundled pack with `@iconify/utils`, and the check is that
+zuzu gives the same view box and the same body.
+
+The exit of phase 7 is that the fixtures of both languages, of the charts
+and of the icons pass these checks.

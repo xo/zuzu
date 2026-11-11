@@ -106,23 +106,45 @@ authors.
 
 | Program | Language | License | What it covers | How it checks |
 | --- | --- | --- | --- | --- |
-| merman | Rust | MIT or Apache-2.0 | all 23 classic kinds and the new ones, with ports of dagre and of ELK layered | baselines of the SVG of 12.3.0 for 37 kinds. Zed uses it |
-| mermaid-rs-renderer, `mmdr` | Rust | MIT | 23 kinds, with its own layered layout | a gallery, with no claim of parity |
-| sebastian | Rust | MIT | 18 kinds the same to the byte as `mmdc` 11.15, with dagre | corpora by kind |
-| selkie, frankenmermaid | Rust | MIT, with a rider for frankenmermaid | 22 kinds and more | comparison with mermaid.js |
-| mmdg | Go | MIT | 22 kinds and more. It says it ports the parsers and the layouts of 12.2.0 | 2142 of 2145 diagrams the same, an untested claim of a project of 4 stars |
-| go-mermaid | Go | MIT | 20 kinds, with its own layered layout | golden SVGs and fuzzing |
-| mermaid-ascii | Go | MIT | flowchart, sequence and ER, as text | none |
-| Naiad | .NET | MIT | 23 kinds and more, with a port of dagre | snapshots |
-| Mermaider | .NET | MIT | 22 kinds and more, with its own layered layout | none named |
-| Maradona | Kotlin | Apache-2.0 | 23 kinds, with a port of dagre | 71 fixtures against mermaid.js |
-| termaid | Python | MIT | 18 kinds, as text | none named |
-| pozeiden | Zig | not named | 17 kinds | golden baselines |
+| [merman](https://github.com/Latias94/merman) | Rust | MIT or Apache-2.0 | all 23 classic kinds and the new ones, with ports of dagre and of ELK layered | baselines of the SVG of 12.3.0 for 37 kinds. Zed uses it |
+| [mermaid-rs-renderer](https://github.com/1jehuang/mermaid-rs-renderer), `mmdr` | Rust | MIT | 23 kinds, with its own layered layout | a gallery, with no claim of parity |
+| [sebastian](https://github.com/aovestdipaperino/sebastian) | Rust | MIT | 18 kinds the same to the byte as `mmdc` 11.15, with dagre | corpora by kind |
+| [selkie](https://github.com/btucker/selkie), [frankenmermaid](https://github.com/Dicklesworthstone/frankenmermaid) | Rust | MIT, with a rider for frankenmermaid | 22 kinds and more | comparison with mermaid.js |
+| [mmdg](https://github.com/bvolpato/mermaid-go-renderer) | Go | MIT | 22 kinds and more. It says it ports the parsers and the layouts of 12.2.0 | 2142 of 2145 diagrams the same, an untested claim of a project of 4 stars |
+| [go-mermaid](https://github.com/zkrebbekx/go-mermaid) | Go | MIT | 20 kinds, with its own layered layout | golden SVGs and fuzzing |
+| [mermaid-ascii](https://github.com/AlexanderGrooff/mermaid-ascii) | Go | MIT | flowchart, sequence and ER, as text | none |
+| [Naiad](https://github.com/Papyrine/Naiad) | .NET | MIT | 23 kinds and more, with a port of dagre | snapshots |
+| [Mermaider](https://github.com/nullean/mermaider) | .NET | MIT | 22 kinds and more, with its own layered layout | none named |
+| [Maradona](https://github.com/rock3r/maradona) | Kotlin | Apache-2.0 | 23 kinds, with a port of dagre | 71 fixtures against mermaid.js |
+| [termaid](https://github.com/fasouto/termaid) | Python | MIT | 18 kinds, as text | none named |
+| [pozeiden](https://github.com/sc2in/pozeiden) | Zig | not named | 17 kinds | golden baselines |
 
-Kroki, goldmark-mermaid, mermaid-py, mermaidx and mermaid-java run
-mermaid.js, so they are not in the count. beautiful-mermaid and pele draw
-with their own code but still need a JavaScript engine. PlantUML does not
-read Mermaid, and D2 has no import of its own.
+The other programs in the count draw fewer kinds, or draw text in a
+terminal:
+
+- Rust: [mmdflux](https://github.com/kevinswiber/mmdflux),
+  [mermaid-render](https://github.com/alitrack/mermaid-render),
+  [meraid](https://github.com/Binlogo/meraid),
+  [graphs-tui](https://github.com/decisiongraph/graphs-tui) and
+  [oxdraw](https://github.com/RohanAdwankar/oxdraw)
+- Go: [mmaid-go](https://github.com/aaronsb/mmaid-go) and
+  [mermaidtext](https://github.com/spacedock-dev/mermaidtext)
+- Python: [merm](https://github.com/alexeygrigorev/merm)
+- Zig: [zig-mmdc](https://github.com/pastel-sketchbook/zig-mmdc)
+- Typst: [umlaut](https://github.com/robertjndw/umlaut)
+
+[Kroki](https://github.com/yuzutech/kroki),
+[goldmark-mermaid](https://github.com/abhinav/goldmark-mermaid),
+[mermaid-py](https://github.com/ouhammmourachid/mermaid-py),
+[mermaidx](https://github.com/MohammadRaziei/mermaidx) and
+[mermaid-java](https://github.com/aresstack/mermaid-java) run mermaid.js,
+so they are not in the count.
+[beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) and
+[pele](https://github.com/obsidianmd/pele) draw with their own code but
+still need a JavaScript engine. PlantUML does not read Mermaid, and D2 has
+no import of its own. Mermaid itself is
+[mermaid-js/mermaid](https://github.com/mermaid-js/mermaid), and its
+version 13 is [mermaid-js/mermaid-v13](https://github.com/mermaid-js/mermaid-v13).
 
 Sources: the README and the status pages of each project on GitHub, with
 crates.io, pkg.go.dev and PyPI.
