@@ -392,3 +392,56 @@ func TestFillContrast(t *testing.T) {
 		}
 	}
 }
+
+func TestDOTNodeSize(t *testing.T) {
+	t.Parallel()
+	src := `digraph {
+		node [fontsize=24 shape=box]
+		a [label="a fairly long label"]
+		b [label="short" width=2.2 height=1]
+		c [label="fixed" width=0.3 height=0.3 fixedsize=true]
+		d [label="wide margin" fontsize=11 margin="0.5,0.25"]
+		e [label="thick" style="filled,setlinewidth(5)"]
+		a -> b -> c -> d -> e
+	}`
+	c, _, err := Parse([]byte(src), WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _, err := c.NewView(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := v.Data("layout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	size := map[string][2]float64{}
+	stroke := map[string]float64{}
+	for _, r := range rows {
+		if r["kind"] != "node" {
+			continue
+		}
+		k, _ := r["key"].(string)
+		w, _ := r["width"].(float64)
+		h, _ := r["height"].(float64)
+		size[k] = [2]float64{w, h}
+		stroke[k], _ = r["strokeWidth"].(float64)
+	}
+	// The label of a is about 200 wide at 24 px, so the box is wider.
+	if size["a"][0] < 190 {
+		t.Errorf("expected the box of a to fit its label at 24 px, got %v", size["a"])
+	}
+	if size["b"][0] < 2.2*72 || size["b"][1] < 72 {
+		t.Errorf("expected b to be at least 158 by 72, got %v", size["b"])
+	}
+	if math.Abs(size["c"][0]-21.6) > 1e-9 || math.Abs(size["c"][1]-21.6) > 1e-9 {
+		t.Errorf("expected c to keep its fixed size, got %v", size["c"])
+	}
+	if size["d"][1] < 36+11 {
+		t.Errorf("expected the margin of d to add 36 to its height, got %v", size["d"])
+	}
+	if stroke["e"] != 5 {
+		t.Errorf("expected setlinewidth(5) to give a stroke of 5, got %v", stroke["e"])
+	}
+}

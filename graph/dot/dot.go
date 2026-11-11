@@ -774,10 +774,16 @@ func (p *parser) finish() error {
 		if err := p.paint(n.Style, a, true, path); err != nil {
 			return err
 		}
-		if a["fixedsize"] == "true" {
-			w, _ := strconv.ParseFloat(a["width"], 64)
-			h, _ := strconv.ParseFloat(a["height"], 64)
+		// width and height are inches. With fixedsize true or shape, they
+		// are the size of the node. Without it, they are its least size,
+		// and the node grows to fit its label.
+		w, _ := strconv.ParseFloat(a["width"], 64)
+		h, _ := strconv.ParseFloat(a["height"], 64)
+		switch a["fixedsize"] {
+		case "true", "shape":
 			n.Width, n.Height = w*72, h*72
+		default:
+			n.MinWidth, n.MinHeight = w*72, h*72
 		}
 		if strings.Contains(a["style"], "invis") {
 			n.Style["fill"], n.Style["stroke"], n.Style["color"] = "transparent", "transparent", "transparent"
@@ -836,10 +842,17 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 	if v := a["fontsize"]; v != "" {
 		st["fontSize"] = v
 	}
+	style := a["style"]
+	// setlinewidth(n) in a style is the old form of penwidth. A penwidth
+	// wins over it.
+	if _, rest, ok := strings.Cut(style, "setlinewidth("); ok {
+		if v, _, ok := strings.Cut(rest, ")"); ok {
+			st["strokeWidth"] = strings.TrimSpace(v)
+		}
+	}
 	if v := a["penwidth"]; v != "" {
 		st["strokeWidth"] = v
 	}
-	style := a["style"]
 	switch {
 	case strings.Contains(style, "dashed"):
 		st["strokeDash"] = "5,4"

@@ -52,11 +52,11 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `layout` | `dot`. Another layout is an issue |
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
 | a node | `shape` | the shape, as below |
-| a node | `width`, `height`, `fixedsize` | the size, in inches |
+| a node | `width`, `height`, `fixedsize` | the size, in inches. With `fixedsize=true` or `shape`, the node has that size. Without it, the node is at least that size and grows to fit its label |
 | a node | `xlabel` | a label outside the node, at a corner, as below |
-| a node | `margin` | the space around a label of HTML, `x` or `x,y` in inches. A node with no shape has `0.11,0.055` by default, and `plain` has 0 |
+| a node | `margin` | the space around the label, `x` or `x,y` in inches. A label of HTML in a node with no shape has `0.11,0.055` by default, and `plain` has 0 |
 | a node | `style` | `filled`, `dashed`, `dotted`, `bold`, `rounded` |
-| a node | `color`, `fillcolor`, `fontcolor`, `penwidth`, `fontsize` | the paint |
+| a node | `color`, `fillcolor`, `fontcolor`, `penwidth`, `fontsize` | the paint. The size of the node fits its label at its `fontsize`. `setlinewidth(n)` in `style` is the old form of `penwidth` |
 | an edge | `label` | the label, or a label of HTML |
 | an edge | `headlabel`, `taillabel` | the labels at the ends, as below |
 | an edge | `xlabel` | a label beside the middle of the edge, as below |

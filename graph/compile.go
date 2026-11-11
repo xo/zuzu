@@ -144,6 +144,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if n.Width > 0 && n.Height > 0 {
 			r["width"], r["height"] = n.Width, n.Height
 		}
+		if n.MinWidth > 0 {
+			r["minWidth"] = n.MinWidth
+		}
+		if n.MinHeight > 0 {
+			r["minHeight"] = n.MinHeight
+		}
 		if m := n.Media; m != nil {
 			media = true
 			media2row(r, m)

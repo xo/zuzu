@@ -105,9 +105,6 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		return te.TextSize(text, "", fontSize, weight)
 	}
-	measure := func(v any, weight string) (float64, float64) {
-		return measureAt(v, fontSize, weight)
-	}
 	// sizeOf returns the size of the font of a row, or the size of the
 	// font of the layout.
 	sizeOf := func(r Row, key string) float64 {
@@ -115,6 +112,15 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			return v
 		}
 		return fontSize
+	}
+	// measureRow measures a text of a row in the size and the weight of
+	// the font of the row, which a style of the source sets.
+	measureRow := func(r Row, v any) (float64, float64) {
+		weight := ""
+		if w, ok := r["fontWeight"]; ok && w != nil {
+			weight = expr.String(w)
+		}
+		return measureAt(v, sizeOf(r, "fontSize"), weight)
 	}
 	// other lays out a label that takes no space in the ranks: the label
 	// of HTML in the field name+"HTML" of a row, or the text in
@@ -197,7 +203,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if rec, ok := records[i]; ok {
 			n.Width, n.Height = 0, 0
 			for _, t := range rec.texts {
-				tw, th := measure(t, "")
+				tw, th := measureRow(r, t)
 				fw, fh := math.Max(tw+2*padding, 24), math.Max(th+1.6*padding, 24)
 				if rec.across {
 					rec.sizes = append(rec.sizes, fw)
@@ -212,7 +218,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		if m, ok := mediaOf(r, padding); ok {
 			medias[i] = m
-			m.tw, m.th = measure(fields["label"].Get(r), "")
+			m.tw, m.th = measureRow(r, fields["label"].Get(r))
 			if m.inline {
 				n.Width, n.Height = graph.NodeSize(kind, m.tw+m.w+4, math.Max(m.th, m.h), padding)
 			} else {
@@ -224,8 +230,22 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			}
 		}
 		if !(n.Width > 0) || !(n.Height > 0) {
-			tw, th := measure(fields["label"].Get(r), "")
-			n.Width, n.Height = graph.NodeSize(kind, tw, th, padding)
+			tw, th := measureRow(r, fields["label"].Get(r))
+			if ms, ok := r["margin"].([]any); ok && len(ms) == 2 {
+				// A margin of DOT is the space around the label in place
+				// of the padding.
+				n.Width, n.Height = graph.NodeSize(kind, tw+2*expr.Number(ms[0]), th+2*expr.Number(ms[1]), 0)
+			} else {
+				n.Width, n.Height = graph.NodeSize(kind, tw, th, padding)
+			}
+		}
+		// A node of DOT with a width or a height and no fixedsize is at
+		// least that size, and grows to fit its label.
+		if v := expr.Number(r["minWidth"]); v > n.Width {
+			n.Width = v
+		}
+		if v := expr.Number(r["minHeight"]); v > n.Height {
+			n.Height = v
 		}
 		var xh *htmlLabel
 		if n.XLabelWidth, n.XLabelHeight, xh, err = other(r, "x", sizeOf(r, "fontSize")); err != nil {
@@ -361,7 +381,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if d, ok := r["direction"].(string); ok {
 			c.Direction = d
 		}
-		tw, th := measure(fields["label"].Get(r), "600")
+		tw, th := measureAt(fields["label"].Get(r), sizeOf(r, "fontSize"), "600")
 		if src, ok := r["html"].(string); ok && src != "" {
 			h, err := layHTML(src, sizeAt, sizeOf(r, "fontSize"))
 			if err != nil {

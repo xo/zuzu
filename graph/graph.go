@@ -89,6 +89,9 @@ type Node struct {
 	XLabel, XHTML string
 	// Width and Height are the size of the node, or 0 to measure the label.
 	Width, Height float64
+	// MinWidth and MinHeight are the least size of the node, which grows to
+	// fit its label, or 0 for none.
+	MinWidth, MinHeight float64
 }
 
 // Media is the icon or the image of a node (D31).
