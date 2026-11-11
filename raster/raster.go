@@ -511,7 +511,8 @@ func parseColor(s string, opacity float64) (okage.Color, bool) {
 		return okage.Color{}, false
 	}
 	ch := func(v float64) float32 { return float32(math.Round(math.Max(0, math.Min(255, v)))) / 255 }
-	return okage.ColorFromRGBAUnchecked(ch(c.R), ch(c.G), ch(c.B), float32(a)), true
+	// The opacity is a byte, as okage gives the color of a paint.
+	return okage.ColorFromRGBAUnchecked(ch(c.R), ch(c.G), ch(c.B), float32(math.Round(a*255))/255), true
 }
 
 // image draws an image item from a URL of data. An image that does not

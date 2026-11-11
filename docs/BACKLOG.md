@@ -29,11 +29,10 @@ name to it.
 
 ### Draw the rest of the marks in the look of zuzu
 
-These rules of `docs/STYLE.md` draw only in the targets, and the runtime
-does not apply them yet: the tint and the name of a group of a hierarchy,
-the total in the center of a donut, the opacity of the link of a sankey,
-and the node of a graph. A tooltip comes with the browser, in phase 8. A
-scheme that a spec names, such as `blues`, takes a ramp of the theme, and a
+The node of a graph in `docs/STYLE.md`, a rounded rectangle with a tint of
+its color and an outline of 1.25, is the node of a diagram of DOT or
+Mermaid, and comes with phase 7. A tooltip comes with the browser, in phase
+8. A scheme that a spec names, such as `blues`, takes a ramp of the theme, and a
 scheme of categories, such as `tableau10`, takes the colors of the
 categories of the theme. A Vega-Lite spec that vega-lite.js compiled, as
 the gallery draws it with `-vl=false`, still names `#4c78a8`.

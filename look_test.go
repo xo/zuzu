@@ -168,3 +168,90 @@ func TestReferenceLine(t *testing.T) {
 		t.Errorf("the name of the reference line: %v", l)
 	}
 }
+
+// renderVega renders a Vega spec.
+func renderVega(t *testing.T, src string) *scene.Scene {
+	t.Helper()
+	c, _, err := Parse([]byte(`{"$schema": "https://vega.github.io/schema/vega/v5.json",` + src + `}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, err := c.Render(t.Context(), WithLocation(time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestHierarchyLook(t *testing.T) {
+	t.Parallel()
+	s := renderVega(t, `"width": 300, "height": 200,
+		"data": [{"name": "tree", "values": [
+			{"id": "root", "p": null}, {"id": "groupA", "p": "root"}, {"id": "a1", "p": "groupA", "v": 5},
+			{"id": "a2", "p": "groupA", "v": 3}, {"id": "b1", "p": "root", "v": 4}],
+			"transform": [{"type": "stratify", "key": "id", "parentKey": "p"},
+				{"type": "treemap", "field": "v", "method": "squarify", "size": [300, 200]}]}],
+		"marks": [{"type": "rect", "from": {"data": "tree"}, "encode": {"enter": {
+			"x": {"field": "x0"}, "y": {"field": "y0"}, "x2": {"field": "x1"}, "y2": {"field": "y1"}}}}]`)
+	rects := marksOf(s, "mark")[0].Items
+	for _, it := range rects {
+		d, ok := it.Datum.(map[string]any)
+		if !ok {
+			t.Fatalf("the datum of a node is %T", it.Datum)
+		}
+		children, _ := d["children"].(float64)
+		group := children > 0
+		want, r := 0.85, 3.0
+		if group {
+			want, r = 0.14, 6
+		}
+		if it.FillOpacity == nil || *it.FillOpacity != want || it.CornerRadius != r {
+			t.Errorf("%v: the opacity %v and the corner %v, want %v and %v", d["id"], it.FillOpacity, it.CornerRadius, want, r)
+		}
+	}
+	names := marksOf(s, "zuzu-hierarchy-label")
+	if len(names) != 1 {
+		t.Fatalf("%d marks of names, want 1", len(names))
+	}
+	found := map[string]bool{}
+	for _, it := range names[0].Items {
+		found[it.Text[0]] = true
+	}
+	if !found["groupA"] || found["root"] {
+		t.Errorf("the names are %v, want groupA and not root", found)
+	}
+}
+
+func TestDonutTotal(t *testing.T) {
+	t.Parallel()
+	s := renderVL(t, `"mark": {"type": "arc", "innerRadius": 50},
+		"encoding": {"theta": {"field": "b", "type": "quantitative"}, "color": {"field": "a", "type": "nominal"}}`)
+	total := marksOf(s, "zuzu-donut-total")
+	if len(total) != 1 || total[0].Items[0].Text[0] != "17" {
+		t.Fatalf("the total of the donut: %v", total)
+	}
+	// A pie has no middle, so it has no total.
+	if p := marksOf(renderVL(t, `"mark": "arc", "encoding": {"theta": {"field": "b", "type": "quantitative"}}`), "zuzu-donut-total"); len(p) != 0 {
+		t.Error("a pie writes a total")
+	}
+}
+
+func TestSankeyLook(t *testing.T) {
+	t.Parallel()
+	s := renderVega(t, `"width": 300, "height": 200,
+		"data": [
+			{"name": "links", "values": [{"source": "a", "target": "b", "value": 2}, {"source": "a", "target": "c", "value": 1}]},
+			{"name": "nodes", "source": "links", "transform": [{"type": "zuzu.sankey", "size": [300, 200]}]},
+			{"name": "bands", "source": "links", "transform": [{"type": "zuzu.sankeylinks", "nodes": "nodes"}]}],
+		"marks": [
+			{"type": "path", "from": {"data": "bands"}, "encode": {"enter": {"path": {"field": "path"}, "fill": {"value": "#888"}}}},
+			{"type": "rect", "from": {"data": "nodes"}, "encode": {"enter": {
+				"x": {"field": "x0"}, "x2": {"field": "x1"}, "y": {"field": "y0"}, "y2": {"field": "y1"}}}}]`)
+	marks := marksOf(s, "mark")
+	if it := marks[0].Items[0]; it.FillOpacity == nil || *it.FillOpacity != 0.32 {
+		t.Errorf("a link has the opacity %v, want 0.32", it.FillOpacity)
+	}
+	if it := marks[1].Items[0]; it.CornerRadius != 3 {
+		t.Errorf("a node has the corner %v, want 3", it.CornerRadius)
+	}
+}

@@ -38,6 +38,17 @@ const (
 	// StyleReference is the style of a rule of Vega-Lite across the whole
 	// plot, a reference line.
 	StyleReference = "zuzu.reference"
+	// Hierarchy is the property of the config of a rect, a symbol and an
+	// arc that draws the nodes of a hierarchy: a group as a tint of its
+	// color, with its name.
+	Hierarchy = "zuzu.hierarchy"
+	// Total is the property of the config of an arc that writes the total
+	// of a donut in its center.
+	Total = "zuzu.total"
+	// Sankey is the property of the config of a path and a rect that draws
+	// the links of a sankey at 0.32 opacity and its nodes with round
+	// corners.
+	Sankey = "zuzu.sankey"
 	// StackGap is the property of a style of a bar that opens a gap of that
 	// width between the bars of a stack.
 	StackGap = "zuzu.stackGap"
@@ -65,17 +76,17 @@ const (
 func (t Theme) Config() map[string]any {
 	c := t.Category[0]
 	return map[string]any{
-		"arc":  map[string]any{"fill": c, "padAngle": 0.01, "cornerRadius": 4},
+		"arc":  map[string]any{"fill": c, "padAngle": 0.01, "cornerRadius": 4, Hierarchy: true, Total: true},
 		"area": map[string]any{"fill": c},
 		"line": map[string]any{
 			"stroke": c, "strokeWidth": 2.0, "strokeCap": "round", "strokeJoin": "round", EndLabel: true,
 		},
-		"path":  map[string]any{"stroke": c},
-		"rect":  map[string]any{"fill": c},
+		"path":  map[string]any{"stroke": c, Sankey: true},
+		"rect":  map[string]any{"fill": c, Hierarchy: true, Sankey: true},
 		"rule":  map[string]any{"stroke": t.Text},
 		"shape": map[string]any{"stroke": c},
 		// A point has a ring of 1 in the background color.
-		"symbol": map[string]any{"fill": c, "size": 64.0, "stroke": t.Background, "strokeWidth": 1.0, LargestFirst: true},
+		"symbol": map[string]any{"fill": c, "size": 64.0, "stroke": t.Background, "strokeWidth": 1.0, LargestFirst: true, Hierarchy: true},
 		"text":   map[string]any{"fill": t.Text},
 		"trail":  map[string]any{"fill": c, "size": 2.0},
 		"style": map[string]any{

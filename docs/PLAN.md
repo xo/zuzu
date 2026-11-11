@@ -356,6 +356,18 @@ config:
 - `zuzu.reference` dashes a rule of Vega-Lite with one place, a reference
   line, and names its value where it starts. A mark of many rules draws
   data and keeps its look.
+- `zuzu.hierarchy` draws the nodes of a hierarchy, the rows with depth and
+  children that its transforms write, as the targets do. A rect of a group
+  is its color at 0.14 with round corners of 6 and its name at the top
+  left, and a rect of a leaf its color at 0.85 with corners of 3 and its
+  name inside where it fits. A circle of a group is a tint, at 0.16 with an
+  outline at the first depth and at 0.45 below, a leaf is at 0.85, and the
+  root is the color of a panel. An arc is at 1, 0.7 and 0.42 by depth. A
+  spec with a text mark of its own keeps its names.
+- `zuzu.total` writes the total of a donut of Vega-Lite in its center, up
+  to a size of 28.
+- `zuzu.sankey` draws the links of `zuzu.sankeylinks` at 0.32 and the nodes
+  of `zuzu.sankey` with round corners of 3.
 
 The marks that these rules add have roles that start with `zuzu-`, and the
 conformance check leaves them out, as it leaves out the guides.

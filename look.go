@@ -37,6 +37,15 @@ func (s *scope) look(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 			out = append(out, s.markHigh(m, sm)...)
 		}
 	}
+	if expr.Truthy(d[theme.Hierarchy]) {
+		out = append(out, s.hierarchyLook(m, sm)...)
+	}
+	if sm.Type == scene.Arc && expr.Truthy(d[theme.Total]) {
+		out = append(out, s.donutTotal(m, sm)...)
+	}
+	if expr.Truthy(d[theme.Sankey]) {
+		sankeyLook(m, sm)
+	}
 	if sm.Type == scene.Line && expr.Truthy(d[theme.EndLabel]) {
 		out = append(out, s.endLabel(m, sm)...)
 	}
@@ -405,4 +414,205 @@ func encodedValue(m *vega.Mark, prop string) (any, bool) {
 		}
 	}
 	return nil, false
+}
+
+// node returns the depth of the node of a hierarchy that an item draws,
+// whether the node has children, and whether the datum is a node, with the
+// fields depth and children that the transforms of a hierarchy write.
+func node(it *scene.Item) (int, bool, bool) {
+	d, ok := it.Datum.(map[string]any)
+	if !ok {
+		return 0, false, false
+	}
+	depth, ok1 := d["depth"].(float64)
+	children, ok2 := d["children"].(float64)
+	if !ok1 || !ok2 {
+		return 0, false, false
+	}
+	return int(depth), children > 0, true
+}
+
+// nodeName returns the name of a node: its field name, or else its id.
+func nodeName(it *scene.Item) string {
+	d, _ := it.Datum.(map[string]any)
+	for _, k := range []string{"name", "id"} {
+		if v, ok := d[k]; ok && v != nil {
+			return expr.String(v)
+		}
+	}
+	return ""
+}
+
+// hierarchyLook draws the nodes of a hierarchy as docs/STYLE.md does, for
+// the properties that the encoding does not set. A rect of a group is a
+// tint of its color with round corners of 6 and its name at the top left,
+// and a rect of a leaf is its color with round corners of 3 and its name
+// inside, where it fits. A circle of a group is a tint with an outline, the
+// deeper the stronger, and the root is the color of a panel. An arc fades
+// with its depth. It returns the marks of the names.
+func (s *scope) hierarchyLook(m *vega.Mark, sm *scene.Mark) []scene.Mark {
+	if _, _, ok := node(&sm.Items[0]); !ok {
+		return nil
+	}
+	setOpacity := !encodes(m, "fillOpacity") && !encodes(m, "opacity")
+	setCorner := !encodesCorners(m)
+	names := scene.Mark{Type: scene.Text, Role: "zuzu-hierarchy-label"}
+	st := s.rt.style()
+	halo := scene.Paint{Color: s.rt.theme.Background}
+	for i := range sm.Items {
+		it := &sm.Items[i]
+		depth, group, _ := node(it)
+		switch sm.Type {
+		case scene.Rect:
+			op, r := 0.85, 3.0
+			if group {
+				op, r = 0.14, 6
+			}
+			if setOpacity {
+				it.FillOpacity = new(op)
+			}
+			if setCorner {
+				it.CornerRadius = r
+			}
+			if depth == 0 {
+				continue
+			}
+			x, y, w, h := shape.Box(it)
+			name := nodeName(it)
+			lab := scene.Item{X: x + 6, Y: y + 13, Text: scene.Lines{name}, FontSize: 11, FontWeight: "600", Fill: scene.Paint{Color: s.rt.theme.Text}}
+			if group {
+				if w <= 40 {
+					continue
+				}
+			} else {
+				lab.X, lab.FontSize, lab.Fill = x+5, 10, halo
+				if tw, _ := st.TextSize(&lab); w <= tw+10 || h <= 18 {
+					continue
+				}
+			}
+			lab.Datum = map[string]any{"name": name}
+			names.Items = append(names.Items, lab)
+		case scene.Symbol:
+			if setOpacity {
+				switch {
+				case depth == 0 && group:
+					it.Fill = scene.Paint{Color: s.rt.theme.Panel}
+				case depth == 1 && group:
+					it.FillOpacity = new(0.16)
+				case group:
+					it.FillOpacity = new(0.45)
+				default:
+					it.FillOpacity = new(0.85)
+				}
+			}
+			if depth == 1 && group && !encodes(m, "stroke") {
+				it.Stroke, it.StrokeWidth = it.Fill, new(1.0)
+			}
+			r := 0.0
+			if it.Size != nil {
+				r = math.Sqrt(*it.Size) / 2
+			}
+			if depth == 1 && group && r > 24 {
+				name := nodeName(it)
+				names.Items = append(names.Items, scene.Item{
+					X: it.X, Y: it.Y - r + 14, Text: scene.Lines{name}, FontSize: 11, FontWeight: "600",
+					Align: "center", Fill: scene.Paint{Color: s.rt.theme.Text}, Stroke: halo, StrokeWidth: new(3.0),
+					Datum: map[string]any{"name": name},
+				})
+			}
+		case scene.Arc:
+			if setOpacity && depth >= 1 {
+				it.FillOpacity = new([]float64{1, 0.7, 0.42}[min(depth, 3)-1])
+			}
+		}
+	}
+	if len(names.Items) == 0 || s.hasText() {
+		// A spec that names its nodes with a text mark keeps its names.
+		return nil
+	}
+	return []scene.Mark{names}
+}
+
+// hasText reports whether the spec of a scope has a text mark.
+func (s *scope) hasText() bool {
+	for i := range s.spec.Marks {
+		if s.spec.Marks[i].Type == scene.Text {
+			return true
+		}
+	}
+	return false
+}
+
+// donutTotal writes the total of a donut in its center (docs/STYLE.md): the
+// sum of the values that the arcs span, when the angles of the arcs read
+// their start and their end through a scale, as a donut of Vega-Lite does.
+func (s *scope) donutTotal(m *vega.Mark, sm *scene.Mark) []scene.Mark {
+	start, _ := s.encodedField(m, "startAngle")
+	end, _ := s.encodedField(m, "endAngle")
+	if start == "" || end == "" {
+		return nil
+	}
+	first := &sm.Items[0]
+	inner := first.InnerRadius
+	total := 0.0
+	for i := range sm.Items {
+		it := &sm.Items[i]
+		if it.X != first.X || it.Y != first.Y || it.InnerRadius <= 0 {
+			// Arcs of more than one center, or a pie, have no middle to
+			// write in.
+			return nil
+		}
+		inner = math.Min(inner, it.InnerRadius)
+		a, ok1 := readField(it.Datum, start).(float64)
+		b, ok2 := readField(it.Datum, end).(float64)
+		if !ok1 || !ok2 {
+			return nil
+		}
+		total += math.Abs(b - a)
+	}
+	size := math.Min(28, inner*0.45)
+	if size < 10 {
+		return nil
+	}
+	text := scene.Item{
+		X: first.X, Y: first.Y, Text: scene.Lines{s.numberText(total)}, FontSize: size, FontWeight: "600",
+		Align: "center", Baseline: "middle", Fill: scene.Paint{Color: s.rt.theme.Text},
+		Datum: map[string]any{"value": total},
+	}
+	return []scene.Mark{{Type: scene.Text, Role: "zuzu-donut-total", Items: []scene.Item{text}}}
+}
+
+// sankeyLook draws the links of a sankey at 0.32 opacity, and its nodes
+// with round corners of 3 (docs/STYLE.md), for the properties that the
+// encoding does not set. The rows of zuzu.sankeylinks hold a path and a
+// width, and the rows of zuzu.sankey a layer.
+func sankeyLook(m *vega.Mark, sm *scene.Mark) {
+	d, ok := sm.Items[0].Datum.(map[string]any)
+	if !ok {
+		return
+	}
+	has := func(keys ...string) bool {
+		for _, k := range keys {
+			if _, ok := d[k]; !ok {
+				return false
+			}
+		}
+		return true
+	}
+	switch {
+	case sm.Type == scene.Path && has("path", "width", "x0", "x1", "y0", "y1"):
+		if encodes(m, "fillOpacity") || encodes(m, "opacity") {
+			return
+		}
+		for i := range sm.Items {
+			sm.Items[i].FillOpacity = new(0.32)
+		}
+	case sm.Type == scene.Rect && has("layer", "depth", "value", "x0", "x1"):
+		if encodesCorners(m) {
+			return
+		}
+		for i := range sm.Items {
+			sm.Items[i].CornerRadius = 3
+		}
+	}
 }
