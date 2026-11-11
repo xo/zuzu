@@ -1,0 +1,12 @@
+flowchart LR
+  subgraph S [Store]
+    s1 --> s2
+  end
+  subgraph C [Cache]
+    direction TB
+    c1 --> c2
+  end
+  src --> S
+  src --> s1
+  S --> C
+  C --> sink

@@ -107,18 +107,25 @@ func (f *flowchart) config() error {
 		f.curve = vc
 	}
 	if h := strings.Fields(f.d.Header); len(h) > 0 {
-		dir := strings.ToUpper(strings.TrimSuffix(h[0], ";"))
-		if dir == "TD" {
-			dir = graph.TB
+		dir, err := direction(h[0])
+		if err != nil {
+			return err
 		}
-		switch dir {
-		case graph.TB, graph.BT, graph.LR, graph.RL:
-			f.g.Direction = dir
-		default:
-			return fmt.Errorf("the direction %s: %w", h[0], ErrSyntax)
-		}
+		f.g.Direction = dir
 	}
 	return nil
+}
+
+// direction reads a direction: TB, TD, BT, LR or RL.
+func direction(s string) (string, error) {
+	dir := strings.ToUpper(strings.TrimSuffix(strings.TrimSpace(s), ";"))
+	switch dir {
+	case "TD":
+		return graph.TB, nil
+	case graph.TB, graph.BT, graph.LR, graph.RL:
+		return dir, nil
+	}
+	return "", fmt.Errorf("the direction %s: %w", s, ErrSyntax)
 }
 
 // statements splits a line at each semicolon outside quotes and brackets.
@@ -185,9 +192,12 @@ func (f *flowchart) stmt(st string) error {
 			return nil
 		}
 	case "direction":
+		dir, err := direction(rest)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", f.line, err)
+		}
 		if len(f.clusters) > 0 {
-			f.clusters[len(f.clusters)-1].Direction = rest
-			return f.add("the direction of a subgraph, which follows the graph")
+			f.clusters[len(f.clusters)-1].Direction = dir
 		}
 		return nil
 	case "classDef":
@@ -262,7 +272,8 @@ func (f *flowchart) node(id string) *graph.Node {
 		}
 		return n
 	}
-	// The id of a subgraph that an edge names is a node of its own here.
+	// The id of a subgraph that an edge names is a node of its own here,
+	// until subgraphEdges takes it out.
 	n := &graph.Node{ID: id, Label: id, Shape: "rect", Cluster: f.cluster(), Style: map[string]string{}}
 	f.nodes[id] = n
 	f.g.Nodes = append(f.g.Nodes, n)
@@ -730,23 +741,14 @@ func (f *flowchart) css(s string) (map[string]string, error) {
 	return st, nil
 }
 
-// subgraphEdges moves each end of an edge that names a subgraph to the
-// first node of that subgraph, since an edge of the layout joins two nodes.
-// Mermaid draws such an edge to the box of the subgraph.
+// subgraphEdges takes out the nodes that only an edge to a subgraph made,
+// since the layout ends such an edge at the box of the subgraph.
 func (f *flowchart) subgraphEdges() error {
 	parent := map[string]string{}
 	for _, c := range f.g.Clusters {
 		parent[c.ID] = c.Parent
 	}
-	in := func(cluster, id string) bool {
-		for c := cluster; c != ""; c = parent[c] {
-			if c == id {
-				return true
-			}
-		}
-		return false
-	}
-	first := map[string]string{}
+	holds := map[string]bool{}
 	var keep []*graph.Node
 	for _, n := range f.g.Nodes {
 		_, isCluster := parent[n.ID]
@@ -754,34 +756,40 @@ func (f *flowchart) subgraphEdges() error {
 			continue
 		}
 		keep = append(keep, n)
-	}
-	for id := range parent {
-		for _, n := range keep {
-			if in(n.Cluster, id) {
-				first[id] = n.ID
-				break
-			}
+		for c := n.Cluster; c != "" && !holds[c]; c = parent[c] {
+			holds[c] = true
 		}
 	}
 	if len(keep) == len(f.g.Nodes) {
 		return nil
 	}
 	f.g.Nodes = keep
-	moved := false
+	nodes := map[string]bool{}
+	for _, n := range keep {
+		nodes[n.ID] = true
+	}
 	for _, e := range f.g.Edges {
-		for _, end := range []*string{&e.Source, &e.Target} {
-			if _, ok := parent[*end]; !ok {
-				continue
+		for _, end := range []string{e.Source, e.Target} {
+			if _, ok := parent[end]; ok && !nodes[end] && !holds[end] {
+				return fmt.Errorf("an edge to the empty subgraph %s: %w", end, ErrSyntax)
 			}
-			to, ok := first[*end]
-			if !ok {
-				return fmt.Errorf("an edge to the empty subgraph %s: %w", *end, ErrSyntax)
-			}
-			*end, moved = to, true
 		}
 	}
-	if moved {
-		return f.issues.Add("edges", "an edge to a subgraph, drawn to the first node of the subgraph")
+	return nil
+}
+
+// directions reports each subgraph whose direction the layout does not
+// keep, because an edge links a node inside it to a node outside it.
+// Mermaid draws such a subgraph in the direction that holds it too.
+func (f *flowchart) directions() error {
+	followed := graph.FollowedDirections(f.g)
+	for _, c := range f.g.Clusters {
+		if d, ok := followed[c.ID]; ok {
+			msg := "the direction %s of the subgraph %q, drawn %s as Mermaid draws it, because an edge links a node inside it to a node outside it"
+			if err := f.issues.Add("subgraph "+c.ID, msg, c.Direction, c.Label, d); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -789,6 +797,9 @@ func (f *flowchart) subgraphEdges() error {
 // finish applies the classes and the styles, and the styles of the links.
 func (f *flowchart) finish() error {
 	if err := f.subgraphEdges(); err != nil {
+		return err
+	}
+	if err := f.directions(); err != nil {
 		return err
 	}
 	for _, n := range f.g.Nodes {

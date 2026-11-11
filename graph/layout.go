@@ -34,6 +34,8 @@ type LayoutNode struct {
 
 // LayoutEdge is an edge to lay out.
 type LayoutEdge struct {
+	// Source and Target are the ids of the ends: each a node, or else a
+	// cluster. An edge to a cluster ends at the box of the cluster.
 	Source, Target string
 	// MinLen is 1 or more, and Weight is 1 for 0.
 	MinLen int
@@ -60,6 +62,12 @@ type LayoutEdge struct {
 type LayoutCluster struct {
 	ID, Parent              string
 	TitleWidth, TitleHeight float64
+	// Direction is the direction of the ranks inside the cluster, TB, BT,
+	// LR or RL, or empty for the direction of the layout that holds it.
+	// The cluster keeps it only when no edge links a node inside the
+	// cluster to a node outside it, as in Mermaid. Otherwise the cluster
+	// follows the layout that holds it.
+	Direction string
 }
 
 // Layout is the result of Lay, with the places in the order of the input.
@@ -71,7 +79,8 @@ type Layout struct {
 }
 
 // NodePlace is the place of a node: its center and its size, its rank and
-// its order in the rank.
+// its order in the rank. A node in a cluster that lays out on its own has
+// the rank and the order of the layout of that cluster.
 type NodePlace struct {
 	X, Y, Width, Height float64
 	Rank, Order         int
@@ -133,10 +142,12 @@ type layout struct {
 	corder []float64
 }
 
-// Lay lays out a graph in ranks: the method of Gansner, Koutsofios, North
-// and Vo, 1993, with the order of the ranks by the weighted median and the
-// places across the ranks by Brandes and Köpf, 2001 (D31).
-func Lay(in LayoutInput) (*Layout, error) {
+// lay lays out a graph of nodes in ranks: the method of Gansner,
+// Koutsofios, North and Vo, 1993, with the order of the ranks by the
+// weighted median and the places across the ranks by Brandes and Köpf,
+// 2001 (D31). It reads no direction of a cluster, and each edge joins two
+// nodes.
+func lay(in LayoutInput) (*Layout, error) {
 	l := &layout{in: &in}
 	l.sep.rank, l.sep.node, l.sep.pad = in.RankSep, in.NodeSep, in.ClusterPadding
 	if l.sep.rank <= 0 {

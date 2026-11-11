@@ -162,7 +162,7 @@ it.
 | a chain | `A --> B --> C` |
 | a group with `&` | `A & B --> C & D` |
 | a subgraph | `subgraph id [Title]`, then `end` |
-| a direction of a subgraph | `direction LR`. It is an issue, and the subgraph follows the graph |
+| a direction of a subgraph | `direction LR`, inside the subgraph |
 | a class | `classDef hot fill:#f96,stroke:#333`, then `class A,B hot` or `A:::hot` |
 | a style of a node | `style A fill:#f9f,stroke-width:2px` |
 | a style of a link | `linkStyle 0,1 stroke:#f00`, `linkStyle default stroke:#999` |
@@ -211,8 +211,22 @@ The text of a label can hold `<br>` as a new line, an entity such as
 `#quot;` or `#35;`, and a string of markdown in backquotes, which draws as
 plain text without its marks.
 
-An edge to the id of a subgraph draws to the first node of the subgraph,
-and the report says so. Mermaid draws it to the box of the subgraph.
+A subgraph with a direction lays out in that direction, as Mermaid does,
+when no edge links a node inside it to a node outside it. zuzu lays out
+such a subgraph on its own, and then places it as one node in the layout
+that holds it. A subgraph inside it without a direction lays out in the
+same direction. If an edge links a node inside the subgraph to a node outside
+it, the subgraph follows the direction of the layout that holds it.
+Mermaid does the same, and the report says so when the two directions
+differ.
+
+An edge to the id of a subgraph ends at the box of the subgraph, as in
+Mermaid. If no edge links a node inside the subgraph to a node outside it,
+the subgraph is one node of the layout, and the edge goes to that node.
+Otherwise the layout takes the edge to the first node of the subgraph,
+and the edge stops where it meets the box. Mermaid picks that first node
+by its own order, so the layout around such a subgraph can differ from the
+layout of Mermaid.
 
 These parts are issues: `click`, a callback and `href`, `accTitle` and
 `accDescr`, the properties of a link such as `e1@{ animate: true }`, the

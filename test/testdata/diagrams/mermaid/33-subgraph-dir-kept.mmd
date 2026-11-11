@@ -1,0 +1,13 @@
+flowchart TB
+  subgraph kept [Kept LR]
+    direction LR
+    k1 --> k2 --> k3
+  end
+  subgraph lost [Lost LR]
+    direction LR
+    l1 --> l2
+  end
+  start --> kept
+  start --> l1
+  kept --> stop
+  l2 --> stop

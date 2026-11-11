@@ -280,6 +280,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if r["parent"] == nil {
 			c.Parent = ""
 		}
+		if d, ok := r["direction"].(string); ok {
+			c.Direction = d
+		}
 		tw, th := measure(fields["label"].Get(r), "600")
 		if tw > 0 {
 			c.TitleWidth, c.TitleHeight = tw, th+4

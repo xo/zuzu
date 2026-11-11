@@ -176,6 +176,48 @@ graph RL
 	}
 }
 
+func TestSubgraphs(t *testing.T) {
+	t.Parallel()
+	src := `flowchart TB
+  subgraph kept [Kept]
+    direction LR
+    a --> b
+  end
+  subgraph lost [Lost]
+    direction rl
+    c --> d
+  end
+  x --> kept
+  x --> c
+`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Clusters[0].Direction != "LR" || g.Clusters[1].Direction != "RL" {
+		t.Errorf("expected the directions LR and RL, got %q and %q", g.Clusters[0].Direction, g.Clusters[1].Direction)
+	}
+	for _, n := range g.Nodes {
+		if n.ID == "kept" {
+			t.Error("the id of a subgraph that an edge names is a node")
+		}
+	}
+	if e := g.Edges[2]; e.Source != "x" || e.Target != "kept" {
+		t.Errorf("expected an edge from x to the subgraph kept, got %s to %s", e.Source, e.Target)
+	}
+	// Only the direction that an edge crosses is in the report.
+	if len(report) != 1 || !strings.Contains(report[0].Message, `"Lost"`) || report[0].Path != "subgraph lost" {
+		t.Errorf("expected one entry for the subgraph lost, got %v", report)
+	}
+	if _, _, err := Graph(d, true); err == nil {
+		t.Error("expected an error in the strict mode")
+	}
+}
+
 func TestErrors(t *testing.T) {
 	t.Parallel()
 	for _, src := range []string{
@@ -184,6 +226,8 @@ func TestErrors(t *testing.T) {
 		"flowchart TD\nend",
 		"flowchart TD\nA --> ",
 		"flowchart TD\nA --> B\nlinkStyle 3 stroke:#f00",
+		"flowchart TD\nsubgraph a\ndirection XY\nA\nend",
+		"flowchart TD\nsubgraph a\nend\nB --> a",
 	} {
 		d, err := Read(src)
 		if err == nil {

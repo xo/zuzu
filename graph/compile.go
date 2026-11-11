@@ -205,6 +205,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if c.Parent != "" {
 			r["parent"] = c.Parent
 		}
+		if c.Direction != "" {
+			r["direction"] = c.Direction
+		}
 		style(r, c.Style)
 		add("cluster", signature(r, paintKeys, "_paint"))
 		add("clusterText", signature(r, textKeys, "_text"))

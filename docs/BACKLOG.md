@@ -72,19 +72,20 @@ numbers before strings.
 
 ### Draw the parts of Mermaid that draw another way
 
-1. A subgraph draws in the direction of the graph, not in its own.
-2. An edge to a subgraph ends at the first node of the subgraph, not at
-   its box.
-3. A named shape that zuzu does not draw yet, such as a shape of BPMN, draws
+1. A named shape that zuzu does not draw yet, such as a shape of BPMN, draws
    as a rounded rectangle.
-4. The properties of a link, such as `animate`, are issues.
-5. The image raster draws no italic text, because zuzu bundles no italic
+2. The properties of a link, such as `animate`, are issues.
+3. The image raster draws no italic text, because zuzu bundles no italic
    face of IBM Plex Sans. The SVG asks for italic, so a viewer draws it.
-6. A label of HTML on an edge, a cluster or the graph draws as plain text.
+4. A label of HTML on an edge, a cluster or the graph draws as plain text.
    `headlabel`, `taillabel` and `xlabel` are issues. dbtpl writes
    `headlabel` on each edge of a schema.
-7. The error of the first line of a diagram says line 1, even after front
+5. The error of the first line of a diagram says line 1, even after front
    matter, because `Diagram` does not keep the number of that line.
+6. A subgraph without a direction, inside a subgraph with a direction,
+   lays out in the direction of the subgraph that holds it. Mermaid 12
+   draws some of these in another direction. In a `flowchart LR`, a
+   subgraph inside a subgraph with `direction TB` draws LR in Mermaid.
 
 ### Give a chart of Mermaid the time of the render
 

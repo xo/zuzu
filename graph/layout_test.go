@@ -114,7 +114,83 @@ func TestLayRules(t *testing.T) {
 			if !reflect.DeepEqual(l, again) {
 				t.Errorf("%s: two layouts differ", name)
 			}
+			// The rules hold too when the clusters have directions of their
+			// own and edges end at clusters.
+			if len(in.Clusters) == 0 {
+				continue
+			}
+			for i := range in.Clusters {
+				in.Clusters[i].Direction = []string{LR, BT, RL}[(int(seed)+i)%3]
+			}
+			in.Edges = append(in.Edges, LayoutEdge{Source: in.Nodes[0].ID, Target: "c1"}, LayoutEdge{Source: "c2", Target: in.Nodes[len(in.Nodes)-1].ID})
+			holds := map[string]bool{}
+			for _, n := range in.Nodes {
+				holds[n.Cluster] = true
+			}
+			if !holds["c1"] || !holds["c2"] {
+				continue
+			}
+			l, err = Lay(in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			checkRules(t, name+" with directions", in, l)
 		}
+	}
+}
+
+func TestLayClusterDirection(t *testing.T) {
+	t.Parallel()
+	in := LayoutInput{
+		Nodes: []LayoutNode{
+			{ID: "x", Width: 20, Height: 20},
+			{ID: "a", Cluster: "c", Width: 20, Height: 20}, {ID: "b", Cluster: "c", Width: 20, Height: 20},
+		},
+		Edges:    []LayoutEdge{{Source: "a", Target: "b"}, {Source: "x", Target: "c"}},
+		Clusters: []LayoutCluster{{ID: "c", Direction: LR, TitleWidth: 10, TitleHeight: 12}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkRules(t, "kept", in, l)
+	x, a, b, c := l.Nodes[0], l.Nodes[1], l.Nodes[2], l.Clusters[0]
+	if a.Y != b.Y || a.X >= b.X {
+		t.Errorf("expected a left of b, got %v and %v", a, b)
+	}
+	if x.Y >= c.Y {
+		t.Errorf("expected x above the cluster, got %v and %v", x, c)
+	}
+	// The edge to the cluster ends at the top of its box.
+	if e := l.Edges[1]; math.Abs(e.EndY-c.Y) > 0.01 || math.Abs(e.EndAngle-90) > 0.01 {
+		t.Errorf("expected the edge to end at the top of %v, going down, got %v at %v", c, e.EndY, e.EndAngle)
+	}
+	// An edge from x to a crosses the cluster, which then follows the
+	// graph, and the edge to the cluster stops at its box.
+	in.Edges = append(in.Edges, LayoutEdge{Source: "x", Target: "a"})
+	if l, err = Lay(in); err != nil {
+		t.Fatal(err)
+	}
+	checkRules(t, "followed", in, l)
+	a, b, c = l.Nodes[1], l.Nodes[2], l.Clusters[0]
+	if a.Y >= b.Y {
+		t.Errorf("expected a above b, got %v and %v", a, b)
+	}
+	if e := l.Edges[1]; math.Abs(e.EndY-c.Y) > 0.01 {
+		t.Errorf("expected the edge to stop at the top of %v, got %v", c, e.EndY)
+	}
+	g := &Graph{
+		Direction: TB,
+		Nodes:     []*Node{{ID: "x"}, {ID: "a", Cluster: "c"}, {ID: "b", Cluster: "c"}},
+		Edges:     []*Edge{{Source: "x", Target: "a"}, {Source: "a", Target: "b"}},
+		Clusters:  []*Cluster{{ID: "c", Direction: LR}},
+	}
+	if got := FollowedDirections(g); !reflect.DeepEqual(got, map[string]string{"c": TB}) {
+		t.Errorf("expected the cluster c to follow TB, got %v", got)
+	}
+	g.Edges[0].Target = "c"
+	if got := FollowedDirections(g); len(got) != 0 {
+		t.Errorf("expected the cluster c to keep LR, got %v", got)
 	}
 }
 
@@ -158,6 +234,8 @@ func TestLayErrors(t *testing.T) {
 	for _, in := range []LayoutInput{
 		{Nodes: []LayoutNode{{ID: "a"}, {ID: "a"}}},
 		{Nodes: []LayoutNode{{ID: "a"}}, Edges: []LayoutEdge{{Source: "a", Target: "b"}}},
+		{Nodes: []LayoutNode{{ID: "a", Cluster: "c"}}, Clusters: []LayoutCluster{{ID: "c", Direction: "XY"}}},
+		{Nodes: []LayoutNode{{ID: "a"}}, Edges: []LayoutEdge{{Source: "a", Target: "c"}}, Clusters: []LayoutCluster{{ID: "c"}}},
 	} {
 		if _, err := Lay(in); err == nil {
 			t.Errorf("%v lays out", in)

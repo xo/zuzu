@@ -380,7 +380,7 @@ func input(g *graph.Graph) (graph.LayoutInput, map[string]int) {
 		in.Edges = append(in.Edges, le)
 	}
 	for _, c := range g.Clusters {
-		in.Clusters = append(in.Clusters, graph.LayoutCluster{ID: c.ID, Parent: c.Parent, TitleWidth: 6.5 * float64(len(c.Label)), TitleHeight: 16})
+		in.Clusters = append(in.Clusters, graph.LayoutCluster{ID: c.ID, Parent: c.Parent, Direction: c.Direction, TitleWidth: 6.5 * float64(len(c.Label)), TitleHeight: 16})
 	}
 	return in, ids
 }
@@ -417,8 +417,10 @@ func rules(t *testing.T, in graph.LayoutInput, l *graph.Layout, ids map[string]i
 		return false
 	}
 	for _, e := range in.Edges {
-		a, b := ids[e.Source], ids[e.Target]
-		if e.NoConstraint || a == b {
+		a, aok := ids[e.Source]
+		b, bok := ids[e.Target]
+		// An edge to a cluster has no rank to check.
+		if e.NoConstraint || a == b || !aok || !bok {
 			continue
 		}
 		minlen := max(e.MinLen, 1) * factor
