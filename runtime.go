@@ -39,6 +39,9 @@ type runtime struct {
 	locale    *format.Locale
 	rand      *rand.Rand
 	theme     theme.Theme
+	// fitW and fitH are the size of the plot area that the autosize fit
+	// asks for, or 0, which NewView renders again with.
+	fitW, fitH float64
 	// config is the config of the theme with the config of the spec over
 	// it (D14).
 	config map[string]any

@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"time"
 
@@ -301,6 +302,30 @@ func (c *Chart) NewView(ctx context.Context, opts ...RenderOption) (*View, Repor
 	s, err := rt.render()
 	if err != nil {
 		return nil, rt.report, err
+	}
+	if rt.fitW > 0 || rt.fitH > 0 {
+		// The autosize fit renders again with the plot area that leaves
+		// room for the guides inside the size of the spec, as Vega does.
+		w, err := rt.root.signal("width")
+		if err != nil {
+			return nil, rt.report, err
+		}
+		h, err := rt.root.signal("height")
+		if err != nil {
+			return nil, rt.report, err
+		}
+		fw, fh := number(w, 0), number(h, 0)
+		if rt.fitW > 0 {
+			fw = rt.fitW
+		}
+		if rt.fitH > 0 {
+			fh = rt.fitH
+		}
+		again := newRuntime(ctx, c, append(slices.Clone(opts), WithSize(fw, fh)))
+		if s, err = again.render(); err != nil {
+			return nil, again.report, err
+		}
+		rt = again
 	}
 	return &View{rt: rt, scene: s}, rt.report, nil
 }

@@ -58,15 +58,6 @@ It does not read `align`, `center`, `offset`, `headerBand` or a padding for
 the rows apart from the columns, and a header with one item serves only the
 first row or column.
 
-### Finish the guides
-
-1. An axis reads neither `labelFlush` nor `labelLimit`, and a legend reads
-   neither `direction`, `orient`, `columns` nor its encodings.
-2. A legend of sizes draws a circle for each value, and not the nested
-   circles of the targets.
-3. The autosize `fit`, `fit-x` and `fit-y` grow the canvas as `pad` does, and
-   do not shrink the plot area.
-
 ### Add the expression functions that zuzu does not have
 
 An expression that calls one of these functions is an issue in the loose

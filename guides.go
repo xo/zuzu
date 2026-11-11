@@ -126,6 +126,27 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 	if ax.BandPosition, err = s.num(a.BandPosition, bp); err != nil {
 		return nil, err
 	}
+	// labelFlush is true for a distance of 1, or a distance, and none by
+	// default, as in Vega.
+	ax.LabelFlush = -1
+	if !a.LabelFlush.IsZero() {
+		v, err := s.value(a.LabelFlush)
+		if err != nil {
+			return nil, err
+		}
+		switch f := v.(type) {
+		case bool:
+			if f {
+				ax.LabelFlush = 1
+			}
+		case float64:
+			ax.LabelFlush = f
+		}
+	}
+	// The labels draw at most 180 wide by default, as in Vega.
+	if ax.LabelLimit, err = s.num(a.LabelLimit, 180); err != nil {
+		return nil, err
+	}
 	if ax.Format, err = s.labelFormat(sc, a.Format, a.FormatType, ax); err != nil {
 		return nil, err
 	}
@@ -356,13 +377,103 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 	if lg.Format, err = s.labelFormat(main, l.Format, l.FormatType, nil); err != nil {
 		return nil, err
 	}
-	w, _ := s.rt.root.size()
-	lg.Width = w
+	place := legendPlace{}
+	if place.orient, err = s.str(l.Orient, ""); err != nil {
+		return nil, err
+	}
+	if place.offset, err = s.num(l.Offset, guideGap); err != nil {
+		return nil, err
+	}
+	if place.x, err = s.num(l.LegendX, 0); err != nil {
+		return nil, err
+	}
+	if place.y, err = s.num(l.LegendY, 0); err != nil {
+		return nil, err
+	}
+	// A legend at the side or in a corner is a column, and one above or
+	// below the plot is a row, as in Vega.
+	dir := "vertical"
+	if place.orient == "" || place.orient == "top" || place.orient == "bottom" {
+		dir = "horizontal"
+	}
+	if lg.Direction, err = s.str(l.Direction, dir); err != nil {
+		return nil, err
+	}
+	columns, err := s.num(l.Columns, 0)
+	if err != nil {
+		return nil, err
+	}
+	lg.Columns = int(math.Max(0, columns))
+	if lg.Direction == "horizontal" {
+		w, _ := s.rt.root.size()
+		lg.Width = w
+	}
 	m := s.rt.style().Legend(lg)
+	if err := s.legendEncode(&m, l.Encode); err != nil {
+		return nil, err
+	}
 	if l.ZIndex != nil {
 		m.ZIndex = *l.ZIndex
 	}
+	m.Items[0].Datum = place
 	return &m, nil
+}
+
+// legendPlace is where a legend goes, which placeGuides reads: its orient,
+// its offset from the plot area, and its place for the orient none.
+type legendPlace struct {
+	orient       string
+	offset, x, y float64
+}
+
+// legendParts are the roles of the parts of a legend that the encode of a
+// legend names.
+var legendParts = map[string]string{
+	"title": "legend-title", "labels": "legend-label", "symbols": "legend-symbol",
+	"gradient": "legend-gradient", "entries": "legend-entry",
+}
+
+// legendEncode applies the encode of a legend to its parts, with the datum
+// of each item, which holds its value and its label. The layout places the
+// parts, so an encoding of a place is left out.
+func (s *scope) legendEncode(m *scene.Mark, enc vega.GuideEncode) error {
+	for name, el := range enc {
+		role, ok := legendParts[name]
+		if !ok {
+			continue
+		}
+		sets := vega.Encode{}
+		for set, props := range el.Sets {
+			kept := vega.Props{}
+			for k, v := range props {
+				switch k {
+				case "x", "y", "x2", "y2", "xc", "yc", "width", "height":
+					continue
+				}
+				kept[k] = v
+			}
+			sets[set] = kept
+		}
+		var err error
+		var walk func(m *scene.Mark)
+		walk = func(m *scene.Mark) {
+			for i := range m.Items {
+				it := &m.Items[i]
+				if m.Role == role && err == nil {
+					st := &itemState{it: it, set: map[string]bool{}}
+					err = s.encodeItem(sets, st, it.Datum, "/encode/"+name)
+				}
+				for j := range it.Items {
+					walk(&it.Items[j])
+				}
+			}
+		}
+		walk(m)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // buildTitle builds the title of a scope. A title of a group stands beyond
@@ -518,22 +629,35 @@ func (s *scope) boolean(v vega.BoolValue, def bool) (bool, error) {
 	return def, nil
 }
 
-// placeGuides puts the legends and the title of a scope above what the
-// scope draws, in the order of docs/STYLE.md: the title, then the legends,
-// then the plot area.
+// placeGuides puts the legends and the title of a scope around what the
+// scope draws. A legend with no orient, or the orient top, goes in a row
+// above the plot area, in the order of docs/STYLE.md: the title, then the
+// legends, then the plot area. A legend with the orient left, right or
+// bottom goes beside or below the plot and its axes, one in a corner goes
+// inside the plot area, and one with the orient none goes at its legendX
+// and legendY.
 func (s *scope) placeGuides(marks []scene.Mark) {
 	st := s.rt.style()
-	top := 0.0
+	w, h := s.size()
+	body := layout.Empty()
 	for i := range marks {
 		m := &marks[i]
 		if m.Role == "legend" || m.Role == "title" {
 			continue
 		}
 		if b := st.MarkBounds(m); !b.IsEmpty() {
-			top = math.Min(top, b.Y1)
+			body.X1, body.Y1 = math.Min(body.X1, b.X1), math.Min(body.Y1, b.Y1)
+			body.X2, body.Y2 = math.Max(body.X2, b.X2), math.Max(body.Y2, b.Y2)
 		}
 	}
-	// The legends stack upward from the top of the plot area.
+	top := math.Min(0, body.Y1)
+	if body.IsEmpty() {
+		body = layout.Bounds{X2: w, Y2: h}
+	}
+	// The next place of each side and corner, as legends stack there.
+	left, right, bottom := 0.0, 0.0, math.Max(h, body.Y2)
+	corner := map[string]float64{}
+	// The legends of the top stack upward from the top of the plot area.
 	for i := len(marks) - 1; i >= 0; i-- {
 		m := &marks[i]
 		if m.Role != "legend" || len(m.Items) == 0 {
@@ -543,9 +667,51 @@ func (s *scope) placeGuides(marks []scene.Mark) {
 		if b.IsEmpty() {
 			continue
 		}
-		y := top - guideGap - b.Y2
-		m.Items[0].Y = y
-		top = y + b.Y1
+		p, _ := m.Items[0].Datum.(legendPlace)
+		it := &m.Items[0]
+		switch p.orient {
+		case "", "top":
+			y := top - guideGap - b.Y2
+			it.Y = y
+			top = y + b.Y1
+		}
+	}
+	for i := range marks {
+		m := &marks[i]
+		if m.Role != "legend" || len(m.Items) == 0 {
+			continue
+		}
+		b := st.MarkBounds(m)
+		if b.IsEmpty() {
+			continue
+		}
+		p, _ := m.Items[0].Datum.(legendPlace)
+		it := &m.Items[0]
+		switch p.orient {
+		case "left":
+			it.X, it.Y = math.Min(0, body.X1)-p.offset-b.X2, left-b.Y1
+			left += b.Y2 - b.Y1 + guideGap
+		case "right":
+			it.X, it.Y = math.Max(w, body.X2)+p.offset-b.X1, right-b.Y1
+			right += b.Y2 - b.Y1 + guideGap
+		case "bottom":
+			it.X, it.Y = -b.X1, bottom+p.offset-b.Y1
+			bottom += p.offset + b.Y2 - b.Y1
+		case "top-left", "top-right", "bottom-left", "bottom-right":
+			it.X = p.offset - b.X1
+			if strings.HasSuffix(p.orient, "right") {
+				it.X = w - p.offset - b.X2
+			}
+			at := corner[p.orient]
+			if strings.HasPrefix(p.orient, "top") {
+				it.Y = p.offset + at - b.Y1
+			} else {
+				it.Y = h - p.offset - at - b.Y2
+			}
+			corner[p.orient] = at + b.Y2 - b.Y1 + guideGap/2
+		case "none":
+			it.X, it.Y = p.x, p.y
+		}
 	}
 	for i := range marks {
 		m := &marks[i]

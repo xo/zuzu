@@ -206,6 +206,10 @@ func (s Style) textBounds(it *scene.Item) Bounds {
 	for _, l := range it.Text {
 		w = math.Max(w, s.width(size, text.Weight(string(it.FontWeight)), l))
 	}
+	if it.Limit > 0 {
+		// A line longer than its limit is cut to it.
+		w = math.Min(w, it.Limit)
+	}
 	h := size * float64(max(1, len(it.Text)))
 	x0 := 0.0
 	switch it.Align {

@@ -79,6 +79,7 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 		return nil, fmt.Errorf("%s/from: %w", path, err)
 	}
 	defaults := s.rt.markDefaults(m)
+	_, configStroke := defaults["stroke"]
 	states := make([]*itemState, len(data))
 	for i, d := range data {
 		st := newItemState(d)
@@ -88,6 +89,11 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 		}
 		if err := s.encodeItem(m.Encode, st, d, path); err != nil {
 			return nil, err
+		}
+		if m.Type == scene.Symbol && configStroke && st.it.Size != nil && *st.it.Size < minRingSize {
+			// The ring that the config gives a point covers a point this
+			// small, so it draws without one.
+			st.it.Stroke = scene.Paint{}
 		}
 		geometry(m.Type, st)
 		states[i] = st
@@ -704,6 +710,10 @@ func setItem(it *scene.Item, r dataflow.Row) {
 		it.FontWeight = scene.Weight(expr.String(v))
 	}
 }
+
+// minRingSize is the size, in square pixels, of the smallest symbol that
+// keeps the stroke of the config, the ring of docs/STYLE.md.
+const minRingSize = 20
 
 // markDefaults returns the defaults of the items of a mark from the config
 // of the render, as Vega applies its config. First comes the config of

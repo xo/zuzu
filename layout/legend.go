@@ -1,7 +1,9 @@
 package layout
 
 import (
+	"cmp"
 	"math"
+	"slices"
 
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/scale"
@@ -27,6 +29,12 @@ type Legend struct {
 	Gradient bool
 	// GradientLength is the length of the bar.
 	GradientLength float64
+	// Direction is horizontal or vertical. A vertical legend draws its
+	// entries in one column, and its gradient upright.
+	Direction string
+	// Columns is the number of columns of the entries. 0 draws them in one
+	// row that wraps at Width, or in one column for a vertical legend.
+	Columns int
 }
 
 // The sizes of a legend.
@@ -41,19 +49,99 @@ const (
 // title, then a row of entries that wraps, or a gradient bar.
 func (s Style) Legend(l *Legend) scene.Mark {
 	group := scene.Item{}
-	x := 0.0
+	x, y := 0.0, 0.0
+	columns := l.Columns
+	if columns <= 0 && l.Direction == "vertical" {
+		columns = 1
+	}
 	if l.Title != "" {
+		// The title is at the left of a row, as docs/STYLE.md draws a
+		// legend, and above a column or a grid.
 		title := s.label(0, swatch/2, l.Title, SmallSize, 400, s.Theme.Faint, "left", "middle")
 		group.Items = append(group.Items, scene.Mark{Type: scene.Text, Role: "legend-title", Items: []scene.Item{title}})
-		x = s.width(SmallSize, 400, l.Title) + entryGap
+		if columns > 0 || l.nested() {
+			y = rowHeight
+		} else {
+			x = s.width(SmallSize, 400, l.Title) + entryGap
+		}
 	}
 	switch {
 	case l.Gradient && l.color() != nil && !scale.Discrete(l.color().Type()):
-		group.Items = append(group.Items, s.gradient(l, x)...)
+		group.Items = append(group.Items, s.gradient(l, x, y)...)
+	case l.nested():
+		group.Items = append(group.Items, s.nested(l, y)...)
 	default:
-		group.Items = append(group.Items, s.entries(l, x))
+		group.Items = append(group.Items, s.entries(l, x, y, columns))
 	}
 	return scene.Mark{Type: scene.Group, Role: "legend", Items: []scene.Item{group}}
+}
+
+// nested reports whether a legend shows only sizes, with a largest circle
+// at least as high as three labels, which it draws as nested circles. A
+// legend of smaller circles draws them in a row, so that their labels have
+// room.
+func (l *Legend) nested() bool {
+	if l.Size == nil || l.Fill != nil || l.Stroke != nil || l.Shape != nil || l.Line {
+		return false
+	}
+	rmax := 0.0
+	for _, v := range l.values() {
+		if f, ok := l.Size.Map(v).(float64); ok && f > 0 {
+			rmax = math.Max(rmax, math.Sqrt(f)/2)
+		}
+	}
+	return 2*rmax >= 3*LabelSize
+}
+
+// nested draws a legend of sizes as circles that share their lowest point,
+// the largest behind, each with a line from its top to its label.
+func (s Style) nested(l *Legend, y float64) []scene.Mark {
+	type entry struct {
+		v     any
+		r     float64
+		label string
+	}
+	var es []entry
+	for _, v := range l.values() {
+		f, ok := l.Size.Map(v).(float64)
+		if !ok || f <= 0 || math.IsNaN(f) {
+			continue
+		}
+		label := ""
+		if l.Format != nil {
+			label = l.Format(v)
+		}
+		es = append(es, entry{v: v, r: math.Sqrt(f) / 2, label: label})
+	}
+	if len(es) == 0 {
+		return nil
+	}
+	slices.SortStableFunc(es, func(a, b entry) int { return cmp.Compare(b.r, a.r) })
+	rmax := es[0].r
+	bottom := y + 2*rmax
+	circles := scene.Mark{Type: scene.Symbol, Role: "legend-symbol"}
+	rules := scene.Mark{Type: scene.Rule, Role: "legend-rule"}
+	labels := scene.Mark{Type: scene.Text, Role: "legend-label"}
+	lx := 2*rmax + swatchGap
+	lastY := math.Inf(-1)
+	for _, e := range es {
+		top := bottom - 2*e.r
+		circles.Items = append(circles.Items, scene.Item{
+			X: rmax, Y: bottom - e.r, Shape: "circle", Size: ptr(4 * e.r * e.r),
+			Stroke: scene.Paint{Color: s.Theme.Muted}, StrokeWidth: ptr(1), Datum: map[string]any{"value": e.v},
+		})
+		// A label that overlaps the one above it is left out, as the
+		// labels of an axis are.
+		if top-lastY < LabelSize {
+			continue
+		}
+		lastY = top
+		rules.Items = append(rules.Items, scene.Item{X: rmax, Y: top, X2: lx, Y2: top, Stroke: scene.Paint{Color: s.Theme.Axis}, StrokeWidth: ptr(1)})
+		lab := s.label(lx+2, top, e.label, LabelSize, 400, s.Theme.Muted, "left", "middle")
+		lab.Datum = map[string]any{"value": e.v, "label": e.label}
+		labels.Items = append(labels.Items, lab)
+	}
+	return []scene.Mark{circles, rules, labels}
 }
 
 // color returns the scale of color of the legend.
@@ -96,16 +184,18 @@ func (l *Legend) values() []any {
 	return nil
 }
 
-// entries draws the entries of a legend in a row from x, which wraps at
-// the width of the legend.
-func (s Style) entries(l *Legend, x float64) scene.Mark {
+// entries draws the entries of a legend from (x, y): in a grid of columns,
+// each as wide as its widest entry, or with no columns in a row that wraps
+// at the width of the legend.
+func (s Style) entries(l *Legend, x, y float64, columns int) scene.Mark {
 	entries := scene.Mark{Type: scene.Group, Role: "legend-entry"}
 	row := scene.Item{}
 	symbols := scene.Mark{Type: scene.Symbol, Role: "legend-symbol"}
 	labels := scene.Mark{Type: scene.Text, Role: "legend-label"}
-	y := 0.0
-	start := x
-	for i, v := range l.values() {
+	vals := l.values()
+	names := make([]string, len(vals))
+	widths := make([]float64, len(vals))
+	for i, v := range vals {
 		label := ""
 		if l.Format != nil {
 			label = l.Format(v)
@@ -115,14 +205,39 @@ func (s Style) entries(l *Legend, x float64) scene.Mark {
 				label = "< " + l.Format(t[0])
 			}
 		}
-		w := swatch + swatchGap + s.width(LabelSize, 400, label)
-		if l.Width > 0 && x > start && x+w > l.Width {
+		names[i] = label
+		widths[i] = swatch + swatchGap + s.width(LabelSize, 400, label)
+	}
+	// The left of each column of a grid.
+	var lefts []float64
+	if columns > 0 {
+		lefts = make([]float64, columns)
+		cw := make([]float64, columns)
+		for i, w := range widths {
+			cw[i%columns] = math.Max(cw[i%columns], w)
+		}
+		at := x
+		for c := range columns {
+			lefts[c] = at
+			at += cw[c] + entryGap
+		}
+	}
+	start := x
+	for i, v := range vals {
+		w := widths[i]
+		switch {
+		case columns > 0:
+			if i > 0 && i%columns == 0 {
+				y += rowHeight
+			}
+			x = lefts[i%columns]
+		case l.Width > 0 && x > start && x+w > l.Width:
 			x, y = start, y+rowHeight
 		}
 		sym := s.swatch(l, v, i, x, y)
 		symbols.Items = append(symbols.Items, sym)
-		lab := s.label(x+swatch+swatchGap, y+swatch/2, label, LabelSize, 400, s.Theme.Muted, "left", "middle")
-		lab.Datum = map[string]any{"value": v, "label": label}
+		lab := s.label(x+swatch+swatchGap, y+swatch/2, names[i], LabelSize, 400, s.Theme.Muted, "left", "middle")
+		lab.Datum = map[string]any{"value": v, "label": names[i]}
 		labels.Items = append(labels.Items, lab)
 		x += w + entryGap
 	}
@@ -174,9 +289,10 @@ func (s Style) swatch(l *Legend, v any, i int, x, y float64) scene.Item {
 	return it
 }
 
-// gradient draws a continuous color scale as a bar from x, with the
-// labels of its ends below.
-func (s Style) gradient(l *Legend, x float64) []scene.Mark {
+// gradient draws a continuous color scale as a bar from (x, y), with the
+// labels of its ends below it, or upright with the labels at its right for
+// a vertical legend, the high end at the top.
+func (s Style) gradient(l *Legend, x, y float64) []scene.Mark {
 	c := l.color()
 	length := l.GradientLength
 	if length <= 0 {
@@ -194,20 +310,30 @@ func (s Style) gradient(l *Legend, x float64) []scene.Mark {
 		}
 	}
 	bar := scene.Item{
-		X: x, Y: 0, Width: length, Height: swatch, CornerRadius: 2,
+		X: x, Y: y, Width: length, Height: swatch, CornerRadius: 2,
 		Fill: scene.Paint{Gradient: &scene.Gradient{Type: "gradient", X1: 0, Y1: 0, X2: 1, Y2: 0, Stops: stops}},
 	}
 	labels := scene.Mark{Type: scene.Text, Role: "legend-label"}
+	label := func(v any) string {
+		if l.Format != nil {
+			return l.Format(v)
+		}
+		return ""
+	}
+	if l.Direction == "vertical" {
+		bar.Width, bar.Height = swatch, length
+		bar.Fill.Gradient.X2, bar.Fill.Gradient.Y1 = 0, 1
+		labels.Items = append(labels.Items,
+			s.label(x+swatch+swatchGap, y, label(dom[len(dom)-1]), LabelSize, 400, s.Theme.Muted, "left", "top"),
+			s.label(x+swatch+swatchGap, y+length, label(dom[0]), LabelSize, 400, s.Theme.Muted, "left", "bottom"))
+		return []scene.Mark{{Type: scene.Rect, Role: "legend-gradient", Items: []scene.Item{bar}}, labels}
+	}
 	for _, e := range []struct {
 		v     any
 		x     float64
 		align string
 	}{{dom[0], x, "left"}, {dom[len(dom)-1], x + length, "right"}} {
-		str := ""
-		if l.Format != nil {
-			str = l.Format(e.v)
-		}
-		labels.Items = append(labels.Items, s.label(e.x, swatch+4, str, LabelSize, 400, s.Theme.Muted, e.align, "top"))
+		labels.Items = append(labels.Items, s.label(e.x, y+swatch+4, label(e.v), LabelSize, 400, s.Theme.Muted, e.align, "top"))
 	}
 	return []scene.Mark{{Type: scene.Rect, Role: "legend-gradient", Items: []scene.Item{bar}}, labels}
 }

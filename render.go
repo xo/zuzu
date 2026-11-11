@@ -81,7 +81,8 @@ func (rt *runtime) render() (*scene.Scene, error) {
 	if err != nil {
 		return nil, err
 	}
-	if autosize(av) != "none" {
+	kind := autosize(av)
+	if kind != "none" {
 		// The canvas grows to hold the guides, and the plot area moves
 		// inside it, as the autosize pad of Vega does.
 		b := layout.Empty()
@@ -98,6 +99,14 @@ func (rt *runtime) render() (*scene.Scene, error) {
 			x2, y2 := math.Max(w, b.X2), math.Max(h, b.Y2)
 			item.X, item.Y = pad.left-x1, pad.top-y1
 			cw, ch = math.Ceil(x2-x1+pad.left+pad.right), math.Ceil(y2-y1+pad.top+pad.bottom)
+			// The autosize fit keeps the size of the spec for the whole
+			// chart, so the plot area gives up what the guides take.
+			if kind == "fit" || kind == "fit-x" {
+				rt.fitW = w - (x2 - x1 - w)
+			}
+			if kind == "fit" || kind == "fit-y" {
+				rt.fitH = h - (y2 - y1 - h)
+			}
 		}
 	}
 	sc := &scene.Scene{

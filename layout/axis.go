@@ -36,6 +36,13 @@ type Axis struct {
 	Offset float64
 	// BandPosition is where in a band a tick sits, from 0 to 1.
 	BandPosition float64
+	// LabelFlush is the distance from an end of the axis within which a
+	// label aligns flush with that end, so that it stays inside the axis,
+	// or a negative number for none.
+	LabelFlush float64
+	// LabelLimit is the widest that a label draws, in pixels, before it is
+	// cut with an ellipsis, or 0 for no limit.
+	LabelLimit float64
 }
 
 // vertical reports whether the axis runs up and down.
@@ -181,7 +188,10 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 		if a.LabelAngle != 0 {
 			it.Angle = a.LabelAngle
 			turnLabel(&it, a.Orient, a.LabelAngle)
+		} else if a.LabelFlush >= 0 {
+			flush(&it, a, pos[i])
 		}
+		it.Limit = a.LabelLimit
 		it.Datum = map[string]any{"value": v, "label": str}
 		m.Items = append(m.Items, it)
 	}
@@ -189,6 +199,28 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 		m.Items = s.dropOverlaps(m.Items)
 	}
 	return m
+}
+
+// flush aligns a label at an end of its axis with that end: the first label
+// of a horizontal axis starts at the start, the last ends at the end, and
+// the labels of a vertical axis hang below the top and sit on the bottom.
+func flush(it *scene.Item, a *Axis, pos float64) {
+	near := func(end float64) bool { return math.Abs(pos-end) <= a.LabelFlush }
+	if a.vertical() {
+		switch {
+		case near(0):
+			it.Baseline = "top"
+		case near(a.Length):
+			it.Baseline = "bottom"
+		}
+		return
+	}
+	switch {
+	case near(0):
+		it.Align = "left"
+	case near(a.Length):
+		it.Align = "right"
+	}
 }
 
 // turnLabel sets the align and the baseline of a turned label, so that its

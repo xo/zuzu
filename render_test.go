@@ -286,9 +286,10 @@ func TestLabelMarks(t *testing.T) {
 	if s := base.Items[0].Stroke.Color; s == "" {
 		t.Error("a rule with no stroke has no default stroke")
 	}
-	// A point has a ring in the background color (docs/STYLE.md).
-	if s := points.Items[0].Stroke.Color; s != "#ffffff" {
-		t.Errorf("the symbol has the stroke %q, want the ring #ffffff", s)
+	// A point has a ring in the background color (docs/STYLE.md), but for
+	// one as small as these, of 16 square pixels.
+	if s := points.Items[0].Stroke; !s.IsZero() {
+		t.Errorf("the small symbol has the stroke %v, want none", s)
 	}
 }
 
@@ -396,5 +397,154 @@ func TestBarEnds(t *testing.T) {
 		"encoding": {"x": {"field": "a", "type": "nominal"}, "y": {"field": "b", "type": "quantitative"}}}`))
 	if len(one) != 1 || one[0].Fill.Color != "#5b6ee1" {
 		t.Errorf("the bar is %+v, want the fill #5b6ee1", one)
+	}
+}
+
+// guideScene renders a Vega spec of 200 by 100 with one bar per value of a
+// field and the guides that it names.
+func guideScene(t *testing.T, guides string) *scene.Scene {
+	t.Helper()
+	src := []byte(`{"$schema": "https://vega.github.io/schema/vega/v5.json",
+		"width": 200, "height": 100,
+		"data": [{"name": "d", "values": [{"k": "a", "v": 1}, {"k": "b", "v": 2}, {"k": "c", "v": 3}]}],
+		"scales": [
+			{"name": "x", "type": "band", "domain": {"data": "d", "field": "k"}, "range": "width"},
+			{"name": "y", "type": "linear", "domain": {"data": "d", "field": "v"}, "range": "height"},
+			{"name": "c", "type": "ordinal", "domain": {"data": "d", "field": "k"}, "range": "category"}],
+		"marks": [{"type": "rect", "from": {"data": "d"}, "encode": {"enter": {
+			"x": {"scale": "x", "field": "k"}, "width": {"scale": "x", "band": 1},
+			"y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}, "fill": {"scale": "c", "field": "k"}}}}]` + guides + `}`)
+	c, _, err := Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, err := c.Render(t.Context(), WithLocation(time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// guide returns the first group of a role in a scene, with its place in
+// the frame of the plot area.
+func guide(s *scene.Scene, role string) *scene.Item {
+	var out *scene.Item
+	var walk func(m *scene.Mark)
+	walk = func(m *scene.Mark) {
+		for i := range m.Items {
+			if m.Role == role && out == nil {
+				out = &m.Items[i]
+			}
+			for j := range m.Items[i].Items {
+				walk(&m.Items[i].Items[j])
+			}
+		}
+	}
+	walk(&s.Root)
+	return out
+}
+
+func TestLegendPlaces(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		legend string
+		check  func(x, y float64) bool
+	}{
+		{`{"fill": "c"}`, func(_, y float64) bool { return y < 0 }},
+		{`{"fill": "c", "orient": "left"}`, func(x, _ float64) bool { return x < -20 }},
+		{`{"fill": "c", "orient": "right"}`, func(x, _ float64) bool { return x > 200 }},
+		{`{"fill": "c", "orient": "bottom"}`, func(_, y float64) bool { return y > 100 }},
+		{`{"fill": "c", "orient": "bottom-right"}`, func(x, y float64) bool { return x > 100 && x < 200 && y > 0 && y < 100 }},
+		{`{"fill": "c", "orient": "none", "legendX": 7, "legendY": 9}`, func(x, y float64) bool { return x == 7 && y == 9 }},
+	} {
+		s := guideScene(t, `, "legends": [`+c.legend+`]`)
+		g := guide(s, "legend")
+		if g == nil {
+			t.Fatalf("%s: no legend", c.legend)
+		}
+		if !c.check(g.X, g.Y) {
+			t.Errorf("%s: the legend is at %v, %v", c.legend, g.X, g.Y)
+		}
+	}
+}
+
+func TestLegendLayout(t *testing.T) {
+	t.Parallel()
+	symbols := func(legend string) []scene.Item {
+		g := guide(guideScene(t, `, "legends": [`+legend+`]`), "legend-entry")
+		if g == nil {
+			t.Fatalf("%s: no entries", legend)
+		}
+		for _, m := range g.Items {
+			if m.Role == "legend-symbol" {
+				return m.Items
+			}
+		}
+		return nil
+	}
+	row := symbols(`{"fill": "c"}`)
+	col := symbols(`{"fill": "c", "direction": "vertical"}`)
+	grid := symbols(`{"fill": "c", "columns": 2}`)
+	if len(row) != 3 || len(col) != 3 || len(grid) != 3 {
+		t.Fatalf("the legends have %d, %d and %d entries, want 3", len(row), len(col), len(grid))
+	}
+	if row[0].Y != row[2].Y || row[0].X >= row[2].X {
+		t.Errorf("a row: %v %v and %v %v", row[0].X, row[0].Y, row[2].X, row[2].Y)
+	}
+	if col[0].X != col[2].X || col[0].Y >= col[2].Y {
+		t.Errorf("a column: %v %v and %v %v", col[0].X, col[0].Y, col[2].X, col[2].Y)
+	}
+	if grid[0].X != grid[2].X || grid[0].Y >= grid[2].Y || grid[0].Y != grid[1].Y {
+		t.Errorf("a grid of 2: %v", grid)
+	}
+	// The encode of a legend sets the parts that it names.
+	s := guideScene(t, `, "legends": [{"fill": "c", "encode": {"labels": {"update": {"fontSize": {"value": 20}}}}}]`)
+	if l := guide(s, "legend-label"); l == nil || l.FontSize != 20 {
+		t.Errorf("the encode of the labels gives %v", l)
+	}
+}
+
+func TestAxisLabels(t *testing.T) {
+	t.Parallel()
+	labels := func(axis string) []scene.Item {
+		s := guideScene(t, `, "axes": [`+axis+`]`)
+		var out []scene.Item
+		var walk func(m *scene.Mark)
+		walk = func(m *scene.Mark) {
+			for i := range m.Items {
+				if m.Role == "axis-label" {
+					out = append(out, m.Items[i])
+				}
+				for j := range m.Items[i].Items {
+					walk(&m.Items[i].Items[j])
+				}
+			}
+		}
+		walk(&s.Root)
+		return out
+	}
+	flush := labels(`{"scale": "y", "orient": "left", "labelFlush": true}`)
+	if len(flush) < 2 || flush[0].Baseline != "bottom" || flush[len(flush)-1].Baseline != "top" {
+		t.Errorf("the flush labels: %+v", flush)
+	}
+	if l := labels(`{"scale": "x", "orient": "bottom"}`); len(l) == 0 || l[0].Limit != 180 {
+		t.Errorf("the limit of a label is not 180 by default: %+v", l)
+	}
+	if l := labels(`{"scale": "x", "orient": "bottom", "labelLimit": 30}`); len(l) == 0 || l[0].Limit != 30 {
+		t.Errorf("the limit of a label is not 30: %+v", l)
+	}
+}
+
+// TestAutosizeFit checks that the autosize fit keeps the size of the spec
+// for the whole chart, the plot area smaller.
+func TestAutosizeFit(t *testing.T) {
+	t.Parallel()
+	pad := guideScene(t, `, "padding": 0, "axes": [{"scale": "y", "orient": "left"}]`)
+	fit := guideScene(t, `, "padding": 0, "autosize": "fit", "axes": [{"scale": "y", "orient": "left"}]`)
+	if pad.Width <= 200 {
+		t.Errorf("the pad is %v wide, want more than 200", pad.Width)
+	}
+	if fit.Width < 199 || fit.Width > 201 {
+		t.Errorf("the fit is %v wide, want 200", fit.Width)
 	}
 }

@@ -329,7 +329,33 @@ also names `zuzu.point` for a point and `zuzu.bar.vertical` or
 which the runtime gives only to the last bar of each stack. A spec turns it
 off with `{"config": {"style": {"zuzu.bar.vertical":
 {"zuzu.cornerRadiusEnd": 0}}}}`. A point of Vega-Lite is filled, as
-`docs/STYLE.md` draws it, and `"filled": false` keeps it hollow.
+`docs/STYLE.md` draws it, and `"filled": false` keeps it hollow. A point
+smaller than 20 square pixels has no ring, because the ring covers it.
+
+On 2026-11-11 the guides read these settings of a spec, where zuzu chose
+the rules that Vega leaves to its renderer (D12):
+
+- A legend with no `orient` is a row above the plot area, as
+  `docs/STYLE.md` draws it. A legend with an `orient` goes there: `left`,
+  `right` and `bottom` beside or below the plot and its axes, `top` with the
+  row above, a corner inside the plot area at its `offset` from the edges,
+  and `none` at its `legendX` and `legendY`. Legends at one place stack.
+- A legend at a side or in a corner is a column, and a legend above or
+  below is a row, unless its `direction` says otherwise. `columns` lays the
+  entries out in a grid, each column as wide as its widest entry. The title
+  is at the left of a row and above a column or a grid.
+- The `encode` of a legend sets the properties of its `title`, `labels`,
+  `symbols`, `gradient` and `entries`, but not their places, which the
+  layout gives.
+- A legend of sizes draws its circles nested, sharing their lowest point,
+  each with a line from its top to its label. No target draws one, so this
+  is the usual design. When the largest circle is less than three labels
+  high, the legend draws a row of circles, so that the labels have room.
+- An axis reads `labelFlush`, true for a distance of 1 pixel, and
+  `labelLimit`, 180 by default, as in Vega.
+- The autosize `fit`, `fit-x` and `fit-y` render the chart a second time,
+  with the plot area smaller by what the guides take, so that the whole
+  chart has the size of the spec.
 
 The survey shows why a theme matters. Of the 13 libraries in
 `compare.html`, Vega, ECharts, ApexCharts, Mermaid, Highcharts and Matplotlib
