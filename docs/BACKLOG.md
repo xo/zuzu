@@ -96,6 +96,42 @@ them come from the corpus of `github.com/bvolpato/mermaid-go-renderer`.
    it does not read, with no issue.
 2. `gantt foo` ignores `foo` with no issue.
 
+### Fix what the corpus of mermaid-go-renderer found
+
+The corpus of `github.com/bvolpato/mermaid-go-renderer` at commit 9af8f11
+holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
+zuzu drew 1947 of them, and 450 with no issue. Of the files that zuzu does
+not draw, 862 are of kinds that it does not draw. Of the files with an
+issue, 741 fail only on `description` in the front matter (open question
+22).
+
+1. A top-level `direction LR` in a flowchart is dropped with no issue.
+   Mermaid sets the direction of the graph with it.
+2. A gantt does not check the settings at the top level of the config, so
+   a setting such as `fontFamily` there is dropped with no issue.
+3. `%%{wrap}%%` is not read. Mermaid sets `wrap: true` with it.
+4. `nodeSpacing` and `rankSpacing` at the top level of the config are
+   issues. Mermaid 12.3 reads them there too.
+5. `class Z foo` on an id that names no node makes a node `Z` in a
+   flowchart, and `class end badBadEvent` makes a state `end`. mmdc makes
+   no node.
+6. A radar with 2 axes is an error. mmdc draws it.
+7. `state h <<history>>` draws a state and an issue, and Mermaid makes no
+   state. `state "x" as s1:::cls` takes the class, and Mermaid adds an
+   empty description and no class.
+8. In an ER diagram, a text where only a part is bold or italic, such as
+   `*first*Name`, draws plain. A line draws in one font.
+9. `htmlLabels` in a mindmap is an issue. mmdc breaks a long word with it.
+10. `gantt.compact` and `gantt.useWidth` are issues. An outlined label of a
+    sankey stays inside the chart, where Mermaid draws it past the left
+    edge.
+11. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
+    reads `0` as a date of 2000 and the end as a time of the day of the
+    render. It needs the time of the render (see "Give a chart of Mermaid
+    the time of the render").
+12. `click`, `callback` and `link` are issues, as `URL` of DOT is. Open
+    question 26 asks about links in the scene.
+
 ### Draw more of Mermaid
 
 1. A label wraps at the width of Mermaid in the pixels of zuzu. zuzu draws
@@ -114,8 +150,8 @@ them come from the corpus of `github.com/bvolpato/mermaid-go-renderer`.
 5. The title of a gantt with sections starts at the names of the tasks, to
    the right of the names of the sections, because a title takes the bounds
    of the axes.
-6. zuzu does not draw a gitGraph, a timeline, a C4 diagram, a block diagram
-   or a requirement diagram. Open question 17 asks for their order.
+6. zuzu does not draw 18 kinds of Mermaid 12, which hold 862 files of the
+   corpus of mermaid-go-renderer. Open question 17 asks for their order.
 
 ### Draw more of DOT
 
@@ -164,6 +200,13 @@ The compilers of the charts work around each of these:
 9. The axis of an encoding reports `zindex`, `labelFontSize`,
    `labelPadding`, `titleFontSize`, `titlePadding`, `tickSize`, `tickWidth`
    and `domainWidth`. `config.axisX` and `config.axisY` apply some of them.
+
+### Fix the bounds of a text and the place of an axis title
+
+The bounds of a text ignore its `lineHeight`, so a text of more lines with
+a `lineHeight` above its font size is cut at the bottom of a chart. The
+title of the axis at the bottom has a fixed place, so it covers labels
+that turn, such as with `labelAngle: 45`.
 
 ### Fix the text of the direct renderer
 

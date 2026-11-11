@@ -1097,7 +1097,12 @@ stays true.
     and ER diagrams, the mindmap, the architecture diagram and the charts
     of D31. The kinds that programs give it next are gitGraph, timeline,
     C4, block and requirement diagrams. D31 keeps the order of the survey
-    until the maintainers answer.
+    until the maintainers answer. On 2026-11-12 the corpus of
+    mermaid-go-renderer held these files of the kinds that zuzu does not
+    draw: requirement 182, gitGraph 170, block 88, swimlane 59, usecase 57,
+    agentflow 50, timeline 44, C4 37, venn 29, treeView 28, railroad 23,
+    eventmodeling 18, zenuml 17, cynefin 15, ishikawa 14, kanban 14,
+    packet 10 and info 3.
 18. Which color do the edges of a diagram take? The edges, the arrowheads
     and the messages of a sequence take the token Axis of `docs/STYLE.md`,
     `#cfd5de` in the light mode. At the size of a terminal, iv finds them
@@ -1118,8 +1123,13 @@ stays true.
 22. Does zuzu read `description` in the front matter of Mermaid? Mermaid
     ignores the key, and zuzu reports it. zuzu can write it as the
     description of the spec, under a name that starts with `zuzu.` (D6).
+    Mermaid 12 reads only `title`, `displayMode` and `config` of the front
+    matter and ignores every other key. On 2026-11-12, 741 files of the
+    corpus of mermaid-go-renderer failed in the strict mode only on
+    `description`.
 23. A maintainer has to review the change to D30 that adds
-    `zuzu.sankeylabels`. An agent wrote it on 2026-11-11.
+    `zuzu.sankeylabels`. An agent wrote it on 2026-11-11. On 2026-11-12 an
+    agent added its parameter `side`.
 24. Does `animate` on a link of Mermaid stay an issue? zuzu draws a still
     image, and Mermaid moves the dashes of the link.
 25. A maintainer has to review the changes to D31 of 2026-11-12. An agent
@@ -1127,3 +1137,7 @@ stays true.
     Lin and Smyth to the search of dot and dagre. It also made the order in
     a rank keep the edges in that rank, and the places across the ranks
     count the weight of an edge. It added `wrap` and `breakWords`.
+26. Does the scene graph carry a link and a tooltip? `URL` and `tooltip` of
+    DOT, and `click`, `callback` and `link` of Mermaid, are issues, because
+    the scene has no field for them and the SVG writer writes neither. A
+    link draws nothing in a PNG.
