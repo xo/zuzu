@@ -1,0 +1,18 @@
+erDiagram
+  direction LR
+  CUSTOMER:::hot ||--o{ ORDER : places
+  ORDER ||--|{ ITEM : contains
+  ITEM {
+    string sku PK
+    int qty
+  }
+  classDef hot fill:#f96,stroke:#333
+  classDef cool fill:#9cf
+  class ORDER,ITEM cool
+  style ITEM stroke-width:3px
+  %% a comment
+  accTitle: Orders
+  accDescr {
+    A customer places orders
+    of items
+  }

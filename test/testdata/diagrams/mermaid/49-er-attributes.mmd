@@ -1,0 +1,31 @@
+---
+title: Cars
+---
+erDiagram
+  CAR ||--o{ NAMED-DRIVER : allows
+  CAR {
+    string registrationNumber PK
+    string make
+    string model
+    string[] parts
+  }
+  PERSON ||--o{ NAMED-DRIVER : is
+  PERSON {
+    string driversLicense PK "The license #"
+    string(99) firstName "Only 99 characters are allowed"
+    string lastName
+    string phone UK
+    int age
+  }
+  NAMED-DRIVER {
+    string carRegistrationNumber PK, FK
+    string driverLicence PK, FK
+  }
+  p[Person] {
+    string firstName
+  }
+  a["Customer Account"] {
+    string email
+  }
+  p ||--o| a : has
+  "Entity with space" ||--|| p : names

@@ -1,0 +1,1 @@
+{"nodes":[{"id":"CUSTOMER","label":"CUSTOMER","x":66.5,"y":71.625},{"id":"ITEM","label":"ITEM","x":562.5,"y":71.625},{"id":"ORDER","label":"ORDER","x":295,"y":71.625}],"edges":[{"source":"CUSTOMER","target":"ORDER","label":"places","points":[[121,71.625],[245,71.625]]},{"source":"ORDER","target":"ITEM","label":"contains","points":[[345,71.625],[484,71.625]]}],"clusters":[]}

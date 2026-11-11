@@ -141,7 +141,7 @@ func TestDiagrams(t *testing.T) {
 	}
 }
 
-func TestClassDiagrams(t *testing.T) {
+func TestClassAndERDiagrams(t *testing.T) {
 	t.Parallel()
 	class := `classDiagram
   class Shape{
@@ -163,6 +163,22 @@ func TestClassDiagrams(t *testing.T) {
 	// The line under the static method is a thin box under it.
 	if !strings.Contains(s, `height="1"`) {
 		t.Error("the class diagram has no line under its static method")
+	}
+	er := `erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  CUSTOMER {
+    string name PK "the name"
+    int age
+  }`
+	// The circle of the arrowhead crowodot draws at 1.4 times its size.
+	s, report, err = svgOf(t, er, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{">CUSTOMER<", ">string<", ">name<", ">PK<", ">the name<", ">int<", ">age<", ">places<", "A3.36 3.36"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the ER diagram has no %s", want)
+		}
 	}
 }
 

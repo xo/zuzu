@@ -1,0 +1,14 @@
+erDiagram
+  A |o--o| B : "zero or one"
+  A ||--|| C : "exactly one"
+  A }o--o{ D : "zero or more"
+  A }|--|{ E : "one or more"
+  F |o..o{ G : dashed
+  MANUFACTURER only one to zero or more CAR : makes
+  CAR one or more optionally to one or zero DRIVER : has
+  DRIVER 1+ to 0+ LICENSE : holds
+  LICENSE many(1) optionally to only one STATE : "issued by"
+  STATE 1 to many(0) CITY : contains
+  CITY one or many to zero or many ROAD : ""
+  ROAD |o.-|| SIGN : posts
+  SIGN }|-.o{ POLE : on

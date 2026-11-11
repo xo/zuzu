@@ -449,6 +449,62 @@ the section `class` of the config other than `hideEmptyMembersBox`, the
 layout `elk`, the look `handDrawn`, the `theme` and the `themeVariables` of
 Mermaid, and a style that a flowchart does not read.
 
+### Entity relationship diagram
+
+The keyword is `erDiagram`. The direction is `TB` by default, and
+`direction LR` on a line of its own sets it. A statement ends at a new
+line.
+
+| Part | Example |
+| --- | --- |
+| an entity | `CUSTOMER`, or a line that names it, such as `CUSTOMER \|\|--o{ ORDER : places` |
+| an entity in double quotes | `"Customer Account"` |
+| an alias | `p[Person]`, `p["A person"]` |
+| attributes | `CUSTOMER {`, then an attribute on each line, then `}` |
+| an attribute | a type and a name: `string name`, `string(99) note`, `string[] parts` |
+| the keys of an attribute | `PK`, `FK`, `UK` after the name, one or more, as `PK, FK` |
+| the comment of an attribute | `string name PK "the full name"` |
+| a relationship | `CUSTOMER \|\|--o{ ORDER : places`, with an optional label after the colon |
+| zero or one | `\|o` or `o\|`, `one or zero`, `zero or one` |
+| exactly one | `\|\|`, `one`, `only one`, `1` |
+| zero or more | `}o` or `o{`, `zero or more`, `zero or many`, `many`, `many(0)`, `0+` |
+| one or more | `}\|` or `\|{`, `one or more`, `one or many`, `many(1)`, `1+` |
+| an identifying relationship | `--` or `to`, a solid line |
+| a relationship that does not identify | `..`, `.-`, `-.` or `optionally to`, a dashed line |
+| a subgraph | `subgraph domain`, `subgraph domain["The domain"]` or `subgraph "The domain"`, then entities, then `end` |
+| a direction of a subgraph | `direction TB` inside it |
+| a class of style | `classDef hot fill:#f96`, then `class A,B hot` or `A:::hot` |
+| a style of an entity | `style CUSTOMER fill:#f9f,stroke:#333` |
+| a comment | `%% a comment` |
+| the text for a screen reader | `accTitle: Orders`, `accDescr: The orders`, `accDescr { ... }` |
+
+zuzu draws each part in its own look:
+
+| Part | Draws as |
+| --- | --- |
+| an entity with attributes | a box with the name in bold at the top, then a row for each attribute, with a line between each two |
+| an attribute | its type, its name, its keys and its comment in columns, each from the left, with a line between each two. A column that is empty in every row of the entity takes no space |
+| an entity with no attributes | a box with its name |
+| a relationship | an edge from the first entity to the second, solid or dashed, with its label in the middle |
+| zero or one | the arrowhead `teeodot`: a bar at the entity, then an open circle |
+| exactly one | the arrowhead `teetee`: two bars |
+| zero or more | the arrowhead `crowodot`: a crow's foot at the entity, then an open circle |
+| one or more | the arrowhead `crowtee`: a crow's foot at the entity, then a bar |
+| a subgraph | a cluster with its title |
+
+Each row of an attribute has a port with the name of the attribute. The
+ends of a relationship draw at 1.4 times the size of an arrowhead of a
+flowchart. The cardinality `u` of Mermaid draws no mark in Mermaid 12, so
+zuzu reads it and draws no mark either. A relationship to the id of a
+subgraph ends at its box. An entity that a subgraph names on a line of
+its own, or with its attributes, moves into the subgraph. `classDef`,
+`class`, `:::` and `style` read the same styles as a flowchart.
+`accTitle` and `accDescr` join into the description of the Vega spec.
+
+These parts are issues: `click`, the settings of the section `er` of the
+config, the layout `elk`, the look `handDrawn`, the `theme` and the
+`themeVariables` of Mermaid, and a style that a flowchart does not read.
+
 ### Charts
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
@@ -799,8 +855,8 @@ tune fcose, such as `numIter` and `seed`, are issues.
 
 ### Other kinds
 
-zuzu draws the flowchart, the state diagram, the class diagram, and the
-charts above. Every other kind of Mermaid is
+zuzu draws the flowchart, the state diagram, the class diagram, the entity
+relationship diagram, and the charts above. Every other kind of Mermaid is
 an error that wraps `mermaid.ErrKind`. D31 names the order of the next
 kinds.
 
