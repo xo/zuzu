@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	zlayout "github.com/xo/zuzu/layout"
 	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
@@ -140,15 +141,36 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			media = true
 			media2row(r, m)
 		}
+		if labelRow(r, "x", n.XLabel, n.XHTML) {
+			html = true
+		}
 		style(r, n.Style)
 		add("node", signature(r, paintKeys, "_paint"))
-		add("nodeText", signature(r, textKeys, "_text"))
+		text := signature(r, textKeys, "_text")
+		add("nodeText", text)
+		if _, ok := r["xLines"]; ok {
+			add("nodeXText", text)
+		}
 		nodes = append(nodes, r)
 	}
 	for i, e := range g.Edges {
 		r := map[string]any{"key": strconv.Itoa(i), "source": e.Source, "target": e.Target}
 		if e.Label != "" {
 			r["label"], r["lines"] = e.Label, lines(e.Label)
+		}
+		if e.HTML != "" {
+			r["html"], r["lines"] = e.HTML, []any{}
+			html = true
+		}
+		for _, l := range []struct{ name, text, src string }{
+			{"head", e.HeadLabel, e.HeadHTML}, {"tail", e.TailLabel, e.TailHTML}, {"x", e.XLabel, e.XHTML},
+		} {
+			if labelRow(r, l.name, l.text, l.src) {
+				html = true
+			}
+		}
+		if e.LabelDistance > 0 {
+			r["labelDistance"], r["labelAngle"] = e.LabelDistance, e.LabelAngle
 		}
 		if e.SourcePort != "" {
 			r["sourcePort"] = e.SourcePort
@@ -179,27 +201,39 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			tail = "none"
 		}
 		r["head"], r["tail"] = head, tail
-		hp, hf := ArrowPath(head)
-		tp, tf := ArrowPath(tail)
-		r["headPath"], r["tailPath"] = hp, tp
+		r["headFill"], r["headOpen"] = ArrowPaths(head)
+		r["tailFill"], r["tailOpen"] = ArrowPaths(tail)
+		size := 36.0
+		if e.ArrowSize > 0 {
+			size *= e.ArrowSize * e.ArrowSize
+		}
+		r["arrowSize"] = size
 		style(r, e.Style)
 		add("edge", signature(r, []string{"stroke", "strokeWidth", "strokeDash"}, "_paint"))
-		add("edgeText", signature(r, textKeys, "_text"))
-		for _, end := range []struct {
-			name, kind string
-			filled     bool
-		}{{"_head", head, hf}, {"_tail", tail, tf}} {
-			sig := "open"
-			if end.filled {
-				sig = "filled"
+		text := signature(r, textKeys, "_text")
+		add("edgeText", text)
+		if _, ok := r["xLines"]; ok {
+			add("edgeXText", text)
+		}
+		arrow := signature(r, []string{"stroke"}, "_arrow")
+		for _, part := range arrowFields {
+			if r[part] != "" {
+				add(part, arrow)
 			}
-			if _, ok := r["stroke"]; ok {
-				sig += ",stroke"
+		}
+		// The labels at the ends take the paint of the label of the edge,
+		// and LabelStyle over it.
+		if _, ok := r["headLines"]; ok || r["tailLines"] != nil {
+			end := map[string]any{}
+			style(end, e.Style)
+			style(end, e.LabelStyle)
+			if v, ok := end["textColor"]; ok {
+				r["endColor"] = v
 			}
-			r[end.name] = sig
-			if end.kind != "none" {
-				add("arrow", sig)
+			if v, ok := end["fontSize"]; ok {
+				r["endFontSize"] = v
 			}
+			add("endText", signature(r, []string{"endColor", "endFontSize"}, "_end"))
 		}
 		edges = append(edges, r)
 	}
@@ -210,6 +244,10 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		if c.Direction != "" {
 			r["direction"] = c.Direction
+		}
+		if c.HTML != "" {
+			r["html"], r["label"] = c.HTML, ""
+			html = true
 		}
 		style(r, c.Style)
 		add("cluster", signature(r, paintKeys, "_paint"))
@@ -222,6 +260,11 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	if g.NodeSep > 0 {
 		layout["nodeSep"] = g.NodeSep
+	}
+	if g.TitleHTML != "" {
+		// The title of HTML takes the size of the title of a chart.
+		layout["titleHTML"], layout["titleFontSize"] = g.TitleHTML, zlayout.TitleSize
+		html = true
 	}
 	transforms := []any{layout}
 	if media {
@@ -279,26 +322,25 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			"x": map[string]any{"value": 0}, "y": map[string]any{"value": 0}, "path": field("path"),
 		}, nil))
 	}
-	for _, sig := range paints["arrow"] {
-		for _, end := range []struct{ name, x, y, angle, path, kind string }{
-			{"_head", "endX", "endY", "endAngle", "headPath", "head"}, {"_tail", "startX", "startY", "startAngle", "tailPath", "tail"},
-		} {
-			st := []string{StyleArrow}
-			if strings.HasPrefix(sig, "open") {
-				st = []string{StyleArrowOpen}
-			}
+	for _, part := range arrowFields {
+		at := map[bool][3]string{true: {"endX", "endY", "endAngle"}, false: {"startX", "startY", "startAngle"}}[strings.HasPrefix(part, "head")]
+		open := strings.HasSuffix(part, "Open")
+		st := []string{StyleArrow}
+		if open {
+			st = []string{StyleArrowOpen}
+		}
+		for _, sig := range paints[part] {
 			enc := map[string]any{
-				"x": field(end.x), "y": field(end.y), "angle": field(end.angle), "shape": field(end.path),
-				"size": map[string]any{"value": 36},
+				"x": field(at[0]), "y": field(at[1]), "angle": field(at[2]), "shape": field(part), "size": field("arrowSize"),
 			}
-			if strings.HasSuffix(sig, ",stroke") {
+			if sig == "stroke" {
 				enc["stroke"] = field("stroke")
-				if !strings.HasPrefix(sig, "open") {
+				if !open {
 					enc["fill"] = field("stroke")
 				}
 			}
 			src := fmt.Sprintf("arrows%d", len(marks))
-			data = append(data, filter(src, "layoutEdges", fmt.Sprintf("datum.%s !== 'none' && datum.%s === %q", end.kind, end.name, sig)))
+			data = append(data, filter(src, "layoutEdges", fmt.Sprintf("datum.%s !== '' && datum._arrow === %q", part, sig)))
 			marks = append(marks, map[string]any{"type": "symbol", "from": map[string]any{"data": src}, "style": st, "encode": map[string]any{"update": enc}})
 		}
 	}
@@ -311,6 +353,28 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			"x": field("labelX"), "y": field("labelY"), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
 		}, map[string]string{"textColor": "fill"}))
 	}
+	// The labels that take no space in the ranks: at the ends of an edge,
+	// and the xlabels.
+	labelMarks := func(source, kind, sigField string, sigs []string, styles []string, rename map[string]string) {
+		if len(sigs) == 0 {
+			return
+		}
+		name := kind + "Labels"
+		if source == "layoutNodes" {
+			name = "nodeXLabels"
+		}
+		data = append(data, filter(name, source, fmt.Sprintf("datum.%sLabelWidth > 0", kind)))
+		for _, sig := range sigs {
+			marks = append(marks, mark("text", name, sigField, sig, styles, map[string]any{
+				"x": field(kind + "LabelX"), "y": field(kind + "LabelY"), "text": field(kind + "Lines"),
+				"align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
+			}, rename))
+		}
+	}
+	endRename := map[string]string{"endColor": "fill", "endFontSize": "fontSize"}
+	labelMarks("layoutEdges", "head", "_end", paints["endText"], []string{StyleEdgeLabel}, endRename)
+	labelMarks("layoutEdges", "tail", "_end", paints["endText"], []string{StyleEdgeLabel}, endRename)
+	labelMarks("layoutEdges", "x", "_text", paints["edgeXText"], []string{StyleEdgeLabel}, map[string]string{"textColor": "fill"})
 	for _, sig := range paints["node"] {
 		marks = append(marks, mark("path", "layoutNodes", "_paint", sig, []string{StyleNode}, map[string]any{
 			"x": field("x"), "y": field("y"), "path": field("path"),
@@ -341,6 +405,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			}}},
 		)
 	}
+	labelMarks("layoutNodes", "x", "_text", paints["nodeXText"], []string{StyleNodeLabel}, map[string]string{"textColor": "fill"})
 	if html {
 		marks = append(marks, htmlMarks(&data)...)
 	}
@@ -366,7 +431,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		"data":     data,
 		"marks":    marks,
 	}
-	if g.Title != "" {
+	if g.Title != "" && g.TitleHTML == "" {
 		spec["title"] = map[string]any{"text": g.Title, "anchor": "start"}
 	}
 	if g.Description != "" {
@@ -431,6 +496,25 @@ func htmlMarks(data *[]any) []any {
 		}, "fill", "font")
 	}
 	return marks
+}
+
+// arrowFields are the fields of a row of an edge that hold the paths of its
+// arrowheads: the filled shapes and the open shapes at each end.
+var arrowFields = []string{"headFill", "tailFill", "headOpen", "tailOpen"}
+
+// labelRow writes a label that takes no space in the ranks into a row: the
+// text in the field name+"Label" and its lines in name+"Lines", or the
+// source of HTML in name+"HTML" with no lines. It reports whether the
+// label is HTML.
+func labelRow(r map[string]any, name, text, src string) bool {
+	switch {
+	case src != "":
+		r[name+"HTML"], r[name+"Lines"] = src, []any{}
+		return true
+	case text != "":
+		r[name+"Label"], r[name+"Lines"] = text, lines(text)
+	}
+	return false
 }
 
 // media2row writes the icon or the image of a node into its row, for the

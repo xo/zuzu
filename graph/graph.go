@@ -35,10 +35,14 @@ type Graph struct {
 	// Direction is TB, BT, LR or RL.
 	Direction string
 	// Title is the title of the diagram, or empty.
-	Title    string
-	Nodes    []*Node
-	Edges    []*Edge
-	Clusters []*Cluster
+	Title string
+	// TitleHTML is the source of a label of HTML of DOT for the title, with
+	// no < and > around it, or empty. It draws in the place of Title, at
+	// the top left of the diagram.
+	TitleHTML string
+	Nodes     []*Node
+	Edges     []*Edge
+	Clusters  []*Cluster
 	// RankSep and NodeSep are the space between the ranks and between the
 	// nodes of a rank, or 0 for the defaults.
 	RankSep, NodeSep float64
@@ -78,6 +82,11 @@ type Node struct {
 	// Margin is the space around a label of HTML, x and y, or nil for the
 	// default of the shape.
 	Margin []float64
+	// XLabel is a label outside the node, at a corner of the node, and
+	// XHTML the source of a label of HTML there, or empty. An xlabel takes
+	// no space in the layout: it goes where it covers no node and no other
+	// label, if it can.
+	XLabel, XHTML string
 	// Width and Height are the size of the node, or 0 to measure the label.
 	Width, Height float64
 }
@@ -114,15 +123,40 @@ type Edge struct {
 	// or both, as p:e.
 	SourcePort, TargetPort string
 	Label                  string
+	// HTML is the source of a label of HTML of DOT, with no < and > around
+	// it, or empty. It draws in the place of Label, and Label holds its
+	// text.
+	HTML string
+	// HeadLabel and TailLabel are the labels at the head and at the tail of
+	// the edge, such as the cardinality of an association, or empty. Each
+	// sits beside the edge, near its end. XLabel is a label beside the
+	// middle of the edge. These three take no space in the ranks.
+	HeadLabel, TailLabel, XLabel string
+	// HeadHTML, TailHTML and XHTML are the sources of labels of HTML that
+	// draw in the place of HeadLabel, TailLabel and XLabel, or empty.
+	HeadHTML, TailHTML, XHTML string
+	// LabelStyle holds the paint of the head and the tail labels: color
+	// and fontSize. A key that it does not set takes the one of Style.
+	LabelStyle map[string]string
+	// LabelDistance and LabelAngle fix the places of the head and the tail
+	// labels, as labeldistance and labelangle of DOT do: the center of a
+	// label is 10 times LabelDistance pixels from the end, at LabelAngle
+	// degrees counterclockwise from the edge. When LabelDistance is 0, the
+	// layout places them itself, beside the edge.
+	LabelDistance, LabelAngle float64
 	// MinLen is the least number of ranks that the edge spans, 1 by
 	// default, and Weight how much a short edge counts, 1 by default.
 	MinLen int
 	Weight float64
 	// NoConstraint takes the edge out of the ranks.
 	NoConstraint bool
-	// Head and Tail are the arrowheads at the ends: normal, none, vee, dot,
-	// empty, circle or cross.
+	// Head and Tail are the arrowheads at the ends: a name of the arrowType
+	// of Graphviz, such as normal, vee, empty, odiamond, crowodot or
+	// teetee, or circle or cross of Mermaid. ArrowOf says which names zuzu
+	// draws.
 	Head, Tail string
+	// ArrowSize scales the arrowheads, 1 for 0.
+	ArrowSize float64
 	// Style holds the paint of the edge, as Node.Style does.
 	Style map[string]string
 	// Curve is the interpolation of the route, or empty for basis.
@@ -132,6 +166,9 @@ type Edge struct {
 // Cluster is a cluster of nodes, as a subgraph of DOT or Mermaid.
 type Cluster struct {
 	ID, Label string
+	// HTML is the source of a label of HTML of DOT for the title, or
+	// empty. It draws in the place of Label.
+	HTML string
 	// Parent is the id of the cluster that holds this one, or empty.
 	Parent string
 	// Direction is the direction of the cluster, or empty for that of the

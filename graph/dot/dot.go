@@ -5,6 +5,7 @@ package dot
 import (
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -319,6 +320,9 @@ func (p *parser) stmt(s *scope, graphAttrs map[string]string) error {
 		p.next()
 		v := p.next()
 		graphAttrs[t.text] = v.text
+		if v.html {
+			graphAttrs[t.text] = htmlMark + v.text
+		}
 		if s.parent != nil && t.text == "rank" {
 			s.rank = v.text
 		}
@@ -429,7 +433,7 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 	}
 	if cl != nil {
 		var err error
-		if cl.Label, err = p.text(attrs["label"], name, "subgraph "+name); err != nil {
+		if cl.Label, cl.HTML, err = p.label(attrs["label"], name, "subgraph "+name); err != nil {
 			return nil, err
 		}
 		if attrs["label"] == "" {
@@ -554,13 +558,47 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 	if !p.g.Directed {
 		dir = "none"
 	}
+	labels := map[string]*[2]string{
+		"label": {}, "headlabel": {}, "taillabel": {}, "xlabel": {},
+	}
+	placed := false
+	e.LabelDistance, e.LabelAngle = 1, -25
 	for k, v := range a {
 		switch k {
-		case "label":
+		case "label", "headlabel", "taillabel", "xlabel":
 			var err error
-			if e.Label, err = p.text(v, "", path); err != nil {
+			l := labels[k]
+			if l[0], l[1], err = p.label(v, "", path); err != nil {
 				return err
 			}
+		case "labeldistance", "labelangle", "arrowsize", "labelfontsize":
+			f, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				if err := p.issues.Add(path, "the %s %s", k, v); err != nil {
+					return err
+				}
+				continue
+			}
+			switch k {
+			case "labeldistance":
+				// A distance of 0 puts the label on the end, as dot does.
+				e.LabelDistance, placed = math.Max(f, 0.01), true
+			case "labelangle":
+				e.LabelAngle, placed = f, true
+			case "arrowsize":
+				e.ArrowSize = f
+			case "labelfontsize":
+				e.LabelStyle = labelStyle(e.LabelStyle, "fontSize", v)
+			}
+		case "labelfontcolor":
+			c, ok := graph.Color(v)
+			if !ok {
+				if err := p.issues.Add(path, "the color %s", v); err != nil {
+					return err
+				}
+				continue
+			}
+			e.LabelStyle = labelStyle(e.LabelStyle, "color", c)
 		case "dir":
 			dir = v
 		case "arrowhead":
@@ -585,11 +623,22 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 			}
 		}
 	}
+	if !placed {
+		e.LabelDistance, e.LabelAngle = 0, 0
+	}
+	e.Label, e.HTML = labels["label"][0], labels["label"][1]
+	e.HeadLabel, e.HeadHTML = labels["headlabel"][0], labels["headlabel"][1]
+	e.TailLabel, e.TailHTML = labels["taillabel"][0], labels["taillabel"][1]
+	e.XLabel, e.XHTML = labels["xlabel"][0], labels["xlabel"][1]
 	if err := p.paint(e.Style, a, false, path); err != nil {
 		return err
 	}
 	if a["style"] == "invis" {
 		e.Style["stroke"] = "transparent"
+		if e.LabelStyle != nil {
+			e.LabelStyle["color"] = "transparent"
+		}
+		e.Style["color"] = "transparent"
 	}
 	head, tail := e.Head, e.Tail
 	if head == "" {
@@ -625,7 +674,7 @@ func (p *parser) graphAttrs(a map[string]string) error {
 		switch k {
 		case "label":
 			var err error
-			if p.g.Title, err = p.text(v, "", "graph"); err != nil {
+			if p.g.Title, p.g.TitleHTML, err = p.label(v, "", "graph"); err != nil {
 				return err
 			}
 		case "rankdir":
@@ -696,6 +745,12 @@ func (p *parser) finish() error {
 			}
 			n.HTML, n.Label, n.Fields = src, htmlText(l), nil
 		}
+		if v, ok := a["xlabel"]; ok {
+			var err error
+			if n.XLabel, n.XHTML, err = p.label(v, n.ID, path); err != nil {
+				return err
+			}
+		}
 		if v, ok := a["margin"]; ok {
 			m, err := margin(v)
 			if err != nil {
@@ -709,7 +764,7 @@ func (p *parser) finish() error {
 		}
 		for k := range a {
 			switch k {
-			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin":
+			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel":
 			default:
 				if err := p.issues.Add(path, "the attribute %s of a node", k); err != nil {
 					return err
@@ -795,6 +850,16 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 		st["strokeWidth"] = "2"
 	}
 	return nil
+}
+
+// labelStyle sets a key of the style of the labels at the ends of an
+// edge, and makes the style when it is nil.
+func labelStyle(st map[string]string, k, v string) map[string]string {
+	if st == nil {
+		st = map[string]string{}
+	}
+	st[k] = v
+	return st
 }
 
 // label reads a label of DOT: \n, \l and \r end a line, and \N names the

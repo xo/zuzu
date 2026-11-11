@@ -1,0 +1,11 @@
+// Labels at the ends of the edges, xlabels on nodes and edges, and the
+// font and the place of the labels at the ends.
+digraph {
+	node [shape=box]
+	author -> book [headlabel="0..*", taillabel="1", label="writes"]
+	book -> isbn [headlabel="1", taillabel="1", labelfontcolor=blue, labelfontsize=9]
+	author -> person [headlabel="is", labeldistance=2, labelangle=40]
+	publisher -> book [xlabel="prints", headlabel="*"]
+	publisher [xlabel="company"]
+	isbn [xlabel=<<i>unique</i>>]
+}

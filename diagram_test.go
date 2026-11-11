@@ -204,6 +204,36 @@ func TestHTMLLabels(t *testing.T) {
 	}
 }
 
+func TestEndLabelsAndHTML(t *testing.T) {
+	t.Parallel()
+	src := `digraph {
+	label=<<b>Shop</b> plan>
+	subgraph cluster_a { label=<<i>Store</i>>; a; b }
+	a [xlabel="outer"]
+	a -> b [dir=both, arrowtail=teetee, arrowhead=crowodot, headlabel="0..*", taillabel="1", xlabel="sells", labelfontcolor=red]
+	b -> c [label=<<table><tr><td>fk</td><td bgcolor="yellow">id</td></tr></table>>, headlabel=<<b>N</b>>]
+}`
+	s, report, err := svgOf(t, src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{">0..*<", ">1<", ">sells<", ">outer<", ">Shop<", "plan<", ">Store<", ">fk<", ">id<", ">N<", `fill="yellow"`, `fill="red"`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the SVG has no %s", want)
+		}
+	}
+	for _, not := range []string{"&lt;b&gt;", "&lt;table", "&lt;i&gt;"} {
+		if strings.Contains(s, not) {
+			t.Errorf("the SVG draws %s as plain text", not)
+		}
+	}
+	// The circle of the arrowhead crowodot, 0.8 of the size of the symbol
+	// across.
+	if !strings.Contains(s, "A2.4 2.4") {
+		t.Error("the SVG has no circle of the arrowhead crowodot")
+	}
+}
+
 func TestIcons(t *testing.T) {
 	t.Parallel()
 	src := "flowchart LR\n  a@{ icon: \"fa:user\", label: \"User\" } --> b@{ icon: \"database\", form: square } --> c[fa:fa-gear Gear]"

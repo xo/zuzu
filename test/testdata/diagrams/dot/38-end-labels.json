@@ -1,0 +1,107 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,141.12,222.25",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "author",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "29,187.75",
+      "shape": "box",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 1,
+      "name": "book",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "103,99.25",
+      "shape": "box",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 2,
+      "name": "isbn",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "103,26.25",
+      "shape": "box",
+      "width": "0.75",
+      "xlabel": "<i>unique<\/i>",
+      "xlp": "57.625,52.5"
+    },
+    {
+      "_gvid": 3,
+      "name": "person",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "27,99.25",
+      "shape": "box",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 4,
+      "name": "publisher",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "108,187.75",
+      "shape": "box",
+      "width": "0.92014",
+      "xlabel": "company",
+      "xlp": "49.75,214"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 0,
+      "head": 1,
+      "head_lp": "74.206,125.85",
+      "headlabel": "0..*",
+      "label": "writes",
+      "lp": "84.5,143.5",
+      "pos": "e,84.706,117.6 41.082,169.59 48.514,159.35 58.422,146.24 68,135.25 70.759,132.08 73.741,128.85 76.759,125.69",
+      "tail_lp": "37.707,161.34",
+      "taillabel": "1"
+    },
+    {
+      "_gvid": 2,
+      "tail": 1,
+      "head": 2,
+      "head_lp": "100.75,49.529",
+      "headlabel": "1",
+      "label": "",
+      "labelfontcolor": "blue",
+      "labelfontsize": "9",
+      "pos": "e,103,44.279 103,81.063 103,73.476 103,64.351 103,55.789",
+      "tail_lp": "100.75,75.813",
+      "taillabel": "1"
+    },
+    {
+      "_gvid": 1,
+      "tail": 0,
+      "head": 3,
+      "head_lp": "14.903,133.21",
+      "headlabel": "is",
+      "label": "",
+      "labelangle": "40",
+      "labeldistance": "2",
+      "pos": "e,27.401,117.6 28.605,169.66 28.335,158.01 27.972,142.3 27.659,128.77"
+    },
+    {
+      "_gvid": 3,
+      "tail": 4,
+      "head": 1,
+      "head_lp": "100.63,125.85",
+      "headlabel": "*",
+      "label": "",
+      "pos": "e,104,117.6 107.01,169.66 106.34,158.01 105.43,142.3 104.65,128.77",
+      "xlabel": "prints",
+      "xlp": "120.9,152.16"
+    }
+  ]
+}

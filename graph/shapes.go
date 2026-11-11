@@ -209,35 +209,3 @@ func shapePath(kind string, w, h float64) string {
 	}
 	return shape.RoundRect(-x, -y, w, h, 6, 6, 6, 6)
 }
-
-// Arrows are the kinds of an arrowhead.
-var arrows = map[string]bool{"normal": true, "none": true, "vee": true, "dot": true, "empty": true, "circle": true, "cross": true, "odot": true, "diamond": true, "odiamond": true}
-
-// ArrowOf reports whether zuzu draws a kind of arrowhead. An empty kind is
-// normal.
-func ArrowOf(kind string) bool {
-	return kind == "" || arrows[kind]
-}
-
-// ArrowPath returns the path of an arrowhead of a kind, for a symbol of
-// Vega that points along x from its tip at 0, 0 back to -2, scaled by the
-// size of the symbol, and whether it is filled.
-func ArrowPath(kind string) (string, bool) {
-	switch kind {
-	case "vee":
-		return "M0,0L-2,-0.9L-1.4,0L-2,0.9Z", true
-	case "dot":
-		return "M0,0A0.6,0.6 0 1,0 -1.2,0A0.6,0.6 0 1,0 0,0Z", true
-	case "odot", "circle":
-		return "M0,0A0.6,0.6 0 1,0 -1.2,0A0.6,0.6 0 1,0 0,0Z", kind == "dot"
-	case "empty":
-		return "M0,0L-2,-0.8L-2,0.8Z", false
-	case "cross":
-		return "M-0.2,-0.8L-1.8,0.8M-0.2,0.8L-1.8,-0.8", false
-	case "diamond":
-		return "M0,0L-1,-0.7L-2,0L-1,0.7Z", true
-	case "odiamond":
-		return "M0,0L-1,-0.7L-2,0L-1,0.7Z", false
-	}
-	return "M0,0L-2,-0.8L-2,0.8Z", true
-}

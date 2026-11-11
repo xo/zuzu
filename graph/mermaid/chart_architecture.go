@@ -827,7 +827,7 @@ func (a *arch) spec() map[string]any {
 			iconTexts = append(iconTexts, map[string]any{"id": n.id, "x": n.x, "y": n.y, "lines": tl})
 		}
 	}
-	arrow, _ := graph.ArrowPath("normal")
+	arrow, _ := graph.ArrowPaths("normal")
 	for i, r := range routes {
 		e := r.e
 		edges = append(edges, map[string]any{"key": i, "source": e.a, "target": e.b, "path": roundPath(r.pts), "label": e.title})

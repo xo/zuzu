@@ -83,7 +83,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		return te.TextSize(text, font, size, weight)
 	}
-	measure := func(v any, weight string) (float64, float64) {
+	measureAt := func(v any, fontSize float64, weight string) (float64, float64) {
 		if v == nil || expr.IsUndefined(v) {
 			return 0, 0
 		}
@@ -105,6 +105,35 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		return te.TextSize(text, "", fontSize, weight)
 	}
+	measure := func(v any, weight string) (float64, float64) {
+		return measureAt(v, fontSize, weight)
+	}
+	// sizeOf returns the size of the font of a row, or the size of the
+	// font of the layout.
+	sizeOf := func(r Row, key string) float64 {
+		if v := expr.Number(r[key]); v > 0 {
+			return v
+		}
+		return fontSize
+	}
+	// other lays out a label that takes no space in the ranks: the label
+	// of HTML in the field name+"HTML" of a row, or the text in
+	// name+"Label". It returns the size of the label, and its layout for
+	// HTML.
+	other := func(r Row, name string, size float64) (float64, float64, *htmlLabel, error) {
+		if src, ok := r[name+"HTML"].(string); ok && src != "" {
+			h, err := layHTML(src, sizeAt, size)
+			if err != nil {
+				return 0, 0, nil, err
+			}
+			return h.lay.Width + 4, h.lay.Height + 2, h, nil
+		}
+		tw, th := measureAt(r[name+"Label"], size, "")
+		if tw > 0 {
+			return tw + 4, th + 2, nil, nil
+		}
+		return 0, 0, nil, nil
+	}
 	in := graph.LayoutInput{Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad}
 	text := func(r Row, f *Accessor) string {
 		v := f.Get(r)
@@ -125,6 +154,10 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	records := map[int]*record{}
 	medias := map[int]*media{}
 	htmls := map[int]*htmlLabel{}
+	// xhtmls holds the xlabel of HTML of each node, and edgeHTMLs the
+	// labels of HTML of each edge, by their names.
+	xhtmls := map[int]*htmlLabel{}
+	edgeHTMLs := map[int]map[string]*htmlLabel{}
 	for i, r := range rows {
 		fs, ok := r["fields"].([]any)
 		if !ok || len(fs) == 0 {
@@ -194,6 +227,13 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			tw, th := measure(fields["label"].Get(r), "")
 			n.Width, n.Height = graph.NodeSize(kind, tw, th, padding)
 		}
+		var xh *htmlLabel
+		if n.XLabelWidth, n.XLabelHeight, xh, err = other(r, "x", sizeOf(r, "fontSize")); err != nil {
+			return nil, fmt.Errorf("the xlabel of HTML of node %s: %w", n.ID, err)
+		}
+		if xh != nil {
+			xhtmls[i] = xh
+		}
 		in.Nodes = append(in.Nodes, n)
 	}
 	index := map[string]int{}
@@ -256,7 +296,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		return at, dir
 	}
-	for _, r := range edges {
+	for i, r := range edges {
 		e := graph.LayoutEdge{Source: text(r, fields["source"]), Target: text(r, fields["target"])}
 		e.SourcePort, e.SourceSide = port(e.Source, r["sourcePort"])
 		e.TargetPort, e.TargetSide = port(e.Target, r["targetPort"])
@@ -272,13 +312,48 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if c, ok := r["curve"].(string); ok {
 			e.Curve = c
 		}
-		lw, lh := measure(fields["label"].Get(r), "")
-		if lw > 0 {
+		size, endSize := sizeOf(r, "fontSize"), sizeOf(r, "endFontSize")
+		if _, ok := r["endFontSize"]; !ok {
+			endSize = size
+		}
+		hs := map[string]*htmlLabel{}
+		if src, ok := r["html"].(string); ok && src != "" {
+			h, err := layHTML(src, sizeAt, size)
+			if err != nil {
+				return nil, fmt.Errorf("the label of HTML of the edge %s -> %s: %w", e.Source, e.Target, err)
+			}
+			hs["label"] = h
+			e.LabelWidth, e.LabelHeight = h.lay.Width+8, h.lay.Height+4
+		} else if lw, lh := measureAt(fields["label"].Get(r), size, ""); lw > 0 {
 			e.LabelWidth, e.LabelHeight = lw+8, lh+4
+		}
+		for _, l := range []struct {
+			name string
+			size float64
+			w, h *float64
+		}{
+			{"head", endSize, &e.HeadLabelWidth, &e.HeadLabelHeight},
+			{"tail", endSize, &e.TailLabelWidth, &e.TailLabelHeight},
+			{"x", size, &e.XLabelWidth, &e.XLabelHeight},
+		} {
+			var h *htmlLabel
+			if *l.w, *l.h, h, err = other(r, l.name, l.size); err != nil {
+				return nil, fmt.Errorf("the %slabel of HTML of the edge %s -> %s: %w", l.name, e.Source, e.Target, err)
+			}
+			if h != nil {
+				hs[l.name] = h
+			}
+		}
+		if len(hs) > 0 {
+			edgeHTMLs[i] = hs
+		}
+		if d := expr.Number(r["labelDistance"]); d > 0 {
+			e.LabelDistance, e.LabelAngle = d, expr.Number(r["labelAngle"])
 		}
 		in.Edges = append(in.Edges, e)
 	}
-	for _, r := range clusters {
+	clusterHTMLs := map[int]*htmlLabel{}
+	for i, r := range clusters {
 		c := graph.LayoutCluster{ID: text(r, fields["key"]), Parent: expr.String(r["parent"])}
 		if r["parent"] == nil {
 			c.Parent = ""
@@ -287,6 +362,14 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			c.Direction = d
 		}
 		tw, th := measure(fields["label"].Get(r), "600")
+		if src, ok := r["html"].(string); ok && src != "" {
+			h, err := layHTML(src, sizeAt, sizeOf(r, "fontSize"))
+			if err != nil {
+				return nil, fmt.Errorf("the label of HTML of cluster %s: %w", c.ID, err)
+			}
+			clusterHTMLs[i] = h
+			tw, th = h.lay.Width, h.lay.Height
+		}
 		if tw > 0 {
 			c.TitleWidth, c.TitleHeight = tw, th+4
 		}
@@ -305,12 +388,17 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o[as[4]], o[as[5]] = float64(np.Rank), float64(np.Order)
 		o["path"] = graph.ShapePath(in.Nodes[i].Shape, np.Width, np.Height)
 		o["textX"], o["textY"] = np.X, np.Y
+		o["xLabelX"], o["xLabelY"] = np.XLabelX, np.XLabelY
+		o["xLabelWidth"], o["xLabelHeight"] = in.Nodes[i].XLabelWidth, in.Nodes[i].XLabelHeight
 		if m, ok := medias[i]; ok {
 			m.place(o, np)
 		}
 		out = append(out, o)
 		if h, ok := htmls[i]; ok {
 			out = append(out, h.rows(r, np.X, np.Y, in.Nodes[i].Shape)...)
+		}
+		if h, ok := xhtmls[i]; ok {
+			out = append(out, h.rows(Row{"key": r["key"], "textColor": r["textColor"]}, np.XLabelX, np.XLabelY, "")...)
 		}
 		rec, ok := records[i]
 		if !ok {
@@ -345,12 +433,35 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o["labelWidth"], o["labelHeight"] = in.Edges[i].LabelWidth, in.Edges[i].LabelHeight
 		o["endX"], o["endY"], o["endAngle"] = ep.EndX, ep.EndY, ep.EndAngle
 		o["startX"], o["startY"], o["startAngle"] = ep.StartX, ep.StartY, ep.StartAngle
+		le := in.Edges[i]
+		o["headLabelX"], o["headLabelY"], o["headLabelWidth"], o["headLabelHeight"] = ep.HeadLabelX, ep.HeadLabelY, le.HeadLabelWidth, le.HeadLabelHeight
+		o["tailLabelX"], o["tailLabelY"], o["tailLabelWidth"], o["tailLabelHeight"] = ep.TailLabelX, ep.TailLabelY, le.TailLabelWidth, le.TailLabelHeight
+		o["xLabelX"], o["xLabelY"], o["xLabelWidth"], o["xLabelHeight"] = ep.XLabelX, ep.XLabelY, le.XLabelWidth, le.XLabelHeight
 		pts := make([]any, len(ep.Points))
 		for j, pt := range ep.Points {
 			pts[j] = []any{pt[0], pt[1]}
 		}
 		o["points"] = pts
 		out = append(out, o)
+		hs := edgeHTMLs[i]
+		// The labels at the ends take the color of the ends, and the
+		// others the color of the label of the edge.
+		end := r["endColor"]
+		if end == nil {
+			end = r["textColor"]
+		}
+		for _, l := range []struct {
+			name  string
+			x, y  float64
+			color any
+		}{
+			{"label", ep.LabelX, ep.LabelY, r["textColor"]}, {"head", ep.HeadLabelX, ep.HeadLabelY, end},
+			{"tail", ep.TailLabelX, ep.TailLabelY, end}, {"x", ep.XLabelX, ep.XLabelY, r["textColor"]},
+		} {
+			if h, ok := hs[l.name]; ok {
+				out = append(out, h.rows(Row{"key": r["key"], "stroke": r["stroke"], "textColor": l.color}, l.x, l.y, "")...)
+			}
+		}
 	}
 	for i, r := range clusters {
 		o := clone(r)
@@ -359,6 +470,23 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o["x"], o["y"], o["width"], o["height"] = cp.X, cp.Y, cp.Width, cp.Height
 		o["depth"], o["titleX"], o["titleY"] = float64(cp.Depth), cp.TitleX, cp.TitleY
 		out = append(out, o)
+		if h, ok := clusterHTMLs[i]; ok && cp.Width > 0 {
+			out = append(out, h.rows(Row{"key": r["key"], "stroke": r["stroke"], "textColor": r["textColor"]}, cp.TitleX+h.lay.Width/2, cp.TitleY+h.lay.Height/2, "")...)
+		}
+	}
+	// A title of HTML sits above the layout, at its left.
+	if src, err := p.str("titleHTML", ""); err != nil {
+		return nil, err
+	} else if src != "" {
+		size, err := p.number("titleFontSize", fontSize)
+		if err != nil {
+			return nil, err
+		}
+		h, err := layHTML(src, sizeAt, size)
+		if err != nil {
+			return nil, fmt.Errorf("the title of HTML: %w", err)
+		}
+		out = append(out, h.rows(Row{"key": "title"}, h.lay.Width/2, -h.lay.Height/2-8, "")...)
 	}
 	return out, nil
 }

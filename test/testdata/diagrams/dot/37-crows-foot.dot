@@ -1,0 +1,14 @@
+// The ends of an entity relationship diagram in crow's foot notation,
+// and the ends of a class diagram of UML.
+digraph {
+	rankdir=LR
+	node [shape=box]
+	edge [dir=both, arrowsize=1.2]
+	customer -> order [arrowtail=teetee, arrowhead=crowodot, label="places"]
+	order -> line [arrowtail=teetee, arrowhead=crowtee, label="holds"]
+	line -> product [arrowtail=crowodot, arrowhead=teeodot, label="names"]
+	shape -> circle [dir=back, arrowtail=empty, label="is a"]
+	car -> wheel [dir=back, arrowtail=diamond, label="has"]
+	team -> player [dir=back, arrowtail=odiamond, label="groups"]
+	client -> service [dir=forward, arrowhead=vee, style=dashed, label="uses"]
+}

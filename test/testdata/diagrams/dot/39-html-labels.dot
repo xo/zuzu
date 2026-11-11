@@ -1,0 +1,13 @@
+// Labels of HTML on an edge, at the ends of an edge, on a cluster and on
+// the graph.
+digraph {
+	label=<<b>Library</b> schema>
+	node [shape=box]
+	subgraph cluster_store {
+		label=<<font color="darkgreen"><b>store</b></font>>
+		shelf
+		book
+	}
+	shelf -> book [label=<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="lightyellow">holds</td><td>1..*</td></tr></table>>]
+	book -> page [headlabel=<<b>*</b>>, taillabel=<<i>1</i>>, xlabel=<<u>pages</u>>]
+}

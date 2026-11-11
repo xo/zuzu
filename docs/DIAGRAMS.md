@@ -45,7 +45,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 
 | Of | Attribute | What zuzu does |
 | --- | --- | --- |
-| the graph | `label` | the title |
+| the graph | `label` | the title, or a title of HTML at the top left |
 | the graph | `rankdir` | `TB`, `BT`, `LR` or `RL` |
 | the graph | `ranksep`, `nodesep` | the space between the ranks and between the nodes, in inches |
 | the graph | `splines` | curved or straight edges. Another value is an issue |
@@ -53,15 +53,22 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
 | a node | `shape` | the shape, as below |
 | a node | `width`, `height`, `fixedsize` | the size, in inches |
+| a node | `xlabel` | a label outside the node, at a corner, as below |
 | a node | `margin` | the space around a label of HTML, `x` or `x,y` in inches. A node with no shape has `0.11,0.055` by default, and `plain` has 0 |
 | a node | `style` | `filled`, `dashed`, `dotted`, `bold`, `rounded` |
 | a node | `color`, `fillcolor`, `fontcolor`, `penwidth`, `fontsize` | the paint |
-| an edge | `label` | the label |
-| an edge | `arrowhead`, `arrowtail`, `dir` | the arrowheads |
+| an edge | `label` | the label, or a label of HTML |
+| an edge | `headlabel`, `taillabel` | the labels at the ends, as below |
+| an edge | `xlabel` | a label beside the middle of the edge, as below |
+| an edge | `labelfontcolor`, `labelfontsize` | the paint of the labels at the ends. They take `fontcolor` and `fontsize` by default |
+| an edge | `labeldistance`, `labelangle` | the place of the labels at the ends, as below |
+| an edge | `arrowhead`, `arrowtail`, `dir` | the arrowheads, as below. `dir` is `forward`, `back`, `both` or `none` |
+| an edge | `arrowsize` | the scale of the arrowheads |
 | an edge | `minlen`, `weight`, `constraint` | the ranks that the edge spans, its weight, and whether it takes part in the ranks |
 | an edge | `headport`, `tailport` | the ports, as below |
 | an edge | `color`, `penwidth`, `style`, `fontcolor`, `fontsize` | the paint |
-| a cluster | `label`, `style`, `color`, `fillcolor`, `bgcolor`, `fontcolor`, `penwidth`, `pencolor` | the title and the paint |
+| a cluster | `label` | the title, or a title of HTML |
+| a cluster | `style`, `color`, `fillcolor`, `bgcolor`, `fontcolor`, `penwidth`, `pencolor` | the paint |
 
 A color is a name of X11 or of SVG, `#rrggbb`, `#rrggbbaa`, or three
 numbers of hue, saturation and value.
@@ -72,8 +79,50 @@ The shapes are `box`, `rect`, `rectangle`, `square`, `ellipse`, `oval`,
 `invtrapezium`, `parallelogram`, `cylinder`, `note`, `tab`, `folder`,
 `plaintext`, `plain`, `none`, `underline`, `record` and `Mrecord`.
 
-The arrowheads are `normal`, `vee`, `dot`, `odot`, `empty`, `diamond`,
-`odiamond`, `none`, and the `inv` forms.
+### Arrowheads
+
+An arrowhead is a name of the `arrowType` of Graphviz: one to four shapes
+in a row, such as `crowodot` or `teetee`. The first shape is at the node.
+The shapes are:
+
+| Shape | What zuzu draws |
+| --- | --- |
+| `normal`, `inv` | a triangle that points to the node, or away from it |
+| `vee` | a triangle with a notch, that points to the node |
+| `crow` | a crow's foot of three lines, open toward the node |
+| `tee` | a bar across the edge |
+| `box`, `diamond`, `dot` | a square, a diamond or a circle |
+| `curve`, `icurve` | an arc across the edge, that bends toward the node, or away from it |
+| `none` | a gap in a row of shapes, and no arrowhead when it is alone |
+
+Before a shape, `o` draws it open, and `l` or `r` keeps only its left or
+its right half, as seen along the edge toward the node. `o` changes only
+`normal`, `inv`, `box`, `diamond` and `dot`, as in Graphviz. The old names
+`empty`, `invempty`, `open`, `halfopen` and `ediamond` draw as `onormal`,
+`oinv`, `vee`, `lvee` and `odiamond`. Another name, or a row of more than
+four shapes, is an issue, and draws as `normal`.
+
+An entity relationship diagram in crow's foot notation uses `teeodot` for
+zero or one, `teetee` for one, `crowodot` for zero or more, and `crowtee`
+for one or more. A class diagram of UML uses `empty` for a generalization,
+`diamond` and `odiamond` for a composition and an aggregation, and `vee`
+for a dependency.
+
+### Labels at the ends and xlabels
+
+`headlabel` and `taillabel` are labels at the head and at the tail of an
+edge. Each sits beside the edge, just past its end, at the right of the
+edge as it runs from the tail to the head. If that place covers a node,
+another label or an edge, the label goes to the left. The space between
+two ranks grows to hold the labels at the ends of the edges between them.
+If an edge sets `labeldistance` or `labelangle`, the center of each label
+is 10 times `labeldistance` points from the end, at `labelangle` degrees
+counterclockwise from the edge, as in dot. The defaults are 1 and -25.
+
+`xlabel` is a label that takes no space in the ranks, as in dot. The xlabel
+of a node sits outside a corner of the node, first the top left. The
+xlabel of an edge sits beside the middle of the edge. Each goes to the
+first place where it covers no node, no other label and no edge.
 
 ### Records
 
@@ -111,7 +160,10 @@ whichever reads on the fill, so that a header in `lightblue` reads in both
 modes. Text with no `color` elsewhere takes the font color of the node, and
 then that of the theme.
 
-A label of HTML on an edge, a cluster or the graph draws as plain text.
+A label of HTML on an edge, at an end of an edge, in an xlabel, on a
+cluster or on the graph draws the same way. Its table takes no fill unless
+it sets a `bgcolor`. A label of HTML on the graph takes the size of the
+title of a chart.
 
 ### Ports
 
@@ -126,8 +178,9 @@ direction of the side.
 ### Issues
 
 An attribute that the table does not list, a shape that zuzu does not
-draw, and a part of a label of HTML that okage does not read, such as
-`href` or `<img>`, are issues. A label of HTML that is not valid is an
+draw, a name that is not an arrowhead, a number that does not read, and a
+part of a label of HTML that okage does not read, such as `href` or
+`<img>`, are issues. A label of HTML that is not valid is an
 error with its line and column.
 
 ## Mermaid

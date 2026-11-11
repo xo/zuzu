@@ -431,6 +431,7 @@ func (n *nest) place(s *scoped, dx, dy float64, out *Layout) {
 	in := n.in
 	for k, np := range s.l.Nodes {
 		np.X, np.Y = np.X+dx, np.Y+dy
+		np.shiftLabels(dx, dy)
 		if i := s.node[k]; i >= 0 {
 			out.Nodes[i] = np
 			continue
@@ -460,6 +461,7 @@ func (n *nest) place(s *scoped, dx, dy float64, out *Layout) {
 		ep.Points = pts
 		ep.LabelX, ep.LabelY = ep.LabelX+dx, ep.LabelY+dy
 		ep.EndX, ep.EndY, ep.StartX, ep.StartY = ep.EndX+dx, ep.EndY+dy, ep.StartX+dx, ep.StartY+dy
+		ep.shiftLabels(dx, dy)
 		ep.Path = n.path(i, pts)
 		out.Edges[i] = ep
 	}
@@ -507,6 +509,7 @@ func (n *nest) clipEdge(i int, out *Layout) {
 	ep.StartX, ep.StartY = pts[0][0], pts[0][1]
 	ep.StartAngle = math.Atan2(pts[0][1]-pts[1][1], pts[0][0]-pts[1][0]) * 180 / math.Pi
 	ep.Path = n.path(i, pts)
+	placeEnds(n.in.Edges[i], ep)
 }
 
 // cutAtBox cuts a route where it first enters a box, and returns false

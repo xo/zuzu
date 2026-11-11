@@ -30,6 +30,9 @@ type LayoutNode struct {
 	// diamond, or else a rect.
 	Shape         string
 	Width, Height float64
+	// XLabelWidth and XLabelHeight are the size of the xlabel of the node,
+	// or 0 for none. The xlabel takes no space in the ranks.
+	XLabelWidth, XLabelHeight float64
 }
 
 // LayoutEdge is an edge to lay out.
@@ -45,6 +48,17 @@ type LayoutEdge struct {
 	// LabelWidth and LabelHeight are the size of the label of the edge, or
 	// 0 for none.
 	LabelWidth, LabelHeight float64
+	// HeadLabelWidth, HeadLabelHeight, TailLabelWidth and TailLabelHeight
+	// are the sizes of the labels at the ends of the edge, and XLabelWidth
+	// and XLabelHeight the size of its xlabel, or 0 for none. These labels
+	// take no space in the ranks.
+	HeadLabelWidth, HeadLabelHeight float64
+	TailLabelWidth, TailLabelHeight float64
+	XLabelWidth, XLabelHeight       float64
+	// LabelDistance and LabelAngle fix the places of the labels at the
+	// ends, as Edge.LabelDistance and Edge.LabelAngle say, or the layout
+	// places them beside the edge when LabelDistance is 0.
+	LabelDistance, LabelAngle float64
 	// Curve is the interpolation of the route: basis, the default, or
 	// another curve of Vega, such as linear or step.
 	Curve string
@@ -84,17 +98,24 @@ type Layout struct {
 type NodePlace struct {
 	X, Y, Width, Height float64
 	Rank, Order         int
+	// XLabelX and XLabelY are the center of the xlabel of the node.
+	XLabelX, XLabelY float64
 }
 
 // EdgePlace is the route of an edge: its points, its path of SVG, the
 // place of its label, and the place and the angle in degrees of the end at
-// its target and at its source.
+// its target and at its source. HeadLabelX, HeadLabelY, TailLabelX,
+// TailLabelY, XLabelX and XLabelY are the centers of the labels at its
+// head and its tail and of its xlabel.
 type EdgePlace struct {
 	Points                     [][2]float64
 	Path                       string
 	LabelX, LabelY             float64
 	EndX, EndY, EndAngle       float64
 	StartX, StartY, StartAngle float64
+	HeadLabelX, HeadLabelY     float64
+	TailLabelX, TailLabelY     float64
+	XLabelX, XLabelY           float64
 }
 
 // ClusterPlace is the box of a cluster, its depth from 0 for an outer one,

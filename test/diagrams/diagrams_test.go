@@ -27,6 +27,7 @@ import (
 // ref is a reference in one form for both languages.
 type ref struct {
 	nodes    map[string]string // the label of each node
+	xlabels  map[string]string // the xlabel of each node
 	edges    []refEdge
 	clusters map[string]string // the title of each cluster
 	// rank holds the rank of each node, from its place across the ranks.
@@ -37,6 +38,8 @@ type ref struct {
 
 type refEdge struct {
 	source, target, label string
+	// head, tail and x are the labels at the ends and the xlabel.
+	head, tail, x string
 }
 
 func TestDOT(t *testing.T) {
@@ -92,16 +95,20 @@ func readDOT(t *testing.T, path, dir string) *ref {
 	t.Helper()
 	var doc struct {
 		Objects []struct {
-			Name  string `json:"name"`
-			Label string `json:"label"`
-			Pos   string `json:"pos"`
-			Nodes []int  `json:"nodes"`
+			Name   string `json:"name"`
+			Label  string `json:"label"`
+			XLabel string `json:"xlabel"`
+			Pos    string `json:"pos"`
+			Nodes  []int  `json:"nodes"`
 		} `json:"objects"`
 		Edges []struct {
-			Tail  int    `json:"tail"`
-			Head  int    `json:"head"`
-			Label string `json:"label"`
-			Pos   string `json:"pos"`
+			Tail      int    `json:"tail"`
+			Head      int    `json:"head"`
+			Label     string `json:"label"`
+			HeadLabel string `json:"headlabel"`
+			TailLabel string `json:"taillabel"`
+			XLabel    string `json:"xlabel"`
+			Pos       string `json:"pos"`
 		} `json:"edges"`
 	}
 	b, err := os.ReadFile(path)
@@ -111,7 +118,7 @@ func readDOT(t *testing.T, path, dir string) *ref {
 	if err := json.Unmarshal(b, &doc); err != nil {
 		t.Fatal(err)
 	}
-	r := &ref{nodes: map[string]string{}, clusters: map[string]string{}}
+	r := &ref{nodes: map[string]string{}, xlabels: map[string]string{}, clusters: map[string]string{}}
 	across := map[string]float64{}
 	for _, o := range doc.Objects {
 		switch {
@@ -123,12 +130,15 @@ func readDOT(t *testing.T, path, dir string) *ref {
 				label = o.Name
 			}
 			r.nodes[o.Name] = label
+			if o.XLabel != "" {
+				r.xlabels[o.Name] = o.XLabel
+			}
 			x, y := point(o.Pos)
 			across[o.Name] = pick(dir, x, y)
 		}
 	}
 	for _, e := range doc.Edges {
-		re := refEdge{doc.Objects[e.Tail].Name, doc.Objects[e.Head].Name, e.Label}
+		re := refEdge{doc.Objects[e.Tail].Name, doc.Objects[e.Head].Name, e.Label, e.HeadLabel, e.TailLabel, e.XLabel}
 		r.edges = append(r.edges, re)
 		var pts [][2]float64
 		for p := range strings.FieldsSeq(e.Pos) {
@@ -182,7 +192,7 @@ func readMermaid(t *testing.T, path, dir string) *ref {
 		r.clusters[c.ID] = c.Label
 	}
 	for _, e := range doc.Edges {
-		r.edges = append(r.edges, refEdge{e.Source, e.Target, e.Label})
+		r.edges = append(r.edges, refEdge{source: e.Source, target: e.Target, label: e.Label})
 		r.routes = append(r.routes, e.Points)
 	}
 	r.rank = ranks(across)
@@ -241,6 +251,15 @@ func norm(s string) string {
 	return strings.Join(strings.Fields(strings.ReplaceAll(s, `\n`, " ")), " ")
 }
 
+// source returns the text of a label of the model as the reference writes
+// it: the source of a label of HTML, or else its text.
+func source(text, html string) string {
+	if html != "" {
+		return html
+	}
+	return text
+}
+
 // check runs the checks of D31 on a graph against its reference.
 func check(t *testing.T, g *graph.Graph, r *ref) {
 	t.Helper()
@@ -262,6 +281,9 @@ func check(t *testing.T, g *graph.Graph, r *ref) {
 		if len(n.Fields) == 0 && n.HTML == "" && norm(label) != "" && norm(n.Label) != norm(label) {
 			t.Errorf("node %s: expected the label %q, got %q", id, norm(label), norm(n.Label))
 		}
+		if x := source(n.XLabel, n.XHTML); norm(x) != norm(r.xlabels[id]) {
+			t.Errorf("node %s: expected the xlabel %q, got %q", id, norm(r.xlabels[id]), norm(x))
+		}
 	}
 	for id, label := range r.clusters {
 		c, ok := clusters[id]
@@ -269,8 +291,8 @@ func check(t *testing.T, g *graph.Graph, r *ref) {
 			t.Errorf("no cluster %s", id)
 			continue
 		}
-		if norm(c.Label) != norm(label) {
-			t.Errorf("cluster %s: expected the title %q, got %q", id, norm(label), norm(c.Label))
+		if norm(source(c.Label, c.HTML)) != norm(label) {
+			t.Errorf("cluster %s: expected the title %q, got %q", id, norm(label), norm(source(c.Label, c.HTML)))
 		}
 	}
 	member := func(id, cluster string) bool {
@@ -298,14 +320,18 @@ func check(t *testing.T, g *graph.Graph, r *ref) {
 		for i, e := range g.Edges {
 			fwd := matches(e.Source, re.source) && matches(e.Target, re.target)
 			back := !g.Directed && matches(e.Source, re.target) && matches(e.Target, re.source)
-			if used[i] || !fwd && !back || norm(e.Label) != norm(re.label) {
+			if used[i] || !fwd && !back || norm(source(e.Label, e.HTML)) != norm(re.label) {
+				continue
+			}
+			if norm(source(e.HeadLabel, e.HeadHTML)) != norm(re.head) || norm(source(e.TailLabel, e.TailHTML)) != norm(re.tail) ||
+				norm(source(e.XLabel, e.XHTML)) != norm(re.x) {
 				continue
 			}
 			used[i], found = true, true
 			break
 		}
 		if !found {
-			t.Errorf("no edge %s -> %s %q", re.source, re.target, re.label)
+			t.Errorf("no edge %s -> %s %q, with the labels %q, %q and %q", re.source, re.target, re.label, re.head, re.tail, re.x)
 		}
 	}
 	// 2. The hard rules of the layout hold.

@@ -1,0 +1,30 @@
+// Every shape of an arrowhead of dot, with the modifiers o, l and r, and
+// names of more than one shape.
+digraph {
+	rankdir=LR
+	ranksep=0.8
+	node [shape=box, width=0.4, height=0.3, fixedsize=true]
+	edge [arrowsize=1.5]
+	a1 -> b1 [arrowhead=normal, xlabel=normal]
+	a2 -> b2 [arrowhead=onormal, xlabel=onormal]
+	a3 -> b3 [arrowhead=lnormal, xlabel=lnormal]
+	a4 -> b4 [arrowhead=inv, xlabel=inv]
+	a5 -> b5 [arrowhead=box, xlabel=box]
+	a6 -> b6 [arrowhead=obox, xlabel=obox]
+	a7 -> b7 [arrowhead=crow, xlabel=crow]
+	a8 -> b8 [arrowhead=rcrow, xlabel=rcrow]
+	a9 -> b9 [arrowhead=tee, xlabel=tee]
+	a10 -> b10 [arrowhead=vee, xlabel=vee]
+	a11 -> b11 [arrowhead=diamond, xlabel=diamond]
+	a12 -> b12 [arrowhead=odiamond, xlabel=odiamond]
+	a13 -> b13 [arrowhead=dot, xlabel=dot]
+	a14 -> b14 [arrowhead=odot, xlabel=odot]
+	a15 -> b15 [arrowhead=curve, xlabel=curve]
+	a16 -> b16 [arrowhead=icurve, xlabel=icurve]
+	a17 -> b17 [arrowhead=nonenormal, xlabel=nonenormal]
+	a18 -> b18 [arrowhead=invempty, xlabel=invempty]
+	a19 -> b19 [arrowhead=lteeoldiamond, xlabel=lteeoldiamond]
+	a20 -> b20 [dir=both, arrowtail=diamond, arrowhead=vee, arrowsize=1, xlabel="dir=both"]
+	a21 -> b21 [dir=back, arrowtail=inv, xlabel="dir=back"]
+	a22 -> b22 [dir=none, xlabel="dir=none"]
+}

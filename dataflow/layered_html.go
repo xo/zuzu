@@ -29,12 +29,24 @@ func htmlOf(r Row, size sizeFunc, fontSize float64) (*htmlLabel, bool, error) {
 	if !ok || src == "" {
 		return nil, false, nil
 	}
-	l, _, err := html.Parse(src)
+	if v := expr.Number(r["fontSize"]); v > 0 {
+		fontSize = v
+	}
+	h, err := layHTML(src, size, fontSize)
 	if err != nil {
 		return nil, false, err
 	}
-	if v := expr.Number(r["fontSize"]); v > 0 {
-		fontSize = v
+	if ms, ok := r["margin"].([]any); ok && len(ms) == 2 {
+		h.mx, h.my = expr.Number(ms[0]), expr.Number(ms[1])
+	}
+	return h, true, nil
+}
+
+// layHTML lays out a label of HTML in a size of font.
+func layHTML(src string, size sizeFunc, fontSize float64) (*htmlLabel, error) {
+	l, _, err := html.Parse(src)
+	if err != nil {
+		return nil, err
 	}
 	m := func(text string, st html.TextStyle) (html.Metrics, error) {
 		weight := ""
@@ -46,13 +58,9 @@ func htmlOf(r Row, size sizeFunc, fontSize float64) (*htmlLabel, bool, error) {
 	}
 	lay, err := l.Layout(html.WithMeasure(m), html.WithTextStyle(html.TextStyle{Size: fontSize}))
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	h := &htmlLabel{label: l, lay: lay, mx: 8, my: 4}
-	if ms, ok := r["margin"].([]any); ok && len(ms) == 2 {
-		h.mx, h.my = expr.Number(ms[0]), expr.Number(ms[1])
-	}
-	return h, true, nil
+	return &htmlLabel{label: l, lay: lay, mx: 8, my: 4}, nil
 }
 
 // size returns the size of a node of a shape around the label, with the

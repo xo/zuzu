@@ -114,28 +114,18 @@ func htmlText(l *html.Label) string {
 	return strings.Join(out, "\n")
 }
 
-// text returns the text of a label of an edge, a cluster or a graph. A
-// label of HTML there draws as plain text, so a font or a table in it is an
-// issue.
-func (p *parser) text(v, id, path string) (string, error) {
+// label returns the text of a label of an edge, a cluster, the graph or an
+// xlabel, and the source of its HTML when it is a label of HTML. The
+// label of HTML draws through the package html of okage, as the label of
+// a node does, and its text is the text of the label.
+func (p *parser) label(v, id, path string) (string, string, error) {
 	src, ok := isHTML(v)
 	if !ok {
-		return label(v, id), nil
+		return label(v, id), "", nil
 	}
 	l, err := p.html(src, path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	plain := l.Table == nil
-	for _, ln := range l.Lines {
-		for _, s := range ln.Spans {
-			plain = plain && s.Font == (html.Font{})
-		}
-	}
-	if !plain {
-		if err := p.issues.Add(path, "a font or a table in a label of HTML that draws as plain text"); err != nil {
-			return "", err
-		}
-	}
-	return htmlText(l), nil
+	return htmlText(l), src, nil
 }

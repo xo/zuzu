@@ -339,6 +339,7 @@ func (l *layout) placeRanks() {
 		}
 		return top + inner
 	}
+	ends := l.endRoom()
 	l.y = make([]float64, len(l.vs))
 	ys := make([]float64, len(l.layers))
 	for r := range l.layers {
@@ -359,11 +360,55 @@ func (l *layout) placeRanks() {
 			}
 		}
 		gap := math.Max(l.sep.rank, above+below+l.sep.rank/2)
+		gap = math.Max(gap, ends[r])
 		ys[r] = ys[r-1] + h[r-1]/2 + gap + h[r]/2
 	}
 	for v := range l.vs {
 		l.y[v] = ys[l.vs[v].rank]
 	}
+}
+
+// endRoom returns the space that the labels at the ends of the edges
+// need between each rank and the rank before it. Such a label sits beside
+// its edge, between the rank of its end and the next rank along the edge,
+// so the space between the two holds it, and both labels of an edge that
+// spans one rank.
+func (l *layout) endRoom() []float64 {
+	room := make([]float64, len(l.layers))
+	sideways := l.in.Direction == LR || l.in.Direction == RL
+	along := func(w, h float64) float64 {
+		if !(w > 0) {
+			return 0
+		}
+		if sideways {
+			return w + endAlong
+		}
+		return h + endAlong
+	}
+	for i, e := range l.in.Edges {
+		ch := l.chains[i]
+		if l.flat[i] || len(ch) < 2 {
+			continue
+		}
+		top, bottom := along(e.TailLabelWidth, e.TailLabelHeight), along(e.HeadLabelWidth, e.HeadLabelHeight)
+		if l.flip[i] {
+			top, bottom = bottom, top
+		}
+		first, last := l.vs[ch[1]].rank, l.vs[ch[len(ch)-1]].rank
+		if len(ch) == 2 {
+			if top+bottom > 0 {
+				room[last] = math.Max(room[last], top+bottom+endAlong*2)
+			}
+			continue
+		}
+		if top > 0 {
+			room[first] = math.Max(room[first], top+endAlong*2)
+		}
+		if bottom > 0 {
+			room[last] = math.Max(room[last], bottom+endAlong*2)
+		}
+	}
+	return room
 }
 
 // result maps the places to the direction of the layout and routes the
@@ -396,6 +441,7 @@ func (l *layout) result(ids map[string]int, _ bool) *Layout {
 	}
 	l.clusterBoxes(out, tf)
 	l.routes(out, ids, tf)
+	placeLabels(in, out)
 	l.normalize(out)
 	return out
 }
@@ -677,12 +723,14 @@ func (l *layout) normalize(out *Layout) {
 			add(e.LabelX-w/2, e.LabelY-h/2, e.LabelX+w/2, e.LabelY+h/2)
 		}
 	}
+	labelBounds(l.in, out, add)
 	if math.IsInf(x1, 1) {
 		return
 	}
 	for i := range out.Nodes {
 		out.Nodes[i].X -= x1
 		out.Nodes[i].Y -= y1
+		out.Nodes[i].shiftLabels(-x1, -y1)
 	}
 	for i := range out.Clusters {
 		c := &out.Clusters[i]
@@ -698,6 +746,7 @@ func (l *layout) normalize(out *Layout) {
 		}
 		e.LabelX, e.LabelY = e.LabelX-x1, e.LabelY-y1
 		e.EndX, e.EndY, e.StartX, e.StartY = e.EndX-x1, e.EndY-y1, e.StartX-x1, e.StartY-y1
+		e.shiftLabels(-x1, -y1)
 		if len(e.Points) > 0 {
 			if l.in.Edges[i].Source == l.in.Edges[i].Target {
 				e.Path = loopPath(e.Points)

@@ -1,0 +1,78 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,112,268.5",
+  "label": "<b>Library<\/b> schema",
+  "lheight": "0.23",
+  "lp": "56,12.25",
+  "lwidth": "1.26",
+  "_subgraph_cnt": 1,
+  "objects": [
+    {
+      "name": "cluster_store",
+      "bb": "8,89.5,104,260.5",
+      "label": "<font color=\"darkgreen\"><b>store<\/b><\/font>",
+      "lheight": "0.23",
+      "lp": "56,248.25",
+      "lwidth": "0.40",
+      "_gvid": 0,
+      "nodes": [
+        1,2
+      ],
+      "edges": [
+        0
+      ]
+    },
+    {
+      "_gvid": 1,
+      "name": "shelf",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "43,210",
+      "shape": "box",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 2,
+      "name": "book",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "43,115.5",
+      "shape": "box",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 3,
+      "name": "page",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "43,42.5",
+      "shape": "box",
+      "width": "0.75"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 1,
+      "head": 2,
+      "label": "<table border=\"0\" cellborder=\"1\" cellspacing=\"0\"><tr><td bgcolor=\"lightyellow\">holds<\/td><td>1..*<\/td><\/tr><\/table>",
+      "lp": "74.125,162.75",
+      "pos": "e,43,133.82 43,191.6 43,178.55 43,160.4 43,145.21"
+    },
+    {
+      "_gvid": 1,
+      "tail": 2,
+      "head": 3,
+      "head_lp": "39.625,68.779",
+      "headlabel": "<b>*<\/b>",
+      "label": "",
+      "pos": "e,43,60.529 43,97.313 43,89.726 43,80.601 43,72.039",
+      "tail_lp": "39.625,89.063",
+      "taillabel": "<i>1<\/i>",
+      "xlabel": "<u>pages<\/u>",
+      "xlp": "58.375,87.192"
+    }
+  ]
+}

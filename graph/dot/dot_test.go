@@ -28,20 +28,19 @@ func TestHTMLLabel(t *testing.T) {
 		t.Errorf("node b: %q %v", b.Label, b.Margin)
 	}
 	e := g.Edges[0]
-	if e.SourcePort != "id:e" || e.TargetPort != "w" || e.Label != "fk" {
-		t.Errorf("edge: %q %q %q", e.SourcePort, e.TargetPort, e.Label)
+	if e.SourcePort != "id:e" || e.TargetPort != "w" || e.Label != "fk" || e.HTML != "<b>fk</b>" {
+		t.Errorf("edge: %q %q %q %q", e.SourcePort, e.TargetPort, e.Label, e.HTML)
 	}
-	if g.Clusters[0].Label != "Box" {
-		t.Errorf("cluster: %q", g.Clusters[0].Label)
+	if c := g.Clusters[0]; c.Label != "Box" || c.HTML != "Box" {
+		t.Errorf("cluster: %q %q", c.Label, c.HTML)
 	}
-	// The href of a cell, the unknown color, and the font of the label of
-	// the edge, which draws as plain text.
+	// The href of a cell and the unknown color.
 	var msgs []string
 	for _, is := range report {
 		msgs = append(msgs, is.Message)
 	}
-	if len(report) != 3 {
-		t.Errorf("expected 3 issues, got %q", msgs)
+	if len(report) != 2 {
+		t.Errorf("expected 2 issues, got %q", msgs)
 	}
 	if _, _, err := Parse(src, true); err == nil {
 		t.Error("expected an error in the strict mode")
@@ -53,5 +52,92 @@ func TestHTMLSyntax(t *testing.T) {
 	_, _, err := Parse(`digraph { a [label=<<table><tr><td>x</tr></table>>] }`, false)
 	if !errors.Is(err, ErrSyntax) || !strings.Contains(err.Error(), "at 1:") {
 		t.Errorf("expected ErrSyntax with a place, got %v", err)
+	}
+}
+
+func TestHTMLGraphLabel(t *testing.T) {
+	t.Parallel()
+	g, report, err := Parse(`digraph { label=<<b>Title</b>>; subgraph cluster_a { label=<<i>A</i>>; x } }`, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Title != "Title" || g.TitleHTML != "<b>Title</b>" {
+		t.Errorf("title: %q %q", g.Title, g.TitleHTML)
+	}
+	if c := g.Clusters[0]; c.Label != "A" || c.HTML != "<i>A</i>" {
+		t.Errorf("cluster: %q %q", c.Label, c.HTML)
+	}
+	if len(report) != 0 {
+		t.Errorf("expected no issue, got %v", report)
+	}
+}
+
+func TestEndLabels(t *testing.T) {
+	t.Parallel()
+	src := `digraph {
+	a [xlabel="ext"]
+	b [xlabel=<<b>B</b>>]
+	a -> b [headlabel="1", taillabel=<<i>*</i>>, xlabel="x", labelfontcolor=red, labelfontsize=9]
+	a -> c [headlabel="h", labelangle=10]
+	b -> c [headlabel="h", labeldistance=0]
+	c -> a [headlabel="h"]
+}`
+	g, report, err := Parse(src, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("expected no issue, got %v", report)
+	}
+	a, b := g.Nodes[0], g.Nodes[1]
+	if a.XLabel != "ext" || a.XHTML != "" || b.XLabel != "B" || b.XHTML != "<b>B</b>" {
+		t.Errorf("xlabels: %q %q %q %q", a.XLabel, a.XHTML, b.XLabel, b.XHTML)
+	}
+	e := g.Edges[0]
+	if e.HeadLabel != "1" || e.HeadHTML != "" || e.TailLabel != "*" || e.TailHTML != "<i>*</i>" || e.XLabel != "x" {
+		t.Errorf("labels: %q %q %q %q %q", e.HeadLabel, e.HeadHTML, e.TailLabel, e.TailHTML, e.XLabel)
+	}
+	if e.LabelStyle["color"] != "red" || e.LabelStyle["fontSize"] != "9" {
+		t.Errorf("label style: %v", e.LabelStyle)
+	}
+	// labelangle alone fixes the place, with the distance of dot, and
+	// labeldistance=0 puts the label on the end. With neither, the layout
+	// places the label.
+	for i, want := range [][2]float64{{0, 0}, {1, 10}, {0.01, -25}, {0, 0}} {
+		if e := g.Edges[i]; e.LabelDistance != want[0] || e.LabelAngle != want[1] {
+			t.Errorf("edge %d: the distance %v and the angle %v, want %v", i, e.LabelDistance, e.LabelAngle, want)
+		}
+	}
+}
+
+func TestArrows(t *testing.T) {
+	t.Parallel()
+	src := `digraph {
+	a -> b [arrowhead=crowodot, arrowsize=2]
+	a -> c [dir=both, arrowtail=lteeoldiamond, arrowhead=invempty]
+	a -> d [dir=back, arrowtail=obox]
+	a -> e [arrowhead=nope]
+	a -> f [arrowhead=normalnormalnormalnormalnormal]
+}`
+	g, report, err := Parse(src, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, e := range g.Edges {
+		got = append(got, e.Head+" "+e.Tail)
+	}
+	want := []string{"crowodot none", "invempty lteeoldiamond", "none obox", "nope none", "normalnormalnormalnormalnormal none"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if g.Edges[0].ArrowSize != 2 {
+		t.Errorf("the arrow size %v", g.Edges[0].ArrowSize)
+	}
+	if len(report) != 2 {
+		t.Errorf("expected 2 issues, for nope and the five shapes, got %v", report)
+	}
+	if _, _, err := Parse(src, true); err == nil {
+		t.Error("expected an error in the strict mode")
 	}
 }
