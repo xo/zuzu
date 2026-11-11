@@ -525,6 +525,28 @@ func end(n NodePlace, kind string, port []float64, to [2]float64) (float64, floa
 	return px + max(t, 0)*dx, py + max(t, 0)*dy
 }
 
+// sides moves an end of a route at a port on a side onto the port, with a
+// point out of the side before it, so that the route leaves the side in its
+// direction. It returns the route and the new index of the point at, which
+// a point at the start moves on by one.
+func sides(pts [][2]float64, at int, na, nb NodePlace, e LayoutEdge, rankSep float64) ([][2]float64, int) {
+	k := math.Min(rankSep/2, 18)
+	if len(e.SourcePort) == 2 && len(e.SourceSide) == 2 {
+		p := [2]float64{na.X + e.SourcePort[0], na.Y + e.SourcePort[1]}
+		q := [2]float64{p[0] + e.SourceSide[0]*k, p[1] + e.SourceSide[1]*k}
+		pts = append([][2]float64{p, q}, pts[1:]...)
+		if at >= 0 {
+			at++
+		}
+	}
+	if len(e.TargetPort) == 2 && len(e.TargetSide) == 2 {
+		p := [2]float64{nb.X + e.TargetPort[0], nb.Y + e.TargetPort[1]}
+		q := [2]float64{p[0] + e.TargetSide[0]*k, p[1] + e.TargetSide[1]*k}
+		pts = append(pts[:len(pts)-1], q, p)
+	}
+	return pts, at
+}
+
 // routes sets the route of each edge: the points of its chain, clipped at
 // the borders of its ends, as a cubic B-spline. A loop goes around the
 // right of its node, and edges between the same two nodes spread apart.
@@ -578,18 +600,22 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 		pts[0][0], pts[0][1] = end(na, in.Nodes[a].Shape, e.SourcePort, pts[1])
 		last := len(pts) - 1
 		pts[last][0], pts[last][1] = end(nb, in.Nodes[b].Shape, e.TargetPort, pts[last-1])
+		label := l.label[i]
+		at := slices.Index(l.chains[i], label)
+		if l.flip[i] && at >= 0 {
+			at = len(pts) - 1 - at
+		}
+		pts, at = sides(pts, at, na, nb, e, l.sep.rank)
+		last = len(pts) - 1
 		ep.Points = pts
 		ep.EndX, ep.EndY = pts[last][0], pts[last][1]
 		ep.EndAngle = math.Atan2(pts[last][1]-pts[last-1][1], pts[last][0]-pts[last-1][0]) * 180 / math.Pi
 		ep.StartX, ep.StartY = pts[0][0], pts[0][1]
 		ep.StartAngle = math.Atan2(pts[0][1]-pts[1][1], pts[0][0]-pts[1][0]) * 180 / math.Pi
-		if lv := l.label[i]; lv >= 0 {
+		if lv := label; lv >= 0 {
 			// A B-spline passes near its middle points, not through them,
 			// so the label sits on the curve where its point pulls it.
-			j := slices.Index(l.chains[i], lv)
-			if l.flip[i] {
-				j = len(pts) - 1 - j
-			}
+			j := at
 			if j > 0 && j < len(pts)-1 {
 				ep.LabelX = (pts[j-1][0] + 4*pts[j][0] + pts[j+1][0]) / 6
 				ep.LabelY = (pts[j-1][1] + 4*pts[j][1] + pts[j+1][1]) / 6

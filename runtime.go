@@ -89,6 +89,9 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
 		rt.rand = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) //nolint:gosec // A chart asks for random data, not a secret (D28).
 	}
 	rt.theme = theme.New(o.mode, o.scheme)
+	if o.hasBackground && o.background != "transparent" {
+		rt.theme.Background = o.background
+	}
 	rt.config = rt.theme.Config()
 	rt.endLabels = map[string]map[string]bool{}
 	for k, raw := range c.spec.Config {

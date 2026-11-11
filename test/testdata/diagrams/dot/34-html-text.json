@@ -1,0 +1,52 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,232.01,134.83",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "a",
+      "height": "0.5",
+      "label": "Plain <b>bold<\/b> and <i>italic<\/i><br align=\"left\"\/>second line",
+      "pos": "63.875,115.92",
+      "shape": "box",
+      "width": "1.7743"
+    },
+    {
+      "_gvid": 1,
+      "name": "b",
+      "height": "0.52542",
+      "label": "<font color=\"red\" point-size=\"16\">big<\/font> text",
+      "pos": "188.88,115.92",
+      "shape": "ellipse",
+      "width": "1.1982"
+    },
+    {
+      "_gvid": 2,
+      "name": "c",
+      "height": "0.84722",
+      "label": "<table rows=\"*\"><tr><td rowspan=\"2\">tall<\/td><td port=\"x\">x<\/td><\/tr><tr><td port=\"y\">y<\/td><\/tr><\/table>",
+      "pos": "113.88,30.5",
+      "shape": "plaintext",
+      "width": "0.83333"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 0,
+      "head": 2,
+      "headport": "x",
+      "pos": "e,126.5,55 98.119,97.441 109.54,89.557 120.44,79.109 124.66,66.305"
+    },
+    {
+      "_gvid": 1,
+      "tail": 1,
+      "head": 2,
+      "headport": "y",
+      "pos": "e,133.88,18.25 186.77,96.733 182.91,71.904 172.39,29.399 145.15,20.087"
+    }
+  ]
+}

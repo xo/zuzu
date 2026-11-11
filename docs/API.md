@@ -60,6 +60,12 @@ package zuzu
 // needs WithDialect.
 func Parse(src []byte, opts ...Option) (*Chart, Report, error)
 
+// Sniff returns the dialect of a source from its first bytes, as a
+// detector of a type of file does: DOT or Mermaid from the first word, and
+// Vega or Vega-Lite from a $schema in the first bytes. It needs no more
+// than the first 512 bytes, and returns false when they do not decide.
+func Sniff(prefix []byte) (Dialect, bool)
+
 // FromVega and FromVegaLite take a spec that a program built as Go values.
 // Each copies the spec, so a later change by the caller does not reach the
 // Chart.
@@ -155,6 +161,7 @@ the wrong place does not compile.
 | `WithRandom(func() rand.Source)` | a source seeded from the system | the random numbers of a render (D28) |
 | `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with |
 | `WithSize(width, height float64)` | from the spec | the size of the chart |
+| `WithBackground(color.Color)` | the theme, then the spec | the background over the theme and the spec. An alpha of 0 draws none, and nil keeps the default |
 | `WithRenderLogger(*slog.Logger)` | none | where a render logs |
 | `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
 | `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |

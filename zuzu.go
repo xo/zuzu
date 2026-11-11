@@ -6,11 +6,13 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"image"
+	"image/color"
 	"io"
 	"log/slog"
 	"math"
 	"math/rand/v2"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -241,6 +243,10 @@ type renderOptions struct {
 	logger     *slog.Logger
 	icons      map[string]*icon.Pack
 	iconLoader IconLoader
+	// background is the color of WithBackground as CSS, and hasBackground
+	// says that the option set it.
+	background    string
+	hasBackground bool
 }
 
 // WithLoader sets how the data of a url is read (D25).
@@ -296,6 +302,34 @@ func WithLocale(l format.Locale) RenderOption {
 // a render (D28). Each render calls it once.
 func WithRandom(fn func() rand.Source) RenderOption {
 	return func(o *renderOptions) { o.random = fn }
+}
+
+// WithBackground sets the background of the chart, over the background of
+// the theme and of the spec. A color with an alpha of 0 draws no
+// background, and nil keeps the background of the theme and of the spec.
+// The boxes under the labels of a diagram and the open arrowheads take an
+// opaque color too, so that they match the background.
+func WithBackground(c color.Color) RenderOption {
+	return func(o *renderOptions) {
+		if c == nil {
+			o.background, o.hasBackground = "", false
+			return
+		}
+		o.background, o.hasBackground = cssColor(c), true
+	}
+}
+
+// cssColor writes a color as #rrggbb when it is opaque, as transparent
+// when its alpha is 0, and as rgba() between the two.
+func cssColor(c color.Color) string {
+	n := color.NRGBAModel.Convert(c).(color.NRGBA) //nolint:forcetypeassert // The model of NRGBA always returns an NRGBA.
+	switch n.A {
+	case 0:
+		return "transparent"
+	case 255:
+		return fmt.Sprintf("#%02x%02x%02x", n.R, n.G, n.B)
+	}
+	return fmt.Sprintf("rgba(%d,%d,%d,%s)", n.R, n.G, n.B, strconv.FormatFloat(float64(n.A)/255, 'f', 3, 64))
 }
 
 // WithSize sets the size of the chart, in place of its width and height.

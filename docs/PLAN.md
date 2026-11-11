@@ -881,6 +881,11 @@ The known gaps are in `docs/BACKLOG.md`, under "Phase 7".
 
 On 2026-11-11 phase 7 is done.
 
+Later on 2026-11-11, DOT gained labels of HTML through the package `html` of
+okage v0.4.0, sides of ports, and `margin`, so that the schemas that dbtpl
+writes draw. The root package gained `Sniff` and `WithBackground` for
+programs that detect and draw a file, such as iv.
+
 ### Phase 8. The browser
 
 The scene graph as a stream, the JavaScript canvas renderer that `web`
@@ -989,7 +994,7 @@ these leads:
    best ranks are not unique. D31 checks the hard rules, the crossings and
    the length of the edges instead.
 5. Gemini said that records and ports are common in real diagrams of DOT.
-   D31 reads them. A label of HTML stays an issue.
+   D31 reads them. Labels of HTML came later, through okage (okage D38).
 6. Both listed the traps of the grammar of Mermaid: `end` as the key of a
    node, the two forms of the text of a link, the delimiters of the shapes,
    and statements that end at a semicolon or a new line. D31 writes the

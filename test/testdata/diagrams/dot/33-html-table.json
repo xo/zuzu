@@ -1,0 +1,42 @@
+{
+  "name": "booktest",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,371,106",
+  "rankdir": "LR",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "authors",
+      "height": "1.1042",
+      "label": "\n\t\t<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"4\">\n\t\t<tr><td bgcolor=\"lightblue\"><b>authors<\/b><\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"author_id\">author_id: integer<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"name\">name: varchar<\/td><\/tr>\n\t\t<\/table>",
+      "margin": "0",
+      "pos": "317.62,40",
+      "shape": "none",
+      "width": "1.4826"
+    },
+    {
+      "_gvid": 1,
+      "name": "books",
+      "height": "1.4722",
+      "label": "\n\t\t<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"4\">\n\t\t<tr><td bgcolor=\"lightblue\"><b>books<\/b><\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"book_id\">book_id: integer<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"author_id\">author_id: integer<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"title\">title: varchar<\/td><\/tr>\n\t\t<\/table>",
+      "margin": "0",
+      "pos": "53.375,53",
+      "shape": "none",
+      "width": "1.4826"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 1,
+      "head": 0,
+      "headport": "author_id:w",
+      "label": "books_author_id_fkey",
+      "lp": "185.5,48.243",
+      "pos": "e,264.25,40 106.75,39.75 172.79,39.75 192.1,39.972 252.84,39.998",
+      "tailport": "author_id:e"
+    }
+  ]
+}

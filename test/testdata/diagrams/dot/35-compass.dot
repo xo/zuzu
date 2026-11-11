@@ -1,0 +1,10 @@
+// Ends of edges on the sides of nodes and of the fields of a record.
+digraph {
+	node [shape=box]
+	r [shape=record, label="<l> left|<m> mid|<r> right"]
+	a -> r:l:n
+	b -> r:r:ne
+	r:m:s -> c:n
+	c:e -> d:w
+	d:s -> e
+}

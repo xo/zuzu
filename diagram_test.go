@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"math"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -44,6 +45,65 @@ func TestSniffDiagram(t *testing.T) {
 	}
 }
 
+func TestSniff(t *testing.T) {
+	t.Parallel()
+	long := "---\ntitle: " + strings.Repeat("x", 600) + "\n---\nflowchart LR\n A"
+	tests := []struct {
+		src string
+		exp Dialect
+		ok  bool
+	}{
+		{"digraph { a -> b }", DOT, true},
+		{"flowchart LR\n A --> B", Mermaid, true},
+		{long[:512], Mermaid, true},
+		{`{"$schema": "https://vega.github.io/schema/vega/v5.json", "marks": []}`, Vega, true},
+		{`{"$schema":"https://vega.github.io/schema/vega-lite/v6.json"}`, VegaLite, true},
+		{`{"$schema": "https://example.com/other.json"}`, 0, false},
+		{`{"data": []}`, 0, false},
+		{"/* an open comment", 0, false},
+		{"hello world", 0, false},
+		{"", 0, false},
+	}
+	for _, test := range tests {
+		if d, ok := Sniff([]byte(test.src)); d != test.exp || ok != test.ok {
+			t.Errorf("%.40q: expected %v %t, got %v %t", test.src, test.exp, test.ok, d, ok)
+		}
+	}
+}
+
+func TestBackground(t *testing.T) {
+	t.Parallel()
+	src := "digraph { a -> b }"
+	bg := func(s string) bool { return strings.Contains(s, `<rect width=`) }
+	s, _, err := svgOf(t, src, true)
+	if err != nil || !bg(s) || !strings.Contains(s, `fill="#ffffff"`) {
+		t.Fatalf("expected the white background of the light theme, got %v", err)
+	}
+	s, _, err = svgOf(t, src, true, WithBackground(color.NRGBA{}))
+	if err != nil || bg(s) {
+		t.Errorf("expected no background, got %v", err)
+	}
+	s, _, err = svgOf(t, src, true, WithBackground(color.NRGBA{R: 0x12, G: 0x34, B: 0x56, A: 255}))
+	if err != nil || !strings.Contains(s, `fill="#123456"`) {
+		t.Errorf("expected the background #123456, got %v", err)
+	}
+	s, _, err = svgOf(t, src, true, WithBackground(nil))
+	if err != nil || !strings.Contains(s, `fill="#ffffff"`) {
+		t.Errorf("expected nil to keep the theme, got %v", err)
+	}
+	c, _, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _, err := c.Image(t.Context(), WithBackground(color.NRGBA{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := img.RGBAAt(0, 0).A; a != 0 {
+		t.Errorf("expected a transparent corner, got an alpha of %d", a)
+	}
+}
+
 // svgOf parses a source and renders it as SVG.
 func svgOf(t *testing.T, src string, strict bool, opts ...RenderOption) (string, Report, error) {
 	t.Helper()
@@ -71,6 +131,76 @@ func TestDiagrams(t *testing.T) {
 				t.Errorf("%q: the SVG has no %s", src, want)
 			}
 		}
+	}
+}
+
+func TestHTMLLabels(t *testing.T) {
+	t.Parallel()
+	src := `digraph {
+	rankdir=LR
+	node [shape=none, margin=0]
+	books [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue">books</td></tr>
+		<tr><td align="left" port="id">id: integer</td></tr>
+		<tr><td align="left" port="author">author_id: integer</td></tr>
+	</table>>]
+	authors [label=<<table border="0" cellborder="1" cellspacing="0"><tr><td port="id">id</td></tr></table>>]
+	books:author:e -> authors:id:w
+}`
+	s, report, err := svgOf(t, src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{">author_id: integer<", ">books<", `fill="lightblue"`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the SVG has no %s", want)
+		}
+	}
+	if strings.Contains(s, ">books\nid") || strings.Contains(s, "<table") {
+		t.Error("the SVG draws the label as plain text")
+	}
+	c, _, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _, err := c.NewView(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := v.Data("layout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var books, edge map[string]any
+	for _, r := range rows {
+		switch {
+		case r["kind"] == "node" && r["key"] == "books":
+			books = r
+		case r["kind"] == "edge":
+			edge = r
+		}
+	}
+	if books == nil || edge == nil {
+		t.Fatal("the layout has no node books or no edge")
+	}
+	// The edge starts on the east side of the books node, below its
+	// center, where the row of author_id is.
+	pts, ok := edge["points"].([]any)
+	if !ok || len(pts) == 0 {
+		t.Fatalf("the edge has no points: %v", edge["points"])
+	}
+	start, ok := pts[0].([]any)
+	if !ok || len(start) != 2 {
+		t.Fatalf("the first point is %v", pts[0])
+	}
+	num := func(v any) float64 {
+		f, _ := v.(float64)
+		return f
+	}
+	x, y := num(start[0]), num(start[1])
+	bx, by, bw := num(books["x"]), num(books["y"]), num(books["width"])
+	if math.Abs(x-(bx+bw/2)) > 0.01 || y <= by {
+		t.Errorf("the edge starts at %v, %v, not on the east side of books at %v, %v", x, y, bx+bw/2, by)
 	}
 }
 

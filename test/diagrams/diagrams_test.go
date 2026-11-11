@@ -259,7 +259,7 @@ func check(t *testing.T, g *graph.Graph, r *ref) {
 			t.Errorf("no node %s", id)
 			continue
 		}
-		if len(n.Fields) == 0 && norm(label) != "" && norm(n.Label) != norm(label) {
+		if len(n.Fields) == 0 && n.HTML == "" && norm(label) != "" && norm(n.Label) != norm(label) {
 			t.Errorf("node %s: expected the label %q, got %q", id, norm(label), norm(n.Label))
 		}
 	}

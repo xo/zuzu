@@ -50,6 +50,10 @@ type LayoutEdge struct {
 	// as x and y from the center of the node, or nil for none. An edge
 	// leaves a port on the side of the node that faces its route.
 	SourcePort, TargetPort []float64
+	// SourceSide and TargetSide are the directions out of the node at a
+	// port on a side, such as 1, 0 for the east side, or nil. An edge at
+	// such a port ends on the port and leaves it in that direction.
+	SourceSide, TargetSide []float64
 }
 
 // LayoutCluster is a cluster to lay out, with the size of its title.

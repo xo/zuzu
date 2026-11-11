@@ -1,0 +1,9 @@
+// Labels of HTML with fonts and lines, in shapes, and a table with spans
+// and rules.
+digraph {
+	a [shape=box, label=<Plain <b>bold</b> and <i>italic</i><br align="left"/>second line>]
+	b [shape=ellipse, label=<<font color="red" point-size="16">big</font> text>]
+	c [shape=plaintext, label=<<table rows="*"><tr><td rowspan="2">tall</td><td port="x">x</td></tr><tr><td port="y">y</td></tr></table>>]
+	a -> c:x
+	b -> c:y
+}

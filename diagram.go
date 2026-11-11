@@ -2,6 +2,7 @@ package zuzu
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
@@ -11,6 +12,33 @@ import (
 	"github.com/xo/zuzu/vegalite"
 )
 
+// schemaRE finds the $schema of a spec of JSON.
+var schemaRE = regexp.MustCompile(`"\$schema"\s*:\s*"([^"]*)"`)
+
+// Sniff returns the dialect of a source from its first bytes, as a
+// detector of a type of file does: DOT or Mermaid from the first word, and
+// Vega or Vega-Lite from a $schema in the first bytes. It needs no more
+// than the first 512 bytes, and returns false when they do not decide.
+func Sniff(prefix []byte) (Dialect, bool) {
+	if d := sniffDiagram(prefix); d != 0 {
+		return d, true
+	}
+	s := bytes.TrimSpace(prefix)
+	if !bytes.HasPrefix(s, []byte("{")) {
+		return 0, false
+	}
+	m := schemaRE.FindSubmatch(s)
+	switch {
+	case m == nil:
+		return 0, false
+	case bytes.Contains(m[1], []byte("/vega-lite/")):
+		return VegaLite, true
+	case bytes.Contains(m[1], []byte("/vega/")):
+		return Vega, true
+	}
+	return 0, false
+}
+
 // sniffDiagram returns the dialect of a source of DOT or Mermaid from its
 // first word, after the front matter, the directives and the comments of
 // Mermaid, or 0 for neither (D31).
@@ -19,11 +47,10 @@ func sniffDiagram(src []byte) Dialect {
 	if strings.HasPrefix(s, "{") || strings.HasPrefix(s, "[") {
 		return 0
 	}
-	// Front matter of Mermaid, between two lines of ---.
-	if strings.HasPrefix(s, "---") {
-		if i := strings.Index(s[3:], "\n---"); i >= 0 {
-			return Mermaid
-		}
+	// Front matter of Mermaid, between two lines of ---. DOT and JSON
+	// never start with ---, so the front matter needs no end in a prefix.
+	if line, _, _ := strings.Cut(s, "\n"); strings.TrimSpace(line) == "---" {
+		return Mermaid
 	}
 	for s != "" {
 		line, rest, _ := strings.Cut(s, "\n")

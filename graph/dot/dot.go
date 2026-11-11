@@ -5,7 +5,6 @@ package dot
 import (
 	"fmt"
 	"maps"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/xo/zuzu/graph"
-	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -399,7 +397,7 @@ func (p *parser) operand(s *scope) ([]end, error) {
 		e.port = p.next().text
 		if p.is(":") {
 			p.next()
-			p.next()
+			e.port += ":" + p.next().text
 		}
 	}
 	p.node(s, e.id, nil)
@@ -430,7 +428,10 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 		return nil, err
 	}
 	if cl != nil {
-		cl.Label = label(attrs["label"], name)
+		var err error
+		if cl.Label, err = p.text(attrs["label"], name, "subgraph "+name); err != nil {
+			return nil, err
+		}
 		if attrs["label"] == "" {
 			cl.Label = ""
 		}
@@ -485,7 +486,7 @@ func (p *parser) attrList() (map[string]string, error) {
 				vt := p.next()
 				v = vt.text
 				if vt.html {
-					v = "<" + v + ">"
+					v = htmlMark + v
 				}
 			}
 			a[k.text] = v
@@ -556,7 +557,10 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 	for k, v := range a {
 		switch k {
 		case "label":
-			e.Label = label(v, "")
+			var err error
+			if e.Label, err = p.text(v, "", path); err != nil {
+				return err
+			}
 		case "dir":
 			dir = v
 		case "arrowhead":
@@ -620,7 +624,10 @@ func (p *parser) graphAttrs(a map[string]string) error {
 	for k, v := range a {
 		switch k {
 		case "label":
-			p.g.Title = label(v, "")
+			var err error
+			if p.g.Title, err = p.text(v, "", "graph"); err != nil {
+				return err
+			}
 		case "rankdir":
 			switch strings.ToUpper(v) {
 			case "TB", "BT", "LR", "RL":
@@ -682,15 +689,27 @@ func (p *parser) finish() error {
 				return err
 			}
 		}
-		if strings.HasPrefix(a["label"], "<") && strings.HasSuffix(a["label"], ">") {
-			if err := p.issues.Add(path, "a label of HTML"); err != nil {
+		if src, ok := isHTML(a["label"]); ok {
+			l, err := p.html(src, path)
+			if err != nil {
 				return err
 			}
-			n.Label = n.ID
+			n.HTML, n.Label, n.Fields = src, htmlText(l), nil
+		}
+		if v, ok := a["margin"]; ok {
+			m, err := margin(v)
+			if err != nil {
+				if err := p.issues.Add(path, "the margin %s", v); err != nil {
+					return err
+				}
+			}
+			n.Margin = m
+		} else if a["shape"] == "plain" {
+			n.Margin = []float64{0, 0}
 		}
 		for k := range a {
 			switch k {
-			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize":
+			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin":
 			default:
 				if err := p.issues.Add(path, "the attribute %s of a node", k); err != nil {
 					return err
@@ -720,7 +739,7 @@ func (p *parser) finish() error {
 // the font color colors the label.
 func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 	col := func(v string) (string, bool) {
-		c, ok := dotColor(v)
+		c, ok := graph.Color(v)
 		if !ok {
 			if err := p.issues.Add(path, "the color %s", v); err != nil {
 				return "", false
@@ -778,64 +797,31 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 	return nil
 }
 
-// dotColor reads a color of DOT: a name, #rrggbb, #rrggbbaa, or hue,
-// saturation and value from 0 to 1. A list of colors takes its first.
-func dotColor(v string) (string, bool) {
-	v = strings.TrimSpace(v)
-	if i := strings.IndexAny(v, ":;"); i > 0 {
-		v = v[:i]
-	}
-	if c, ok := color.Parse(v); ok {
-		if len(v) == 9 && v[0] == '#' {
-			return fmt.Sprintf("rgba(%d,%d,%d,%s)", int(c.R), int(c.G), int(c.B), strconv.FormatFloat(c.A, 'f', 3, 64)), true
-		}
-		_ = c
-		return v, true
-	}
-	f := strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == ' ' })
-	if len(f) == 3 {
-		var hsv [3]float64
-		for i, s := range f {
-			x, err := strconv.ParseFloat(s, 64)
-			if err != nil {
-				return "", false
-			}
-			hsv[i] = x
-		}
-		r, g, b := hsvToRGB(hsv[0], hsv[1], hsv[2])
-		return fmt.Sprintf("rgb(%d,%d,%d)", r, g, b), true
-	}
-	return "", false
-}
-
-func hsvToRGB(h, s, v float64) (int, int, int) {
-	h = math.Mod(h, 1) * 6
-	i := math.Floor(h)
-	f := h - i
-	p, q, t := v*(1-s), v*(1-s*f), v*(1-s*(1-f))
-	var r, g, b float64
-	switch int(i) {
-	case 0:
-		r, g, b = v, t, p
-	case 1:
-		r, g, b = q, v, p
-	case 2:
-		r, g, b = p, v, t
-	case 3:
-		r, g, b = p, q, v
-	case 4:
-		r, g, b = t, p, v
-	default:
-		r, g, b = v, p, q
-	}
-	return int(math.Round(r * 255)), int(math.Round(g * 255)), int(math.Round(b * 255))
-}
-
 // label reads a label of DOT: \n, \l and \r end a line, and \N names the
 // node.
 func label(v, id string) string {
 	r := strings.NewReplacer(`\n`, "\n", `\l`, "\n", `\r`, "\n", `\N`, id, `\G`, "", `\"`, `"`, `\ `, " ")
 	return strings.TrimRight(r.Replace(v), "\n")
+}
+
+// margin reads the margin of a node, x or x,y in inches, as points.
+func margin(v string) ([]float64, error) {
+	f := strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == ' ' })
+	if len(f) == 0 || len(f) > 2 {
+		return nil, ErrSyntax
+	}
+	var out []float64
+	for _, s := range f {
+		x, err := strconv.ParseFloat(s, 64)
+		if err != nil || x < 0 {
+			return nil, ErrSyntax
+		}
+		out = append(out, x*72)
+	}
+	if len(out) == 1 {
+		out = append(out, out[0])
+	}
+	return out, nil
 }
 
 // record reads the fields of the label of a record, {a|<p>b|c}, flat: a

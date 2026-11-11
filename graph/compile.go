@@ -3,6 +3,7 @@ package graph
 import (
 	"encoding/json/v2"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -96,7 +97,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		dir = TB
 	}
 	var nodes, edges, clusters []any
-	media := false
+	media, html := false, false
 	paints := map[string][]string{}
 	add := func(kind, sig string) {
 		if !slices.Contains(paints[kind], sig) {
@@ -121,6 +122,13 @@ func Compile(g *Graph) (*vega.Spec, error) {
 				texts, ports = append(texts, f.Text), append(ports, f.Port)
 			}
 			r["fields"], r["ports"], r["lines"] = texts, ports, []any{}
+		}
+		if n.HTML != "" {
+			r["html"], r["lines"] = n.HTML, []any{}
+			html = true
+		}
+		if len(n.Margin) == 2 {
+			r["margin"] = []any{n.Margin[0], n.Margin[1]}
 		}
 		if n.Width > 0 && n.Height > 0 {
 			r["width"], r["height"] = n.Width, n.Height
@@ -327,6 +335,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			}}},
 		)
 	}
+	if html {
+		marks = append(marks, htmlMarks(&data)...)
+	}
 	records := slices.ContainsFunc(g.Nodes, func(n *Node) bool { return len(n.Fields) > 0 })
 	for _, sig := range paints["nodeText"] {
 		for _, from := range []string{"layoutNodes", "layoutFields"} {
@@ -357,6 +368,60 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		return nil, fmt.Errorf("writing the spec of a graph: %w", err)
 	}
 	return vega.Parse(b)
+}
+
+// htmlMarks returns the marks that draw the labels of HTML that the
+// transform zuzu.layered lays out (D31): their boxes, their rules, the lines
+// of their text, and their runs of text. A row of the layout leaves out
+// each paint that the theme gives, and the field _paint lists the paints
+// that it sets, so a mark for each list draws its rows.
+func htmlMarks(data *[]any) []any {
+	field := func(f string) map[string]any { return map[string]any{"field": f} }
+	var marks []any
+	add := func(typ, kind, sig string, styles []string, enc map[string]any, keys ...string) {
+		name := fmt.Sprintf("html%d", len(marks))
+		test := fmt.Sprintf("datum.kind === %q && datum._paint === %q", kind, sig)
+		*data = append(*data, map[string]any{"name": name, "source": "layout", "transform": []any{map[string]any{"type": "filter", "expr": test}}})
+		e := map[string]any{}
+		maps.Copy(e, enc)
+		for _, k := range keys {
+			if slices.Contains(strings.Split(sig, ","), k) {
+				e[k] = field(k)
+			}
+		}
+		// A fill of a label of HTML is opaque, as the fill of a filled
+		// node of DOT is.
+		if typ == "rect" && e["fill"] != nil {
+			e["fillOpacity"] = map[string]any{"value": 1}
+		}
+		marks = append(marks, map[string]any{"type": typ, "from": map[string]any{"data": name}, "style": styles, "encode": map[string]any{"update": e}})
+	}
+	both := []string{"", "fill", "stroke", "fill,stroke"}
+	for _, sig := range both {
+		add("rect", "htmlBox", sig, []string{StyleNode}, map[string]any{
+			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
+			"strokeWidth": field("strokeWidth"), "strokeDash": field("strokeDash"), "cornerRadius": field("cornerRadius"),
+		}, "fill", "stroke")
+	}
+	for _, sig := range []string{"", "stroke"} {
+		add("rule", "htmlRule", sig, []string{StyleNode}, map[string]any{
+			"x": field("x"), "y": field("y"), "x2": field("x2"), "y2": field("y2"),
+			"strokeWidth": field("strokeWidth"), "strokeDash": field("strokeDash"),
+		}, "stroke")
+	}
+	for _, sig := range []string{"", "fill"} {
+		add("rect", "htmlDeco", sig, []string{StyleNodeLabel}, map[string]any{
+			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
+		}, "fill")
+	}
+	for _, sig := range []string{"", "fill", "font", "fill,font"} {
+		add("text", "htmlRun", sig, []string{StyleNodeLabel}, map[string]any{
+			"x": field("x"), "y": field("y"), "text": field("text"), "fontSize": field("fontSize"),
+			"fontWeight": field("fontWeight"), "fontStyle": field("fontStyle"),
+			"align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "middle"},
+		}, "fill", "font")
+	}
+	return marks
 }
 
 // media2row writes the icon or the image of a node into its row, for the

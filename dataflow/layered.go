@@ -77,6 +77,12 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		return nil, err
 	}
 	te, _ := p.env.(TextEnv)
+	sizeAt := func(text, font string, size float64, weight string) (float64, float64) {
+		if te == nil {
+			return 0.6 * size * float64(len([]rune(text))), size
+		}
+		return te.TextSize(text, font, size, weight)
+	}
 	measure := func(v any, weight string) (float64, float64) {
 		if v == nil || expr.IsUndefined(v) {
 			return 0, 0
@@ -116,6 +122,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	}
 	records := map[int]*record{}
 	medias := map[int]*media{}
+	htmls := map[int]*htmlLabel{}
 	for i, r := range rows {
 		fs, ok := r["fields"].([]any)
 		if !ok || len(fs) == 0 {
@@ -141,6 +148,16 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		n.Shape = kind
 		n.Width, n.Height = expr.Number(fields["width"].Get(r)), expr.Number(fields["height"].Get(r))
+		h, ok, err := htmlOf(r, sizeAt, fontSize)
+		if err != nil {
+			return nil, fmt.Errorf("the label of HTML of node %s: %w", n.ID, err)
+		}
+		if ok {
+			htmls[i] = h
+			if !(n.Width > 0) || !(n.Height > 0) {
+				n.Width, n.Height = h.size(kind, padding)
+			}
+		}
 		if rec, ok := records[i]; ok {
 			n.Width, n.Height = 0, 0
 			for _, t := range rec.texts {
@@ -180,39 +197,66 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	for i, n := range in.Nodes {
 		index[n.ID] = i
 	}
-	// port returns the place of a port of a node from its center, or nil.
-	port := func(id string, v any) []float64 {
-		name, ok := v.(string)
-		if !ok || name == "" {
-			return nil
-		}
-		// A port of DOT can end in a side, as p:n, which zuzu does not
-		// follow.
-		name, _, _ = strings.Cut(name, ":")
-		i, ok := index[id]
-		if !ok {
-			return nil
-		}
-		rec, ok := records[i]
-		if !ok {
-			return nil
-		}
+	// boxes holds the box of each port of each node, as x, y, width and
+	// height from its center.
+	boxes := map[int]map[string][4]float64{}
+	for i, rec := range records {
+		n := in.Nodes[i]
+		m := map[string][4]float64{}
 		at := 0.0
-		for j, p := range rec.ports {
-			if p == name {
-				c := at + rec.sizes[j]/2
+		for j, name := range rec.ports {
+			if name != "" {
 				if across {
-					return []float64{c - in.Nodes[i].Width/2, 0}
+					m[name] = [4]float64{at - n.Width/2, -n.Height / 2, rec.sizes[j], n.Height}
+				} else {
+					m[name] = [4]float64{-n.Width / 2, at - n.Height/2, n.Width, rec.sizes[j]}
 				}
-				return []float64{0, c - in.Nodes[i].Height/2}
 			}
 			at += rec.sizes[j]
 		}
-		return nil
+		boxes[i] = m
+	}
+	for i, h := range htmls {
+		boxes[i] = h.ports()
+	}
+	// port returns the place of a port of a node from its center, or nil,
+	// and the direction out of the node when the port names a side. A port
+	// is a name, a side such as e, or both, as p:e. A port names the center
+	// of its box, and the edge leaves the border of the node on the line
+	// from it. A side names a point of the box of the port, or of the node,
+	// and the edge leaves it in the direction of the side.
+	port := func(id string, v any) ([]float64, []float64) {
+		s, ok := v.(string)
+		if !ok || s == "" {
+			return nil, nil
+		}
+		i, ok := index[id]
+		if !ok {
+			return nil, nil
+		}
+		n := in.Nodes[i]
+		name, side, _ := strings.Cut(s, ":")
+		b, ok := boxes[i][name]
+		if !ok {
+			if side != "" {
+				return nil, nil
+			}
+			// A word that names no port can be a side of the node.
+			side, b = name, [4]float64{-n.Width / 2, -n.Height / 2, n.Width, n.Height}
+		}
+		if side == "" {
+			return []float64{b[0] + b[2]/2, b[1] + b[3]/2}, nil
+		}
+		at, dir, ok := compass(side, b)
+		if !ok {
+			return nil, nil
+		}
+		return at, dir
 	}
 	for _, r := range edges {
 		e := graph.LayoutEdge{Source: text(r, fields["source"]), Target: text(r, fields["target"])}
-		e.SourcePort, e.TargetPort = port(e.Source, r["sourcePort"]), port(e.Target, r["targetPort"])
+		e.SourcePort, e.SourceSide = port(e.Source, r["sourcePort"])
+		e.TargetPort, e.TargetSide = port(e.Target, r["targetPort"])
 		if m := expr.Number(fields["minlen"].Get(r)); m > 0 {
 			e.MinLen = int(m)
 		}
@@ -259,6 +303,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			m.place(o, np)
 		}
 		out = append(out, o)
+		if h, ok := htmls[i]; ok {
+			out = append(out, h.rows(r, np.X, np.Y, in.Nodes[i].Shape)...)
+		}
 		rec, ok := records[i]
 		if !ok {
 			continue

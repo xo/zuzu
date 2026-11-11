@@ -50,15 +50,16 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `ranksep`, `nodesep` | the space between the ranks and between the nodes, in inches |
 | the graph | `splines` | curved or straight edges. Another value is an issue |
 | the graph | `layout` | `dot`. Another layout is an issue |
-| a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name |
+| a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
 | a node | `shape` | the shape, as below |
 | a node | `width`, `height`, `fixedsize` | the size, in inches |
+| a node | `margin` | the space around a label of HTML, `x` or `x,y` in inches. A node with no shape has `0.11,0.055` by default, and `plain` has 0 |
 | a node | `style` | `filled`, `dashed`, `dotted`, `bold`, `rounded` |
 | a node | `color`, `fillcolor`, `fontcolor`, `penwidth`, `fontsize` | the paint |
 | an edge | `label` | the label |
 | an edge | `arrowhead`, `arrowtail`, `dir` | the arrowheads |
 | an edge | `minlen`, `weight`, `constraint` | the ranks that the edge spans, its weight, and whether it takes part in the ranks |
-| an edge | `headport`, `tailport` | the ports |
+| an edge | `headport`, `tailport` | the ports, as below |
 | an edge | `color`, `penwidth`, `style`, `fontcolor`, `fontsize` | the paint |
 | a cluster | `label`, `style`, `color`, `fillcolor`, `bgcolor`, `fontcolor`, `penwidth`, `pencolor` | the title and the paint |
 
@@ -83,11 +84,51 @@ across. A field of a nested group, `{b|{c|d}}`, is a field of the record,
 in order. `<name>` names a port, and an edge that names the port ends at
 its field. `\{`, `\}`, `\|`, `\<`, `\>` and `\ ` are text.
 
+### Labels of HTML
+
+A label in angle brackets, `label=<...>`, is a label of HTML of Graphviz.
+The package `html` of okage reads it and lays it out as dot 16.1.0 does
+(okage D38), and zuzu draws the layout with its own fonts and theme:
+
+| Part | What zuzu draws |
+| --- | --- |
+| text with `<b>`, `<i>`, `<u>`, `<o>`, `<s>`, `<sub>`, `<sup>` and `<font color point-size face>` | runs of text in their fonts. A line under, over or through a run draws in the color of the text |
+| `<br align="left">` | a new line, placed in the text by its `align` |
+| `<table>` with `<tr>`, `<td>`, `<hr/>` and `<vr/>` | the boxes of the table and its cells, and the rules |
+| `border`, `cellborder`, `cellspacing`, `cellpadding` | the borders and the spaces, in points |
+| `bgcolor`, `color` | the fill and the border. A cell with no color takes that of its table, and then the color of the node |
+| `align`, `balign`, `valign` | the place of the content in a cell |
+| `colspan`, `rowspan`, `width`, `height`, `fixedsize` | the size of a cell or a table |
+| `sides` | the sides of a cell that have a border |
+| `style` | `rounded`, `dashed` and `dotted` |
+| `rows="*"`, `columns="*"` | a rule between each two rows or columns |
+| `port` | a port, as below |
+
+A table in a node with no shape, such as `shape=none` or `shape=plaintext`,
+takes the fill of a node of the theme. Text with no `color` on a cell with a
+`bgcolor` takes the text color of the light theme or of the dark theme,
+whichever reads on the fill, so that a header in `lightblue` reads in both
+modes. Text with no `color` elsewhere takes the font color of the node, and
+then that of the theme.
+
+A label of HTML on an edge, a cluster or the graph draws as plain text.
+
+### Ports
+
+An end of an edge can name a port, a side, or both: `a:p`, `a:n` or
+`a:p:e`. A port is a field of a record or a cell or a table of a label of
+HTML with a `port`. A side is `n`, `ne`, `e`, `se`, `s`, `sw`, `w`, `nw`,
+`c` or `_`. An edge to a port ends at the border of the node, on the line
+from the center of the port. An edge to a side ends on that side of the
+port, or of the node when the end names no port, and leaves it in the
+direction of the side.
+
 ### Issues
 
-A label of HTML draws as the name of its node. An attribute that the table
-does not list, a shape that zuzu does not draw, and a side of a port, such
-as `:n`, are issues.
+An attribute that the table does not list, a shape that zuzu does not
+draw, and a part of a label of HTML that okage does not read, such as
+`href` or `<img>`, are issues. A label of HTML that is not valid is an
+error with its line and column.
 
 ## Mermaid
 

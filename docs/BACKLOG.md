@@ -78,8 +78,12 @@ numbers before strings.
 3. A named shape that zuzu does not draw yet, such as a shape of BPMN, draws
    as a rounded rectangle.
 4. The properties of a link, such as `animate`, are issues.
-5. A side of a port of DOT, such as `:n`, and a label of HTML are issues.
-6. The error of the first line of a diagram says line 1, even after front
+5. The image raster draws no italic text, because zuzu bundles no italic
+   face of IBM Plex Sans. The SVG asks for italic, so a viewer draws it.
+6. A label of HTML on an edge, a cluster or the graph draws as plain text.
+   `headlabel`, `taillabel` and `xlabel` are issues. dbtpl writes
+   `headlabel` on each edge of a schema.
+7. The error of the first line of a diagram says line 1, even after front
    matter, because `Diagram` does not keep the number of that line.
 
 ### Give a chart of Mermaid the time of the render

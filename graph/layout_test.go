@@ -164,3 +164,33 @@ func TestLayErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestLaySides(t *testing.T) {
+	t.Parallel()
+	// An edge from the east side of a to the west side of b, in ranks
+	// that run down, leaves a to the right and comes into b from the left.
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 40, Height: 20}, {ID: "b", Width: 40, Height: 20}},
+		Edges: []LayoutEdge{{
+			Source: "a", Target: "b",
+			SourcePort: []float64{20, 0}, SourceSide: []float64{1, 0},
+			TargetPort: []float64{-20, 0}, TargetSide: []float64{-1, 0},
+		}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b, pts := l.Nodes[0], l.Nodes[1], l.Edges[0].Points
+	first, second := pts[0], pts[1]
+	last, before := pts[len(pts)-1], pts[len(pts)-2]
+	if first != [2]float64{a.X + 20, a.Y} || second[0] <= first[0] || second[1] != first[1] {
+		t.Errorf("the start %v %v does not leave the east side of a at %v", first, second, a)
+	}
+	if last != [2]float64{b.X - 20, b.Y} || before[0] >= last[0] || before[1] != last[1] {
+		t.Errorf("the end %v %v does not come into the west side of b at %v", before, last, b)
+	}
+	if math.Abs(l.Edges[0].EndAngle) > 1e-9 {
+		t.Errorf("expected the arrowhead to point east, got %v", l.Edges[0].EndAngle)
+	}
+}

@@ -61,6 +61,13 @@ type Node struct {
 	Media *Media
 	// Fields are the fields of a record, or nil.
 	Fields []Field
+	// HTML is the source of a label of HTML of DOT, with no < and > around
+	// it, or empty. The package html of okage reads it and lays it out
+	// (D31).
+	HTML string
+	// Margin is the space around a label of HTML, x and y, or nil for the
+	// default of the shape.
+	Margin []float64
 	// Width and Height are the size of the node, or 0 to measure the label.
 	Width, Height float64
 }
@@ -93,7 +100,8 @@ type Field struct {
 type Edge struct {
 	ID             string
 	Source, Target string
-	// SourcePort and TargetPort name a field or a side of the end.
+	// SourcePort and TargetPort name a field or a cell, a side such as e,
+	// or both, as p:e.
 	SourcePort, TargetPort string
 	Label                  string
 	// MinLen is the least number of ranks that the edge spans, 1 by

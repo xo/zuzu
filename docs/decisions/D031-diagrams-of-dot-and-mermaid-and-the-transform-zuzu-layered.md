@@ -116,9 +116,15 @@ It reads these attributes: `label`, `shape` (`box`, `rect`, `ellipse`,
 `constraint` and `headport` and `tailport`.
 
 A record, `{a|b|<p>c}`, draws as a box of fields, and a port names a field
-or a side, so that an edge ends there. A label of HTML, `splines=ortho`,
-the other engines of Graphviz, such as neato, and every other attribute are
-issues.
+or a side, so that an edge ends there. `splines=ortho`, the other engines
+of Graphviz, such as neato, and every other attribute are issues.
+
+On 2026-11-11 the maintainers added labels of HTML. The package `html` of
+okage reads a label of HTML and lays it out as dot does (okage D38), with
+the measure of text of zuzu. zuzu draws the boxes, the rules and the runs
+of text of the layout as marks, and a port names a cell or a table of the
+label. A side of a port, such as `p:e`, ends an edge on that side and
+leaves it in that direction.
 
 ## Mermaid
 

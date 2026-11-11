@@ -1,0 +1,20 @@
+// A schema of two tables, as dbtpl writes it: labels of HTML with ports,
+// and an edge between the sides of two cells.
+digraph booktest {
+	rankdir=LR
+	node [shape=none, margin=0]
+	authors [label=<
+		<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue"><b>authors</b></td></tr>
+		<tr><td align="left" port="author_id">author_id: integer</td></tr>
+		<tr><td align="left" port="name">name: varchar</td></tr>
+		</table>>]
+	books [label=<
+		<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue"><b>books</b></td></tr>
+		<tr><td align="left" port="book_id">book_id: integer</td></tr>
+		<tr><td align="left" port="author_id">author_id: integer</td></tr>
+		<tr><td align="left" port="title">title: varchar</td></tr>
+		</table>>]
+	books:author_id:e -> authors:author_id:w [label="books_author_id_fkey"]
+}
