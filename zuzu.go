@@ -247,6 +247,20 @@ type renderOptions struct {
 	// says that the option set it.
 	background    string
 	hasBackground bool
+	// scale is the scale of WithScale, and hasScale says that the option
+	// set it.
+	scale    float64
+	hasScale bool
+}
+
+// WithScale draws the image of Image at a scale, as a ratio of device
+// pixels to the pixels of the chart, such as 2 for a screen of high
+// density. The layout, the fonts and the size of the scene do not change,
+// and the image has the size of the scene times the scale. The SVG of SVG
+// has a viewBox, so a viewer scales it, and the scale does not change it.
+// A scale that is not more than zero, or not finite, is an error of Image.
+func WithScale(scale float64) RenderOption {
+	return func(o *renderOptions) { o.scale, o.hasScale = scale, true }
 }
 
 // WithLoader sets how the data of a url is read (D25).
@@ -452,9 +466,17 @@ func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, R
 	if err != nil {
 		return nil, report, err
 	}
+	var o renderOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	ropts := []raster.Option{}
+	if o.hasScale {
+		ropts = append(ropts, raster.WithScale(o.scale))
+	}
 	fonts := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
 		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
-	img, err := raster.Draw(s, raster.WithRenderer(fonts))
+	img, err := raster.Draw(s, append(ropts, raster.WithRenderer(fonts))...)
 	if err != nil {
 		return nil, report, fmt.Errorf("drawing the image: %w", err)
 	}

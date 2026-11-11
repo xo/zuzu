@@ -162,6 +162,7 @@ the wrong place does not compile.
 | `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with |
 | `WithSize(width, height float64)` | from the spec | the size of the chart |
 | `WithBackground(color.Color)` | the theme, then the spec | the background over the theme and the spec. An alpha of 0 draws none, and nil keeps the default |
+| `WithScale(float64)` | 1 | the ratio of device pixels to the pixels of the chart in the image of `Image`, such as 2 for a screen of high density. The layout does not change, and the SVG does not change |
 | `WithRenderLogger(*slog.Logger)` | none | where a render logs |
 | `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
 | `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |

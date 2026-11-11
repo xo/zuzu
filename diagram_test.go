@@ -293,3 +293,39 @@ func TestImageNode(t *testing.T) {
 		t.Errorf("expected 1 line in the report, got %v, %v", report, err)
 	}
 }
+
+func TestScale(t *testing.T) {
+	t.Parallel()
+	src := `{"$schema": "https://vega.github.io/schema/vega/v5.json", "width": 40, "height": 20, "padding": 0,
+		"marks": [{"type": "rect", "encode": {"enter": {"x": {"value": 10}, "y": {"value": 5}, "width": {"value": 20}, "height": {"value": 10}, "fill": {"value": "#ff0000"}}}}]}`
+	c, _, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, _, err := c.Image(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, _, err := c.Image(t.Context(), WithScale(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b1, b2 := one.Bounds(), two.Bounds(); b2.Dx() != 2*b1.Dx() || b2.Dy() != 2*b1.Dy() {
+		t.Fatalf("expected twice %v, got %v", b1.Size(), b2.Size())
+	}
+	// The rect covers 10 to 30 and 5 to 15, so 20 to 60 and 10 to 30 at
+	// the scale 2.
+	for _, p := range []struct {
+		x, y int
+		red  bool
+	}{{21, 11, true}, {58, 28, true}, {18, 11, false}, {21, 31, false}} {
+		if got := two.RGBAAt(p.x, p.y).R == 255 && two.RGBAAt(p.x, p.y).G == 0; got != p.red {
+			t.Errorf("at %d,%d: expected red %t, got %v", p.x, p.y, p.red, two.RGBAAt(p.x, p.y))
+		}
+	}
+	for _, s := range []float64{0, -1, math.Inf(1), math.NaN()} {
+		if _, _, err := c.Image(t.Context(), WithScale(s)); err == nil {
+			t.Errorf("expected an error of the scale %v", s)
+		}
+	}
+}

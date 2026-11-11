@@ -63,11 +63,28 @@ func WithRenderer(r *okagesvg.Renderer) Option {
 	}
 }
 
-// Draw draws a scene as an image. Its size is the size of the scene,
-// rounded to whole pixels, as okage rounds the size of an SVG. The pixels
-// are premultiplied, as image.RGBA expects.
+// WithScale draws a scene at a scale, as a ratio of device pixels to the
+// pixels of the scene. A scale of 2 gives an image of twice the width and
+// twice the height, with the same layout and sharper lines and text. A
+// scale that is not more than zero, or not finite, is ErrSize.
+func WithScale(scale float64) Option {
+	return func(d *drawer) {
+		d.scale = scale
+	}
+}
+
+// Draw draws a scene as an image. Its size is the size of the scene, times
+// the scale of WithScale, rounded to whole pixels, as okage rounds the size
+// of an SVG. The pixels are premultiplied, as image.RGBA expects.
 func Draw(s *scene.Scene, opts ...Option) (*image.RGBA, error) {
-	w, h := max(1, math.Round(s.Width)), max(1, math.Round(s.Height))
+	d := &drawer{measure: text.NewEstimate(), scale: 1}
+	for _, o := range opts {
+		o(d)
+	}
+	if !(d.scale > 0) || math.IsInf(d.scale, 0) {
+		return nil, ErrSize
+	}
+	w, h := max(1, math.Round(s.Width*d.scale)), max(1, math.Round(s.Height*d.scale))
 	if w > math.MaxInt32 || h > math.MaxInt32 || math.IsNaN(w) || math.IsNaN(h) {
 		return nil, ErrSize
 	}
@@ -75,15 +92,13 @@ func Draw(s *scene.Scene, opts ...Option) (*image.RGBA, error) {
 	if !ok {
 		return nil, ErrSize
 	}
-	d := &drawer{pm: pm, measure: text.NewEstimate()}
-	for _, o := range opts {
-		o(d)
-	}
+	d.pm = pm
+	ts := okage.Transform{SX: float32(d.scale), SY: float32(d.scale)}
 	if !s.Background.IsZero() {
 		bg := &scene.Item{Width: s.Width, Height: s.Height, Fill: s.Background}
-		d.rect(bg, okage.Transform{SX: 1, SY: 1})
+		d.rect(bg, ts)
 	}
-	if err := d.mark(&s.Root, okage.Transform{SX: 1, SY: 1}); err != nil {
+	if err := d.mark(&s.Root, ts); err != nil {
 		return nil, err
 	}
 	return pm.AsRGBA(), nil
@@ -92,6 +107,8 @@ func Draw(s *scene.Scene, opts ...Option) (*image.RGBA, error) {
 // drawer holds the state of one call of Draw.
 type drawer struct {
 	pm *okage.Pixmap
+	// scale is the ratio of device pixels to the pixels of the scene.
+	scale float64
 	// fonts shapes the text, and measure measures a line for its limit, as
 	// the SVG writer measures it.
 	fonts   *okagesvg.Renderer
