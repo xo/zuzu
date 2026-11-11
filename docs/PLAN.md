@@ -403,9 +403,14 @@ the rules that Vega leaves to its renderer (D12):
   high, the legend draws a row of circles, so that the labels have room.
 - An axis reads `labelFlush`, true for a distance of 1 pixel, and
   `labelLimit`, 180 by default, as in Vega.
-- The autosize `fit`, `fit-x` and `fit-y` render the chart a second time,
-  with the plot area smaller by what the guides take, so that the whole
-  chart has the size of the spec.
+- The autosize `fit`, `fit-x` and `fit-y` render the chart again, with the
+  plot area smaller by what the guides take, so that the whole chart has
+  the size of the spec. The guides of a smaller plot can take another
+  size, so a render that misses the size corrects it again, in three
+  renders at most. With `"contains": "padding"`, the size of the spec holds
+  the padding too, for `fit` and for `pad`.
+- `WithSize` replaces the size of the spec, even one that a signal works
+  out from a step, as Vega-Lite does for a discrete x.
 
 The survey shows why a theme matters. Of the 13 libraries in
 `compare.html`, Vega, ECharts, ApexCharts, Mermaid, Highcharts and Matplotlib

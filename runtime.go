@@ -46,6 +46,9 @@ type runtime struct {
 	// fitW and fitH are the size of the plot area that the autosize fit
 	// asks for, or 0, which NewView renders again with.
 	fitW, fitH float64
+	// wantW and wantH are the size of the canvas that the autosize fit
+	// asks for, or 0.
+	wantW, wantH float64
 	// config is the config of the theme with the config of the spec over
 	// it (D14).
 	config map[string]any
@@ -269,12 +272,18 @@ func (s *scope) builtins(spec *vega.Spec) {
 		}
 		s.signals[name] = &signalState{def: d}
 	}
-	width, height := spec.Width, spec.Height
+	// A size that the caller gives replaces the size of the spec, even one
+	// that a signal of the spec works out from a step.
 	if o := s.rt.opts; o.width > 0 {
-		width, height = vega.Num(o.width), vega.Num(o.height)
+		v, _ := json.Marshal(o.width)
+		s.signals["width"] = &signalState{def: &vega.Signal{Name: "width", Value: v}}
 	}
-	num("width", width, 0)
-	num("height", height, 0)
+	if o := s.rt.opts; o.height > 0 {
+		v, _ := json.Marshal(o.height)
+		s.signals["height"] = &signalState{def: &vega.Signal{Name: "height", Value: v}}
+	}
+	num("width", spec.Width, 0)
+	num("height", spec.Height, 0)
 	val := func(name string, v vega.Value) {
 		if _, ok := s.signals[name]; ok {
 			return

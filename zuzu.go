@@ -8,6 +8,7 @@ import (
 	"image"
 	"io"
 	"log/slog"
+	"math"
 	"math/rand/v2"
 	"slices"
 	"strings"
@@ -321,11 +322,27 @@ func (c *Chart) NewView(ctx context.Context, opts ...RenderOption) (*View, Repor
 		if rt.fitH > 0 {
 			fh = rt.fitH
 		}
-		again := newRuntime(ctx, c, append(slices.Clone(opts), WithSize(fw, fh)))
-		if s, err = again.render(); err != nil {
-			return nil, again.report, err
+		wantW, wantH := rt.wantW, rt.wantH
+		// The guides of a smaller plot can take another size, so a render
+		// that misses the size corrects the plot again, twice at most.
+		for range 3 {
+			again := newRuntime(ctx, c, append(slices.Clone(opts), WithSize(fw, fh)))
+			if s, err = again.render(); err != nil {
+				return nil, again.report, err
+			}
+			rt = again
+			dw, dh := 0.0, 0.0
+			if wantW > 0 {
+				dw = wantW - s.Width
+			}
+			if wantH > 0 {
+				dh = wantH - s.Height
+			}
+			if math.Abs(dw) < 1 && math.Abs(dh) < 1 {
+				break
+			}
+			fw, fh = fw+dw, fh+dh
 		}
-		rt = again
 	}
 	return &View{rt: rt, scene: s}, rt.report, nil
 }

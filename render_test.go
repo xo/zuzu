@@ -548,3 +548,39 @@ func TestAutosizeFit(t *testing.T) {
 		t.Errorf("the fit is %v wide, want 200", fit.Width)
 	}
 }
+
+// TestSizeOfAChart checks the size of the image of a chart of a nominal x,
+// whose width Vega-Lite works out from a step: the autosize fit that holds
+// the padding, and the size that the caller gives.
+func TestSizeOfAChart(t *testing.T) {
+	t.Parallel()
+	spec := func(size string) []byte {
+		return []byte(`{"$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+			"data": {"values": [{"k": "a", "v": 1, "s": "p"}, {"k": "a", "v": 2, "s": "q"}, {"k": "b", "v": 3, "s": "p"}]},
+			"mark": "bar", "padding": 5, "title": {"text": "T", "subtitle": "S"},
+			"encoding": {"x": {"field": "k", "type": "nominal", "sort": null}, "y": {"field": "v", "type": "quantitative"},
+				"color": {"field": "s"}, "xOffset": {"field": "s"}}` + size + `}`)
+	}
+	for _, c := range []struct {
+		name string
+		src  []byte
+		opts []RenderOption
+		w, h int
+	}{
+		{"fit with the padding", spec(`, "width": 320, "height": 240, "autosize": {"type": "fit", "contains": "padding"}`), nil, 320, 240},
+		{"fit", spec(`, "width": 320, "height": 240, "autosize": {"type": "fit"}`), nil, 330, 250},
+		{"the size of the caller", spec(`, "autosize": {"type": "fit", "contains": "padding"}`), []RenderOption{WithSize(320, 240)}, 320, 240},
+	} {
+		chart, _, err := Parse(c.src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		img, _, err := chart.Image(t.Context(), append(c.opts, WithLocation(time.UTC))...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b := img.Bounds(); b.Dx() < c.w-1 || b.Dx() > c.w+1 || b.Dy() < c.h-1 || b.Dy() > c.h+1 {
+			t.Errorf("%s: the image is %dx%d, want %dx%d", c.name, b.Dx(), b.Dy(), c.w, c.h)
+		}
+	}
+}

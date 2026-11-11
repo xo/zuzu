@@ -39,6 +39,13 @@ func autosize(v any) string {
 	return "pad"
 }
 
+// containsPadding reports whether the autosize signal puts the padding
+// inside the width and the height, with "contains": "padding".
+func containsPadding(v any) bool {
+	m, ok := v.(map[string]any)
+	return ok && m["contains"] == "padding"
+}
+
 // render runs the spec and builds the scene graph.
 func (rt *runtime) render() (*scene.Scene, error) {
 	s := rt.root
@@ -100,12 +107,24 @@ func (rt *runtime) render() (*scene.Scene, error) {
 			item.X, item.Y = pad.left-x1, pad.top-y1
 			cw, ch = math.Ceil(x2-x1+pad.left+pad.right), math.Ceil(y2-y1+pad.top+pad.bottom)
 			// The autosize fit keeps the size of the spec for the whole
-			// chart, so the plot area gives up what the guides take.
+			// chart, so the plot area gives up what the guides take. With
+			// "contains": "padding", the size of the spec holds the
+			// padding too, for fit and for pad.
+			padW, padH := 0.0, 0.0
+			if containsPadding(av) {
+				padW, padH = pad.left+pad.right, pad.top+pad.bottom
+			}
 			if kind == "fit" || kind == "fit-x" {
-				rt.fitW = w - (x2 - x1 - w)
+				rt.fitW = w - (x2 - x1 - w) - padW
+				rt.wantW = w + pad.left + pad.right - padW
+			} else if padW > 0 {
+				rt.fitW = w - padW
 			}
 			if kind == "fit" || kind == "fit-y" {
-				rt.fitH = h - (y2 - y1 - h)
+				rt.fitH = h - (y2 - y1 - h) - padH
+				rt.wantH = h + pad.top + pad.bottom - padH
+			} else if padH > 0 {
+				rt.fitH = h - padH
 			}
 		}
 	}
