@@ -72,11 +72,17 @@ func sniffDiagram(src []byte) Dialect {
 		case word == "strict" || word == "digraph":
 			return DOT
 		case word == "graph":
-			// graph TD is Mermaid, and graph name { or graph { is DOT.
-			if len(f) > 1 && isDirection(f[1]) {
-				return Mermaid
+			// graph TD is Mermaid. A graph of Mermaid takes only a
+			// direction, so graph name, graph "" and graph { are DOT,
+			// with the brace on this line or a later one. A bare graph
+			// is Mermaid, unless a brace follows it.
+			if len(f) > 1 {
+				if isDirection(f[1]) {
+					return Mermaid
+				}
+				return DOT
 			}
-			if strings.Contains(t, "{") || len(f) == 1 && strings.HasPrefix(strings.TrimSpace(rest), "{") {
+			if strings.HasPrefix(strings.TrimSpace(rest), "{") {
 				return DOT
 			}
 			return Mermaid
