@@ -280,6 +280,19 @@ reads `pie.textPosition`, `pie.donutHole`, `pie.legendPosition` and the
 colors `pie1` and on. A negative value is an error, and a second slice with
 the same label is an issue.
 
+The percent of a slice goes on the middle angle of the slice, with the
+center of the text on that point. The setting `pie.zuzu.textPlacement`
+gives the distance of that point from the center of the pie:
+
+| Value | The distance |
+| --- | --- |
+| `bisector`, the default | `pie.textPosition` of the radius, 0.75 by default, as Mermaid does |
+| `centroid` | the center of mass of the slice. A wide slice puts its label near the center of the pie |
+| `circle` | the center of the largest circle in the slice. A slice of 180 degrees or more puts its label halfway to its edge, and a thin slice puts its label near its edge |
+
+In a donut, `centroid` and `circle` keep the label in the ring. With
+`centroid` or `circle`, `pie.textPosition` is an issue.
+
 #### xychart
 
 `horizontal` or `vertical` after the keyword, `title`, an `x-axis` of

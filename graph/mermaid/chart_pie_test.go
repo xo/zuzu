@@ -3,6 +3,7 @@ package mermaid_test
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -181,6 +182,8 @@ func TestPieIssues(t *testing.T) {
 		{"---\nconfig:\n  theme: forest\n---\npie\n\"A\" : 1", "theme"},
 		{"---\nconfig:\n  themeVariables:\n    pie2: red\n---\npie\n\"A\" : 1", "themeVariables"},
 		{"---\nconfig:\n  look: handDrawn\n---\npie\n\"A\" : 1", "handDrawn"},
+		{"---\nconfig:\n  pie:\n    zuzu.textPlacement: middle\n---\npie\n\"A\" : 1", "text placement middle"},
+		{"---\nconfig:\n  pie:\n    zuzu.textPlacement: circle\n    textPosition: 0.5\n---\npie\n\"A\" : 1", "pie.textPosition"},
 	}
 	for _, test := range tests {
 		report, err := compileMermaid(t, test.src, false)
@@ -193,6 +196,55 @@ func TestPieIssues(t *testing.T) {
 		}
 		if _, err := compileMermaid(t, test.src, true); err == nil {
 			t.Errorf("%q: expected an error in the strict mode", test.src)
+		}
+	}
+}
+
+func TestPieTextPlacement(t *testing.T) {
+	t.Parallel()
+	const pets = "pie\n\"Dogs\" : 386\n\"Cats\" : 85\n\"Rats\" : 15"
+	tests := []struct {
+		config string
+		want   map[string]float64
+	}{
+		{"", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 112.5}},
+		{"    textPosition: 0.5\n", map[string]float64{"79%": 75, "17%": 75, "3%": 75}},
+		{"    zuzu.textPlacement: bisector\n", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 112.5}},
+		{"    zuzu.textPlacement: centroid\n", map[string]float64{"79%": 24.14, "17%": 95.04, "3%": 99.84}},
+		{"    zuzu.textPlacement: circle\n", map[string]float64{"79%": 75, "17%": 98.54, "3%": 136.76}},
+		// In a ring from 75 to 150, a label stays in the ring.
+		{"    zuzu.textPlacement: circle\n    donutHole: 0.5\n", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 136.76}},
+		{"    zuzu.textPlacement: centroid\n    donutHole: 0.5\n", map[string]float64{"79%": 112.5}},
+	}
+	for _, test := range tests {
+		src := pets
+		if test.config != "" {
+			src = "---\nconfig:\n  pie:\n" + test.config + "---\n" + pets
+		}
+		items := renderMermaid(t, src)
+		var cx, cy float64
+		for _, it := range items {
+			if it.mark == scene.Arc {
+				cx, cy = it.item.X, it.item.Y
+			}
+		}
+		for text, want := range test.want {
+			found := false
+			for _, it := range items {
+				if it.mark != scene.Text || it.text != text {
+					continue
+				}
+				found = true
+				if it.item.Align != "center" || it.item.Baseline != "middle" {
+					t.Errorf("%q: the label %s has the align %q and the baseline %q", test.config, text, it.item.Align, it.item.Baseline)
+				}
+				if got := math.Hypot(it.item.X-cx, it.item.Y-cy); math.Abs(got-want) > 0.01 {
+					t.Errorf("%q: the label %s is %.2f from the center, expected %.2f", test.config, text, got, want)
+				}
+			}
+			if !found {
+				t.Errorf("%q: no label %s", test.config, text)
+			}
 		}
 	}
 }

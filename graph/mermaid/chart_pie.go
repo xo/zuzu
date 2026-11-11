@@ -29,7 +29,20 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 			}
 		}
 	}
-	read := []string{"pie.textPosition", "pie.donutHole", "pie.legendPosition"}
+	placement := "bisector"
+	switch v := str(c.d.Config, "pie", "zuzu.textPlacement"); v {
+	case "":
+	case "bisector", "centroid", "circle":
+		placement = v
+	default:
+		if err := c.add("the text placement %s of a pie chart", v); err != nil {
+			return nil, false, err
+		}
+	}
+	read := []string{"pie.donutHole", "pie.legendPosition", "pie.zuzu.textPlacement"}
+	if placement == "bisector" {
+		read = append(read, "pie.textPosition")
+	}
 	// The theme variables pie1 to pie12 are the colors of the slices. A
 	// gap ends the list, and the variables after it are issues.
 	var colors []any
@@ -122,10 +135,11 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 		sum += s.value
 	}
 	// The slices start at the top and go clockwise. The compiler places
-	// the percent of each slice at its middle angle, at textPosition of
-	// the radius, with the center of the text on that point.
+	// the percent of each slice on its middle angle, at the distance from
+	// the center that the text placement gives, with the center of the text
+	// on that point.
 	const size = 300
-	r := textPosition * size / 2
+	ro, ri := size/2.0, hole*size/2
 	rows := make([]any, 0, len(parts))
 	domain := make([]any, 0, len(parts))
 	var cum float64
@@ -138,9 +152,16 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 		if sum > 0 && s.value > 0 {
 			percent = strconv.FormatFloat(s.value/sum*100, 'f', 0, 64) + "%"
 		}
-		mid := 0.0
+		mid, span := 0.0, 0.0
 		if sum > 0 {
-			mid = 2 * math.Pi * (cum + s.value/2) / sum
+			mid, span = 2*math.Pi*(cum+s.value/2)/sum, 2*math.Pi*s.value/sum
+		}
+		r := textPosition * ro
+		switch placement {
+		case "centroid":
+			r = sectorCentroid(span, ri, ro)
+		case "circle":
+			r = sectorCircle(span, ri, ro)
 		}
 		cum += s.value
 		domain = append(domain, name)
@@ -186,6 +207,44 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 		spec["title"] = map[string]any{"text": title, "anchor": "start"}
 	}
 	return spec, true, nil
+}
+
+// sectorCentroid returns the distance from the center of a pie to the
+// centroid of a slice that spans an angle, in radians, on a ring from the
+// radius ri to the radius ro. The centroid of a wide slice of a ring falls
+// toward the hole, so the distance is never less than the middle of the
+// ring.
+func sectorCentroid(span, ri, ro float64) float64 {
+	if span <= 0 {
+		return (ri + ro) / 2
+	}
+	d := 4 * math.Sin(span/2) * (ro*ro*ro - ri*ri*ri) / (3 * span * (ro*ro - ri*ri))
+	if ri > 0 {
+		d = math.Max(d, (ri+ro)/2)
+	}
+	return d
+}
+
+// sectorCircle returns the distance from the center of a pie to the center
+// of the largest circle in a slice that spans an angle, in radians, on a
+// ring from the radius ri to the radius ro. The circle touches the outer
+// arc, and also the inner arc or the two sides of the slice, whichever it
+// meets first. A slice of 180 degrees or more has sides that a circle on
+// its middle angle does not meet, and a slice of the whole pie has none.
+func sectorCircle(span, ri, ro float64) float64 {
+	if span >= 2*math.Pi-1e-9 && ri == 0 {
+		return 0
+	}
+	if span >= math.Pi {
+		return (ri + ro) / 2
+	}
+	s := math.Sin(span / 2)
+	radius := func(t float64) float64 { return min(ro-t, t-ri, t*s) }
+	best := (ri + ro) / 2
+	if t := ro / (1 + s); t >= ri && radius(t) > radius(best) {
+		best = t
+	}
+	return best
 }
 
 // pieScale returns the color scale of the slices: their names, and the
