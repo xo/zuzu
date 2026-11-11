@@ -114,9 +114,11 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		return expr.String(v)
 	}
 	// A record lays its fields out across the ranks: side by side when the
-	// ranks run down, and one under another when they run across.
+	// ranks run down, and one under another when they run across. A record
+	// with the field stack lays them one under another in every direction.
 	across := dir == graph.TB || dir == graph.BT
 	type record struct {
+		across       bool
 		texts, ports []string
 		sizes        []float64
 	}
@@ -128,7 +130,8 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if !ok || len(fs) == 0 {
 			continue
 		}
-		rec := &record{}
+		stack, _ := r["stack"].(bool)
+		rec := &record{across: across && !stack}
 		ps, _ := r["ports"].([]any)
 		for j, f := range fs {
 			rec.texts = append(rec.texts, expr.String(f))
@@ -163,7 +166,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			for _, t := range rec.texts {
 				tw, th := measure(t, "")
 				fw, fh := math.Max(tw+2*padding, 24), math.Max(th+1.6*padding, 24)
-				if across {
+				if rec.across {
 					rec.sizes = append(rec.sizes, fw)
 					n.Width += fw
 					n.Height = math.Max(n.Height, fh)
@@ -206,7 +209,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		at := 0.0
 		for j, name := range rec.ports {
 			if name != "" {
-				if across {
+				if rec.across {
 					m[name] = [4]float64{at - n.Width/2, -n.Height / 2, rec.sizes[j], n.Height}
 				} else {
 					m[name] = [4]float64{-n.Width / 2, at - n.Height/2, n.Width, rec.sizes[j]}
@@ -313,13 +316,13 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if !ok {
 			continue
 		}
-		o["path"] = graph.RecordPath(in.Nodes[i].Shape, np.Width, np.Height, across, rec.sizes)
+		o["path"] = graph.RecordPath(in.Nodes[i].Shape, np.Width, np.Height, rec.across, rec.sizes)
 		at := 0.0
 		for j, t := range rec.texts {
 			f := clone(r)
 			f["kind"] = "field"
 			c := at + rec.sizes[j]/2
-			if across {
+			if rec.across {
 				f["x"], f["y"] = np.X-np.Width/2+c, np.Y
 			} else {
 				f["x"], f["y"] = np.X, np.Y-np.Height/2+c

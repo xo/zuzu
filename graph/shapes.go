@@ -30,6 +30,7 @@ var shapes = map[string]string{
 	"octagon": "octagon", "pentagon": "pentagon", "house": "house", "invhouse": "invhouse",
 	"note": "note", "doc": "doc", "document": "doc", "folder": "folder", "tab": "folder",
 	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point",
+	"bullseye": "bullseye", "bar": "bar",
 	"plaintext": "none", "plain": "none", "none": "none", "text": "none", "underline": "none",
 }
 
@@ -71,6 +72,10 @@ func NodeSize(kind string, tw, th, pad float64) (float64, float64) {
 		return w, h + 6
 	case "point":
 		return 8, 8
+	case "bullseye":
+		return 14, 14
+	case "bar":
+		return 70, 10
 	case "none":
 		return tw + 4, th + 4
 	}
@@ -151,6 +156,16 @@ func shapePath(kind string, w, h float64) string {
 		return ellipse(x, y)
 	case "point":
 		return ellipse(x, y)
+	case "bullseye":
+		// A ring and a dot: the hole turns the other way, so that it stays
+		// empty with either rule of fill.
+		ring := func(r float64, sweep string) string {
+			return "M" + num(r) + ",0A" + num(r) + "," + num(r) + " 0 1," + sweep + " " + num(-r) + ",0A" + num(r) + "," + num(r) + " 0 1," + sweep + " " + num(r) + ",0Z"
+		}
+		return ring(x, "1") + ring(x*0.72, "0") + ring(x*0.46, "1")
+	case "bar":
+		r := math.Min(2, math.Min(w, h)/2)
+		return shape.RoundRect(-x, -y, w, h, r, r, r, r)
 	case "diamond":
 		return poly([2]float64{0, -y}, [2]float64{x, 0}, [2]float64{0, y}, [2]float64{-x, 0})
 	case "hexagon":

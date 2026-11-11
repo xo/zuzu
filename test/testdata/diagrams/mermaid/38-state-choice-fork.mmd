@@ -1,0 +1,16 @@
+stateDiagram-v2
+    state if_state <<choice>>
+    state fork_state <<fork>>
+    state join_state <<join>>
+    [*] --> IsPositive
+    IsPositive --> if_state
+    if_state --> False : if n < 0
+    if_state --> True : if n >= 0
+    True --> fork_state
+    False --> fork_state
+    fork_state --> State2
+    fork_state --> State3
+    State2 --> join_state
+    State3 --> join_state
+    join_state --> State4
+    State4 --> [*]

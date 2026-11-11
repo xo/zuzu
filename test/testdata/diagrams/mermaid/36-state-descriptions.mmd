@@ -1,0 +1,9 @@
+stateDiagram-v2
+    state "Waiting for input" as Wait
+    Idle : The machine is idle
+    Done : finished
+    Done : and saved
+    [*] --> Idle
+    Idle --> Wait : start
+    Wait --> Done : key pressed
+    Done --> [*]

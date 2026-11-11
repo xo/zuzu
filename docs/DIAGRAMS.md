@@ -264,6 +264,69 @@ of the image by default, and `constraint: on` keeps its aspect.
 
 The packs and the icon loader are in `docs/API.md`, under "Icons".
 
+### State diagram
+
+The keywords are `stateDiagram` and `stateDiagram-v2`. Both read the same
+statements. The direction is `TB` by default, and `direction LR` on a line
+of its own sets it. A statement ends at a new line.
+
+| Part | Example |
+| --- | --- |
+| a state | `Still`, `Still:::hot` |
+| a state with a description | `state "Waiting for input" as Wait`, `Wait : press a key` |
+| a transition | `Still --> Moving` |
+| a transition with text | `Still --> Moving : push` |
+| the start and the end | `[*] --> Still`, `Still --> [*]` |
+| a composite state | `state Moving { ... }`, `state "Text" as Moving { ... }` |
+| a choice | `state check <<choice>>`, `state check [[choice]]` |
+| a fork and a join | `state split <<fork>>`, `state merge <<join>>` |
+| regions of a composite state | `--` on a line of its own, inside the braces |
+| a note | `note right of Still : text`, `note left of Still`, then lines of text, then `end note` |
+| a direction | `direction LR`, at the top or inside a composite state |
+| a class | `classDef hot fill:#f96,stroke:#333`, then `class Still,Moving hot` or `Still:::hot` |
+| a style of a state | `style Still fill:#f9f,stroke-width:2px` |
+| a comment | `%% a comment` |
+| the text for a screen reader | `accTitle: Doors`, `accDescr: The states of a door`, `accDescr { ... }` |
+
+zuzu draws each part in its own look:
+
+| Part | Draws as |
+| --- | --- |
+| a state | a rounded rectangle with its description, or its id when it has none |
+| a state with two descriptions or more | a rounded rectangle with the first description as a title, a line under it, and the rest |
+| the start `[*]` | a filled circle of 14 pixels |
+| the end `[*]` | a ring and a dot of 14 pixels |
+| a choice | a diamond of 28 pixels |
+| a fork and a join | a filled bar of 70 by 10 pixels, which turns to 10 by 70 when the ranks run to the left or to the right |
+| a composite state | a cluster with its title |
+| a region | a cluster with no title and a dashed border, beside the other regions of its composite state |
+| a note | a node of the shape note, with a dotted line to its state |
+| a transition | an edge with an arrowhead, and its text in the middle |
+
+Each scope has its own start and its own end, as in Mermaid. A scope is the
+diagram, a composite state, or a region. `[*]` in a scope ends at the start
+or the end of that scope. A transition to the id of a composite state ends
+at its box.
+
+A note on the right of a state has a line from the state to the note, and
+a note on the left has a line from the note to the state, as in Mermaid.
+The layout puts a note on the right in the rank after its state, and a note
+on the left in the rank before it. Mermaid 12 does the same. A state keeps
+one note, the last.
+
+`classDef`, `class`, `:::` and `style` read the same styles as a flowchart.
+A class or a style on a composite state paints its cluster. `accTitle` and
+`accDescr` join into the description of the Vega spec, as in a gantt.
+`hide empty description` is a line of the first version of the state
+diagram, and Mermaid draws nothing for it, so zuzu reads it and draws
+nothing too.
+
+These parts are issues: `scale`, `click`, a floating note with no state,
+such as `note "text" as N1`, a kind of state other than `choice`, `fork`
+and `join`, which draws as a state, the settings of the section `state` of
+the config, the layout `elk`, the look `handDrawn`, the `theme` and the
+`themeVariables` of Mermaid, and a style that a flowchart does not read.
+
 ### Charts
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the

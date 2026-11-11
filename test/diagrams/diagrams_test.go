@@ -1,10 +1,10 @@
-// Package diagrams checks the fixtures of DOT and of the flowcharts of
-// Mermaid against the references of dot and of mmdc (D31). zuzu lays out a
-// graph its own way, so the check does not ask for the places of the
-// reference. It asks that every node, edge, cluster and label of the
-// reference exists, that the hard rules of the layout hold, and that the
-// crossings and the span of the edges are no worse than those of the
-// reference, plus 10 percent and 1.
+// Package diagrams checks the fixtures of DOT, and of the flowcharts and
+// the state diagrams of Mermaid, against the references of dot and of mmdc
+// (D31). zuzu lays out a graph its own way, so the check does not ask for
+// the places of the reference. It asks that every node, edge, cluster and
+// label of the reference exists, that the hard rules of the layout hold,
+// and that the crossings and the span of the edges are no worse than those
+// of the reference, plus 10 percent and 1.
 //
 // Run oracle/diagrams.sh to write the references again.
 package diagrams
@@ -416,6 +416,20 @@ func rules(t *testing.T, in graph.LayoutInput, l *graph.Layout, ids map[string]i
 		}
 		return false
 	}
+	// A cluster with a direction can lay out on its own, with ranks of its
+	// own, so an edge inside it spans its minlen without the factor.
+	parent, dir := map[string]string{}, map[string]string{}
+	for _, c := range in.Clusters {
+		parent[c.ID], dir[c.ID] = c.Parent, c.Direction
+	}
+	own := func(i int) string {
+		for c := in.Nodes[i].Cluster; c != ""; c = parent[c] {
+			if dir[c] != "" {
+				return c
+			}
+		}
+		return ""
+	}
 	for _, e := range in.Edges {
 		a, aok := ids[e.Source]
 		b, bok := ids[e.Target]
@@ -424,6 +438,9 @@ func rules(t *testing.T, in graph.LayoutInput, l *graph.Layout, ids map[string]i
 			continue
 		}
 		minlen := max(e.MinLen, 1) * factor
+		if c := own(a); c != "" && c == own(b) {
+			minlen = max(e.MinLen, 1)
+		}
 		if l.Nodes[b].Rank-l.Nodes[a].Rank < minlen && !reach(b, a) {
 			t.Errorf("edge %s -> %s spans %d ranks, less than %d, and is on no cycle", e.Source, e.Target, l.Nodes[b].Rank-l.Nodes[a].Rank, minlen)
 		}

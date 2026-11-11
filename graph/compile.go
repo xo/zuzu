@@ -106,7 +106,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	for _, n := range g.Nodes {
 		label := n.Label
-		if label == "" && n.Label == "" {
+		if label == "" && (n.Width <= 0 || n.Height <= 0) {
 			label = n.ID
 		}
 		r := map[string]any{"key": n.ID, "label": label, "lines": lines(label), "shape": n.Shape}
@@ -122,6 +122,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 				texts, ports = append(texts, f.Text), append(ports, f.Port)
 			}
 			r["fields"], r["ports"], r["lines"] = texts, ports, []any{}
+			if n.Stack {
+				r["stack"] = true
+			}
 		}
 		if n.HTML != "" {
 			r["html"], r["lines"] = n.HTML, []any{}
@@ -365,6 +368,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	if g.Title != "" {
 		spec["title"] = map[string]any{"text": g.Title, "anchor": "start"}
+	}
+	if g.Description != "" {
+		spec["description"] = g.Description
 	}
 	b, err := json.Marshal(spec, json.Deterministic(true))
 	if err != nil {

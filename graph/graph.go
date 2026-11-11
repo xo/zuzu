@@ -42,11 +42,17 @@ type Graph struct {
 	// RankSep and NodeSep are the space between the ranks and between the
 	// nodes of a rank, or 0 for the defaults.
 	RankSep, NodeSep float64
+
+	// Description is the text of the diagram for a screen reader, or
+	// empty. Compile writes it as the description of the spec.
+	Description string
 }
 
 // Node is a node of a graph.
 type Node struct {
-	ID    string
+	ID string
+	// Label is the text of the node. An empty label draws the id, except
+	// on a node with a Width and a Height, which draws no text.
 	Label string
 	// Shape names the shape of the node, such as rect or ellipse.
 	Shape string
@@ -61,6 +67,10 @@ type Node struct {
 	Media *Media
 	// Fields are the fields of a record, or nil.
 	Fields []Field
+	// Stack lays the fields of a record one under another in every
+	// direction, as the title and the descriptions of a state of Mermaid.
+	// Otherwise the fields lie across the ranks.
+	Stack bool
 	// HTML is the source of a label of HTML of DOT, with no < and > around
 	// it, or empty. The package html of okage reads it and lays it out
 	// (D31).

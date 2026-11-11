@@ -1,6 +1,6 @@
-// Command mmdcref reads the SVG of a flowchart that mmdc drew, and writes
-// the nodes, the edges and the clusters that it holds as JSON, the
-// reference of the check of D31. Run test/oracle/diagrams.sh to draw the
+// Command mmdcref reads the SVG of a flowchart or a state diagram that mmdc
+// drew, and writes the nodes, the edges and the clusters that it holds as
+// JSON, the reference of the check of D31. Run test/oracle/diagrams.sh to draw the
 // SVGs and to write the references.
 package main
 
@@ -50,12 +50,12 @@ type Cluster struct {
 }
 
 var (
-	nodeRE = regexp.MustCompile(`<g class="[^"]*" id="my-svg-flowchart-([^"]+?)-\d+"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"`)
+	nodeRE = regexp.MustCompile(`<g class="[^"]*" id="my-svg-(?:flowchart|state)-([^"]+?)-\d+"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"`)
 	// A node with a link sits in an a element that holds its place.
 	linkedRE  = regexp.MustCompile(`<a [^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"><g class="[^"]*" id="my-svg-flowchart-([^"]+?)-\d+"`)
 	clusterRE = regexp.MustCompile(`<g class="cluster[^"]*" id="my-svg-([^"]+)"[^>]*><rect[^>]*x="([-\d.e]+)" y="([-\d.e]+)" width="([-\d.e]+)" height="([-\d.e]+)"`)
 	edgeRE    = regexp.MustCompile(`<path [^>]*data-id="(L_[^"]+)"[^>]*data-points="([^"]+)"`)
-	labelRE   = regexp.MustCompile(`<g class="label" data-id="(L_[^"]+)"[^>]*>(.*?)</g>`)
+	labelRE   = regexp.MustCompile(`<g class="label" data-id="([^"]+)"[^>]*>(.*?)</g>`)
 	textRE    = regexp.MustCompile(`<(?:p|span)[^>]*>([^<]*)</`)
 	tagRE     = regexp.MustCompile(`<br\s*/?>`)
 )
@@ -86,15 +86,15 @@ func main() {
 	s := string(b)
 	ref := Ref{Nodes: []Node{}, Edges: []Edge{}, Clusters: []Cluster{}}
 	ids := map[string]bool{}
-	for _, loc := range nodeRE.FindAllStringSubmatchIndex(s, -1) {
-		m := s[loc[0]:loc[1]]
-		sub := nodeRE.FindStringSubmatch(m)
-		end := strings.Index(s[loc[1]:], `</g></g>`)
-		if end < 0 {
-			end = len(s) - loc[1]
-		}
-		ref.Nodes = append(ref.Nodes, Node{ID: sub[1], Label: text(s[loc[1] : loc[1]+end]), X: num(sub[2]), Y: num(sub[3])})
-		ids[sub[1]] = true
+	ns, marks := nodes(s)
+	if strings.Contains(s, `aria-roledescription="stateDiagram"`) {
+		ref = stateRef(s, ns, marks)
+		write(ref)
+		return
+	}
+	for _, n := range ns {
+		ref.Nodes = append(ref.Nodes, n)
+		ids[n.ID] = true
 	}
 	for _, m := range linkedRE.FindAllStringSubmatch(s, -1) {
 		ref.Nodes = append(ref.Nodes, Node{ID: m[3], Label: m[3], X: num(m[1]), Y: num(m[2])})
@@ -142,6 +142,34 @@ func main() {
 		}
 		ref.Edges = append(ref.Edges, e)
 	}
+	write(ref)
+}
+
+// nodes returns the nodes of an SVG, and the markup of each up to the end
+// of its group.
+func nodes(s string) ([]Node, []string) {
+	var ns []Node
+	var marks []string
+	for _, loc := range nodeRE.FindAllStringSubmatchIndex(s, -1) {
+		sub := nodeRE.FindStringSubmatch(s[loc[0]:loc[1]])
+		end := strings.Index(s[loc[1]:], `</g></g>`)
+		if end < 0 {
+			end = len(s) - loc[1]
+		}
+		// A node with no label, such as the start of a state diagram, ends
+		// before the next node.
+		if next := strings.Index(s[loc[1]:], ` id="my-svg-`); next >= 0 && next < end {
+			end = next
+		}
+		ns = append(ns, Node{ID: sub[1], Label: text(s[loc[1] : loc[1]+end]), X: num(sub[2]), Y: num(sub[3])})
+		marks = append(marks, s[loc[1]:loc[1]+end])
+	}
+	return ns, marks
+}
+
+// write writes a reference as JSON, with its nodes in the order of their
+// ids.
+func write(ref Ref) {
 	slices.SortStableFunc(ref.Nodes, func(a, b Node) int { return strings.Compare(a.ID, b.ID) })
 	out, err := json.Marshal(ref)
 	if err == nil {

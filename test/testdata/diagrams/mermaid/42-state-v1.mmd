@@ -1,0 +1,13 @@
+stateDiagram
+    [*] --> Still
+    Still --> [*]
+    Still --> Moving
+    Moving --> Still
+    Moving --> Crash
+    state fork1 [[fork]]
+    state choice1 [[choice]]
+    Crash --> choice1
+    choice1 --> fork1 : retry
+    choice1 --> [*] : give up
+    fork1 --> Still
+    fork1 --> Moving

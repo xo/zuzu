@@ -57,31 +57,13 @@ func (f *flowchart) add(format string, args ...any) error {
 func (f *flowchart) config() error {
 	cfg := f.d.Config
 	for k, v := range cfg {
-		switch k {
-		case "layout":
-			switch v {
-			case "dagre":
-			case "elk":
-				// ELK routes edges in its own way, so the layered layout
-				// stands in for it (D31).
-				if err := f.issues.Add("config", "the layout elk, drawn with zuzu.layered"); err != nil {
-					return err
-				}
-			default:
-				if err := f.issues.Add("config", "the layout %v", v); err != nil {
-					return err
-				}
-			}
-		case "look":
-			if v == "handDrawn" {
-				if err := f.issues.Add("config", "the look handDrawn"); err != nil {
-					return err
-				}
-			}
-		case "theme", "themeVariables", "themeCSS":
-			if err := f.issues.Add("config", "the %s of Mermaid, drawn in the look of zuzu", k); err != nil {
+		if ok, err := lookSetting(f.issues, k, v); ok || err != nil {
+			if err != nil {
 				return err
 			}
+			continue
+		}
+		switch k {
 		case "flowchart":
 			m, _ := v.(map[string]any)
 			for fk := range m {
@@ -709,36 +691,7 @@ func (f *flowchart) linkStyle(rest string) error {
 
 // css reads the style of a class or a node: fill:#f9f,stroke:#333.
 func (f *flowchart) css(s string) (map[string]string, error) {
-	st := map[string]string{}
-	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' }) {
-		k, v, ok := strings.Cut(part, ":")
-		if !ok {
-			continue
-		}
-		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
-		v = strings.TrimSuffix(strings.TrimSpace(strings.TrimSuffix(v, "!important")), "px")
-		switch k {
-		case "fill":
-			st["fill"], st["fillOpacity"] = v, "1"
-		case "stroke":
-			st["stroke"] = v
-		case "stroke-width":
-			st["strokeWidth"] = v
-		case "color":
-			st["color"] = v
-		case "stroke-dasharray":
-			st["strokeDash"] = strings.Join(strings.Fields(strings.ReplaceAll(v, ",", " ")), ",")
-		case "font-weight":
-			st["fontWeight"] = v
-		case "font-size":
-			st["fontSize"] = v
-		default:
-			if err := f.add("the style %s", k); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return st, nil
+	return css(s, f.add)
 }
 
 // subgraphEdges takes out the nodes that only an edge to a subgraph made,
@@ -784,20 +737,7 @@ func (f *flowchart) finish() error {
 		return err
 	}
 	for _, n := range f.g.Nodes {
-		st := maps.Clone(f.classes["default"])
-		if st == nil {
-			st = map[string]string{}
-		}
-		for _, c := range f.nodeClasses[n.ID] {
-			cs, ok := f.classes[c]
-			if !ok {
-				continue
-			}
-			maps.Copy(st, cs)
-		}
-		maps.Copy(st, f.nodeStyles[n.ID])
-		maps.Copy(st, n.Style)
-		n.Style = st
+		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)
 	}
 	for i, e := range f.g.Edges {
 		maps.Copy(e.Style, f.linkDefault)

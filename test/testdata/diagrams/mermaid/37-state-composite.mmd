@@ -1,0 +1,20 @@
+stateDiagram-v2
+    [*] --> First
+    state First {
+        [*] --> second
+        second --> [*]
+    }
+    First --> Second
+    state Second {
+        [*] --> Inner
+        state Inner {
+            [*] --> deep
+            deep --> [*]
+        }
+        Inner --> [*]
+    }
+    Second --> Third
+    state "The third state" as Third {
+        [*] --> leaf
+    }
+    Third --> [*]

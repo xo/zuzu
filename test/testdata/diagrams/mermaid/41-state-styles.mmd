@@ -1,0 +1,24 @@
+---
+title: Styled states
+---
+stateDiagram-v2
+    accTitle: The states of a door
+    accDescr {
+        A door opens and closes,
+        and it can lock.
+    }
+    direction LR
+    %% a comment
+    classDef warn fill:#f96,stroke:#333,stroke-width:2px
+    classDef calm fill:#9cf
+    [*] --> Closed
+    Closed --> Open : open
+    Open --> Closed : close
+    Closed --> Locked:::warn : lock
+    Locked --> Closed : unlock
+    class Open calm
+    style Closed stroke:#c00,stroke-width:3px
+    state Locked {
+        direction TB
+        Bolted --> Chained
+    }
