@@ -1,0 +1,12 @@
+// A record that is one group in braces lies one under another when the
+// ranks run down, in plain text and in HTML.
+digraph {
+	node [shape=record]
+	a [label="{<top> title|<mid> a\lb\l|<bot> end}"]
+	b [label="<l> left|<r> right"]
+	c [label=<{<u>name</u>|<b>key</b>}>]
+	d [shape=Mrecord, label=<{<i>one</i>|two}>]
+	a:bot -> b:l
+	a:bot -> c
+	b:r -> d
+}

@@ -1,0 +1,101 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,126,197.5",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "a",
+      "color": "lightblue2",
+      "fillcolor": "salmon2",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "62,179.5",
+      "style": "filled",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 1,
+      "name": "b",
+      "color": "lightblue2",
+      "fillcolor": "goldenrod2",
+      "fontcolor": "grey28",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "27,106.5",
+      "style": "filled",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 2,
+      "name": "c",
+      "color": "darkolivegreen3",
+      "fillcolor": "gray95",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "99,106.5",
+      "style": "filled",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 3,
+      "name": "d",
+      "color": "navyblue",
+      "fillcolor": "lightyellow1",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "27,18",
+      "style": "filled",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 4,
+      "name": "e",
+      "color": "lightblue2",
+      "fillcolor": "Grey40",
+      "fontcolor": "gray100",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "99,18",
+      "style": "filled",
+      "width": "0.75"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 0,
+      "head": 1,
+      "color": "steelblue3",
+      "label": "",
+      "pos": "e,35.074,123.88 53.882,162.03 49.774,153.7 44.686,143.38 40.046,133.97"
+    },
+    {
+      "_gvid": 1,
+      "tail": 0,
+      "head": 2,
+      "color": "coral3",
+      "label": "",
+      "pos": "e,90.465,123.88 70.582,162.03 74.925,153.7 80.303,143.38 85.208,133.97"
+    },
+    {
+      "_gvid": 2,
+      "tail": 1,
+      "head": 3,
+      "label": "",
+      "pos": "e,27,36.35 27,88.41 27,76.758 27,61.047 27,47.519"
+    },
+    {
+      "_gvid": 3,
+      "tail": 2,
+      "head": 4,
+      "color": "darkorchid4",
+      "fontcolor": "turquoise3",
+      "label": "gray",
+      "lp": "111,62.25",
+      "pos": "e,99,36.35 99,88.41 99,76.758 99,61.047 99,47.519"
+    }
+  ]
+}

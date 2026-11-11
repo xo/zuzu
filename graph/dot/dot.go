@@ -459,7 +459,7 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 	}
 	for k := range attrs {
 		switch k {
-		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "penwidth", "pencolor":
+		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "penwidth", "pencolor", "gradientangle":
 		default:
 			if err := p.issues.Add("subgraph "+name, "the attribute %s of a subgraph", k); err != nil {
 				return nil, err
@@ -725,8 +725,29 @@ func (p *parser) finish() error {
 		if s, ok := a["shape"]; ok {
 			n.Shape = s
 		}
+		src, isHTMLLabel := isHTML(a["label"])
 		if n.Shape == "record" || n.Shape == "Mrecord" {
-			n.Fields = record(a["label"], n.ID)
+			switch {
+			case isHTMLLabel && len(splitRecord(src)) == 1:
+				// A label of HTML with no brace and no bar, such as a
+				// table, draws in the shape of the record, as one field.
+			case isHTMLLabel:
+				// The braces and the bars split a label of HTML into the
+				// fields of the record, and the text of each field is
+				// HTML.
+				fields, err := p.htmlRecord(src, path)
+				if err != nil {
+					return err
+				}
+				n.Fields, isHTMLLabel = fields, false
+			default:
+				n.Fields = record(a["label"], n.ID)
+			}
+			// The fields of one group in braces lie one under another
+			// when the ranks run down. When the ranks run across, they
+			// lie one under another too, and not side by side as in
+			// Graphviz.
+			n.Stack = wholeGroup(src) && (p.g.Direction == graph.TB || p.g.Direction == graph.BT)
 			var parts []string
 			for _, f := range n.Fields {
 				parts = append(parts, f.Text)
@@ -738,7 +759,7 @@ func (p *parser) finish() error {
 				return err
 			}
 		}
-		if src, ok := isHTML(a["label"]); ok {
+		if isHTMLLabel {
 			l, err := p.html(src, path)
 			if err != nil {
 				return err
@@ -764,7 +785,7 @@ func (p *parser) finish() error {
 		}
 		for k := range a {
 			switch k {
-			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel":
+			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle":
 			default:
 				if err := p.issues.Add(path, "the attribute %s of a node", k); err != nil {
 					return err
@@ -799,12 +820,13 @@ func (p *parser) finish() error {
 // of DOT: the color is the outline, the fill color fills a filled one, and
 // the font color colors the label.
 func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
+	// err keeps the first issue of a color, which is an error in the
+	// strict mode.
+	var err error
 	col := func(v string) (string, bool) {
 		c, ok := graph.Color(v)
-		if !ok {
-			if err := p.issues.Add(path, "the color %s", v); err != nil {
-				return "", false
-			}
+		if !ok && err == nil {
+			err = p.issues.Add(path, "the color %s", v)
 		}
 		return c, ok
 	}
@@ -819,18 +841,25 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 		}
 	}
 	if fills {
-		filled := strings.Contains(a["style"], "filled")
-		if v := a["fillcolor"]; v != "" {
+		// style=radial fills too, with a radial gradient.
+		radial := hasStyle(a["style"], "radial")
+		filled := strings.Contains(a["style"], "filled") || radial
+		v := a["fillcolor"]
+		if v == "" {
+			v = a["bgcolor"]
+		}
+		if v == "" && filled {
+			v = a["color"]
+		}
+		switch {
+		case v != "":
 			if c, ok := col(v); ok {
 				st["fill"], st["fillOpacity"] = c, "1"
+				if gerr := p.gradient(st, v, a, radial, path); gerr != nil {
+					return gerr
+				}
 			}
-		} else if v := a["bgcolor"]; v != "" {
-			if c, ok := col(v); ok {
-				st["fill"], st["fillOpacity"] = c, "1"
-			}
-		} else if filled && a["color"] != "" {
-			st["fill"], st["fillOpacity"] = st["stroke"], "1"
-		} else if filled {
+		case filled:
 			st["fill"], st["fillOpacity"] = "lightgrey", "1"
 		}
 	}
@@ -861,6 +890,46 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 	}
 	if strings.Contains(style, "bold") && a["penwidth"] == "" {
 		st["strokeWidth"] = "2"
+	}
+	return err
+}
+
+// hasStyle reports whether a style of DOT, a list split by commas or
+// spaces, holds a word.
+func hasStyle(style, word string) bool {
+	return slices.Contains(strings.FieldsFunc(style, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }), word)
+}
+
+// gradient sets the gradient of a fill of two colors, `a:b` or `a;0.3:b`, with
+// the angle of gradientangle. Each color of the list must read. A color
+// after the second and a weight that does not read are issues.
+func (p *parser) gradient(st map[string]string, v string, a map[string]string, radial bool, path string) error {
+	colors, _, ok := graph.ColorList(v)
+	if !ok {
+		if err := p.issues.Add(path, "the weights of the colors %s", v); err != nil {
+			return err
+		}
+	}
+	if len(colors) < 2 {
+		return nil
+	}
+	if _, ok := graph.Color(colors[1]); !ok {
+		return p.issues.Add(path, "the color %s", colors[1])
+	}
+	if len(colors) > 2 {
+		if err := p.issues.Add(path, "the colors after the second of the gradient %s", v); err != nil {
+			return err
+		}
+	}
+	st["gradient"] = v
+	if radial {
+		st["gradientType"] = "radial"
+	}
+	if g := a["gradientangle"]; g != "" {
+		if _, err := strconv.ParseFloat(g, 64); err != nil {
+			return p.issues.Add(path, "the gradientangle %s", g)
+		}
+		st["gradientAngle"] = g
 	}
 	return nil
 }

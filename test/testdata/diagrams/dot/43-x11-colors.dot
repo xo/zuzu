@@ -1,0 +1,13 @@
+// Colors of the X11 scheme of Graphviz that CSS does not name.
+digraph {
+	node [style=filled, color=lightblue2]
+	a [fillcolor=salmon2]
+	b [fillcolor=goldenrod2, fontcolor=grey28]
+	c [fillcolor=gray95, color=darkolivegreen3]
+	d [fillcolor=lightyellow1, color=navyblue]
+	e [fillcolor=Grey40, fontcolor=gray100]
+	a -> b [color=steelblue3]
+	a -> c [color=coral3]
+	b -> d
+	c -> e [color=darkorchid4, fontcolor=turquoise3, label=gray]
+}

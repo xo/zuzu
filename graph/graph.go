@@ -70,7 +70,10 @@ type Node struct {
 	// Rank names a group of nodes of the same rank, or empty.
 	Rank string
 	// Style holds the paint of the node: fill, stroke, color, strokeWidth,
-	// strokeDash, fontWeight and so on, with the names of Vega.
+	// strokeDash, fontWeight and so on, with the names of Vega. A fill of
+	// two colors of DOT, such as a:b, sets gradient to the list of colors,
+	// gradientAngle to its angle in degrees, and gradientType to radial
+	// for a radial gradient. Fill then holds the first color.
 	Style map[string]string
 	// Media is the icon or the image of the node, or nil.
 	Media *Media

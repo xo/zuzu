@@ -1,0 +1,17 @@
+// Gradients on the tables and the cells of a label of HTML, as in the
+// gradient table of the gallery of Graphviz.
+digraph {
+	a0 [shape=none, label=<
+<TABLE border="0" cellspacing="10" cellpadding="10" style="rounded" bgcolor="lightyellow1:salmon2" gradientangle="315">
+<TR><TD bgcolor="red:yellow">00</TD>
+<TD bgcolor="yellow:green">01</TD>
+<TD bgcolor="green:blue" gradientangle="270">02</TD></TR>
+<TR><TD bgcolor="red;0.3:yellow">10</TD>
+<TD colspan="2" bgcolor="blue:white" gradientangle="90">11</TD></TR>
+<TR><TD style="radial" bgcolor="white:red">20</TD>
+<TD style="radial" bgcolor="white:green" gradientangle="45">21</TD>
+<TD style="radial" bgcolor="white:blue" gradientangle="180">22</TD></TR>
+</TABLE>>]
+	b [shape=box, style=filled, fillcolor="gray80:white"]
+	a0 -> b
+}

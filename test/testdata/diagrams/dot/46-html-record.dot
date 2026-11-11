@@ -1,0 +1,20 @@
+// Records with labels of HTML, as the class diagram of UML of the gallery
+// of Graphviz writes them: the braces and the bars split the fields, and
+// the text of each field is HTML.
+digraph {
+	node [shape=record, style=filled, fillcolor=gray95]
+	edge [dir=back, arrowtail=empty]
+	Interface1 [label=<{<b>«interface» I/O</b> | + property<br align="left"/>...<br align="left"/>|+ method<br align="left"/>...<br align="left"/>}>]
+	Class1 [label=<{<b>I/O class</b> | + property<br align="left"/>...<br align="left"/>|+ method<br align="left"/>...<br align="left"/>}>]
+	Shared [label=<{
+		<b>Shared resource</b>
+		|
+			+ property<br align="left"/>
+			...<br align="left"/>
+		|
+			<i>+ method</i><br align="left"/>
+			...<br align="left"/>
+		}>]
+	Interface1 -> Class1 [xlabel=inheritance]
+	Class1 -> Shared [arrowtail=odiamond]
+}

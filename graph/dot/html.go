@@ -22,8 +22,10 @@ func isHTML(v string) (string, bool) {
 
 // html reads a label of HTML with the package html of okage (D31), and
 // adds an issue for each part that it does not read and each color that
-// zuzu does not know.
+// zuzu does not know. zuzu reads the gradientangle and the style radial of
+// a table or a cell itself.
 func (p *parser) html(src, path string) (*html.Label, error) {
+	src, _, _ = graph.HTMLGradients(src)
 	l, issues, err := html.Parse(src)
 	if err != nil {
 		if se, ok := errors.AsType[*html.SyntaxError](err); ok {
@@ -36,10 +38,25 @@ func (p *parser) html(src, path string) (*html.Label, error) {
 			return nil, err
 		}
 	}
-	for _, c := range htmlColors(l) {
-		if _, ok := graph.Color(c); !ok {
-			if err := p.issues.Add(path, "the color %s", c); err != nil {
+	for _, v := range htmlColors(l) {
+		// A fill of two colors is a gradient.
+		colors, _, ok := graph.ColorList(v)
+		if !ok {
+			if err := p.issues.Add(path, "the weights of the colors %s", v); err != nil {
 				return nil, err
+			}
+		}
+		if len(colors) > 2 {
+			if err := p.issues.Add(path, "the colors after the second of the gradient %s", v); err != nil {
+				return nil, err
+			}
+			colors = colors[:2]
+		}
+		for _, c := range colors {
+			if _, ok := graph.Color(c); !ok {
+				if err := p.issues.Add(path, "the color %s", c); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -128,4 +145,150 @@ func (p *parser) label(v, id, path string) (string, string, error) {
 		return "", "", err
 	}
 	return htmlText(l), src, nil
+}
+
+// htmlRecord reads the label of HTML of a record, as Graphviz does: the
+// braces and the bars outside the tags split the fields, and the text of
+// each field is HTML. A field draws its lines in their fonts, at the left
+// when each of its lines ends with <br align="left"/>. A table in a field,
+// a line in more than one font, a font with a color, a size or a face, and
+// a line at the right are issues.
+func (p *parser) htmlRecord(src, path string) ([]graph.Field, error) {
+	var out []graph.Field
+	for _, part := range splitRecord(src) {
+		if strings.TrimSpace(part) == "" {
+			continue
+		}
+		l, err := p.html(part, path)
+		if err != nil {
+			return nil, err
+		}
+		if l.Table != nil {
+			if err := p.issues.Add(path, "a table in a field of a record"); err != nil {
+				return nil, err
+			}
+			out = append(out, graph.Field{Text: htmlText(l)})
+			continue
+		}
+		f, err := p.htmlField(l.Lines, path)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, nil
+}
+
+// htmlField returns the field of a record that the lines of a label of
+// HTML draw.
+func (p *parser) htmlField(lines []html.Line, path string) (graph.Field, error) {
+	var f graph.Field
+	var texts []string
+	fonts, left, other := false, 0, 0
+	for _, ln := range lines {
+		var b strings.Builder
+		var font graph.Font
+		mixed, first := false, true
+		for _, s := range ln.Spans {
+			b.WriteString(s.Text)
+			if strings.TrimSpace(s.Text) == "" {
+				continue
+			}
+			ft := graph.Font{Bold: s.Font.Bold, Italic: s.Font.Italic, Underline: s.Font.Underline}
+			if first {
+				font, first = ft, false
+			} else if ft != font {
+				mixed = true
+			}
+			x := s.Font
+			if x.Color != "" || x.Size != 0 || x.Face != "" || x.Overline || x.Strike || x.Sub || x.Sup {
+				if err := p.issues.Add(path, "a font with a color, a size, a face or a line over or through its text in a field of a record"); err != nil {
+					return f, err
+				}
+			}
+		}
+		if mixed {
+			if err := p.issues.Add(path, "a line in more than one font in a field of a record"); err != nil {
+				return f, err
+			}
+		}
+		texts = append(texts, strings.TrimSpace(b.String()))
+		f.Fonts = append(f.Fonts, font)
+		fonts = fonts || font != graph.Font{}
+		switch ln.Align {
+		case html.AlignLeft:
+			left++
+		case html.AlignRight:
+			if err := p.issues.Add(path, "a line at the right in a field of a record"); err != nil {
+				return f, err
+			}
+			other++
+		default:
+			other++
+		}
+	}
+	switch {
+	case left > 0 && other == 0:
+		f.Align = "l"
+	case left > 0:
+		if err := p.issues.Add(path, "lines at the left and at the center in a field of a record"); err != nil {
+			return f, err
+		}
+	}
+	if !fonts {
+		f.Fonts = nil
+	}
+	f.Text = strings.Join(texts, "\n")
+	return f, nil
+}
+
+// splitRecord splits the label of HTML of a record into the sources of its
+// fields, flat, as record does: a brace or a bar outside a tag ends a
+// field. \{, \} and \| are text.
+func splitRecord(src string) []string {
+	var out []string
+	var b strings.Builder
+	inTag := false
+	for i := 0; i < len(src); i++ {
+		c := src[i]
+		switch {
+		case inTag:
+			inTag = c != '>'
+		case c == '<':
+			inTag = true
+		case c == '\\' && i+1 < len(src) && strings.IndexByte("{}|", src[i+1]) >= 0:
+			i++
+			c = src[i]
+		case c == '{' || c == '}' || c == '|':
+			out = append(out, b.String())
+			b.Reset()
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return append(out, b.String())
+}
+
+// wholeGroup reports whether the label of a record is one group in braces,
+// {a|b}. Its fields lie in the other direction, as in Graphviz.
+func wholeGroup(v string) bool {
+	v = strings.TrimSpace(v)
+	if !strings.HasPrefix(v, "{") || !strings.HasSuffix(v, "}") || strings.HasSuffix(v, `\}`) {
+		return false
+	}
+	depth := 0
+	for i := 0; i < len(v); i++ {
+		switch v[i] {
+		case '\\':
+			i++
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 && i < len(v)-1 {
+				return false
+			}
+		}
+	}
+	return depth == 0
 }

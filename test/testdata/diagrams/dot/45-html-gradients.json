@@ -1,0 +1,37 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,156.5,229.5",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "a0",
+      "height": "2.1875",
+      "label": "\n<TABLE border=\"0\" cellspacing=\"10\" cellpadding=\"10\" style=\"rounded\" bgcolor=\"lightyellow1:salmon2\" gradientangle=\"315\">\n<TR><TD bgcolor=\"red:yellow\">00<\/TD>\n<TD bgcolor=\"yellow:green\">01<\/TD>\n<TD bgcolor=\"green:blue\" gradientangle=\"270\">02<\/TD><\/TR>\n<TR><TD bgcolor=\"red;0.3:yellow\">10<\/TD>\n<TD colspan=\"2\" bgcolor=\"blue:white\" gradientangle=\"90\">11<\/TD><\/TR>\n<TR><TD style=\"radial\" bgcolor=\"white:red\">20<\/TD>\n<TD style=\"radial\" bgcolor=\"white:green\" gradientangle=\"45\">21<\/TD>\n<TD style=\"radial\" bgcolor=\"white:blue\" gradientangle=\"180\">22<\/TD><\/TR>\n<\/TABLE>",
+      "pos": "78.25,150.75",
+      "shape": "none",
+      "width": "2.1736"
+    },
+    {
+      "_gvid": 1,
+      "name": "b",
+      "fillcolor": "gray80:white",
+      "height": "0.5",
+      "label": "\\N",
+      "pos": "78.25,18",
+      "shape": "box",
+      "style": "filled",
+      "width": "0.75"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 0,
+      "head": 1,
+      "pos": "e,78.25,36.43 78.25,72.181 78.25,63.585 78.25,55.281 78.25,47.892"
+    }
+  ]
+}

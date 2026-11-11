@@ -10,12 +10,16 @@ import (
 	"github.com/xo/zuzu/theme"
 )
 
-// Color reads a color of DOT: a name, #rrggbb, #rrggbbaa, or hue,
-// saturation and value from 0 to 1. A list of colors takes its first.
+// Color reads a color of DOT: a name of CSS or of the X11 scheme of
+// Graphviz, #rrggbb, #rrggbbaa, or hue, saturation and value from 0 to 1.
+// A list of colors takes its first.
 func Color(v string) (string, bool) {
 	v = strings.TrimSpace(v)
 	if i := strings.IndexAny(v, ":;"); i > 0 {
 		v = v[:i]
+	}
+	if c, ok := x11[strings.ToLower(v)]; ok {
+		return fmt.Sprintf("#%06x", c), true
 	}
 	if c, ok := color.Parse(v); ok {
 		if len(v) == 9 && v[0] == '#' {
@@ -65,18 +69,41 @@ func hsvToRGB(h, s, v float64) (int, int, int) {
 
 // Contrast returns a color of text that reads on a fill: the text of the
 // light theme on a light fill, and that of the dark theme on a dark fill.
-// The two hold in either mode. It returns empty for a fill that is empty,
-// unknown or mostly transparent.
+// The two hold in either mode. A fill of two colors, a gradient, reads as
+// the mean of its colors, by their weights. It returns empty for a fill
+// that is empty, unknown or mostly transparent.
 func Contrast(fill string) string {
-	c, ok := Color(fill)
+	colors, weights, _ := ColorList(fill)
+	lum := func(v string) (float64, bool) {
+		c, ok := Color(v)
+		if !ok {
+			return 0, false
+		}
+		rgba, ok := color.Parse(c)
+		if !ok || rgba.A < 0.5 {
+			return 0, false
+		}
+		return rgba.Luminance(), true
+	}
+	l, ok := lum(colors[0])
 	if !ok {
 		return ""
 	}
-	rgba, ok := color.Parse(c)
-	if !ok || rgba.A < 0.5 {
-		return ""
+	if len(colors) >= 2 {
+		l2, ok := lum(colors[1])
+		if !ok {
+			return ""
+		}
+		w := 0.5
+		switch {
+		case weights[0] >= 0:
+			w = weights[0]
+		case weights[1] >= 0:
+			w = 1 - weights[1]
+		}
+		l = w*l + (1-w)*l2
 	}
-	if rgba.Luminance() > 0.35 {
+	if l > 0.35 {
 		return theme.New(theme.Light, theme.Zuzu).Text
 	}
 	return theme.New(theme.Dark, theme.Zuzu).Text

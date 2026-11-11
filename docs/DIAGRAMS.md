@@ -55,8 +55,9 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | a node | `width`, `height`, `fixedsize` | the size, in inches. With `fixedsize=true` or `shape`, the node has that size. Without it, the node is at least that size and grows to fit its label |
 | a node | `xlabel` | a label outside the node, at a corner, as below |
 | a node | `margin` | the space around the label, `x` or `x,y` in inches. A label of HTML in a node with no shape has `0.11,0.055` by default, and `plain` has 0 |
-| a node | `style` | `filled`, `dashed`, `dotted`, `bold`, `rounded` |
+| a node | `style` | `filled`, `radial`, `dashed`, `dotted`, `bold`, `rounded` |
 | a node | `color`, `fillcolor`, `fontcolor`, `penwidth`, `fontsize` | the paint. The size of the node fits its label at its `fontsize`. `setlinewidth(n)` in `style` is the old form of `penwidth` |
+| a node | `gradientangle` | the angle of a fill of two colors, as below |
 | an edge | `label` | the label, or a label of HTML |
 | an edge | `headlabel`, `taillabel` | the labels at the ends, as below |
 | an edge | `xlabel` | a label beside the middle of the edge, as below |
@@ -68,10 +69,34 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | an edge | `headport`, `tailport` | the ports, as below |
 | an edge | `color`, `penwidth`, `style`, `fontcolor`, `fontsize` | the paint |
 | a cluster | `label` | the title, or a title of HTML |
-| a cluster | `style`, `color`, `fillcolor`, `bgcolor`, `fontcolor`, `penwidth`, `pencolor` | the paint |
+| a cluster | `style`, `color`, `fillcolor`, `bgcolor`, `fontcolor`, `penwidth`, `pencolor`, `gradientangle` | the paint |
 
-A color is a name of X11 or of SVG, `#rrggbb`, `#rrggbbaa`, or three
-numbers of hue, saturation and value.
+A color is a name of CSS or of the X11 scheme of Graphviz, `#rrggbb`,
+`#rrggbbaa`, or three numbers of hue, saturation and value. The X11 scheme
+adds the numbered colors, such as `salmon2` and `lightblue4`, `gray0` to
+`gray100`, `grey0` to `grey100`, and names such as `navyblue`. A name that
+CSS also has, such as `gray`, `green`, `maroon` or `purple`, keeps its
+color of CSS, as the SVG of Graphviz does. The case of a name does not
+matter.
+
+### Gradients
+
+A fill of two colors, such as `fillcolor="red:blue"`, is a gradient, as in
+Graphviz. A node, a cluster, and a table or a cell of a label of HTML can
+have one:
+
+| Form | What zuzu draws |
+| --- | --- |
+| `a:b` | a linear gradient from `a` at the left to `b` at the right |
+| `gradientangle=90` | the line of the gradient turns counterclockwise by that angle in degrees, so 90 goes from the bottom to the top |
+| `a;0.3:b` or `a:b;0.7` | a hard change from `a` to `b` at 0.3 of the way |
+| `style=radial` | a radial gradient from `a` at the center to `b` at the edge. With a `gradientangle`, the center of `a` moves toward that angle |
+
+`style=radial` fills the node or the cluster, as `filled` does. A color
+after the second, as in `a:b:c`, does not draw, as in Graphviz, and it is
+an issue. A weight that is not a number from 0 to 1 is an issue. The text
+on a gradient takes the color that reads on the mean of its two colors.
+The gradients draw in the SVG and in the PNG.
 
 The shapes are `box`, `rect`, `rectangle`, `square`, `ellipse`, `oval`,
 `circle`, `doublecircle`, `point`, `diamond`, `hexagon`, `octagon`,
@@ -133,6 +158,28 @@ across. A field of a nested group, `{b|{c|d}}`, is a field of the record,
 in order. `<name>` names a port, and an edge that names the port ends at
 its field. `\{`, `\}`, `\|`, `\<`, `\>` and `\ ` are text.
 
+A record whose label is one group in braces, `{a|b|c}`, lays its fields
+one under another when the ranks run down, as in Graphviz. When the ranks
+run across, its fields also lie one under another, and not side by side
+as in Graphviz.
+
+A record can have a label of HTML, as a class of UML of the gallery of
+Graphviz does:
+
+```dot
+Class1 [shape=record, label=<{<b>I/O class</b> | + property<br align="left"/>...<br align="left"/>}>]
+```
+
+The braces and the bars outside the tags split the fields, and the text of
+each field is HTML. A line of a field draws in its font: bold, italic or
+with a line under it. A field whose lines each end in `<br align="left"/>`
+draws them at the left of the field. A label of HTML with no brace and no
+bar, such as a table, draws in the shape of the record, as a label of HTML
+does. A field of HTML has no port, as in Graphviz. A table in a field, a
+line in more than one font, a font with a color, a size or a face, a line
+at the right, and a field with lines at the left and at the center are
+issues.
+
 ### Labels of HTML
 
 A label in angle brackets, `label=<...>`, is a label of HTML of Graphviz.
@@ -145,11 +192,12 @@ The package `html` of okage reads it and lays it out as dot 16.1.0 does
 | `<br align="left">` | a new line, placed in the text by its `align` |
 | `<table>` with `<tr>`, `<td>`, `<hr/>` and `<vr/>` | the boxes of the table and its cells, and the rules |
 | `border`, `cellborder`, `cellspacing`, `cellpadding` | the borders and the spaces, in points |
-| `bgcolor`, `color` | the fill and the border. A cell with no color takes that of its table, and then the color of the node |
+| `bgcolor`, `color` | the fill and the border. A cell with no color takes that of its table, and then the color of the node. A `bgcolor` of two colors is a gradient, as above |
+| `gradientangle` | the angle of the gradient of a table or a cell |
 | `align`, `balign`, `valign` | the place of the content in a cell |
 | `colspan`, `rowspan`, `width`, `height`, `fixedsize` | the size of a cell or a table |
 | `sides` | the sides of a cell that have a border |
-| `style` | `rounded`, `dashed` and `dotted` |
+| `style` | `rounded`, `radial`, `dashed` and `dotted` |
 | `rows="*"`, `columns="*"` | a rule between each two rows or columns |
 | `port` | a port, as below |
 
@@ -182,6 +230,11 @@ draw, a name that is not an arrowhead, a number that does not read, and a
 part of a label of HTML that okage does not read, such as `href` or
 `<img>`, are issues. A label of HTML that is not valid is an
 error with its line and column.
+
+`URL`, `href` and `tooltip` on a node or an edge are issues. Vega has the
+encodings `href` and `tooltip` for them. The scene graph of zuzu holds no
+link and no tooltip, and the SVG writer writes neither, so zuzu has no
+place to put them.
 
 ## Mermaid
 

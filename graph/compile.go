@@ -93,7 +93,11 @@ func lines(s string) []any {
 // the dark theme that reads on it, so that its label reads in both modes.
 func style(r map[string]any, st map[string]string) {
 	if _, ok := st["color"]; !ok && st["fill"] != "" && st["fillOpacity"] == "1" {
-		if c := Contrast(st["fill"]); c != "" {
+		fill := st["fill"]
+		if g := st["gradient"]; g != "" {
+			fill = g
+		}
+		if c := Contrast(fill); c != "" {
 			r["textColor"] = c
 		}
 	}
@@ -120,6 +124,13 @@ func style(r map[string]any, st map[string]string) {
 			if len(dash) > 0 {
 				r[k] = dash
 			}
+		}
+	}
+	// A fill of two colors draws as a gradient.
+	if list := st["gradient"]; list != "" {
+		angle, _ := strconv.ParseFloat(st["gradientAngle"], 64)
+		if g, ok := Gradient(list, angle, st["gradientType"] == "radial"); ok {
+			r["fill"] = g
 		}
 	}
 }

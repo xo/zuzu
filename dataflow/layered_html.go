@@ -16,6 +16,10 @@ type htmlLabel struct {
 	label  *html.Label
 	lay    *html.Layout
 	mx, my float64
+	// grads holds the gradient of each table and each cell, by the
+	// *html.Table or the *html.Cell, as gradientangle and style=radial
+	// set it.
+	grads map[any]graph.HTMLGradient
 }
 
 // sizeFunc measures a text in a font, a size and a weight.
@@ -44,9 +48,32 @@ func htmlOf(r Row, size sizeFunc, fontSize float64) (*htmlLabel, bool, error) {
 
 // layHTML lays out a label of HTML in a size of font.
 func layHTML(src string, size sizeFunc, fontSize float64) (*htmlLabel, error) {
+	src, tables, cells := graph.HTMLGradients(src)
 	l, _, err := html.Parse(src)
 	if err != nil {
 		return nil, err
+	}
+	grads := map[any]graph.HTMLGradient{}
+	// The tables and the cells come in the order of the source, as a walk
+	// of the tree finds them.
+	var walk func(t *html.Table)
+	walk = func(t *html.Table) {
+		if len(tables) > 0 {
+			grads[t], tables = tables[0], tables[1:]
+		}
+		for _, r := range t.Rows {
+			for _, c := range r.Cells {
+				if len(cells) > 0 {
+					grads[c], cells = cells[0], cells[1:]
+				}
+				if c.Table != nil {
+					walk(c.Table)
+				}
+			}
+		}
+	}
+	if l.Table != nil {
+		walk(l.Table)
 	}
 	m := func(text string, st html.TextStyle) (html.Metrics, error) {
 		weight := ""
@@ -60,7 +87,7 @@ func layHTML(src string, size sizeFunc, fontSize float64) (*htmlLabel, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &htmlLabel{label: l, lay: lay, mx: 8, my: 4}, nil
+	return &htmlLabel{label: l, lay: lay, mx: 8, my: 4, grads: grads}, nil
 }
 
 // size returns the size of a node of a shape around the label, with the
@@ -115,6 +142,21 @@ func colorOf(v string) (string, bool) {
 	return graph.Color(v)
 }
 
+// gradient returns the gradient of the fill of a box, or false for a fill
+// of one color.
+func (h *htmlLabel) gradient(b html.Box) (map[string]any, bool) {
+	if !strings.Contains(b.Fill, ":") {
+		return nil, false
+	}
+	var g graph.HTMLGradient
+	if b.Cell != nil {
+		g = h.grads[b.Cell]
+	} else if b.Table != nil {
+		g = h.grads[b.Table]
+	}
+	return graph.Gradient(b.Fill, g.Angle, g.Radial)
+}
+
 // rows writes the rows that draw the label of a node at its center: its
 // boxes, its rules, the lines under, over and through its text, and its
 // runs of text. A node with no shape fills its outer table with the fill
@@ -135,7 +177,9 @@ func (h *htmlLabel) rows(r Row, x, y float64, kind string) []Row {
 		if b.Style.Rounded {
 			o["cornerRadius"] = 6.0
 		}
-		if c, ok := colorOf(b.Fill); ok {
+		if g, ok := h.gradient(b); ok {
+			o["fill"] = g
+		} else if c, ok := colorOf(b.Fill); ok {
 			o["fill"] = c
 		} else if b.Table != h.label.Table || kind != "none" {
 			o["fill"] = "transparent"

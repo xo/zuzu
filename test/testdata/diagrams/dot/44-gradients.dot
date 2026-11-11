@@ -1,0 +1,28 @@
+// Fills of two colors on nodes and clusters: linear at an angle, with a
+// weight, and radial.
+digraph {
+	node [shape=box, style=filled]
+	a [fillcolor="red:blue"]
+	b [fillcolor="red:blue", gradientangle=90]
+	c [fillcolor="salmon2;0.3:gray28"]
+	d [shape=ellipse, style=radial, fillcolor="white:lightblue2"]
+	e [shape=ellipse, style=radial, fillcolor="yellow:red", gradientangle=45]
+	subgraph cluster_lin {
+		label="linear"
+		style=filled
+		fillcolor="lightyellow1:darkolivegreen3"
+		gradientangle=270
+		f
+	}
+	subgraph cluster_rad {
+		label="radial"
+		style=radial
+		bgcolor="white:lightblue2"
+		g
+	}
+	a -> f
+	b -> f
+	c -> g
+	d -> g
+	e -> g
+}

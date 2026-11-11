@@ -1,0 +1,65 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,115.25,389.5",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "Interface1",
+      "fillcolor": "gray95",
+      "height": "1.4931",
+      "label": "{<b>«interface» I\/O<\/b> | + property<br align=\"left\"\/>...<br align=\"left\"\/>|+ method<br align=\"left\"\/>...<br align=\"left\"\/>}",
+      "pos": "60,335.75",
+      "rects": "7.75,364.5,112.25,389 7.75,323.5,112.25,364.5 7.75,282.5,112.25,323.5",
+      "shape": "record",
+      "style": "filled",
+      "width": "1.4514"
+    },
+    {
+      "_gvid": 1,
+      "name": "Class1",
+      "fillcolor": "gray95",
+      "height": "1.4931",
+      "label": "{<b>I\/O class<\/b> | + property<br align=\"left\"\/>...<br align=\"left\"\/>|+ method<br align=\"left\"\/>...<br align=\"left\"\/>}",
+      "pos": "60,192.25",
+      "rects": "23.125,221,96.875,245.5 23.125,180,96.875,221 23.125,139,96.875,180",
+      "shape": "record",
+      "style": "filled",
+      "width": "1.0243"
+    },
+    {
+      "_gvid": 2,
+      "name": "Shared",
+      "fillcolor": "gray95",
+      "height": "1.4236",
+      "label": "{\n\t\t<b>Shared resource<\/b>\n\t\t|\n\t\t\t+ property<br align=\"left\"\/>\n\t\t\t...<br align=\"left\"\/>\n\t\t|\n\t\t\t<i>+ method<\/i><br align=\"left\"\/>\n\t\t\t...<br align=\"left\"\/>\n\t\t}",
+      "pos": "60,51.25",
+      "rects": "4.75,77.5,115.25,102 4.75,36.5,115.25,77.5 4.75,0.5,115.25,36.5",
+      "shape": "record",
+      "style": "filled",
+      "width": "1.5347"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 0,
+      "head": 1,
+      "arrowtail": "empty",
+      "dir": "back",
+      "pos": "s,60,282.06 60,270.56 60,262.34 60,254 60,245.98",
+      "xlabel": "inheritance",
+      "xlp": "30,272.24"
+    },
+    {
+      "_gvid": 1,
+      "tail": 1,
+      "head": 2,
+      "arrowtail": "odiamond",
+      "dir": "back",
+      "pos": "s,60,138.7 60,125.85 60,117.87 60,109.82 60,102.12"
+    }
+  ]
+}
