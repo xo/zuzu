@@ -13,7 +13,7 @@ On 2026-11-11 phases 0, 1 and 2 are done: a maintainer accepted
 specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is done: zuzu
 draws the charts of tiers 1 and 2. Phase 6 is done: `raster` draws a scene
 with okage directly. Code follows the plan (D3).
-Every decision from D1 to D30 is decided. The open questions are at the end of `docs/PLAN.md`.
+The decisions run from D1 to D31. D31 is proposed, and the rest are decided. The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules
 

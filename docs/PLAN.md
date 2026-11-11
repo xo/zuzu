@@ -852,6 +852,8 @@ Mermaid (D18).
 Exit: a set of fixtures for each language, with references from Graphviz
 and from Mermaid.
 
+D31 proposes the design on 2026-11-11, and waits for the maintainers.
+
 ### Phase 8. The browser
 
 The scene graph as a stream, the JavaScript canvas renderer that `web`
@@ -942,6 +944,37 @@ D30 did not take these:
 4. Gemini asked for the hours of a session inside a day. D30 leaves them
    out, since no target needs them.
 
+Gemini 3.1 Pro and DeepSeek V4 Flash reviewed a draft of D31 on
+2026-11-11: the parsers of DOT and Mermaid and the transform
+`zuzu.layered`. DeepSeek V4 Pro did not answer in time, twice. D31 took
+these leads:
+
+1. Both said to make one transform that writes one dataset of nodes,
+   edges and clusters, with a field of the kind, which the marks filter.
+   The draft had two transforms that each ran the layout. D31 has one.
+2. Both said to place the nodes across the ranks by Brandes and Köpf,
+   which is simpler than network simplex and good for 5 to 200 nodes.
+3. Both said that keeping the nodes of a cluster together in each rank is
+   not enough. D31 nests the clusters, moves a cluster as a block, keeps
+   room for its padding and its title, and gives an edge that leaves a
+   cluster a dummy node on the border.
+4. Both said that the ranks of dot are not a sound reference, since the
+   best ranks are not unique. D31 checks the hard rules, the crossings and
+   the length of the edges instead.
+5. Gemini said that records and ports are common in real diagrams of DOT.
+   D31 reads them. A label of HTML stays an issue.
+6. Both listed the traps of the grammar of Mermaid: `end` as the key of a
+   node, the two forms of the text of a link, the delimiters of the shapes,
+   and statements that end at a semicolon or a new line. D31 writes the
+   grammar of each subset down and tests it against `mmdc`.
+
+D31 did not take this:
+
+1. Gemini said to generate the parser of Mermaid with a tool such as goyacc
+   or pigeon. zuzu writes its parsers by hand, as `expr` does, and a
+   grammar in a document holds the subset. A lexer with modes handles the
+   text of a link.
+
 ## Open questions for the maintainers
 
 A question keeps its number after it is answered, so that a reference to it
@@ -993,3 +1026,6 @@ stays true.
     the width and the padding of its nodes, or whether the time scale reads
     a list of the days to skip or a calendar of weekdays. Phase 5 waits for
     this answer to draw those four targets from a spec.
+
+16. Is D31, the design of the diagrams of DOT and Mermaid and of the
+    transform `zuzu.layered`, accepted? Phase 7 waits for this answer.
