@@ -123,7 +123,7 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 	}
 	// The slices start at the top and go clockwise. The compiler places
 	// the percent of each slice at its middle angle, at textPosition of
-	// the radius.
+	// the radius, with the center of the text on that point.
 	const size = 300
 	r := textPosition * size / 2
 	rows := make([]any, 0, len(parts))
@@ -172,7 +172,7 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 				},
 			},
 			map[string]any{
-				"mark":      map[string]any{"type": "text", "fontWeight": 600},
+				"mark":      map[string]any{"type": "text", "fontWeight": 600, "align": "center", "baseline": "middle"},
 				"transform": []any{map[string]any{"filter": "datum.percent != ''"}},
 				"encoding": map[string]any{
 					"x":    map[string]any{"field": "tx", "type": "quantitative", "scale": nil},

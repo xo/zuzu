@@ -8,6 +8,7 @@ package layout
 import (
 	"math"
 
+	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/theme"
@@ -143,7 +144,15 @@ func (s Style) itemBounds(typ string, it *scene.Item) Bounds {
 	case scene.Group:
 		b.add(it.X, it.Y)
 		b.add(it.X+it.Width, it.Y+it.Height)
+		if it.Clip {
+			// A group that clips draws nothing outside its box, as Vega
+			// bounds it.
+			return b
+		}
 		for i := range it.Items {
+			if it.Items[i].Clip {
+				continue
+			}
 			c := s.MarkBounds(&it.Items[i])
 			if !c.IsEmpty() {
 				b.add(it.X+c.X1, it.Y+c.Y1)
@@ -191,8 +200,66 @@ func (s Style) itemBounds(typ string, it *scene.Item) Bounds {
 		b.union(s.textBounds(it))
 	case scene.Path, scene.Shape:
 		b.add(it.X, it.Y)
+		if it.Path != "" {
+			pathBounds(&b, it)
+		}
 	}
 	return b
+}
+
+// pathSink adds the points of a path to bounds, after the rotation and the
+// move of its item. A curve adds points along it, not its control points,
+// which lie outside the curve.
+type pathSink struct {
+	b              *Bounds
+	x, y           float64
+	sin, cos       float64
+	curX, curY     float64
+	startX, startY float64
+}
+
+// pathSteps is the count of points that a curve adds.
+const pathSteps = 16
+
+func (p *pathSink) MoveTo(x, y float64) {
+	p.startX, p.startY = x, y
+	p.add(x, y)
+}
+
+func (p *pathSink) LineTo(x, y float64) { p.add(x, y) }
+
+func (p *pathSink) QuadTo(x1, y1, x, y float64) {
+	x0, y0 := p.curX, p.curY
+	for i := 1; i <= pathSteps; i++ {
+		t := float64(i) / pathSteps
+		u := 1 - t
+		p.add(u*u*x0+2*u*t*x1+t*t*x, u*u*y0+2*u*t*y1+t*t*y)
+	}
+}
+
+func (p *pathSink) CubicTo(x1, y1, x2, y2, x, y float64) {
+	x0, y0 := p.curX, p.curY
+	for i := 1; i <= pathSteps; i++ {
+		t := float64(i) / pathSteps
+		u := 1 - t
+		a, b, c, d := u*u*u, 3*u*u*t, 3*u*t*t, t*t*t
+		p.add(a*x0+b*x1+c*x2+d*x, a*y0+b*y1+c*y2+d*y)
+	}
+}
+
+func (p *pathSink) Close() { p.curX, p.curY = p.startX, p.startY }
+
+// add adds a point of the path, and makes it the current point.
+func (p *pathSink) add(x, y float64) {
+	p.curX, p.curY = x, y
+	p.b.add(p.x+x*p.cos-y*p.sin, p.y+x*p.sin+y*p.cos)
+}
+
+// pathBounds adds the bounds of the path of an item. Path data that does not
+// read adds the segments before the error, as SVG draws them.
+func pathBounds(b *Bounds, it *scene.Item) {
+	sin, cos := math.Sincos(it.Angle * math.Pi / 180)
+	_ = shape.Parse(it.Path, &pathSink{b: b, x: it.X, y: it.Y, sin: sin, cos: cos})
 }
 
 // textBounds returns the bounds of a text item, from the estimate of its
