@@ -306,6 +306,23 @@ gives the distance of that point from the center of the pie:
 In a donut, `centroid` and `circle` keep the label in the ring. With
 `centroid` or `circle`, `pie.textPosition` is an issue.
 
+A label can be too large for its slice. zuzu measures the box of each
+label in the bundled font. The box fits if all of it lies within the ring
+and between the two edges of the slice, with a margin of 2 pixels. If the
+box does not fit, the label goes outside the pie:
+
+1. The label goes in a column 18 pixels out from the right side of the
+   pie when the middle angle of its slice points right, and else in a
+   column at the left side.
+2. In each column, the labels sort from the top by the height of the bend
+   of their leader lines. Each label moves down to clear the label above
+   it by 2 pixels.
+3. If the last label of a column leaves the chart at the bottom, the
+   column moves up, as far as the top of the chart.
+4. A leader line of 1 pixel, in the color of the slice, leaves the rim at
+   the middle angle of the slice. It bends 10 pixels out from the rim, and
+   stops 3 pixels before the label.
+
 #### xychart
 
 `horizontal` or `vertical` after the keyword, `title`, an `x-axis` of

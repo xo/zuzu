@@ -1,11 +1,14 @@
 package mermaid
 
 import (
+	"cmp"
 	"maps"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/xo/zuzu/text"
 )
 
 // pieChart compiles a pie chart into an arc of Vega-Lite. Each slice has
@@ -142,6 +145,8 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 	ro, ri := size/2.0, hole*size/2
 	rows := make([]any, 0, len(parts))
 	domain := make([]any, 0, len(parts))
+	var outside []*pieLabel
+	measure := text.NewEstimate()
 	var cum float64
 	for i, s := range parts {
 		name := s.label
@@ -163,14 +168,27 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 		case "circle":
 			r = sectorCircle(span, ri, ro)
 		}
+		start := 0.0
+		if sum > 0 {
+			start = 2 * math.Pi * cum / sum
+		}
 		cum += s.value
 		domain = append(domain, name)
-		rows = append(rows, map[string]any{
+		x, y := r*math.Sin(mid), r*math.Cos(mid)
+		row := map[string]any{
 			"kind": "slice", "i": i, "label": s.label, "value": s.value,
-			"name": name, "percent": percent,
-			"tx": size/2 + r*math.Sin(mid), "ty": size/2 - r*math.Cos(mid),
-		})
+			"name": name, "percent": percent, "tx": size/2 + x, "ty": size/2 - y,
+		}
+		rows = append(rows, row)
+		// A label that does not fit in its slice goes outside the pie.
+		if percent != "" {
+			w := measure.Width(text.Font{Family: text.Family, Size: pieLabelSize, Weight: 600}, percent)
+			if !pieLabelFits(x, y, w, pieLabelSize, start, span, ri, ro) {
+				outside = append(outside, &pieLabel{row: row, mid: mid, w: w})
+			}
+		}
 	}
+	placeOutside(outside, size/2, size/2, ro, size)
 	arc := map[string]any{"type": "arc", "outerRadius": size / 2}
 	if hole > 0 {
 		arc["innerRadius"] = hole * size / 2
@@ -192,6 +210,8 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 					},
 				},
 			},
+			pieLeader("px", "py", "ex", "ey"),
+			pieLeader("ex", "ey", "lx", "ly"),
 			map[string]any{
 				"mark":      map[string]any{"type": "text", "fontWeight": 600, "align": "center", "baseline": "middle"},
 				"transform": []any{map[string]any{"filter": "datum.percent != ''"}},
@@ -207,6 +227,156 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 		spec["title"] = map[string]any{"text": title, "anchor": "start"}
 	}
 	return spec, true, nil
+}
+
+// pieLabelSize is the font size of the percent of a slice.
+const pieLabelSize = 11
+
+// The leader line of a label outside the pie leaves the rim of the slice at
+// its middle angle, and bends at pieElbow pixels out from the rim. The
+// label starts pieColumn pixels out from the side of the pie, and the line
+// stops pieLeaderGap pixels before the label. Two labels outside keep a
+// gap of pieLabelGap pixels.
+const (
+	pieElbow     = 10
+	pieColumn    = 18
+	pieLeaderGap = 3
+	pieLabelGap  = 2
+	pieMargin    = 2
+)
+
+// pieLabel is a label of a slice that goes outside the pie.
+type pieLabel struct {
+	row map[string]any
+	mid float64 // the middle angle of the slice, clockwise from the top
+	w   float64 // the width of the label
+	y   float64 // the middle of the label
+}
+
+// pieLabelFits reports whether a label of a width and a height, with its
+// center at x, y from the center of the pie, with y up, lies inside a
+// slice. The slice starts at the angle start, clockwise from the top, and
+// spans the angle span, on a ring from the radius ri to the radius ro. The
+// label keeps a margin of pieMargin from the arcs and the edges of the
+// slice.
+func pieLabelFits(x, y, w, h, start, span, ri, ro float64) bool {
+	x1, x2, y1, y2 := x-w/2, x+w/2, y-h/2, y+h/2
+	// The farthest point of a box from the center is a corner.
+	for _, c := range [][2]float64{{x1, y1}, {x2, y1}, {x1, y2}, {x2, y2}} {
+		if math.Hypot(c[0], c[1]) > ro-pieMargin {
+			return false
+		}
+	}
+	// The nearest point of a box to the center.
+	if ri > 0 && math.Hypot(min(max(0, x1), x2), min(max(0, y1), y2)) < ri+pieMargin {
+		return false
+	}
+	if span >= 2*math.Pi-1e-9 {
+		return true
+	}
+	// Each point on the edge of the box, at steps of at most a pixel, lies
+	// between the two edges of the slice, at least the margin from each.
+	inSlice := func(px, py float64) bool {
+		r := math.Hypot(px, py)
+		if r == 0 {
+			return false
+		}
+		t := math.Mod(math.Atan2(px, py)-start+4*math.Pi, 2*math.Pi)
+		if t > span {
+			return false
+		}
+		edge := func(d float64) float64 {
+			if d >= math.Pi/2 {
+				return r
+			}
+			return r * math.Sin(d)
+		}
+		return edge(t) >= pieMargin && edge(span-t) >= pieMargin
+	}
+	steps := func(a, b float64) int { return max(1, int(math.Ceil(b-a))) }
+	nx, ny := steps(x1, x2), steps(y1, y2)
+	for k := range nx + 1 {
+		px := x1 + (x2-x1)*float64(k)/float64(nx)
+		if !inSlice(px, y1) || !inSlice(px, y2) {
+			return false
+		}
+	}
+	for k := range ny + 1 {
+		py := y1 + (y2-y1)*float64(k)/float64(ny)
+		if !inSlice(x1, py) || !inSlice(x2, py) {
+			return false
+		}
+	}
+	return true
+}
+
+// placeOutside places the labels that do not fit in their slices outside
+// a pie with its center at cx, cy and the radius ro, in a chart of a
+// height. A label goes in a column at the right of the pie when its slice
+// points right, and else at the left. In each column, the labels sort by
+// the height of the bend of their leader lines, and each moves down to
+// clear the label above. If the last label leaves the chart, the column
+// moves up. Each label gets its center in tx and ty, and its leader line
+// from px, py on the rim to the bend at ex, ey and on to lx, ly.
+func placeOutside(labels []*pieLabel, cx, cy, ro, height float64) {
+	var left, right []*pieLabel
+	for _, l := range labels {
+		sin, cos := math.Sin(l.mid), math.Cos(l.mid)
+		l.row["outside"] = true
+		l.row["px"], l.row["py"] = cx+ro*sin, cy-ro*cos
+		l.row["ex"], l.row["ey"] = cx+(ro+pieElbow)*sin, cy-(ro+pieElbow)*cos
+		l.y = cy - (ro+pieElbow)*cos
+		if l.mid < math.Pi {
+			right = append(right, l)
+		} else {
+			left = append(left, l)
+		}
+	}
+	for _, col := range [][]*pieLabel{left, right} {
+		slices.SortStableFunc(col, func(a, b *pieLabel) int { return cmp.Compare(a.y, b.y) })
+		for i, l := range col {
+			l.y = max(l.y, pieLabelSize/2)
+			if i > 0 {
+				l.y = max(l.y, col[i-1].y+pieLabelSize+pieLabelGap)
+			}
+		}
+		if n := len(col); n > 0 {
+			if over := col[n-1].y + pieLabelSize/2 - height; over > 0 {
+				// The column moves up, but its first label stays in the
+				// chart.
+				over = min(over, col[0].y-pieLabelSize/2)
+				for _, l := range col {
+					l.y -= over
+				}
+			}
+		}
+	}
+	for _, l := range labels {
+		x := cx + ro + pieColumn
+		l.row["tx"], l.row["lx"] = x+l.w/2, x-pieLeaderGap
+		if l.mid >= math.Pi {
+			x = cx - ro - pieColumn
+			l.row["tx"], l.row["lx"] = x-l.w/2, x+pieLeaderGap
+		}
+		l.row["ty"], l.row["ly"] = l.y, l.y
+	}
+}
+
+// pieLeader returns a layer that draws one part of the leader lines of the
+// labels outside a pie, from the point of two fields to the point of two
+// others, in the color of the slice.
+func pieLeader(x, y, x2, y2 string) map[string]any {
+	pos := func(f string) map[string]any {
+		return map[string]any{"field": f, "type": "quantitative", "scale": nil}
+	}
+	return map[string]any{
+		"mark":      map[string]any{"type": "rule", "strokeWidth": 1},
+		"transform": []any{map[string]any{"filter": "datum.outside === true"}},
+		"encoding": map[string]any{
+			"x": pos(x), "y": pos(y), "x2": pos(x2), "y2": pos(y2),
+			"color": map[string]any{"field": "name", "type": "nominal"},
+		},
+	}
 }
 
 // sectorCentroid returns the distance from the center of a pie to the

@@ -207,10 +207,12 @@ func TestPieTextPlacement(t *testing.T) {
 		config string
 		want   map[string]float64
 	}{
-		{"", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 112.5}},
-		{"    textPosition: 0.5\n", map[string]float64{"79%": 75, "17%": 75, "3%": 75}},
-		{"    zuzu.textPlacement: bisector\n", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 112.5}},
-		{"    zuzu.textPlacement: centroid\n", map[string]float64{"79%": 24.14, "17%": 95.04, "3%": 99.84}},
+		// The label 3% does not fit in its slice at these places, so it goes
+		// outside the pie. A distance of 0 stands for outside.
+		{"", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 0}},
+		{"    textPosition: 0.5\n", map[string]float64{"79%": 75, "17%": 75, "3%": 0}},
+		{"    zuzu.textPlacement: bisector\n", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 0}},
+		{"    zuzu.textPlacement: centroid\n", map[string]float64{"79%": 24.14, "17%": 95.04, "3%": 0}},
 		{"    zuzu.textPlacement: circle\n", map[string]float64{"79%": 75, "17%": 98.54, "3%": 136.76}},
 		// In a ring from 75 to 150, a label stays in the ring.
 		{"    zuzu.textPlacement: circle\n    donutHole: 0.5\n", map[string]float64{"79%": 112.5, "17%": 112.5, "3%": 136.76}},
@@ -238,12 +240,93 @@ func TestPieTextPlacement(t *testing.T) {
 				if it.item.Align != "center" || it.item.Baseline != "middle" {
 					t.Errorf("%q: the label %s has the align %q and the baseline %q", test.config, text, it.item.Align, it.item.Baseline)
 				}
-				if got := math.Hypot(it.item.X-cx, it.item.Y-cy); math.Abs(got-want) > 0.01 {
+				got := math.Hypot(it.item.X-cx, it.item.Y-cy)
+				if want == 0 && got > 150 {
+					continue
+				}
+				if math.Abs(got-want) > 0.01 {
 					t.Errorf("%q: the label %s is %.2f from the center, expected %.2f", test.config, text, got, want)
 				}
 			}
 			if !found {
 				t.Errorf("%q: no label %s", test.config, text)
+			}
+		}
+	}
+}
+
+func TestPieOutsideLabels(t *testing.T) {
+	t.Parallel()
+	// The 1% slices are too thin for their labels, and 90% is not.
+	const src = "pie\n\"Big\" : 90\n\"A\" : 1\n\"B\" : 5\n\"C\" : 2\n\"D\" : 1\n\"E\" : 1"
+	items := renderMermaid(t, src)
+	var cx, cy, ro float64
+	for _, it := range items {
+		if it.mark == scene.Arc {
+			cx, cy, ro = it.item.X, it.item.Y, it.item.OuterRadius
+		}
+	}
+	type label struct {
+		text  string
+		box   [4]float64
+		left  bool
+		rules int
+	}
+	var outside []label
+	for _, it := range items {
+		if it.mark != scene.Text || !strings.HasSuffix(it.text, "%") {
+			continue
+		}
+		d := it.datum
+		in := math.Hypot(it.item.X-cx, it.item.Y-cy) < ro
+		if d["label"] == "Big" {
+			if !in || d["outside"] == true {
+				t.Errorf("the label %s of the large slice is outside the pie", it.text)
+			}
+			continue
+		}
+		if d["label"] == "A" || d["label"] == "D" || d["label"] == "E" {
+			if in || d["outside"] != true {
+				t.Errorf("the label %s of the slice %v is inside the pie", it.text, d["label"])
+				continue
+			}
+		}
+		if in {
+			continue
+		}
+		w := 6.0 * float64(len(it.text))
+		l := label{text: it.text, box: [4]float64{it.item.X - w/2, it.item.Y - 5.5, it.item.X + w/2, it.item.Y + 5.5}}
+		l.left = it.item.X < cx
+		// The label sits in a column beside the pie, on the side of the
+		// middle angle of its slice.
+		if l.box[2] > cx-ro && l.box[0] < cx+ro {
+			t.Errorf("the label %s of %v is not beside the pie", it.text, d["label"])
+		}
+		px, _ := d["px"].(float64)
+		py, _ := d["py"].(float64)
+		if r := math.Hypot(px-cx, py-cy); math.Abs(r-ro) > 0.01 {
+			t.Errorf("the leader of %v starts %.2f from the center, not on the rim", d["label"], r)
+		}
+		if (px < cx) != l.left {
+			t.Errorf("the label of %v is on the other side of its slice", d["label"])
+		}
+		for _, r := range items {
+			if r.mark == scene.Rule && r.datum != nil && r.datum["label"] == d["label"] {
+				l.rules++
+			}
+		}
+		if l.rules != 2 {
+			t.Errorf("the leader of %v has %d parts, not 2", d["label"], l.rules)
+		}
+		outside = append(outside, l)
+	}
+	if len(outside) < 3 {
+		t.Fatalf("%d labels outside the pie, not 3 or more", len(outside))
+	}
+	for i, a := range outside {
+		for _, b := range outside[i+1:] {
+			if a.box[0] < b.box[2] && b.box[0] < a.box[2] && a.box[1] < b.box[3] && b.box[1] < a.box[3] {
+				t.Errorf("the labels %s and %s overlap", a.text, b.text)
 			}
 		}
 	}
