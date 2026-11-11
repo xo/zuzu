@@ -56,6 +56,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `layout` | `dot`. Another layout is an issue |
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
 | a node | `shape` | the shape, as below |
+| a node | `sides`, `skew`, `distortion`, `orientation`, `regular` | the polygon of the shape `polygon`, as below. Another shape draws without `sides`, `skew` and `distortion`, as in Graphviz. An `orientation` that is not 0, or `regular=true`, on another shape is an issue |
 | a node | `width`, `height`, `fixedsize` | the size, in inches. With `fixedsize=true` or `shape`, the node has that size. Without it, the node is at least that size and grows to fit its label |
 | a node | `xlabel` | a label outside the node, at a corner, as below |
 | a node | `margin` | the space around the label, `x` or `x,y` in inches. A label of HTML in a node with no shape has `0.11,0.055` by default, and `plain` has 0 |
@@ -106,7 +107,26 @@ The shapes are `box`, `rect`, `rectangle`, `square`, `ellipse`, `oval`,
 `circle`, `doublecircle`, `point`, `diamond`, `hexagon`, `octagon`,
 `pentagon`, `triangle`, `invtriangle`, `house`, `invhouse`, `trapezium`,
 `invtrapezium`, `parallelogram`, `cylinder`, `note`, `tab`, `folder`,
-`plaintext`, `plain`, `none`, `underline`, `record` and `Mrecord`.
+`plaintext`, `plain`, `none`, `underline`, `record`, `Mrecord`,
+`Mdiamond`, `Msquare`, `Mcircle` and `polygon`.
+
+`Mdiamond` is a diamond and `Msquare` is a square, each with a short line
+across each corner. `Mcircle` is a circle with a line across its top and
+its bottom.
+
+`polygon` reads its attributes as Graphviz documents them:
+
+| Attribute | What zuzu draws |
+| --- | --- |
+| `sides` | the number of sides, 4 by default. The base is flat. A polygon of fewer than 3 sides is an ellipse |
+| `skew` | a slant. A positive skew moves the top to the right, and a negative skew moves it to the left |
+| `distortion` | a change of width from top to bottom. A positive distortion makes the top wider than the bottom |
+| `orientation` | a turn of the polygon, in degrees, counterclockwise |
+| `regular` | with `true`, the node is as wide as it is high |
+
+The polygon fills the box of the node. The node is the polygon of the
+least area that holds its label at its center, and it grows across at
+least as much as down. An edge ends on the outline of the polygon.
 
 ### Ranks and order
 
@@ -328,8 +348,54 @@ The shapes of a node:
 the map `shapes` in `graph/shapes.go` lists, such as `rect`, `rounded`,
 `stadium`, `subproc`, `cyl`, `circle`, `dbl-circ`, `diam`, `hex`,
 `lean-r`, `lean-l`, `trap-b`, `trap-t`, `odd`, `tri`, `flip-tri`, `doc`,
-`f-circ` and `text`. A shape that zuzu does not draw yet draws as a rounded
-rectangle, and the report says so.
+`f-circ` and `text`, with the aliases of Mermaid 12. zuzu also draws these
+named shapes of Mermaid 12:
+
+| Name and aliases | What zuzu draws |
+| --- | --- |
+| `lin-doc`, `lined-document` | a document with a second line down its left side |
+| `tag-doc`, `tagged-document` | a document with a line across its bottom right corner |
+| `docs`, `documents`, `st-doc`, `stacked-document` | a stack of three documents |
+| `brace`, `brace-l`, `comment` | a curly brace on the left of the label, with no fill |
+| `brace-r` | a curly brace on the right of the label, with no fill |
+| `braces` | a curly brace on each side of the label, with no fill |
+| `notch-rect`, `card`, `notched-rectangle` | a rectangle with its top left corner cut off |
+| `notch-pent`, `loop-limit`, `notched-pentagon` | a rectangle with its two top corners cut off |
+| `lin-rect`, `lined-rectangle`, `lined-process`, `lin-proc`, `shaded-process` | a rectangle with a second line down its left side |
+| `div-rect`, `div-proc`, `divided-rectangle`, `divided-process` | a rectangle with a line across its top |
+| `win-pane`, `internal-storage`, `window-pane` | a rectangle with a line across its top and a line down its left side |
+| `tag-rect`, `tagged-rectangle`, `tag-proc`, `tagged-process` | a rectangle with a line across its bottom right corner |
+| `st-rect`, `procs`, `processes`, `stacked-rectangle` | a stack of three rectangles |
+| `sl-rect`, `manual-input`, `sloped-rectangle` | a rectangle with a top that slopes up to the right |
+| `datastore`, `data-store` | a line above and a line below the label |
+| `delay`, `half-rounded-rectangle` | a rectangle with a round right end |
+| `curv-trap`, `curved-trapezoid`, `display` | a point on the left and a round right end |
+| `bow-rect`, `stored-data`, `bow-tie-rectangle` | a round left end and a right end that curves in |
+| `h-cyl`, `das`, `horizontal-cylinder` | a cylinder on its side |
+| `lin-cyl`, `disk`, `lined-cylinder` | a cylinder with a second line under its top |
+| `flag`, `paper-tape` | a band with a wavy top and bottom |
+| `bucket` | a bucket with an open top |
+| `console` | a rounded rectangle with `>_` at its top left |
+| `browser` | a rounded rectangle with the bar of a window |
+| `cloud` | a cloud |
+| `bang` | a spiky burst |
+| `fork`, `join` | a filled bar across the flow, 70 by 10, with no text |
+| `hourglass`, `collate` | an hourglass of 30 by 30, with no text |
+| `bolt`, `com-link`, `lightning-bolt` | a lightning bolt of 35 by 70, with no text |
+| `cross-circ`, `summary`, `crossed-circle` | a circle of 40 with a cross in it, with no text |
+| `fr-circ`, `stop`, `framed-circle` | a ring of 14 with a dot in it, with no text |
+| `subprocess` | a subroutine |
+| `directory` | a folder |
+| `bpmn-activity` | a rounded rectangle |
+| `bpmn-annotation` | a square bracket on the left of the label |
+
+A shape with no text drops its label, as Mermaid does. An edge ends on the
+box of the node, except for `cross-circ`, `fr-circ`, `cloud` and `bang`,
+where it ends on the ellipse. A shape that zuzu does not draw yet draws as a
+rounded rectangle, and the report says so. These are `person`, and the
+shapes of BPMN that put their label under the shape: `bpmn-start`,
+`bpmn-intermediate`, `bpmn-boundary`, `bpmn-end`, `bpmn-gateway`,
+`bpmn-data` and `bpmn-data-store`.
 
 The links:
 
@@ -706,6 +772,30 @@ settings `xyChart.width`, `height`, `chartOrientation`, `showLegend`,
 `showTitle`, `showDataLabel`, `showDataLabelOutsideBar`, and the colors of
 `plotColorPalette`.
 
+zuzu also reads these settings, and gives each to the setting of Vega-Lite
+with the same meaning. The `xAxis` of Mermaid is the axis of the
+categories, which is at the left of a horizontal chart.
+
+| Setting of `xyChart` | Setting of Vega-Lite |
+| --- | --- |
+| `titleFontSize` | the `fontSize` of the title |
+| `titlePadding` | the `offset` of the title |
+| `xAxis.labelFontSize`, `yAxis.labelFontSize` | the `labelFontSize` of the axis |
+| `xAxis.titleFontSize`, `yAxis.titleFontSize` | the `titleFontSize` of the axis |
+| `xAxis.axisLineWidth` | the `domainWidth` of the axis of categories |
+
+These settings are issues, because the look of zuzu has no place for them.
+An axis has no ticks, so `tickLength` and `tickWidth` are issues. The
+labels of an axis are 8 pixels from the plot, and the title of an axis is
+at its end, so `labelPadding` and `titlePadding` of an axis are issues. An
+axis of numbers has no axis line, so `axisLineWidth` on it is an issue.
+`width` and `height` give the size of the plot, so
+`plotReservedSpacePercent` is an issue.
+
+With `showDataLabel`, the value of a bar is 10 pixels from the end of the
+bar, inside it or outside it, as in Mermaid. In a horizontal chart, the
+value is on the middle line of the bar.
+
 #### quadrantChart
 
 `title`, `x-axis` and `y-axis` with one end or both, `low --> high`,
@@ -727,7 +817,7 @@ is an error. zuzu reads `chartWidth`, `chartHeight`, `pointRadius`,
 | `weekend` | `friday` or `saturday` |
 | `inclusiveEndDates` | an end date that holds its whole day |
 | `topAxis` | the axis at the top |
-| `section` | a group of tasks, in its own color |
+| `section` | a group of tasks, in its own color, with its name at the left |
 | a task | `Name : tags, id, start, end` |
 
 A task names its start as a date, as `after a b`, or not at all, which
@@ -746,6 +836,16 @@ JavaScript reads it. An end date that is not a duration does not read, so
 the task has no length, and that is an issue. An item of `excludes` or
 `includes` that is not a date, a day of the week or `weekends` excludes or
 includes no day. Each statement with such items is one issue.
+
+A section draws as Mermaid draws it, in the look of a group of a
+hierarchy. Every other section, from the first, has a band behind its
+rows. The band starts at the left of the names
+of the sections and ends at the end of the time axis. It is a tint of the
+color of the section, so that the grid and the names of the tasks show
+through it. The name of each section is at the left of the names of its
+tasks, in the middle of its rows, 11 pixels and bold. The names take the
+place of the legend. A gantt with no named section draws no band and no
+name.
 
 #### journey
 
@@ -794,6 +894,26 @@ on a leaf, `"Leaf": 12`. `classDef` and `:::class` style a node with
 `showValues`, `padding`, `diagramPadding`, `labelFontSize` and
 `valueFontSize`. A value on a section with children, and a leaf with no
 value, are issues.
+
+The name of a leaf that does not fit gets smaller, as in Mermaid 12. zuzu
+measures each name and each value in the bundled font, and the spec works
+out the sizes with Vega expressions after the layout of the treemap:
+
+1. The name starts at `labelFontSize`. It gets smaller by 1 pixel at a time
+   until it fits the width of the leaf, less 6 pixels on each side.
+2. Then it gets smaller until the name, the gap and the value fit the
+   height of the leaf, less 6 pixels at the top and at the bottom. The
+   value and the gap shrink with the name. With `showValues: false`, only
+   the name must fit.
+3. In a treemap of more than 20 leaves, the smallest size is 4. A name
+   that does not fit at 4 is cut at the edge of its leaf, with no ellipsis.
+4. In a treemap of 20 leaves or fewer, the smallest size is 8. A name that
+   does not fit at 8 is not drawn.
+5. A leaf whose space for text is less than 8 pixels wide or high, or 10
+   in a treemap of 20 leaves or fewer, draws no name.
+6. The value is not drawn when its name is not drawn, when it is wider
+   than the leaf, or when it ends less than 4 pixels from the bottom of the
+   leaf. Its smallest size is 4, or 6 in a treemap of 20 leaves or fewer.
 
 #### sequenceDiagram
 

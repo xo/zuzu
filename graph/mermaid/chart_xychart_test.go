@@ -148,6 +148,15 @@ func TestXYIssues(t *testing.T) {
 		{"xychart\naccTitle: T\nbar [1]", "accTitle"},
 		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showTick: false\n---\nxychart\nbar [1]", "xyChart.xAxis"},
 		{"---\nconfig:\n  themeVariables:\n    xyChart:\n      titleColor: red\n---\nxychart\nbar [1]", "themeVariables.xyChart.titleColor"},
+		// zuzu draws no ticks, puts the labels 8 from the plot and the title
+		// of an axis at its end, and draws no axis line along numbers.
+		{"---\nconfig:\n  xyChart:\n    plotReservedSpacePercent: 60\n---\nxychart\nbar [1]", "xyChart.plotReservedSpacePercent"},
+		{"---\nconfig:\n  xyChart:\n    xAxis:\n      tickLength: 10\n---\nxychart\nbar [1]", "xyChart.xAxis.tickLength"},
+		{"---\nconfig:\n  xyChart:\n    xAxis:\n      tickWidth: 5\n---\nxychart\nbar [1]", "xyChart.xAxis.tickWidth"},
+		{"---\nconfig:\n  xyChart:\n    yAxis:\n      labelPadding: 10\n---\nxychart\nbar [1]", "xyChart.yAxis.labelPadding"},
+		{"---\nconfig:\n  xyChart:\n    yAxis:\n      titlePadding: 10\n---\nxychart\nbar [1]", "xyChart.yAxis.titlePadding"},
+		{"---\nconfig:\n  xyChart:\n    yAxis:\n      axisLineWidth: 5\n---\nxychart\nx-axis [a]\nbar [1]", "xyChart.yAxis.axisLineWidth"},
+		{"---\nconfig:\n  xyChart:\n    xAxis:\n      axisLineWidth: 5\n---\nxychart\nx-axis 1 --> 5\nbar [1]", "xyChart.xAxis.axisLineWidth"},
 	}
 	for _, test := range tests {
 		report, err := compileMermaid(t, test.src, false)
@@ -160,6 +169,60 @@ func TestXYIssues(t *testing.T) {
 		}
 		if _, err := compileMermaid(t, test.src, true); err == nil {
 			t.Errorf("%q: expected an error in the strict mode", test.src)
+		}
+	}
+}
+
+func TestXYConfig(t *testing.T) {
+	t.Parallel()
+	items := renderMermaid(t, mmdFiles(t, "xychart")["06-config.mmd"])
+	size := func(s string) float64 {
+		for _, it := range items {
+			if it.mark == scene.Text && it.text == s {
+				return it.item.FontSize
+			}
+		}
+		return 0
+	}
+	// The x axis of Mermaid holds the categories, on the left of a
+	// horizontal chart.
+	for s, want := range map[string]float64{"Sales by month": 22, "jan": 14, "Months": 13, "4,000": 12, "Revenue (in $)": 15} {
+		if got := size(s); got != want {
+			t.Errorf("%q draws at %v, not %v", s, got, want)
+		}
+	}
+	line := false
+	for _, it := range items {
+		if it.mark == scene.Rule && it.item.StrokeWidth != nil && *it.item.StrokeWidth == 3 {
+			line = true
+		}
+	}
+	if !line {
+		t.Error("the axis line of the categories is not 3 wide")
+	}
+	// A value sits inside the end of its bar, 10 from the end, and in the
+	// middle of the bar across it.
+	for _, bar := range items {
+		if bar.mark != scene.Rect || bar.datum["kind"] != "bar" {
+			continue
+		}
+		v := num(bar.datum["y"])
+		found := false
+		for _, it := range items {
+			if it.mark != scene.Text || it.text != strconv.FormatFloat(v, 'f', -1, 64) {
+				continue
+			}
+			found = true
+			x, y := it.item.X+it.item.Dx, it.item.Y+it.item.Dy
+			if end := bar.item.X + bar.item.Width; x != end-10 || it.item.Align != "right" {
+				t.Errorf("the value %v ends at %v, %s aligned, and its bar at %v", v, x, it.item.Align, end)
+			}
+			if mid := bar.item.Y + bar.item.Height/2; y != mid || it.item.Baseline != "middle" {
+				t.Errorf("the value %v is at %v with the baseline %s, and the middle of its bar at %v", v, y, it.item.Baseline, mid)
+			}
+		}
+		if !found {
+			t.Errorf("the value %v of a bar draws no label", v)
 		}
 	}
 }

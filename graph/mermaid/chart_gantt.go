@@ -3,6 +3,9 @@ package mermaid
 import (
 	"slices"
 	"time"
+
+	"github.com/xo/zuzu/layout"
+	"github.com/xo/zuzu/text"
 )
 
 // The look of a gantt.
@@ -17,6 +20,13 @@ const (
 	// ganttLayout writes a time as a date of JavaScript with no zone, which
 	// reads in the time zone of the render (D27).
 	ganttLayout = "2006-01-02T15:04:05.000"
+	// ganttWidth is the width of the time axis, and ganttRow the height of
+	// the row of a task.
+	ganttWidth = 640
+	ganttRow   = 26
+	// ganttTint is the opacity of the band of a section, the tint of a
+	// group of a hierarchy and of a node of a diagram.
+	ganttTint = 0.14
 )
 
 // ganttChart compiles a chart of the kind gantt into Vega-Lite: a bar for
@@ -113,11 +123,21 @@ func (g *gantt) spec() (map[string]any, error) {
 		return x
 	}
 	x := xOf("start")
-	y := map[string]any{"field": "key", "type": "nominal", "title": nil, "scale": map[string]any{"domain": domain, "paddingInner": 0.3}}
+	// The outer padding is half the inner padding, so that each row of a
+	// task is ganttRow high and the bands of the sections meet.
+	y := map[string]any{"field": "key", "type": "nominal", "title": nil,
+		"scale": map[string]any{"domain": domain, "paddingInner": 0.3, "paddingOuter": 0.15}}
+	named := slices.ContainsFunc(g.tasks, func(t *ganttTask) bool { return !t.vert && t.section != "" })
 	var color any = map[string]any{"field": "section", "type": "nominal", "title": nil,
 		"scale": map[string]any{"domain": order}, "legend": map[string]any{"orient": "bottom"}}
-	if len(sections) < 2 {
-		color = map[string]any{"field": "section", "type": "nominal", "legend": nil}
+	if len(sections) < 2 || named {
+		// The names of the sections at the left take the place of the
+		// legend.
+		color = map[string]any{"field": "section", "type": "nominal", "scale": map[string]any{"domain": order}, "legend": nil}
+	}
+	var secs []any
+	if named {
+		secs = g.sections(keys, color)
 	}
 	bar := func(rows []any, mark map[string]any) map[string]any {
 		mark["type"] = "bar"
@@ -129,6 +149,9 @@ func (g *gantt) spec() (map[string]any, error) {
 		}
 	}
 	var layers []any
+	if secs != nil {
+		layers = append(layers, secs...)
+	}
 	if bands := g.bands(); len(bands) > 0 {
 		layers = append(layers, map[string]any{
 			"data":     ganttData(bands, "start", "end"),
@@ -199,8 +222,8 @@ func (g *gantt) spec() (map[string]any, error) {
 		return nil, g.c.errorf("the gantt has no task")
 	}
 	spec := map[string]any{
-		"width":  640,
-		"height": map[string]any{"step": 26},
+		"width":  ganttWidth,
+		"height": map[string]any{"step": ganttRow},
 		"layer":  layers,
 	}
 	if g.title != "" {
@@ -210,6 +233,71 @@ func (g *gantt) spec() (map[string]any, error) {
 		spec["description"] = g.desc
 	}
 	return spec, nil
+}
+
+// sections returns the layers that draw the sections as Mermaid does: a
+// band behind the rows of every other section, across the chart, and the
+// name of each section at the left of the names of its tasks. A section
+// draws as a group of a hierarchy does in the look of zuzu: the band is a
+// tint of the color of the section, and the name is 11 pixels, bold, in the
+// color of the text. The band is a tint and not a panel, so that the grid
+// and the names of the tasks under it still show.
+func (g *gantt) sections(keys []string, color any) []any {
+	type run struct {
+		name        string
+		first, last int
+	}
+	var runs []run
+	row := 0
+	m := text.NewEstimate()
+	var keyWidth, nameWidth float64
+	for i, t := range g.tasks {
+		if t.vert {
+			continue
+		}
+		keyWidth = max(keyWidth, m.Width(text.Font{Family: text.Family, Size: layout.LabelSize, Weight: 400}, keys[i]))
+		if n := len(runs); n > 0 && runs[n-1].name == t.section {
+			runs[n-1].last = row
+		} else {
+			runs = append(runs, run{name: t.section, first: row, last: row})
+			nameWidth = max(nameWidth, m.Width(text.Font{Family: text.Family, Size: 11, Weight: 600}, t.section))
+		}
+		row++
+	}
+	// The band starts 8 before the name of the section. The name ends 16
+	// before the names of the tasks, which end 8 before the plot and draw
+	// at most 180 wide.
+	left := layout.LabelPad + min(keyWidth, 180) + 16 + nameWidth + 8
+	var bands, names []any
+	for i, r := range runs {
+		y0, y1 := float64(r.first*ganttRow), float64((r.last+1)*ganttRow)
+		if i%2 == 0 {
+			bands = append(bands, map[string]any{"section": r.name, "y0": y0, "y1": y1})
+		}
+		if r.name != "" {
+			names = append(names, map[string]any{"section": r.name, "y": (y0 + y1) / 2})
+		}
+	}
+	pixels := func(field string) map[string]any {
+		return map[string]any{"field": field, "type": "quantitative", "scale": nil}
+	}
+	return []any{
+		map[string]any{
+			"data": map[string]any{"values": bands},
+			"mark": map[string]any{"type": "rect", "fillOpacity": ganttTint},
+			"encoding": map[string]any{
+				"x": map[string]any{"value": -left}, "x2": map[string]any{"value": ganttWidth},
+				"y": pixels("y0"), "y2": map[string]any{"field": "y1"}, "color": color,
+			},
+		},
+		map[string]any{
+			"data": map[string]any{"values": names},
+			"mark": map[string]any{"type": "text", "align": "left", "baseline": "middle", "fontSize": 11, "fontWeight": 600},
+			"encoding": map[string]any{
+				"x": map[string]any{"value": -left + 8}, "y": pixels("y"), "text": map[string]any{"field": "section"},
+			},
+		},
+	}
 }
 
 // keys returns the key of the row of each task: its name, with spaces in

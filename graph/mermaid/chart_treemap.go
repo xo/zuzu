@@ -1,12 +1,16 @@
 package mermaid
 
 import (
+	"fmt"
 	"maps"
+	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/text"
 )
 
 // treemapNode matches a node of a treemap: a name in quotes, a class, a
@@ -180,6 +184,10 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 	}
 	labelSize := settingNumber(cfg, "labelFontSize", 11)
 	valueSize := settingNumber(cfg, "valueFontSize", 10)
+	fit := newTreemapFit(rows, labelSize, valueSize, showValues)
+	if err := fit.measure(values, valueFormat); err != nil {
+		return nil, false, err
+	}
 	inner := settingNumber(cfg, "padding", 3)
 	left := map[string]any{"signal": "datum.x0 + 6"}
 	value := "format(datum.total, " + quoteJS(valueFormat) + ")"
@@ -199,7 +207,9 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 			map[string]any{"type": "formula", "as": "y1", "expr": "datum.y1 - " + strconv.FormatFloat(labelSize+10, 'f', -1, 64)},
 		}},
 		filteredData("sections", "tree", "datum.depth >= 1 && datum.children > 0"),
-		filteredData("leaves", "tree", "datum.depth >= 1 && !datum.children"),
+		fit.leaves(filteredData("leaves", "tree", "datum.depth >= 1 && !datum.children")),
+		filteredData("leafLabels", "leaves", "datum.labelShow"),
+		filteredData("leafValueRows", "leaves", "datum.valueShow"),
 	}
 	paint := func(prop string) []any {
 		return []any{map[string]any{"test": "datum." + prop, "field": prop}}
@@ -247,13 +257,20 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 		"limit":    map[string]any{"signal": "max(0, datum.x1 - datum.x0 - 60)"},
 		"text":     map[string]any{"field": "name"},
 	})
-	text("leafNames", "leaves", "zuzu.edgeLabelBox", map[string]any{
-		"x": left, "y": map[string]any{"signal": "datum.y0 + 6"},
+	leafName := map[string]any{
+		"x": left, "y": map[string]any{"signal": "datum.y0 + " + treemapInset},
 		"baseline": map[string]any{"value": "top"}, "fontWeight": map[string]any{"value": 600},
-		"fontSize": map[string]any{"value": labelSize},
-		"limit":    map[string]any{"signal": "max(0, datum.x1 - datum.x0 - 12)"},
+		"fontSize": map[string]any{"field": "labelSize"},
 		"text":     map[string]any{"field": "name"},
-	})
+	}
+	if fit.complex {
+		// A name that does not fit at the smallest size is cut at the edge
+		// of its leaf, with no ellipsis. The ellipsis is a space, because
+		// zuzu reads an empty ellipsis as the default one.
+		leafName["limit"] = map[string]any{"field": "labelWidth"}
+		leafName["ellipsis"] = map[string]any{"value": " "}
+	}
+	text("leafNames", "leafLabels", "zuzu.edgeLabelBox", leafName)
 	if showValues {
 		text("sectionValues", "sections", "zuzu.edgeLabel", map[string]any{
 			"x": map[string]any{"signal": "datum.x1 - 6"}, "y": map[string]any{"signal": "datum.y0 + 5"},
@@ -261,11 +278,10 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 			"fontSize": map[string]any{"value": valueSize},
 			"text":     map[string]any{"signal": value},
 		})
-		text("leafValues", "leaves", "zuzu.edgeLabelBox", map[string]any{
-			"x": left, "y": map[string]any{"signal": "datum.y0 + 10 + " + strconv.FormatFloat(labelSize, 'f', -1, 64)},
+		text("leafValues", "leafValueRows", "zuzu.edgeLabelBox", map[string]any{
+			"x": left, "y": map[string]any{"signal": "datum.y0 + datum.valueTop"},
 			"baseline": map[string]any{"value": "top"},
-			"fontSize": map[string]any{"value": valueSize},
-			"limit":    map[string]any{"signal": "max(0, datum.x1 - datum.x0 - 12)"},
+			"fontSize": map[string]any{"field": "valueSize"},
 			"text":     map[string]any{"signal": value},
 		})
 	}
@@ -306,4 +322,115 @@ func (c *chart) css(s string) (map[string]any, error) {
 		}
 	}
 	return st, nil
+}
+
+// treemapInset is the distance from the top and from the left of a leaf
+// to its name, in the expression language.
+const treemapInset = "6"
+
+// treemapFit fits the name and the value of each leaf in its box, as
+// Mermaid 12 does. The name starts at the size of labelFontSize. It gets
+// smaller by one pixel at a time until it fits the width of the leaf, and
+// then until the name and the value fit the height. In a treemap of more
+// than 20 leaves, the smallest size is 4, and a name that does not fit at 4
+// is cut at the edge of its leaf. In a smaller treemap, the smallest size
+// is 8, and a name that does not fit at 8 is not drawn. The size of the
+// value follows the size of the name. A value is not drawn when its name is
+// not drawn, or when it does not fit.
+type treemapFit struct {
+	labelSize, valueSize float64
+	// minLabel and minValue are the smallest sizes of a name and of a
+	// value. least is the smallest width and height of the space for the
+	// text in a leaf. A leaf with less space draws no text.
+	minLabel, minValue, least float64
+	complex, showValues       bool
+}
+
+// newTreemapFit returns the fit of the leaves of a treemap.
+func newTreemapFit(rows []*treemapRow, labelSize, valueSize float64, showValues bool) *treemapFit {
+	leaves := 0
+	for _, r := range rows[1:] {
+		if r.children == 0 {
+			leaves++
+		}
+	}
+	f := &treemapFit{labelSize: labelSize, valueSize: valueSize, minLabel: 8, minValue: 6, least: 10, showValues: showValues}
+	if leaves > 20 {
+		f.complex, f.minLabel, f.minValue, f.least = true, 4, 4, 8
+	}
+	f.minLabel, f.minValue = min(f.minLabel, labelSize), min(f.minValue, valueSize)
+	return f
+}
+
+// measure sets the width of the name and of the value of each leaf at a
+// size of 1 pixel, in the bundled font.
+func (f *treemapFit) measure(values []any, valueFormat string) error {
+	write, err := format.Number(valueFormat, format.EnUS)
+	if err != nil {
+		return fmt.Errorf("writing the values of a treemap: %w", err)
+	}
+	m := text.NewEstimate()
+	for _, v := range values[1:] {
+		row, _ := v.(map[string]any)
+		name, _ := row["name"].(string)
+		total, _ := row["total"].(float64)
+		row["nameWidth"] = m.Width(text.Font{Family: text.Family, Size: f.labelSize, Weight: 600}, name) / f.labelSize
+		row["valueWidth"] = m.Width(text.Font{Family: text.Family, Size: f.valueSize, Weight: 400}, write(total)) / f.valueSize
+	}
+	return nil
+}
+
+// value returns the size of the value under a name of a size.
+func (f *treemapFit) value(size float64) float64 {
+	return max(f.minValue, min(f.valueSize, math.Round(size*f.valueSize/f.labelSize)))
+}
+
+// height returns the height of a name of a size, with its value under it
+// when the values show. The gap between them is 4 at labelFontSize, and
+// shrinks with the name.
+func (f *treemapFit) height(size float64) float64 {
+	if !f.showValues {
+		return size
+	}
+	return size*(1+4/f.labelSize) + f.value(size)
+}
+
+// leaves adds the fields of the fit to the dataset of the leaves: the space
+// for the text, the sizes of the name and of the value, the top of the
+// value, and whether each one draws.
+func (f *treemapFit) leaves(data map[string]any) map[string]any {
+	num := func(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
+	// The sizes go from labelFontSize down to the smallest size, one pixel
+	// at a time. tall picks the largest size whose height fits the leaf.
+	sizes := []float64{f.labelSize}
+	for s := math.Ceil(f.labelSize) - 1; s > f.minLabel; s-- {
+		sizes = append(sizes, s)
+	}
+	tall := num(f.minLabel)
+	for _, s := range slices.Backward(sizes) {
+		tall = "datum.labelHeight >= " + num(f.height(s)) + " ? " + num(s) + " : " + tall
+	}
+	show := "datum.labelWidth >= " + num(f.least) + " && datum.labelHeight >= " + num(f.least)
+	if !f.complex {
+		show += " && datum.labelSize * datum.nameWidth <= datum.labelWidth && datum.labelHeight >= datum.labelSize"
+	}
+	formula := func(as, expr string) map[string]any {
+		return map[string]any{"type": "formula", "as": as, "expr": expr}
+	}
+	tr, _ := data["transform"].([]any)
+	data["transform"] = append(tr,
+		formula("labelWidth", "datum.x1 - datum.x0 - 2 * "+treemapInset),
+		formula("labelHeight", "datum.y1 - datum.y0 - 2 * "+treemapInset),
+		formula("labelSize", "max("+num(f.minLabel)+", min("+num(f.labelSize)+
+			", floor(datum.labelWidth / max(datum.nameWidth, 0.001)), "+tall+"))"),
+		formula("labelShow", show),
+		formula("valueSize", "max("+num(f.minValue)+", min("+num(f.valueSize)+
+			", round(datum.labelSize * "+num(f.valueSize/f.labelSize)+")))"),
+		formula("valueTop", treemapInset+" + datum.labelSize * "+num(1+4/f.labelSize)),
+		// A value does not draw when its name does not, when it is wider
+		// than the space, or when it ends less than 4 from the bottom.
+		formula("valueShow", "datum.labelShow && datum.valueSize * datum.valueWidth <= datum.labelWidth && "+
+			"datum.valueTop + datum.valueSize <= datum.y1 - datum.y0 - 4"),
+	)
+	return data
 }

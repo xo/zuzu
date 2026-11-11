@@ -2,6 +2,8 @@ package mermaid_test
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -47,6 +49,10 @@ func TestTreemapFixtures(t *testing.T) {
 		"05-tabs.mmd": {
 			sec("Main", "50"), leaf("A", 20, "20"), sec("B", "25"), leaf("B1", 10, "10"), leaf("B2", 15, "15"),
 			leaf("C", 5, "5"), leaf("Side", 30, "30"),
+		},
+		"06-fit.mmd": {
+			sec("Source files", "113"), leaf("internal/render/okage.go", 60, "60"),
+			leaf("internal/render/svg_writer.go", 30, "30"), leaf("layout/axis_x.go", 14, "14"), leaf("cmd/main.go", 9, "9"),
 		},
 	}
 	files := fixtures(t, "treemap")
@@ -105,6 +111,81 @@ func TestTreemapClasses(t *testing.T) {
 	})
 	if plain != 1 {
 		t.Error("a node with no class takes the style of a class")
+	}
+}
+
+// leafText returns the size of the name and of the value of a leaf, or 0
+// for one that does not draw, and whether its name ends with an ellipsis.
+// A name is bold and a value is not.
+func leafText(items []drawnItem, name string) (float64, float64, bool) {
+	var label, value float64
+	cut := false
+	for _, it := range items {
+		if children, _ := it.datum["children"].(float64); it.mark != scene.Text || it.datum["name"] != name || children > 0 {
+			continue
+		}
+		if it.item.FontWeight == "600" {
+			label = it.item.FontSize
+			cut = strings.HasSuffix(it.text, "…")
+		} else {
+			value = it.item.FontSize
+		}
+	}
+	return label, value, cut
+}
+
+// drawTreemap draws the source of a treemap.
+func drawTreemap(t *testing.T, src string) []drawnItem {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "treemap.mmd")
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	items, report := drawFixture(t, path)
+	if len(report) != 0 {
+		t.Errorf("report: %v", report)
+	}
+	return items
+}
+
+func TestTreemapFit(t *testing.T) {
+	t.Parallel()
+	items, _ := drawFixture(t, "testdata/treemap/06-fit.mmd")
+	// A name that fits draws at labelFontSize, and a name in a narrow
+	// leaf gets smaller, with its value.
+	if label, value, _ := leafText(items, "cmd/main.go"); label != 11 || value != 10 {
+		t.Errorf("a name that fits draws at %v with its value at %v", label, value)
+	}
+	label, value, cut := leafText(items, "layout/axis_x.go")
+	if label < 8 || label >= 11 || value >= 10 || value == 0 || cut {
+		t.Errorf("a name in a narrow leaf draws at %v with its value at %v, cut %v", label, value, cut)
+	}
+	// In a small treemap, a name that does not fit at 8 does not draw, and
+	// its value does not draw either.
+	items = drawTreemap(t, "treemap-beta\n\"Files\"\n    \"a\": 60\n    \"a much longer name of a file.go\": 3\n")
+	if label, value, _ := leafText(items, "a much longer name of a file.go"); label != 0 || value != 0 {
+		t.Errorf("a name that does not fit draws at %v with its value at %v", label, value)
+	}
+	// In a treemap of more than 20 leaves, a name gets as small as 4 and
+	// is cut with no ellipsis.
+	var b strings.Builder
+	b.WriteString("treemap-beta\n\"Files\"\n    \"a\": 40\n")
+	for i := range 21 {
+		fmt.Fprintf(&b, "    \"packages/app/tests/file%d.go\": 1\n", i)
+	}
+	items = drawTreemap(t, b.String())
+	small := 0
+	for i := range 21 {
+		label, _, cut := leafText(items, fmt.Sprintf("packages/app/tests/file%d.go", i))
+		if cut {
+			t.Errorf("the name of leaf %d ends with an ellipsis", i)
+		}
+		if label == 4 {
+			small++
+		}
+	}
+	if small == 0 {
+		t.Error("no name draws at 4")
 	}
 }
 

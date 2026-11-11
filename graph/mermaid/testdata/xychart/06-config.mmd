@@ -1,0 +1,23 @@
+---
+config:
+  xyChart:
+    width: 600
+    height: 360
+    titleFontSize: 22
+    titlePadding: 12
+    chartOrientation: horizontal
+    showDataLabel: true
+    xAxis:
+      labelFontSize: 14
+      titleFontSize: 13
+      axisLineWidth: 3
+    yAxis:
+      labelFontSize: 12
+      titleFontSize: 15
+---
+xychart
+    title "Sales by month"
+    x-axis Months [jan, feb, mar, apr]
+    y-axis "Revenue (in $)" 4000 --> 11000
+    bar [5000, 7500, 11000, 9200]
+    line [5000, 7500, 11000, 9200]

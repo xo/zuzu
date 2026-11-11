@@ -38,11 +38,6 @@ func xyChart(c *chart) (map[string]any, bool, error) {
 		c.line = c.d.N
 		return nil, false, c.errorf("the header %q of an xychart", c.d.Header)
 	}
-	if err := c.unreadSettings("xyChart.width", "xyChart.height", "xyChart.chartOrientation",
-		"xyChart.showLegend", "xyChart.showTitle", "xyChart.showDataLabel",
-		"xyChart.showDataLabelOutsideBar", "themeVariables.xyChart.plotColorPalette"); err != nil {
-		return nil, false, err
-	}
 	var title string
 	var xa, ya *xyAxis
 	var plots []*xyPlot
@@ -105,6 +100,19 @@ func xyChart(c *chart) (map[string]any, bool, error) {
 	}
 	if ya == nil {
 		ya = &xyAxis{}
+	}
+	read := []string{"xyChart.width", "xyChart.height", "xyChart.chartOrientation",
+		"xyChart.showLegend", "xyChart.showTitle", "xyChart.showDataLabel",
+		"xyChart.showDataLabelOutsideBar", "xyChart.titleFontSize", "xyChart.titlePadding",
+		"xyChart.xAxis.labelFontSize", "xyChart.xAxis.titleFontSize",
+		"xyChart.yAxis.labelFontSize", "xyChart.yAxis.titleFontSize",
+		"themeVariables.xyChart.plotColorPalette"}
+	if xa.cats != nil {
+		// zuzu draws an axis line along an axis of categories alone.
+		read = append(read, "xyChart.xAxis.axisLineWidth")
+	}
+	if err := c.unreadSettings(read...); err != nil {
+		return nil, false, err
 	}
 	return c.xySpec(title, horizontal, xa, ya, plots)
 }
@@ -281,37 +289,62 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 		// A step places the first category at the top.
 		h = map[string]any{"step": height / float64(max(len(xa.cats), 1))}
 	}
+	config := map[string]any{
+		"style": map[string]any{"xyUnnamed": map[string]any{"zuzu.endLabel": false}},
+	}
+	// The x axis of Mermaid is the axis of the categories, which is the y
+	// of Vega-Lite in a horizontal chart.
+	for _, a := range []struct{ name, channel string }{{"xAxis", cat}, {"yAxis", val}} {
+		ac := map[string]any{}
+		for from, to := range map[string]string{"labelFontSize": "labelFontSize", "titleFontSize": "titleFontSize", "axisLineWidth": "domainWidth"} {
+			if v, ok := configNumber(cfg, "xyChart", a.name, from); ok && (from != "axisLineWidth" || (a.name == "xAxis" && xa.cats != nil)) {
+				ac[to] = v
+			}
+		}
+		if len(ac) > 0 {
+			config["axis"+strings.ToUpper(a.channel)] = ac
+		}
+	}
 	spec := map[string]any{
 		"width":    w,
 		"height":   h,
 		"data":     map[string]any{"values": rows},
 		"encoding": encoding,
 		"layer":    layers,
-		"config": map[string]any{
-			"style": map[string]any{"xyUnnamed": map[string]any{"zuzu.endLabel": false}},
-		},
+		"config":   config,
 	}
 	if show, ok := configBool(cfg, "xyChart", "showTitle"); ok && !show {
 		spec["title"] = map[string]any{"text": ""}
 	} else if title != "" {
-		spec["title"] = map[string]any{"text": title, "anchor": "start"}
+		t := map[string]any{"text": title, "anchor": "start"}
+		if v, ok := configNumber(cfg, "xyChart", "titleFontSize"); ok {
+			t["fontSize"] = v
+		}
+		// Mermaid puts titlePadding above and below the title. Vega-Lite
+		// puts the offset between the title and the chart.
+		if v, ok := configNumber(cfg, "xyChart", "titlePadding"); ok {
+			t["offset"] = v
+		}
+		spec["title"] = t
 	}
 	return spec, true, nil
 }
 
 // xyDataLabels writes the layer of the values on the bars, inside the end
-// of each bar or past it.
+// of each bar or past it. As in Mermaid, a value is 10 pixels from the end
+// of its bar, so that it stays clear of a line that ends there. In a
+// horizontal chart, the value is on the middle line of its bar.
 func xyDataLabels(horizontal, outside bool, barEnc map[string]any) map[string]any {
 	mark := map[string]any{"type": "text", "fontWeight": 600}
 	switch {
 	case horizontal && outside:
-		mark["align"], mark["dx"] = "left", 4
+		mark["align"], mark["baseline"], mark["dx"] = "left", "middle", 10
 	case horizontal:
-		mark["align"], mark["dx"] = "right", -4
+		mark["align"], mark["baseline"], mark["dx"] = "right", "middle", -10
 	case outside:
-		mark["baseline"], mark["dy"] = "bottom", -4
+		mark["baseline"], mark["dy"] = "alphabetic", -10
 	default:
-		mark["baseline"], mark["dy"] = "top", 4
+		mark["baseline"], mark["dy"] = "top", 10
 	}
 	enc := map[string]any{"text": map[string]any{"field": "y", "type": "quantitative"}}
 	for k, v := range barEnc {
