@@ -1,0 +1,20 @@
+digraph {
+  newrank=true
+  node [shape=box]
+  edge [weight=10]
+  subgraph one { one -> one_ [arrowhead=none]; a1; one_ -> a1 [style=invis]; a1 -> a2 }
+  subgraph two { two -> two_ [arrowhead=none]; b1; two_ -> b1 [style=invis]; b1 -> b2 }
+  subgraph three { three -> three_ [arrowhead=none]; c1; three_ -> c1 [style=invis]; c1 -> c2 }
+  b1 -> a2 [weight=0]
+  subgraph top {
+    rank=same
+    edge [style=invis, weight=1]
+    key -> one -> two -> three
+  }
+  key -> k1 -> k2
+  subgraph r1 { rank=same; k1; a1; b1; c1 }
+  subgraph r2 { rank=same; k2; a2; b2; c2 }
+  one_ [shape=point, style=invis]
+  two_ [shape=point, style=invis]
+  three_ [shape=point, style=invis]
+}

@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 )
@@ -210,6 +211,112 @@ func TestLayRanks(t *testing.T) {
 	}
 	if r(3) != r(4) {
 		t.Errorf("the nodes of one rank group have the ranks %d and %d", r(3), r(4))
+	}
+}
+
+func TestLayCycleSource(t *testing.T) {
+	t.Parallel()
+	// The search from s turns c -> a around, so that s, the only node with
+	// no edge in, keeps the first rank, as in dot.
+	in := LayoutInput{}
+	for _, id := range []string{"s", "a", "b", "c", "d"} {
+		in.Nodes = append(in.Nodes, LayoutNode{ID: id, Width: 20, Height: 20})
+	}
+	for _, e := range [][2]string{{"s", "a"}, {"a", "b"}, {"b", "c"}, {"c", "a"}, {"d", "a"}, {"c", "d"}} {
+		in.Edges = append(in.Edges, LayoutEdge{Source: e[0], Target: e[1]})
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []int{0, 1, 2, 3, 4} {
+		if got := l.Nodes[i].Rank; got != want {
+			t.Errorf("the node %s has the rank %d, want %d", in.Nodes[i].ID, got, want)
+		}
+	}
+}
+
+func TestLayFlatOrder(t *testing.T) {
+	t.Parallel()
+	// Four columns, each a chain from a node of the first rank. The edges in
+	// the first rank give the order of the columns, against the order of
+	// the input.
+	in := LayoutInput{}
+	cols := []string{"w", "x", "y", "z"}
+	for _, c := range cols {
+		in.Nodes = append(in.Nodes, LayoutNode{ID: c, Width: 20, Height: 20, Rank: "top"})
+		for r := 1; r <= 3; r++ {
+			in.Nodes = append(in.Nodes, LayoutNode{ID: c + strconv.Itoa(r), Width: 20, Height: 20})
+			in.Edges = append(in.Edges, LayoutEdge{Source: c + strconv.Itoa(r-1), Target: c + strconv.Itoa(r)})
+		}
+		in.Edges[len(in.Edges)-3].Source = c
+	}
+	for _, e := range [][2]string{{"z", "y"}, {"y", "x"}, {"x", "w"}} {
+		in.Edges = append(in.Edges, LayoutEdge{Source: e[0], Target: e[1]})
+	}
+	ids := map[string]int{}
+	for i, n := range in.Nodes {
+		ids[n.ID] = i
+	}
+	for _, dir := range []string{TB, LR} {
+		in.Direction = dir
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for r := range 4 {
+			var order []int
+			for _, id := range slices.Backward(cols) {
+				if r > 0 {
+					id += strconv.Itoa(r)
+				}
+				order = append(order, l.Nodes[ids[id]].Order)
+			}
+			if !slices.IsSorted(order) {
+				t.Errorf("%s: the rank %d has the orders %v of z, y, x and w", dir, r, order)
+			}
+		}
+		checkRules(t, dir, in, l)
+	}
+}
+
+func TestLayWeight(t *testing.T) {
+	t.Parallel()
+	// b has two neighbors above it. The heavy edge from a stays straight.
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 20, Height: 20}, {ID: "c", Width: 20, Height: 20}, {ID: "b", Width: 20, Height: 20}},
+		Edges: []LayoutEdge{{Source: "a", Target: "b", Weight: 100}, {Source: "c", Target: "b"}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a, b := l.Nodes[0], l.Nodes[2]; math.Abs(a.X-b.X) > 0.01 {
+		t.Errorf("a at x %v and b at x %v, want the same x", a.X, b.X)
+	}
+}
+
+func TestLayLoopRoom(t *testing.T) {
+	t.Parallel()
+	// The loop of a and its label take room at the right of a, so the label
+	// of the long edge from s beside it does not cover them.
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "s", Width: 20, Height: 20}, {ID: "a", Width: 20, Height: 20}, {ID: "b", Width: 20, Height: 20}},
+		Edges: []LayoutEdge{
+			{Source: "s", Target: "a"}, {Source: "a", Target: "b"}, {Source: "s", Target: "b", LabelWidth: 40, LabelHeight: 14},
+			{Source: "a", Target: "a", LabelWidth: 40, LabelHeight: 14},
+		},
+	}
+	for _, dir := range []string{TB, LR} {
+		in.Direction = dir
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		loop, long := l.Edges[3], l.Edges[2]
+		if math.Abs(loop.LabelX-long.LabelX) < 40-0.01 && math.Abs(loop.LabelY-long.LabelY) < 14-0.01 {
+			t.Errorf("%s: the labels at %v,%v and %v,%v overlap", dir, loop.LabelX, loop.LabelY, long.LabelX, long.LabelY)
+		}
 	}
 }
 

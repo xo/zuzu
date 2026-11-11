@@ -142,21 +142,31 @@ type vertex struct {
 
 // layout holds the state of one call of Lay.
 type layout struct {
-	in      *LayoutInput
-	vs      []vertex
-	up      [][]int // the neighbors of each vertex in the rank above
-	down    [][]int // and in the rank below
-	layers  [][]int
-	cparent []int
-	cdepth  []int
+	in   *LayoutInput
+	vs   []vertex
+	up   [][]int // the neighbors of each vertex in the rank above
+	down [][]int // and in the rank below
+	// upW and downW hold the weight of the edge to each neighbor in up and
+	// down.
+	upW, downW [][]float64
+	// flatIn holds the vertices that must come before each vertex in its
+	// rank, by the edges between two nodes of the same rank and cluster,
+	// and flatOut the vertices that must come after it.
+	flatIn, flatOut [][]int
+	layers          [][]int
+	cparent         []int
+	cdepth          []int
 	// chains holds the vertices of each edge from its upper end to its
 	// lower end, and flip whether that is the reverse of the edge.
 	chains [][]int
 	flip   []bool
 	flat   []bool
 	label  []int // the vertex of the label of each edge, or -1
-	x, y   []float64
-	sep    struct{ rank, node, edge, pad float64 }
+	// loopw is the space that the loops of each node and their labels take
+	// at its right, across the ranks, or 0.
+	loopw []float64
+	x, y  []float64
+	sep   struct{ rank, node, edge, pad float64 }
 	// corder is the order of each cluster among the clusters beside it,
 	// the same in every rank, so that the blocks of the clusters keep
 	// their order from rank to rank.
@@ -246,6 +256,7 @@ func lay(in LayoutInput) (*Layout, error) {
 	l.rank(ids, hasLabels)
 	l.chainEdges(ids, sideways)
 	l.addBorders()
+	l.flatEdges()
 	l.order()
 	l.place()
 	return l.result(ids, sideways), nil
@@ -319,10 +330,21 @@ func (l *layout) chainEdges(ids map[string]int, sideways bool) {
 	l.flip = make([]bool, n)
 	l.flat = make([]bool, n)
 	l.label = make([]int, n)
+	l.loopw = make([]float64, len(in.Nodes))
 	for i, e := range in.Edges {
 		l.label[i] = -1
 		a, b := ids[e.Source], ids[e.Target]
 		if a == b {
+			// The loop routes as loop in place.go says.
+			r := 18 + e.LabelWidth/4
+			w := 1.2 * r
+			if e.LabelWidth > 0 {
+				w = 1.3*r + e.LabelWidth
+				if sideways {
+					w = 1.3*r + e.LabelHeight
+				}
+			}
+			l.loopw[a] = math.Max(l.loopw[a], w)
 			continue
 		}
 		if l.vs[a].rank > l.vs[b].rank {
@@ -354,15 +376,120 @@ func (l *layout) chainEdges(ids map[string]int, sideways bool) {
 	}
 	l.up = make([][]int, len(l.vs))
 	l.down = make([][]int, len(l.vs))
+	l.upW = make([][]float64, len(l.vs))
+	l.downW = make([][]float64, len(l.vs))
 	for i, ch := range l.chains {
 		if l.flat[i] || len(ch) < 2 {
 			continue
 		}
+		w := in.Edges[i].Weight
+		if w <= 0 {
+			w = 1
+		}
 		for k := 1; k < len(ch); k++ {
 			l.down[ch[k-1]] = append(l.down[ch[k-1]], ch[k])
 			l.up[ch[k]] = append(l.up[ch[k]], ch[k-1])
+			l.downW[ch[k-1]] = append(l.downW[ch[k-1]], w)
+			l.upW[ch[k]] = append(l.upW[ch[k]], w)
 		}
 	}
+}
+
+// flatEdges sets flatIn from the edges between two nodes of the same rank
+// and the same cluster: the source of such an edge comes before its target,
+// as in dot. A search from each node in the order of the input turns around
+// each such edge that closes a cycle.
+func (l *layout) flatEdges() {
+	l.flatIn = make([][]int, len(l.vs))
+	l.flatOut = make([][]int, len(l.vs))
+	out := make([][]int, len(l.vs))
+	for i, ch := range l.chains {
+		if !l.flat[i] {
+			continue
+		}
+		a, b := ch[0], ch[1]
+		if a != b && l.vs[a].cluster == l.vs[b].cluster {
+			out[a] = append(out[a], b)
+		}
+	}
+	// state is 0 for a vertex that the search did not reach, 1 for a vertex
+	// on its path, and 2 for a vertex that it left.
+	state := make([]int8, len(l.vs))
+	var visit func(v int)
+	visit = func(v int) {
+		state[v] = 1
+		for _, w := range out[v] {
+			a, b := v, w
+			switch state[w] {
+			case 0:
+				visit(w)
+			case 1:
+				a, b = w, v
+			}
+			l.flatIn[b] = append(l.flatIn[b], a)
+			l.flatOut[a] = append(l.flatOut[a], b)
+		}
+		state[v] = 2
+	}
+	for v := range l.vs {
+		if state[v] == 0 && len(out[v]) > 0 {
+			visit(v)
+		}
+	}
+}
+
+// keepFlat returns a rank in an order where each vertex comes after the
+// vertices of flatIn. It takes each time the first vertex of the rank
+// whose vertices of flatIn are placed, so that the order changes as little
+// as it can.
+func (l *layout) keepFlat(rank []int) []int {
+	need := false
+	for _, v := range rank {
+		if len(l.flatIn[v]) > 0 {
+			need = true
+			break
+		}
+	}
+	if !need {
+		return rank
+	}
+	in := make(map[int]bool, len(rank))
+	for _, v := range rank {
+		in[v] = true
+	}
+	placed := make(map[int]bool, len(rank))
+	ready := func(v int) bool {
+		for _, u := range l.flatIn[v] {
+			if in[u] && !placed[u] {
+				return false
+			}
+		}
+		return true
+	}
+	out := make([]int, 0, len(rank))
+	for len(out) < len(rank) {
+		next := -1
+		for _, v := range rank {
+			if !placed[v] && ready(v) {
+				next = v
+				break
+			}
+		}
+		if next < 0 {
+			// The edges hold no cycle, so this does not happen. Keep the
+			// rest in its order.
+			for _, v := range rank {
+				if !placed[v] {
+					out = append(out, v)
+					placed[v] = true
+				}
+			}
+			break
+		}
+		out = append(out, next)
+		placed[next] = true
+	}
+	return out
 }
 
 // addBorders adds a left and a right border to each cluster in each rank
@@ -392,9 +519,13 @@ func (l *layout) addBorders() {
 				l.vs = append(l.vs, vertex{node: -1, cluster: c, rank: r, dummy: true, border: side})
 				l.up = append(l.up, nil)
 				l.down = append(l.down, nil)
+				l.upW = append(l.upW, nil)
+				l.downW = append(l.downW, nil)
 				if prev >= 0 {
 					l.down[prev] = append(l.down[prev], v)
 					l.up[v] = append(l.up[v], prev)
+					l.downW[prev] = append(l.downW[prev], 1)
+					l.upW[v] = append(l.upW[v], 1)
 				}
 				prev = v
 			}
@@ -434,12 +565,12 @@ func (l *layout) order() {
 		visit(v)
 	}
 	for r := range l.layers {
-		l.layers[r] = l.arrange(l.layers[r], nil)
+		l.layers[r] = l.keepFlat(l.arrange(l.layers[r], nil))
 	}
 	l.setOrder()
 	l.clusterOrder()
 	for r := range l.layers {
-		l.layers[r] = l.arrange(l.layers[r], nil)
+		l.layers[r] = l.keepFlat(l.arrange(l.layers[r], nil))
 	}
 	l.setOrder()
 	best := l.copyLayers()
@@ -532,20 +663,46 @@ func (l *layout) median(nb []int) (float64, bool) {
 }
 
 // sweep orders a rank by the medians of the neighbors of its vertices in
-// the rank before it. A vertex with no neighbor keeps its place.
+// the rank before it. A vertex with no neighbor there and an edge in its
+// rank goes next to the other end of that edge, as in dot. Another vertex
+// with no neighbor keeps its place.
 func (l *layout) sweep(r int, nb [][]int) {
 	key := map[int]float64{}
+	has := map[int]bool{}
 	for _, v := range l.layers[r] {
 		if m, ok := l.median(nb[v]); ok {
-			key[v] = m
-		} else {
-			key[v] = float64(l.vs[v].order)
+			key[v], has[v] = m, true
 		}
 	}
-	l.layers[r] = l.arrange(l.layers[r], key)
+	for _, v := range l.layers[r] {
+		if has[v] {
+			continue
+		}
+		key[v] = float64(l.vs[v].order)
+		// The end of the edge that is last in the rank, for a vertex that
+		// comes before it, or first, for a vertex that comes after it.
+		if w := l.flatEnd(l.flatOut[v], true); w >= 0 && has[w] {
+			key[v] = key[w] + 1e-3
+		} else if w := l.flatEnd(l.flatIn[v], false); w >= 0 && has[w] {
+			key[v] = key[w] - 1e-3
+		}
+	}
+	l.layers[r] = l.keepFlat(l.arrange(l.layers[r], key))
 	for i, v := range l.layers[r] {
 		l.vs[v].order = i
 	}
+}
+
+// flatEnd returns the vertex of a list that is last in its rank, or first,
+// or -1 for an empty list.
+func (l *layout) flatEnd(vs []int, last bool) int {
+	best := -1
+	for _, w := range vs {
+		if best < 0 || last == (l.vs[w].order > l.vs[best].order) {
+			best = w
+		}
+	}
+	return best
 }
 
 // arrange sorts a rank by a key, or keeps its order for a nil key, with the
@@ -666,7 +823,7 @@ func (l *layout) transpose() {
 		for r, ly := range l.layers {
 			for i := 0; i+1 < len(ly); i++ {
 				v, w := ly[i], ly[i+1]
-				if l.vs[v].cluster != l.vs[w].cluster || l.vs[v].border != 0 || l.vs[w].border != 0 {
+				if l.vs[v].cluster != l.vs[w].cluster || l.vs[v].border != 0 || l.vs[w].border != 0 || slices.Contains(l.flatIn[w], v) {
 					continue
 				}
 				before := l.pairCross(r, v, w)

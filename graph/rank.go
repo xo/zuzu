@@ -14,88 +14,40 @@ type redge struct {
 }
 
 // acyclic returns the edges with each edge that closes a cycle turned
-// around, by the greedy heuristic of Eades, Lin and Smyth, 1993: it peels
-// the sinks to the end of an order and the sources to its start, and else
-// takes the node whose weight out most exceeds its weight in. An edge that
-// goes back in the order turns around. The ties go to the node that comes
-// first, so that the result is the same each time. reversed says which.
+// around, as dot and dagre do: a depth first search from each node in the
+// order of the input, along the edges out of a node in the order of the
+// input, turns around each edge to a node that is still on the path of the
+// search. So a node with no edge in stays a source, and the result is the
+// same each time. reversed says which edges turn around.
 func acyclic(n int, edges []redge) ([]redge, []bool) {
-	out := make([]float64, n)
-	in := make([]float64, n)
-	adjOut := make([][]int, n)
-	adjIn := make([][]int, n)
+	adj := make([][]int, n)
 	for i, e := range edges {
-		if e.u == e.v {
-			continue
-		}
-		out[e.u] += e.weight
-		in[e.v] += e.weight
-		adjOut[e.u] = append(adjOut[e.u], i)
-		adjIn[e.v] = append(adjIn[e.v], i)
-	}
-	removed := make([]bool, n)
-	var head, tail []int
-	remove := func(x int) {
-		removed[x] = true
-		for _, i := range adjOut[x] {
-			if !removed[edges[i].v] {
-				in[edges[i].v] -= edges[i].weight
-			}
-		}
-		for _, i := range adjIn[x] {
-			if !removed[edges[i].u] {
-				out[edges[i].u] -= edges[i].weight
-			}
+		if e.u != e.v {
+			adj[e.u] = append(adj[e.u], i)
 		}
 	}
-	left := n
-	for left > 0 {
-		progress := true
-		for progress {
-			progress = false
-			for x := range n {
-				if !removed[x] && out[x] <= 1e-9 {
-					tail = append(tail, x)
-					remove(x)
-					left--
-					progress = true
-				}
-			}
-			for x := range n {
-				if !removed[x] && in[x] <= 1e-9 {
-					head = append(head, x)
-					remove(x)
-					left--
-					progress = true
-				}
-			}
-		}
-		if left == 0 {
-			break
-		}
-		best, bd := -1, math.Inf(-1)
-		for x := range n {
-			if !removed[x] && out[x]-in[x] > bd {
-				best, bd = x, out[x]-in[x]
-			}
-		}
-		head = append(head, best)
-		remove(best)
-		left--
-	}
-	slices.Reverse(tail)
-	order := slices.Concat(head, tail)
-	pos := make([]int, n)
-	for i, x := range order {
-		pos[x] = i
-	}
-	res := make([]redge, len(edges))
+	res := slices.Clone(edges)
 	rev := make([]bool, len(edges))
-	for i, e := range edges {
-		res[i] = e
-		if e.u != e.v && pos[e.u] > pos[e.v] {
-			res[i].u, res[i].v = e.v, e.u
-			rev[i] = true
+	// state is 0 for a node that the search did not reach, 1 for a node on
+	// the path of the search, and 2 for a node that it left.
+	state := make([]int8, n)
+	var visit func(x int)
+	visit = func(x int) {
+		state[x] = 1
+		for _, i := range adj[x] {
+			switch y := edges[i].v; state[y] {
+			case 0:
+				visit(y)
+			case 1:
+				res[i].u, res[i].v = y, x
+				rev[i] = true
+			}
+		}
+		state[x] = 2
+	}
+	for x := range n {
+		if state[x] == 0 {
+			visit(x)
 		}
 	}
 	return res, rev

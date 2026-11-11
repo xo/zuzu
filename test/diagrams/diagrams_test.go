@@ -465,6 +465,11 @@ func rules(t *testing.T, in graph.LayoutInput, l *graph.Layout, ids map[string]i
 		if e.NoConstraint || a == b || !aok || !bok {
 			continue
 		}
+		// An edge between two nodes of one group of the same rank spans no
+		// rank.
+		if r := in.Nodes[a].Rank; r != "" && r == in.Nodes[b].Rank {
+			continue
+		}
 		minlen := max(e.MinLen, 1) * factor
 		if c := own(a); c != "" && c == own(b) {
 			minlen = max(e.MinLen, 1)

@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"cmp"
 	"math"
 	"slices"
 	"strconv"
@@ -21,6 +22,11 @@ func (l *layout) separation(u, v int) float64 {
 	case a.dummy || b.dummy:
 		gap = (l.sep.node + l.sep.edge) / 2
 	}
+	loop := 0.0
+	if u < len(l.loopw) {
+		// The loops of a node go at its right.
+		loop = l.loopw[u]
+	}
 	if a.border != 0 || b.border != 0 {
 		// A border keeps the padding of its cluster from what is inside,
 		// and the space between nodes from what is outside.
@@ -29,11 +35,11 @@ func (l *layout) separation(u, v int) float64 {
 			inner = a.border == -1 && b.border == 1
 		}
 		if inner {
-			return (a.w+b.w)/2 + l.sep.pad
+			return (a.w+b.w)/2 + l.sep.pad + loop
 		}
-		return (a.w+b.w)/2 + l.sep.edge
+		return (a.w+b.w)/2 + l.sep.edge + loop
 	}
-	return (a.w+b.w)/2 + gap
+	return (a.w+b.w)/2 + gap + loop
 }
 
 // place sets x and y of each vertex: x by Brandes and Köpf, the balance of
@@ -50,10 +56,10 @@ func (l *layout) place() {
 				slices.Reverse(ly)
 			}
 		}
-		pred := l.up
+		pred, predW := l.up, l.upW
 		if !downward {
 			slices.Reverse(layers)
-			pred = l.down
+			pred, predW = l.down, l.downW
 		}
 		pos := make([]int, n)
 		for _, ly := range layers {
@@ -61,7 +67,7 @@ func (l *layout) place() {
 				pos[v] = i
 			}
 		}
-		root, align := l.align(layers, pred, pos, conflict)
+		root, align := l.align(layers, pred, predW, pos, conflict)
 
 		x := l.compact(layers, root, align, pos, leftward)
 		if !leftward {
@@ -149,9 +155,10 @@ func (l *layout) conflicts() map[[2]int]bool {
 
 // align joins each vertex to a median neighbor in the rank before, as a
 // block, when no conflict forbids it and the join crosses no join made
-// before it in the rank. The borders of the clusters join first, so that
-// each border is straight where it can be.
-func (l *layout) align(layers [][]int, pred [][]int, pos []int, conflict map[[2]int]bool) ([]int, []int) {
+// before it in the rank. The median counts each neighbor by the weight of
+// its edge, so that a heavy edge stays straight, as in dot. The borders of
+// the clusters join first, so that each border is straight where it can be.
+func (l *layout) align(layers [][]int, pred [][]int, predW [][]float64, pos []int, conflict map[[2]int]bool) ([]int, []int) {
 	n := len(l.vs)
 	root := make([]int, n)
 	align := make([]int, n)
@@ -187,25 +194,38 @@ func (l *layout) align(layers [][]int, pred [][]int, pos []int, conflict map[[2]
 				}
 			}
 		}
+		// The vertices whose median edges weigh the most join first, so
+		// that a heavy edge wins over a light one that crosses it. With
+		// equal weights, they join from left to right.
+		type cand struct {
+			v, lo, hi int
+			w         float64
+		}
+		var cands []cand
 		for _, v := range ly {
-			if l.vs[v].border != 0 {
+			if l.vs[v].border != 0 || len(pred[v]) == 0 {
 				continue
 			}
-			nb := slices.Clone(pred[v])
-			if len(nb) == 0 {
-				continue
+			lo, hi := weightedMedians(pred[v], predW[v], pos)
+			w := 0.0
+			for k, u := range pred[v] {
+				if u == lo || u == hi {
+					w = math.Max(w, predW[v][k])
+				}
 			}
-			slices.SortFunc(nb, func(a, b int) int { return pos[a] - pos[b] })
-			d := len(nb)
-			for _, m := range []int{(d - 1) / 2, d / 2} {
+			cands = append(cands, cand{v, lo, hi, w})
+		}
+		slices.SortStableFunc(cands, func(a, b cand) int { return cmp.Compare(b.w, a.w) })
+		for _, c := range cands {
+			v, lo, hi := c.v, c.lo, c.hi
+			for _, u := range []int{lo, hi} {
 				if align[v] != v {
 					break
 				}
-				u := nb[m]
 				if !marked(u, v) && !crosses(u, v) {
 					join(u, v)
 				}
-				if d%2 == 1 {
+				if lo == hi {
 					break
 				}
 			}
@@ -214,11 +234,38 @@ func (l *layout) align(layers [][]int, pred [][]int, pos []int, conflict map[[2]
 	return root, align
 }
 
+// weightedMedians returns the lower and the upper weighted median of the
+// neighbors of a vertex, in the order of pos, with the weight of the edge to
+// each. With equal weights they are the two middle neighbors, or the one
+// middle neighbor twice.
+func weightedMedians(nb []int, w []float64, pos []int) (int, int) {
+	idx := make([]int, len(nb))
+	total := 0.0
+	for i := range nb {
+		idx[i] = i
+		total += w[i]
+	}
+	slices.SortStableFunc(idx, func(a, b int) int { return pos[nb[a]] - pos[nb[b]] })
+	lo, hi := -1, -1
+	sum := 0.0
+	for _, i := range idx {
+		sum += w[i]
+		if lo < 0 && sum >= total/2 {
+			lo = nb[i]
+		}
+		if sum > total/2 {
+			hi = nb[i]
+			break
+		}
+	}
+	return lo, hi
+}
+
 // compact places the blocks: a graph of the blocks with an edge from the
 // block of each vertex to the block of the next one in its rank, each as
 // long as their separation, places each block as far left as the edges
 // allow, and then as far right as the blocks after it allow.
-func (l *layout) compact(layers [][]int, root, _ []int, _ []int, _ bool) []float64 {
+func (l *layout) compact(layers [][]int, root, _ []int, _ []int, leftward bool) []float64 {
 	n := len(l.vs)
 	type bedge struct {
 		to  int
@@ -229,7 +276,12 @@ func (l *layout) compact(layers [][]int, root, _ []int, _ []int, _ bool) []float
 	for _, ly := range layers {
 		for i := 1; i < len(ly); i++ {
 			a, b := root[ly[i-1]], root[ly[i]]
+			// The layers of a pass to the right run from right to left,
+			// and separation takes the left vertex first.
 			g := l.separation(ly[i-1], ly[i])
+			if !leftward {
+				g = l.separation(ly[i], ly[i-1])
+			}
 			out[a] = append(out[a], bedge{b, g})
 			in[b] = append(in[b], bedge{a, g})
 		}

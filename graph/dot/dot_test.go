@@ -7,6 +7,41 @@ import (
 	"testing"
 )
 
+func TestRankInherit(t *testing.T) {
+	t.Parallel()
+	// rank=same in the graph is the rank of each subgraph that starts after
+	// it, as in dot. A subgraph before it and a subgraph that sets its own
+	// rank keep theirs.
+	src := `graph {
+	newrank=true
+	{a b}
+	rank=same
+	{c -- d}
+	subgraph s { e; f }
+	{rank=min; g; h}
+}`
+	g, report, err := Parse(src, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rank := map[string]string{}
+	for _, n := range g.Nodes {
+		rank[n.ID] = n.Rank
+	}
+	if rank["a"] != "" || rank["b"] != "" {
+		t.Errorf("a and b have the ranks %q and %q, want none", rank["a"], rank["b"])
+	}
+	if rank["c"] == "" || rank["c"] != rank["d"] || rank["e"] == "" || rank["e"] != rank["f"] || rank["c"] == rank["e"] {
+		t.Errorf("the ranks %v, want c and d in one group, and e and f in another", rank)
+	}
+	if rank["g"] != "" {
+		t.Errorf("g has the rank %q, want none", rank["g"])
+	}
+	if len(report) != 1 || !strings.Contains(report[0].Error(), "the rank min") {
+		t.Errorf("expected one issue for rank=min, got %v", report)
+	}
+}
+
 func TestHTMLLabel(t *testing.T) {
 	t.Parallel()
 	src := `digraph {

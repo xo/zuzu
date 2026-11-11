@@ -3,6 +3,7 @@
 package dot
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"math"
@@ -177,12 +178,13 @@ type scope struct {
 	node, edge map[string]string
 	cluster    string
 	nodes      []string // the nodes that the subgraph names, in order
-	rank       string
-	parent     *scope
+	// rank is the rank that a subgraph that starts here takes by default.
+	rank   string
+	parent *scope
 }
 
 func (s *scope) child() *scope {
-	c := &scope{node: map[string]string{}, edge: map[string]string{}, cluster: s.cluster, parent: s}
+	c := &scope{node: map[string]string{}, edge: map[string]string{}, cluster: s.cluster, rank: s.rank, parent: s}
 	maps.Copy(c.node, s.node)
 	maps.Copy(c.edge, s.edge)
 	return c
@@ -307,6 +309,9 @@ func (p *parser) stmt(s *scope, graphAttrs map[string]string) error {
 		switch kind {
 		case "graph":
 			maps.Copy(graphAttrs, a)
+			if r, ok := a["rank"]; ok {
+				s.rank = r
+			}
 		case "node":
 			maps.Copy(s.node, a)
 		case "edge":
@@ -323,7 +328,7 @@ func (p *parser) stmt(s *scope, graphAttrs map[string]string) error {
 		if v.html {
 			graphAttrs[t.text] = htmlMark + v.text
 		}
-		if s.parent != nil && t.text == "rank" {
+		if t.text == "rank" {
 			s.rank = v.text
 		}
 		return nil
@@ -421,6 +426,9 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 		return nil, err
 	}
 	sub := s.child()
+	// A subgraph takes the rank of the graph that holds it at the time
+	// that it starts, as in dot, unless it sets its own.
+	inherited := s.rank
 	var cl *graph.Cluster
 	if strings.HasPrefix(name, "cluster") {
 		cl = &graph.Cluster{ID: name, Parent: s.cluster, Style: map[string]string{}}
@@ -443,7 +451,7 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 			return nil, err
 		}
 	}
-	if r := attrs["rank"]; r != "" {
+	if r := cmp.Or(attrs["rank"], inherited); r != "" {
 		switch r {
 		case "same":
 			p.ranks++
@@ -696,6 +704,12 @@ func (p *parser) graphAttrs(a map[string]string) error {
 					return err
 				}
 			}
+		case "rank":
+			// The rank of the graph is the rank of each subgraph that
+			// starts after it, and the subgraph reads it.
+		case "newrank":
+			// zuzu ranks the nodes of every cluster with those of the graph,
+			// as dot does with newrank=true.
 		case "layout":
 			if v != "dot" {
 				if err := p.issues.Add("graph", "the layout %s", v); err != nil {

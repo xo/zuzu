@@ -35,7 +35,9 @@ zuzu reads the language of Graphviz 16 for the layout `dot`.
 A subgraph whose name starts with `cluster` is a cluster, which draws as a
 box with its title. A cluster that names a node made outside it takes the
 node in, as dot does. `rank=same` in a subgraph puts its nodes in one rank.
-Another `rank` is an issue.
+A `rank` of the graph, such as `rank=same` before `{a -- b}`, is the rank
+of each subgraph that starts after it and sets no rank of its own, as in
+dot. Another `rank` is an issue.
 
 An ID is a name, a numeral, a string in double quotes, or a string of HTML
 in angle brackets. Strings joined with `+` are one string. Comments are
@@ -48,6 +50,8 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `label` | the title, or a title of HTML at the top left |
 | the graph | `rankdir` | `TB`, `BT`, `LR` or `RL` |
 | the graph | `ranksep`, `nodesep` | the space between the ranks and between the nodes, in inches |
+| the graph | `rank` | the rank of the subgraphs that start after it, as above |
+| the graph | `newrank` | nothing. zuzu always ranks the nodes of a cluster with the nodes of the whole graph, as dot does with `newrank=true` |
 | the graph | `splines` | curved or straight edges. Another value is an issue |
 | the graph | `layout` | `dot`. Another layout is an issue |
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
@@ -103,6 +107,29 @@ The shapes are `box`, `rect`, `rectangle`, `square`, `ellipse`, `oval`,
 `pentagon`, `triangle`, `invtriangle`, `house`, `invhouse`, `trapezium`,
 `invtrapezium`, `parallelogram`, `cylinder`, `note`, `tab`, `folder`,
 `plaintext`, `plain`, `none`, `underline`, `record` and `Mrecord`.
+
+### Ranks and order
+
+The layout follows dot in these steps:
+
+1. An edge that closes a cycle turns around. A search goes from each node
+   in the order of the source, along the edges in the order of the
+   source, and turns around each edge back to a node on its path. So a
+   node with no edge in it stays in the first rank.
+2. An edge between two nodes of the same rank and the same cluster puts
+   its tail before its head in the rank, such as the edges of a row of
+   `rank=same {a -- b -- c}`. A node with no edge to the next rank goes
+   beside the other end of such an edge.
+3. The `weight` of an edge pulls its ends into one line across the
+   ranks. A node with edges to several nodes of the rank before it
+   lines up with the median of their places, and each edge counts by its
+   weight. `weight=0` counts as 1.
+4. A loop and its label take room at the side of their node, so that no
+   other node or label covers them.
+
+The flowcharts, the state, the class and the entity relationship diagrams
+of Mermaid use the same layout. Mermaid turns cycles around in the same
+way.
 
 ### Arrowheads
 

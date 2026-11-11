@@ -1,0 +1,14 @@
+graph {
+  node [shape=plaintext]
+  a0 -- b1 -- c2 -- d3
+  d0 -- c1 -- b2 -- a3
+  edge [weight=1000 style=dashed]
+  a0 -- a1 -- a2 -- a3
+  b0 -- b1 -- b2 -- b3
+  c0 -- c1 -- c2 -- c3
+  d0 -- d1 -- d2 -- d3
+  rank=same {a0 -- b0 -- c0 -- d0}
+  rank=same {a1 -- b1 -- c1 -- d1}
+  rank=same {a2 -- b2 -- c2 -- d2}
+  rank=same {a3 -- b3 -- c3 -- d3}
+}
