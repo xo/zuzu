@@ -332,6 +332,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	if g.NodeSep > 0 {
 		layout["nodeSep"] = g.NodeSep
 	}
+	if g.ClusterTitleTop > 0 {
+		layout["clusterTitleTop"] = g.ClusterTitleTop
+	}
+	if g.ClusterTitleBottom > 0 {
+		layout["clusterTitleBottom"] = g.ClusterTitleBottom
+	}
 	if g.BreakWords {
 		layout["breakWords"] = true
 	}
@@ -504,15 +510,23 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
 		}, map[string]string{"textColor": "fill"}))
 	}
+	padding := 8.0
+	if g.Padding != nil {
+		padding = *g.Padding
+	}
 	spec := map[string]any{
 		"$schema":  "https://vega.github.io/schema/vega/v5.json",
-		"padding":  8,
+		"padding":  padding,
 		"autosize": "pad",
 		"data":     data,
 		"marks":    marks,
 	}
 	if g.Title != "" && g.TitleHTML == "" {
-		spec["title"] = map[string]any{"text": g.Title, "anchor": "start"}
+		title := map[string]any{"text": g.Title, "anchor": "start"}
+		if g.TitleOffset != nil {
+			title["offset"] = *g.TitleOffset
+		}
+		spec["title"] = title
 	}
 	if g.Description != "" {
 		spec["description"] = g.Description

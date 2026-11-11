@@ -46,6 +46,14 @@ type Graph struct {
 	// RankSep and NodeSep are the space between the ranks and between the
 	// nodes of a rank, or 0 for the defaults.
 	RankSep, NodeSep float64
+	// ClusterTitleTop and ClusterTitleBottom are the space above and below
+	// the title of each cluster, 0 by default.
+	ClusterTitleTop, ClusterTitleBottom float64
+	// Padding is the space around the diagram, or nil for 8 pixels.
+	Padding *float64
+	// TitleOffset is the space between the title and the diagram, or nil
+	// for the space of the title of a chart.
+	TitleOffset *float64
 	// BreakWords breaks a word that is wider than the wrap width of its
 	// label between two letters, as the SVG labels of Mermaid do. Otherwise
 	// the word stays whole on a line of its own, and the label is wider

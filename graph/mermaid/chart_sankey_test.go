@@ -261,7 +261,7 @@ func TestSankeyIssues(t *testing.T) {
 	}{
 		{"---\nconfig:\n  sankey:\n    linkColor: gradient\n---\nsankey\nA,B,1\n", "gradient"},
 		{"---\nconfig:\n  sankey:\n    labelStyle: outlined\n---\nsankey\nA,B,1\n", "labelStyle outlined"},
-		{"---\nconfig:\n  sankey:\n    useMaxWidth: false\n---\nsankey\nA,B,1\n", "sankey.useMaxWidth"},
+		{"---\nconfig:\n  sankey:\n    useWidth: 500\n---\nsankey\nA,B,1\n", "sankey.useWidth"},
 		{"---\nconfig:\n  sankey:\n    nodeAlignment: top\n---\nsankey\nA,B,1\n", "nodeAlignment top"},
 		{"---\nconfig:\n  theme: forest\n---\nsankey\nA,B,1\n", "theme of Mermaid"},
 		{"---\nconfig:\n  fontFamily: serif\n---\nsankey\nA,B,1\n", "setting fontFamily"},

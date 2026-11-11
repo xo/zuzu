@@ -1,0 +1,18 @@
+---
+config:
+  flowchart:
+    subGraphTitleMargin:
+      top: 10
+      bottom: 20
+---
+%%{init: {'config': {'inheritDir': true}}}%%
+flowchart LR
+  a[Order] --> outer
+  subgraph outer [Warehouse]
+    direction TB
+    p[Pick] --> q[Pack]
+    subgraph inner [Shipping]
+      s[Label] --> t[Send]
+    end
+  end
+  outer --> z[Done]

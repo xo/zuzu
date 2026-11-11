@@ -76,6 +76,8 @@ type LayoutEdge struct {
 type LayoutCluster struct {
 	ID, Parent              string
 	TitleWidth, TitleHeight float64
+	// TitleTop is the space above the title, which TitleHeight holds.
+	TitleTop float64
 	// Direction is the direction of the ranks inside the cluster, TB, BT,
 	// LR or RL, or empty for the direction of the layout that holds it.
 	// The cluster keeps it only when no edge links a node inside the

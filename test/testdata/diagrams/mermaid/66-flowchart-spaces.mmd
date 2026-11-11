@@ -1,0 +1,17 @@
+---
+title: Spaces of a flowchart
+config:
+  flowchart:
+    nodeSpacing: 100   # twice the default of Mermaid
+    rankSpacing: 25
+    diagramPadding: 30
+    titleTopMargin: 50
+    useMaxWidth: false
+  logLevel: debug
+  securityLevel: loose
+---
+flowchart TB
+  a[Start] --> b[Check]
+  a --> c[Skip]
+  b --> d[End]
+  c --> d

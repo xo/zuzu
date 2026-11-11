@@ -142,7 +142,7 @@ func TestRadarIssues(t *testing.T) {
 	tests := []struct {
 		src, issue string
 	}{
-		{"---\nconfig:\n  radar:\n    useMaxWidth: false\n---\n" + body, "radar.useMaxWidth"},
+		{"---\nconfig:\n  radar:\n    useWidth: 500\n---\n" + body, "radar.useWidth"},
 		{"---\nconfig:\n  themeVariables:\n    cScale0: \"#ff0000\"\n---\n" + body, "cScale"},
 		{"---\nconfig:\n  themeVariables:\n    fontSize: 20\n---\n" + body, "theme variable fontSize"},
 		{body + "accTitle: A radar\n", "accessibility"},

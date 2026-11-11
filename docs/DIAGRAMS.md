@@ -323,13 +323,60 @@ version that bundles Mermaid 12.3.0.
 | the keyword of the kind, on the first line | `flowchart LR` |
 
 The `title` of the front matter is the title of the diagram. Its `config`
-and each directive merge into one config. A setting of the config that a
-kind does not read is an issue. The front matter is YAML. zuzu reads maps
-by their indent, and a value in quotes or plain. A value can run over more
-lines, indented under its key. A block after `|` keeps its new lines, and a
-block after `>` joins its lines with spaces. A `-` or a `+` after either
-sets the new lines at its end, as in YAML. The other parts of YAML, such as
-lists and anchors, do not read.
+and each directive merge into one config, and a directive wins over the
+front matter. A setting of the config that a kind does not read is an
+issue. The front matter is YAML. zuzu reads maps by their indent, and a
+value in quotes or plain. A value can run over more lines, indented under
+its key. A block after `|` keeps its new lines, and a block after `>` joins
+its lines with spaces. A `-` or a `+` after either sets the new lines at
+its end, as in YAML. A `#` after a space, outside quotes, starts a comment
+that runs to the end of the line, as in YAML. The other parts of YAML, such
+as lists and anchors, do not read.
+
+The key `config` in a directive sets the section of the config of the kind,
+as Mermaid 12 does. In a sequence diagram,
+`%%{init: {'config': {'wrap': true}}}%%` sets `sequence.wrap`. The section
+takes the name that Mermaid gives to the kind:
+
+| Keyword | Section |
+| --- | --- |
+| `flowchart`, `graph` | `flowchart` |
+| `sequenceDiagram` | `sequence` |
+| `erDiagram` | `er` |
+| `classDiagram`, `classDiagram-v2` | `classDiagram` |
+| `stateDiagram`, `stateDiagram-v2` | `stateDiagram` |
+| a keyword that ends in `-beta`, such as `xychart-beta` | the keyword without `-beta`, such as `xychart` |
+| any other keyword, such as `gantt` | the keyword |
+
+Mermaid reads its class diagram from the section `class` and its state
+diagram from the section `state`, and so the key `config` sets nothing in
+them, or in an xychart, whose section is `xyChart`. zuzu reports such a
+setting, as it reports any setting that it does not read.
+
+### Settings that change nothing
+
+These settings change nothing in a still image. zuzu accepts them in every
+kind, with no issue:
+
+| Setting | What it does in Mermaid |
+| --- | --- |
+| `logLevel` | sets what Mermaid writes to the log of the browser |
+| `securityLevel` | sets which scripts, links and tags of HTML a page can run |
+| `useMaxWidth`, at the top or in a section, such as `flowchart.useMaxWidth` | makes the SVG as wide as the page that holds it. zuzu writes an SVG of a fixed size |
+| `handDrawnSeed` | seeds the random lines of the look `handDrawn`, which is an issue of its own |
+| `architecture.seed`, `architecture.randomize` | seed and start the layout of forces of an architecture diagram. The layout of zuzu uses no random numbers |
+| `class.htmlLabels` | nothing. Mermaid 12 does not read it |
+| `htmlLabels`, `flowchart.htmlLabels`, in a chart other than a mindmap | nothing. A chart draws its text in SVG |
+
+zuzu matches the names of these settings in any case, so `loglevel` is
+`logLevel`. Mermaid matches a name in its own case, and ignores a key such
+as `loglevel`. Either way, the image is the same. `mmdc` draws each of
+these settings with no change to the image, except `useMaxWidth`, which
+changes only the scale of the PNG of `mmdc`.
+
+`htmlLabels` changes the wrap of a label in a graph and in a mindmap. A
+graph reads it, as "Labels that wrap" says. A mindmap does not read it, and
+it is an issue there.
 
 ### Flowchart
 
@@ -480,11 +527,42 @@ A class of a link sets its style as `linkStyle` does, and `linkStyle` goes
 over it. `accTitle` and `accDescr` join into the description of the Vega
 spec, as in a state diagram.
 
+zuzu reads these settings of the section `flowchart` of the config:
+
+| Setting | Default of Mermaid | What zuzu does |
+| --- | --- | --- |
+| `curve` | `basis` | draws the links with the curve of Vega of that name |
+| `wrappingWidth` | 120 | wraps the label of a node, as "Labels that wrap" says |
+| `htmlLabels` | true | the old form of `htmlLabels`, as "Labels that wrap" says |
+| `nodeSpacing` | 50 | sets the space between two nodes of a rank to 24/50 of it |
+| `rankSpacing` | 50 | sets the space between two ranks to 40/50 of it |
+| `diagramPadding` | 8 | sets the space around the diagram to it |
+| `titleTopMargin` | 25 | sets the space between the title and the diagram to 10/25 of it |
+| `subGraphTitleMargin` | `top: 0`, `bottom: 0` | puts `top` above the title of each subgraph and `bottom` under it |
+| `inheritDir` | false | gives each subgraph with no direction the direction of the flowchart |
+
+The look of zuzu is smaller than the look of Mermaid. A space of the
+config takes the ratio of the default of zuzu to the default of Mermaid, so
+the default of Mermaid draws the default of zuzu. The default space between
+two nodes of a rank is 24 in zuzu, and between two ranks it is 40. The
+default space between the title and the diagram is 10, and the default
+space around the diagram is 8, as in Mermaid. The spaces of the config also
+hold in a subgraph that lays out on its own. Mermaid 12.3.0 does the same,
+but it adds 25 to the space between the ranks of such a subgraph. Mermaid
+takes 0 for `nodeSpacing` and `rankSpacing` as the default, and zuzu does
+too. A value that is not a number of 0 or more is an issue, and the space
+keeps its default.
+
+Without `inheritDir`, a subgraph with no direction takes the direction of
+the subgraph that holds it, as the subgraphs above say. With
+`inheritDir: true`, it takes the direction of the flowchart, as in Mermaid.
+
 These parts are issues: `click`, a callback and `href`, the properties of
 a link such as `e1@{ animate: true }`, the
 layout `elk`, which draws with `zuzu.layered`, the look `handDrawn`, the
 `theme` and the `themeVariables` of Mermaid, which draw in the look of zuzu,
-and a style that is not `fill`, `stroke`, `stroke-width`, `color`,
+the other settings of the section `flowchart`, such as `minNodeWidth`, and
+a style that is not `fill`, `stroke`, `stroke-width`, `color`,
 `stroke-dasharray`, `font-weight` or `font-size`.
 
 ### Icons and images
@@ -617,6 +695,7 @@ of its own sets it. A statement ends at a new line.
 | a cardinality | `A "1" --> "*" B` |
 | the label of a relation | `A --> B : uses` |
 | a namespace | `namespace Shapes {`, then classes, then `}` |
+| a namespace in a namespace | `namespace Shapes.Round {`, then classes, then `}` |
 | a note | `note "text"`, and `note for Duck "text"` |
 | a class of style | `classDef hot fill:#f96`, then `cssClass "A,B" hot`, `class A:::hot` or `A:::hot` |
 | a style of a class | `style Animal fill:#f9f,stroke:#333` |
@@ -644,6 +723,7 @@ zuzu draws each part in its own look:
 | a relation | an edge from the class on the left to the class on the right, solid or dashed, with its label in the middle |
 | a cardinality | a label at its end of the edge, beside the line |
 | a namespace | a cluster with its title |
+| a namespace with dots in its name | a cluster for each part of the name, each in the one before it, with its part as its title |
 | a note | a node of the shape note. A note for a class has a dotted line from the note to the class |
 
 The ends of a relation draw at 1.4 times the size of an arrowhead of a
@@ -655,8 +735,15 @@ names inside a namespace moves into it. `classDef`, `cssClass`, `:::` and
 styles every class. `accTitle` and `accDescr` join into the description
 of the Vega spec.
 
+A namespace `Company.Engineering` is a cluster `Engineering` in a cluster
+`Company`, as in Mermaid. Another namespace with the same first part, or a
+namespace `Company`, goes in the same cluster. The setting
+`class.hierarchicalNamespaces: false` draws each namespace as one cluster
+with its whole name as its title, as Mermaid does.
+
 These parts are issues: `click`, `link` and `callback`, the settings of
-the section `class` of the config other than `hideEmptyMembersBox`, the
+the section `class` of the config other than `hideEmptyMembersBox` and
+`hierarchicalNamespaces`, the
 layout `elk`, the look `handDrawn`, the `theme` and the `themeVariables` of
 Mermaid, and a style that a flowchart does not read.
 
@@ -746,8 +833,9 @@ zuzu reads two settings of the top level of the config:
    Mermaid does. With `htmlLabels: false`, Mermaid ignores it, and so does
    zuzu.
 
-`flowchart.htmlLabels` is an old form of `htmlLabels`, and it is an issue.
-Another value of one of these settings, such as a width that is not a
+`flowchart.htmlLabels` is the old form of `htmlLabels`. When `htmlLabels`
+is not set, Mermaid 12 reads `flowchart.htmlLabels` in its place in every
+kind of graph, and so does zuzu. Another value of one of these settings, such as a width that is not a
 positive number, is an issue, and the label takes the default.
 
 A width is in the pixels of zuzu, which draws a label at 11 pixels.
@@ -1185,8 +1273,8 @@ of a tile, 56 by default, `architecture.fontSize`, 11 by default,
 `architecture.nodeSeparation`, the space between two cells, 40 by default.
 A title on an edge widens that space to fit. The layout of zuzu uses no
 random numbers, so it is the same on each run. zuzu accepts
-`architecture.randomize`, true or false, and it changes nothing. The other
-settings, which tune fcose, such as `numIter` and `seed`, are issues.
+`architecture.randomize` and `architecture.seed`, and they change nothing.
+The other settings, which tune fcose, such as `numIter`, are issues.
 
 ### Other kinds
 

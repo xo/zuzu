@@ -15,9 +15,13 @@ const dashed = "4,3"
 
 // lookSetting reports a setting of the top level of the config that every
 // graph reads: the layout, the look and the theme, which a graph draws in
-// its own way, and htmlLabels and markdownAutoWrap, which change how a
-// label wraps. It returns false for any other setting.
-func lookSetting(is *graph.Issues, k string, v any) (bool, error) {
+// its own way, htmlLabels and markdownAutoWrap, which change how a label
+// wraps, and the settings that change nothing in an image. It returns
+// false for any other setting.
+func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
+	if inert(kind, k) {
+		return true, nil
+	}
 	switch k {
 	case "layout":
 		switch v {
@@ -46,6 +50,75 @@ func lookSetting(is *graph.Issues, k string, v any) (bool, error) {
 	return false, nil
 }
 
+// graphSection reports each setting of a section of the config of a graph,
+// such as flowchart.curve, except the settings that read names, which the
+// caller reads, the settings that change nothing in an image, and
+// flowchart.htmlLabels, which labelWrap reads. A value that is not a map
+// is one issue.
+func graphSection(is *graph.Issues, kind, section string, v any, read ...string) error {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return is.Add("config", "the setting %s", section)
+	}
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		path := section + "." + k
+		var err error
+		switch {
+		case slices.Contains(read, k), inert(kind, path):
+		case path == "flowchart.htmlLabels":
+			if _, ok := m[k].(bool); !ok {
+				err = is.Add("config", "the setting %s: %v", path, m[k])
+			}
+		default:
+			err = is.Add("config", "the setting %s", path)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isGraph reports whether a kind of diagram reads into a graph.
+func isGraph(kind string) bool {
+	switch kind {
+	case "flowchart", "graph", "flowchart-elk", "stateDiagram", "stateDiagram-v2",
+		"classDiagram", "classDiagram-v2", "erDiagram":
+		return true
+	}
+	return false
+}
+
+// inert reports whether a setting changes nothing in a still image of a
+// kind of diagram, so that zuzu accepts it with no issue. path is the keys
+// of the setting joined with dots, such as er.useMaxWidth. The names match
+// in any case. Mermaid matches them in their own case and ignores a key
+// such as loglevel, which changes nothing either.
+func inert(kind, path string) bool {
+	keys := strings.Split(path, ".")
+	is := func(names ...string) bool {
+		return slices.ContainsFunc(names, func(n string) bool { return strings.EqualFold(path, n) })
+	}
+	switch {
+	case is("logLevel", "securityLevel", "handDrawnSeed", "architecture.seed", "architecture.randomize", "class.htmlLabels"):
+		// logLevel sets what Mermaid logs, and securityLevel the scripts
+		// and the links of a page. handDrawnSeed seeds the look handDrawn,
+		// which is an issue of its own. The layout of an architecture
+		// diagram uses no random numbers. Mermaid 12 does not read
+		// class.htmlLabels.
+		return true
+	case len(keys) <= 2 && strings.EqualFold(keys[len(keys)-1], "useMaxWidth"):
+		// useMaxWidth makes an SVG as wide as the page that holds it.
+		return true
+	case is("htmlLabels", "flowchart.htmlLabels"):
+		// A graph and a mindmap wrap their labels by htmlLabels, with
+		// flowchart.htmlLabels in its place when it is not set. A chart
+		// draws the same text either way.
+		return !isGraph(kind) && kind != "mindmap"
+	}
+	return false
+}
+
 // The widths in pixels at which Mermaid 12 wraps a label: the label of a
 // node of a flowchart or of a state by default, and the label of an edge
 // always.
@@ -72,6 +145,12 @@ func labelWrap(cfg map[string]any, g *graph.Graph) wrapping {
 	w := wrapping{html: true, markdown: true}
 	if v, ok := cfg["htmlLabels"].(bool); ok {
 		w.html = v
+	} else if fc, _ := cfg["flowchart"].(map[string]any); fc != nil {
+		// flowchart.htmlLabels is the old form of htmlLabels, and Mermaid
+		// reads it in every kind of graph when htmlLabels is not set.
+		if v, ok := fc["htmlLabels"].(bool); ok {
+			w.html = v
+		}
 	}
 	if v, ok := cfg["markdownAutoWrap"].(bool); ok {
 		w.markdown = v
@@ -181,24 +260,17 @@ func sectionConfig(d *Diagram, is *graph.Issues, section string, known ...string
 	cfg := d.Config
 	for _, k := range slices.Sorted(maps.Keys(cfg)) {
 		v := cfg[k]
-		if ok, err := lookSetting(is, k, v); ok || err != nil {
+		if ok, err := lookSetting(is, d.Kind, k, v); ok || err != nil {
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		if m, ok := v.(map[string]any); ok && k == section {
-			for _, sk := range slices.Sorted(maps.Keys(m)) {
-				if slices.Contains(known, sk) {
-					continue
-				}
-				if err := is.Add("config", "the setting %s.%s", section, sk); err != nil {
-					return err
-				}
-			}
-			continue
+		var read []string
+		if k == section {
+			read = known
 		}
-		if err := is.Add("config", "the setting %s", k); err != nil {
+		if err := graphSection(is, d.Kind, k, v, read...); err != nil {
 			return err
 		}
 	}

@@ -1,0 +1,124 @@
+package mermaid
+
+import (
+	"maps"
+	"slices"
+)
+
+// flowSettings are the settings of the section flowchart of the config
+// that a flowchart reads.
+var flowSettings = []string{
+	"curve", "wrappingWidth", "nodeSpacing", "rankSpacing", "diagramPadding",
+	"titleTopMargin", "subGraphTitleMargin", "inheritDir",
+}
+
+// The defaults of Mermaid 12 and of zuzu for the spaces of a flowchart. The
+// look of zuzu is smaller than the look of Mermaid, so a space of the
+// config takes the ratio of the default of zuzu to the default of Mermaid:
+// nodeSpacing 50 is a space of 24 between two nodes of a rank.
+const (
+	mermaidNodeSpacing, zuzuNodeSep = 50.0, 24.0
+	mermaidRankSpacing, zuzuRankSep = 50.0, 40.0
+	// The title of the diagram is titleTopMargin above the diagram in
+	// Mermaid, 25 by default, and 10 above it in zuzu.
+	mermaidTitleTop, zuzuTitleOffset = 25.0, 10.0
+)
+
+// spacing reads the settings of the section flowchart of the config that
+// set the spaces of the layout: nodeSpacing, rankSpacing, diagramPadding,
+// titleTopMargin and subGraphTitleMargin. A value that is not a number of 0
+// or more is an issue, and the space keeps its default.
+func (f *flowchart) spacing() error {
+	cfg := f.d.Config
+	m, _ := cfg["flowchart"].(map[string]any)
+	if m == nil {
+		return nil
+	}
+	num := func(path string, v any) (float64, bool, error) {
+		if v == nil {
+			return 0, false, nil
+		}
+		n, ok := configNumber(map[string]any{"v": v}, "v")
+		if !ok || n < 0 {
+			return 0, false, f.issues.Add("config", "the setting %s: %v", path, v)
+		}
+		return n, true, nil
+	}
+	// Mermaid takes 0 as the default for the spaces between the nodes
+	// and the ranks.
+	n, ok, err := num("flowchart.nodeSpacing", m["nodeSpacing"])
+	if err != nil {
+		return err
+	}
+	if ok {
+		f.g.NodeSep = n * zuzuNodeSep / mermaidNodeSpacing
+	}
+	if n, ok, err = num("flowchart.rankSpacing", m["rankSpacing"]); err != nil {
+		return err
+	}
+	if ok {
+		f.g.RankSep = n * zuzuRankSep / mermaidRankSpacing
+	}
+	if n, ok, err = num("flowchart.diagramPadding", m["diagramPadding"]); err != nil {
+		return err
+	}
+	if ok {
+		pad := n
+		f.g.Padding = &pad
+	}
+	if n, ok, err = num("flowchart.titleTopMargin", m["titleTopMargin"]); err != nil {
+		return err
+	}
+	if ok {
+		off := n * zuzuTitleOffset / mermaidTitleTop
+		f.g.TitleOffset = &off
+	}
+	if v, ok := m["subGraphTitleMargin"]; ok {
+		margin, _ := v.(map[string]any)
+		if margin == nil {
+			return f.issues.Add("config", "the setting flowchart.subGraphTitleMargin: %v", v)
+		}
+		for _, k := range slices.Sorted(maps.Keys(margin)) {
+			mv := margin[k]
+			path := "flowchart.subGraphTitleMargin." + k
+			switch k {
+			case "top", "bottom":
+				n, ok, err := num(path, mv)
+				if err != nil {
+					return err
+				}
+				if ok && k == "top" {
+					f.g.ClusterTitleTop = n
+				} else if ok {
+					f.g.ClusterTitleBottom = n
+				}
+			default:
+				if err := f.issues.Add("config", "the setting %s", path); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if v, ok := m["inheritDir"]; ok {
+		if _, ok := v.(bool); !ok {
+			return f.issues.Add("config", "the setting flowchart.inheritDir: %v", v)
+		}
+	}
+	return nil
+}
+
+// inheritDir gives each subgraph with no direction the direction of the
+// flowchart, for the setting flowchart.inheritDir. Without it, such a
+// subgraph takes the direction of the subgraph that holds it, as in
+// Mermaid.
+func (f *flowchart) inheritDir() {
+	m, _ := f.d.Config["flowchart"].(map[string]any)
+	if on, _ := m["inheritDir"].(bool); !on {
+		return
+	}
+	for _, c := range f.g.Clusters {
+		if c.Direction == "" {
+			c.Direction = f.g.Direction
+		}
+	}
+}

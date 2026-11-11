@@ -568,7 +568,7 @@ func (l *layout) clusterBoxes(out *Layout, tf func(x, y float64) (float64, float
 		}
 		out.Clusters[c] = ClusterPlace{
 			X: X1, Y: Y1, Width: X2 - X1, Height: Y2 - Y1, Depth: l.cdepth[c],
-			TitleX: X1 + pad, TitleY: Y1 + pad/2,
+			TitleX: X1 + pad, TitleY: Y1 + pad/2 + in.Clusters[c].TitleTop,
 		}
 	}
 }

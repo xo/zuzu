@@ -214,7 +214,7 @@ func TestWardleyIssues(t *testing.T) {
 		src, issue string
 	}{
 		{"---\nconfig:\n  wardley:\n    width: 900\n---\n" + body, "wardley.width"},
-		{"---\nconfig:\n  look: handDrawn\n---\n" + body, "setting look"},
+		{"---\nconfig:\n  look: handDrawn\n---\n" + body, "look handDrawn"},
 		{body + "accTitle: A map\n", "accessibility"},
 	}
 	for _, test := range tests {

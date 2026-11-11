@@ -346,7 +346,7 @@ func TestMindmapIssues(t *testing.T) {
 	}{
 		{body + "    :::urgent\n", "the class urgent"},
 		{body + "    ::icon(book)\n", "names no pack"},
-		{"---\nconfig:\n  mindmap:\n    useMaxWidth: false\n---\n" + body, "mindmap.useMaxWidth"},
+		{"---\nconfig:\n  mindmap:\n    useWidth: 500\n---\n" + body, "mindmap.useWidth"},
 		{"---\nconfig:\n  mindmap:\n    colorBy: section\n---\n" + body, "mindmap.colorBy section"},
 		{"---\nconfig:\n  layout: elk\n---\n" + body, "layout elk"},
 		{"---\nconfig:\n  theme: dark\n---\n" + body, "the theme of Mermaid"},

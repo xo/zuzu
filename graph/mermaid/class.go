@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
@@ -37,6 +38,9 @@ type classDiagram struct {
 	// hideEmpty draws a class with no members as its name alone, for the
 	// setting class.hideEmptyMembersBox.
 	hideEmpty bool
+	// flat draws a namespace with dots in its name as one cluster with the
+	// whole name, for the setting class.hierarchicalNamespaces: false.
+	flat bool
 }
 
 // class is a class: its node, its name as it draws, its annotations, its
@@ -74,11 +78,20 @@ func classGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 		classes: map[string]*class{}, namespaces: map[string]*graph.Cluster{},
 		styles: map[string]map[string]string{}, nodeClasses: map[string][]string{}, nodeStyles: map[string]map[string]string{},
 	}
-	if err := sectionConfig(d, c.issues, "class", "hideEmptyMembersBox"); err != nil {
+	if err := sectionConfig(d, c.issues, "class", "hideEmptyMembersBox", "hierarchicalNamespaces"); err != nil {
 		return nil, c.issues.Report, err
 	}
 	if m, ok := d.Config["class"].(map[string]any); ok {
 		c.hideEmpty, _ = m["hideEmptyMembersBox"].(bool)
+		if v, ok := m["hierarchicalNamespaces"]; ok {
+			b, ok := v.(bool)
+			if !ok {
+				if err := c.issues.Add("config", "the setting class.hierarchicalNamespaces: %v", v); err != nil {
+					return nil, c.issues.Report, err
+				}
+			}
+			c.flat = ok && !b
+		}
 	}
 	if err := c.parse(); err != nil {
 		return nil, c.issues.Report, err
@@ -295,17 +308,30 @@ func (c *classDiagram) class(id, cls string) {
 	}
 }
 
-// namespace opens a namespace, namespace Name {.
+// namespace opens a namespace, namespace Name {. A name with dots, such as
+// A.B.C, is a namespace C in a namespace B in a namespace A, each a
+// cluster with its own part of the name, as in Mermaid. With the setting
+// class.hierarchicalNamespaces: false, it is one cluster with the whole
+// name.
 func (c *classDiagram) namespace(rest string) error {
 	name, ok := strings.CutSuffix(rest, "{")
 	name = strings.TrimSpace(name)
 	if !ok || name == "" {
 		return c.errorf("the namespace %q", rest)
 	}
-	if _, ok := c.namespaces[name]; !ok {
-		cl := &graph.Cluster{ID: name, Label: name, Parent: c.namespace0(), Style: map[string]string{}}
-		c.namespaces[name] = cl
-		c.g.Clusters = append(c.g.Clusters, cl)
+	parts := strings.Split(name, ".")
+	if c.flat || slices.Contains(parts, "") {
+		parts = []string{name}
+	}
+	parent := c.namespace0()
+	for i, part := range parts {
+		id := strings.Join(parts[:i+1], ".")
+		if _, ok := c.namespaces[id]; !ok {
+			cl := &graph.Cluster{ID: id, Label: part, Parent: parent, Style: map[string]string{}}
+			c.namespaces[id] = cl
+			c.g.Clusters = append(c.g.Clusters, cl)
+		}
+		parent = id
 	}
 	c.scopes = append(c.scopes, name)
 	return nil

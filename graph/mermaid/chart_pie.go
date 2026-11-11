@@ -443,7 +443,7 @@ func (c *chart) unreadSettings(read ...string) error {
 func (c *chart) unreadIn(m map[string]any, prefix string, read []string) error {
 	for _, k := range slices.Sorted(maps.Keys(m)) {
 		path := prefix + k
-		if slices.Contains(read, path) {
+		if slices.Contains(read, path) || inert(c.d.Kind, path) {
 			continue
 		}
 		// The theme variables are one issue, unless the chart reads some

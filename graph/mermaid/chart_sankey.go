@@ -199,17 +199,17 @@ func (c *chart) settings(section string, read []string, own ...string) (map[stri
 		switch {
 		case k == section:
 			for _, s := range slices.Sorted(maps.Keys(m)) {
-				if !slices.Contains(read, s) {
+				if !slices.Contains(read, s) && !inert(c.d.Kind, section+"."+s) {
 					if err = c.add("the setting %s.%s", section, s); err != nil {
 						break
 					}
 				}
 			}
-		case slices.Contains(own, k):
+		case slices.Contains(own, k), inert(c.d.Kind, k):
 		case k == "theme" || k == "themeVariables" || k == "themeCSS":
 			err = c.add("the %s of Mermaid, drawn in the look of zuzu", k)
 		default:
-			err = c.add("the setting %s", k)
+			err = c.unreadIn(map[string]any{k: cfg[k]}, "", nil)
 		}
 		if err != nil {
 			return nil, err

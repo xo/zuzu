@@ -339,7 +339,7 @@ func (n *nest) layScope(s int) (*scoped, error) {
 		if n.boxed[c] || n.cscope[c] != s {
 			continue
 		}
-		sub.Clusters = append(sub.Clusters, LayoutCluster{ID: cl.ID, Parent: clusterID(n.parent[c]), TitleWidth: cl.TitleWidth, TitleHeight: cl.TitleHeight})
+		sub.Clusters = append(sub.Clusters, LayoutCluster{ID: cl.ID, Parent: clusterID(n.parent[c]), TitleWidth: cl.TitleWidth, TitleHeight: cl.TitleHeight, TitleTop: cl.TitleTop})
 		out.cluster = append(out.cluster, c)
 	}
 	// rep returns the id in s of an end, or false when the end is not in s.
@@ -440,7 +440,7 @@ func (n *nest) place(s *scoped, dx, dy float64, out *Layout) {
 		cl := in.Clusters[c]
 		x1, y1 := np.X-np.Width/2, np.Y-np.Height/2
 		p := n.pad()
-		out.Clusters[c] = ClusterPlace{X: x1, Y: y1, Width: np.Width, Height: np.Height, Depth: n.depth[c], TitleX: x1 + p, TitleY: y1 + p/2}
+		out.Clusters[c] = ClusterPlace{X: x1, Y: y1, Width: np.Width, Height: np.Height, Depth: n.depth[c], TitleX: x1 + p, TitleY: y1 + p/2 + cl.TitleTop}
 		inner := s.inner[c]
 		n.place(inner, x1+(np.Width-inner.width)/2, y1+p+cl.TitleHeight, out)
 	}

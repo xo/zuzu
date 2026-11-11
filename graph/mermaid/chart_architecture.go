@@ -125,9 +125,9 @@ type arch struct {
 // a group is a box around a grid of its own.
 func architectureChart(c *chart) (map[string]any, bool, error) {
 	a := &arch{c: c, byID: map[string]any{}, tile: 56, font: 11, pad: 16, gap: 40, m: text.NewEstimate()}
-	// The layout uses no random numbers, so architecture.randomize changes
-	// nothing and is not an issue.
-	if err := c.unreadSettings("architecture.iconSize", "architecture.fontSize", "architecture.padding", "architecture.nodeSeparation", "architecture.randomize"); err != nil {
+	// The layout uses no random numbers, so architecture.randomize and
+	// architecture.seed change nothing, and inert accepts them.
+	if err := c.unreadSettings("architecture.iconSize", "architecture.fontSize", "architecture.padding", "architecture.nodeSeparation"); err != nil {
 		return nil, false, err
 	}
 	for _, s := range []struct {

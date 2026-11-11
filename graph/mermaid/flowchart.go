@@ -84,28 +84,24 @@ func (f *flowchart) add(format string, args ...any) error {
 // config reads the config of the front matter and the directives.
 func (f *flowchart) config() error {
 	cfg := f.d.Config
-	for k, v := range cfg {
-		if ok, err := lookSetting(f.issues, k, v); ok || err != nil {
+	for _, k := range slices.Sorted(maps.Keys(cfg)) {
+		v := cfg[k]
+		if ok, err := lookSetting(f.issues, f.d.Kind, k, v); ok || err != nil {
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		switch k {
-		case "flowchart":
-			m, _ := v.(map[string]any)
-			for fk := range m {
-				if fk != "curve" && fk != "wrappingWidth" {
-					if err := f.issues.Add("config", "the setting flowchart.%s", fk); err != nil {
-						return err
-					}
-				}
-			}
-		default:
-			if err := f.issues.Add("config", "the setting %s", k); err != nil {
-				return err
-			}
+		var read []string
+		if k == "flowchart" {
+			read = flowSettings
 		}
+		if err := graphSection(f.issues, f.d.Kind, k, v, read...); err != nil {
+			return err
+		}
+	}
+	if err := f.spacing(); err != nil {
+		return err
 	}
 	f.wrap = labelWrap(cfg, f.g)
 	var err error
@@ -990,7 +986,7 @@ func (f *flowchart) finish() error {
 			e.Curve = c
 		}
 	}
-	for i := range f.linkStyles {
+	for _, i := range slices.Sorted(maps.Keys(f.linkStyles)) {
 		if i >= len(f.g.Edges) {
 			return fmt.Errorf("the linkStyle of the link %d, of %d links: %w", i, len(f.g.Edges), ErrSyntax)
 		}

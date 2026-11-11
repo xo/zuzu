@@ -69,6 +69,8 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	}
 	rankSep, nodeSep, pad := num("rankSep", 40), num("nodeSep", 24), num("clusterPadding", 12)
 	fontSize, padding := num("fontSize", 11), num("padding", 8)
+	// The space above and below the title of a cluster.
+	titleTop, titleBottom := num("clusterTitleTop", 0), num("clusterTitleBottom", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +402,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			tw, th = h.lay.Width, h.lay.Height
 		}
 		if tw > 0 {
-			c.TitleWidth, c.TitleHeight = tw, th+4
+			c.TitleWidth, c.TitleHeight, c.TitleTop = tw, th+4+titleTop+titleBottom, titleTop
 		}
 		in.Clusters = append(in.Clusters, c)
 	}

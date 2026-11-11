@@ -91,10 +91,11 @@ func Read(src string) (*Diagram, error) {
 		i = j + 1
 	}
 	body := strings.Join(lines[i:], "\n")
+	inits := map[string]any{}
 	for _, m := range directive.FindAllStringSubmatch(body, -1) {
 		var v map[string]any
 		if json.Unmarshal([]byte(relaxedJSON(m[2])), &v) == nil {
-			merge(d.Config, v)
+			merge(inits, v)
 		}
 	}
 	body = directive.ReplaceAllStringFunc(body, func(s string) string {
@@ -132,7 +133,38 @@ func Read(src string) (*Diagram, error) {
 	if d.Kind == "" {
 		return nil, fmt.Errorf("no kind of diagram: %w", ErrSyntax)
 	}
+	// Mermaid moves the key config of the directives to the section of
+	// the kind, so %%{init: {'config': {'wrap': true}}}%% in a sequence
+	// diagram sets sequence.wrap.
+	if c, ok := inits["config"]; ok {
+		delete(inits, "config")
+		inits[configSection(d.Kind)] = c
+	}
+	merge(d.Config, inits)
 	return d, nil
+}
+
+// configSection returns the key that Mermaid gives to the key config of a
+// directive in a kind of diagram: the id of the kind in Mermaid, such as
+// sequence for sequenceDiagram. It is the section of the config of most
+// kinds, but not of all: the section of classDiagram is class, and so the
+// key config of a class diagram sets nothing in Mermaid.
+func configSection(kind string) string {
+	switch kind {
+	case "graph":
+		return "flowchart"
+	case "sequenceDiagram":
+		return "sequence"
+	case "erDiagram":
+		return "er"
+	case "requirementDiagram":
+		return "requirement"
+	case "classDiagram-v2":
+		return "classDiagram"
+	case "stateDiagram-v2":
+		return "stateDiagram"
+	}
+	return strings.TrimSuffix(kind, "-beta")
 }
 
 // inQuotes reports whether a place of a line is inside double quotes.
@@ -224,6 +256,7 @@ func yamlMap(lines []string) map[string]any {
 		if !ok {
 			continue
 		}
+		v = yamlComment(v)
 		for len(stack) > 1 && stack[len(stack)-1].indent >= indent {
 			stack = stack[:len(stack)-1]
 		}
@@ -240,7 +273,7 @@ func yamlMap(lines []string) map[string]any {
 			cur[k] = yamlBlock(v, under)
 			i = end - 1
 		case v == "" && !yamlNested(under):
-			if s := yamlPlain(under); s != "" {
+			if s := yamlComment(yamlPlain(under)); s != "" {
 				cur[k] = s
 				i = end - 1
 				continue
@@ -257,10 +290,44 @@ func yamlMap(lines []string) map[string]any {
 				v += " " + more
 				i = end - 1
 			}
-			cur[k] = scalar(v)
+			cur[k] = scalar(yamlComment(v))
 		}
 	}
 	return root
+}
+
+// yamlComment cuts a comment off a value of YAML. A comment starts with a
+// # after a space, outside quotes, and runs to the end of the value. A
+// value in quotes starts with the quote, and its comment can only come
+// after the closing quote.
+func yamlComment(v string) string {
+	from := 0
+	switch q := v[:min(1, len(v))]; q {
+	case `"`, "'":
+		from = -1
+		for i := 1; i < len(v); i++ {
+			switch {
+			case q == `"` && v[i] == '\\':
+				i++
+			case q == "'" && v[i] == '\'' && i+1 < len(v) && v[i+1] == '\'':
+				i++
+			case v[i] == q[0]:
+				from = i + 1
+			}
+			if from >= 0 {
+				break
+			}
+		}
+		if from < 0 {
+			return v
+		}
+	}
+	for i := from; i < len(v); i++ {
+		if v[i] == '#' && (i == 0 || v[i-1] == ' ' || v[i-1] == '\t') {
+			return strings.TrimSpace(v[:i])
+		}
+	}
+	return v
 }
 
 // yamlIndent returns the number of spaces before the text of a line.
@@ -437,5 +504,6 @@ func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	if err := f.parse(); err != nil {
 		return nil, f.issues.Report, err
 	}
+	f.inheritDir()
 	return f.g, f.issues.Report, nil
 }

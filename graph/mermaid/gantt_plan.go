@@ -188,6 +188,9 @@ func (g *gantt) config() error {
 				}
 			}
 		default:
+			if inert(g.c.d.Kind, "gantt."+k) {
+				continue
+			}
 			if err := g.c.add("zuzu does not read the setting gantt.%s", k); err != nil {
 				return err
 			}
