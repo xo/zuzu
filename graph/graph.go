@@ -46,6 +46,11 @@ type Graph struct {
 	// RankSep and NodeSep are the space between the ranks and between the
 	// nodes of a rank, or 0 for the defaults.
 	RankSep, NodeSep float64
+	// BreakWords breaks a word that is wider than the wrap width of its
+	// label between two letters, as the SVG labels of Mermaid do. Otherwise
+	// the word stays whole on a line of its own, and the label is wider
+	// than the wrap width, as the HTML labels of Mermaid are.
+	BreakWords bool
 
 	// Description is the text of the diagram for a screen reader, or
 	// empty. Compile writes it as the description of the spec.
@@ -94,6 +99,11 @@ type Node struct {
 	// MinWidth and MinHeight are the least size of the node, which grows to
 	// fit its label, or 0 for none.
 	MinWidth, MinHeight float64
+	// Wrap is the width in pixels at which the label wraps, or 0 for a
+	// label that does not wrap. A line of the label that is wider breaks at
+	// its spaces into lines that are not wider. The label of a node with
+	// fields or HTML does not wrap.
+	Wrap float64
 }
 
 // Media is the icon or the image of a node (D31).
@@ -183,6 +193,9 @@ type Edge struct {
 	Style map[string]string
 	// Curve is the interpolation of the route, or empty for basis.
 	Curve string
+	// Wrap is the width in pixels at which the label wraps, as Node.Wrap,
+	// or 0 for a label that does not wrap.
+	Wrap float64
 }
 
 // Cluster is a cluster of nodes, as a subgraph of DOT or Mermaid.

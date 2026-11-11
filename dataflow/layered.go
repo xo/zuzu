@@ -72,6 +72,10 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
+	breakWords, err := p.boolean("breakWords", false)
+	if err != nil {
+		return nil, err
+	}
 	as, err := p.as("x", "y", "width", "height", "rank", "order")
 	if err != nil {
 		return nil, err
@@ -113,14 +117,39 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		return fontSize
 	}
+	// weightOf returns the weight of the font of a row.
+	weightOf := func(r Row) string {
+		if w, ok := r["fontWeight"]; ok && w != nil {
+			return expr.String(w)
+		}
+		return ""
+	}
 	// measureRow measures a text of a row in the size and the weight of
 	// the font of the row, which a style of the source sets.
 	measureRow := func(r Row, v any) (float64, float64) {
-		weight := ""
-		if w, ok := r["fontWeight"]; ok && w != nil {
-			weight = expr.String(w)
+		return measureAt(v, sizeOf(r, "fontSize"), weightOf(r))
+	}
+	// wrapRow wraps a label of a row to a width, in the size and the
+	// weight of the font of the row, or of the label of an edge. It returns
+	// the label as lines that the measure reads, and the lines that the
+	// text draws, or nil when the label does not wrap.
+	wrapRow := func(v any, limit, size float64, weight string) (any, []any) {
+		if !(limit > 0) || v == nil || expr.IsUndefined(v) {
+			return v, nil
 		}
-		return measureAt(v, sizeOf(r, "fontSize"), weight)
+		s := expr.String(v)
+		if s == "" {
+			return v, nil
+		}
+		ls := wrapText(s, limit, breakWords, func(l string) float64 {
+			w, _ := sizeAt(l, "", size, weight)
+			return w
+		})
+		out := make([]any, len(ls))
+		for j, l := range ls {
+			out[j] = l
+		}
+		return strings.Join(ls, "\n"), out
 	}
 	// other lays out a label that takes no space in the ranks: the label
 	// of HTML in the field name+"HTML" of a row, or the text in
@@ -155,6 +184,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	records := map[int]*record{}
 	medias := map[int]*media{}
 	htmls := map[int]*htmlLabel{}
+	// wrapped holds the lines of each label that wraps, of a node or of
+	// an edge, by its index.
+	wrapped, edgeWrapped := map[int][]any{}, map[int][]any{}
 	// xhtmls holds the xlabel of HTML of each node, and edgeHTMLs the
 	// labels of HTML of each edge, by their names.
 	xhtmls := map[int]*htmlLabel{}
@@ -187,9 +219,22 @@ func layered(p *params, rows []Row) ([]Row, error) {
 				return measureAt(v, sizeOf(r, "fontSize"), weight)
 			}, padding)
 		}
+		label := fields["label"].Get(r)
+		if _, ok := records[i]; !ok && htmls[i] == nil {
+			// A label wraps beside an icon in the line, so the icon
+			// takes a part of the width.
+			limit := expr.Number(r["wrap"])
+			if m, ok := mediaOf(r, padding); ok && m.inline {
+				limit = math.Max(limit-m.w-4, 1)
+			}
+			var ls []any
+			if label, ls = wrapRow(label, limit, sizeOf(r, "fontSize"), weightOf(r)); ls != nil {
+				wrapped[i] = ls
+			}
+		}
 		if m, ok := mediaOf(r, padding); ok {
 			medias[i] = m
-			m.tw, m.th = measureRow(r, fields["label"].Get(r))
+			m.tw, m.th = measureRow(r, label)
 			if m.inline {
 				n.Width, n.Height = graph.NodeSize(kind, m.tw+m.w+4, math.Max(m.th, m.h), padding)
 			} else {
@@ -201,7 +246,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			}
 		}
 		if !(n.Width > 0) || !(n.Height > 0) {
-			tw, th := measureRow(r, fields["label"].Get(r))
+			tw, th := measureRow(r, label)
 			if ms, ok := r["margin"].([]any); ok && len(ms) == 2 {
 				// A margin of DOT is the space around the label in place
 				// of the padding.
@@ -302,8 +347,14 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			}
 			hs["label"] = h
 			e.LabelWidth, e.LabelHeight = h.lay.Width+8, h.lay.Height+4
-		} else if lw, lh := measureAt(fields["label"].Get(r), size, ""); lw > 0 {
-			e.LabelWidth, e.LabelHeight = lw+8, lh+4
+		} else {
+			label, ls := wrapRow(fields["label"].Get(r), expr.Number(r["wrap"]), size, "")
+			if ls != nil {
+				edgeWrapped[i] = ls
+			}
+			if lw, lh := measureAt(label, size, ""); lw > 0 {
+				e.LabelWidth, e.LabelHeight = lw+8, lh+4
+			}
 		}
 		for _, l := range []struct {
 			name string
@@ -362,6 +413,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o := clone(r)
 		np := l.Nodes[i]
 		o["kind"] = "node"
+		if ls, ok := wrapped[i]; ok {
+			o["lines"] = ls
+		}
 		o[as[0]], o[as[1]], o[as[2]], o[as[3]] = np.X, np.Y, np.Width, np.Height
 		o[as[4]], o[as[5]] = float64(np.Rank), float64(np.Order)
 		o["path"] = graph.ShapePath(in.Nodes[i].Shape, np.Width, np.Height)
@@ -388,6 +442,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o := clone(r)
 		ep := l.Edges[i]
 		o["kind"] = "edge"
+		if ls, ok := edgeWrapped[i]; ok {
+			o["lines"] = ls
+		}
 		o["path"] = ep.Path
 		o["labelX"], o["labelY"] = ep.LabelX, ep.LabelY
 		o["labelWidth"], o["labelHeight"] = in.Edges[i].LabelWidth, in.Edges[i].LabelHeight
@@ -505,4 +562,59 @@ func (m *media) place(o Row, np graph.NodePlace) {
 	}
 	o["mediaLeft"] = expr.Number(o["mediaX"]) - m.w/2
 	o["mediaTop"] = expr.Number(o["mediaY"]) - m.h/2
+}
+
+// wrapText breaks each line of a text at its spaces into lines that are no
+// wider than limit, as Mermaid wraps a label. width measures a line. A line
+// that fits stays as it is. A word that is wider than limit takes a line of
+// its own, or, with breakWords, breaks between two letters into pieces
+// that fit, with at least one letter in each.
+func wrapText(s string, limit float64, breakWords bool, width func(string) float64) []string {
+	var out []string
+	for line := range strings.SplitSeq(s, "\n") {
+		if width(line) <= limit {
+			out = append(out, line)
+			continue
+		}
+		cur := ""
+		for w := range strings.FieldsSeq(line) {
+			next := w
+			if cur != "" {
+				next = cur + " " + w
+			}
+			if width(next) <= limit {
+				cur = next
+				continue
+			}
+			if cur != "" {
+				out = append(out, cur)
+				cur = ""
+			}
+			if width(w) <= limit {
+				cur = w
+				continue
+			}
+			if !breakWords {
+				out = append(out, w)
+				continue
+			}
+			rs := []rune(w)
+			for len(rs) > 0 {
+				k := 1
+				for k < len(rs) && width(string(rs[:k+1])) <= limit {
+					k++
+				}
+				if k == len(rs) {
+					cur = string(rs)
+					break
+				}
+				out = append(out, string(rs[:k]))
+				rs = rs[k:]
+			}
+		}
+		if cur != "" {
+			out = append(out, cur)
+		}
+	}
+	return out
 }

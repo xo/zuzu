@@ -13,9 +13,10 @@ import (
 // an entity, and the border of a region of a state.
 const dashed = "4,3"
 
-// lookSetting reports a setting of the config that a graph draws in its
-// own way: the layout, the look and the theme. It returns false for any
-// other setting.
+// lookSetting reports a setting of the top level of the config that every
+// graph reads: the layout, the look and the theme, which a graph draws in
+// its own way, and htmlLabels and markdownAutoWrap, which change how a
+// label wraps. It returns false for any other setting.
 func lookSetting(is *graph.Issues, k string, v any) (bool, error) {
 	switch k {
 	case "layout":
@@ -35,8 +36,88 @@ func lookSetting(is *graph.Issues, k string, v any) (bool, error) {
 		return true, nil
 	case "theme", "themeVariables", "themeCSS":
 		return true, is.Add("config", "the %s of Mermaid, drawn in the look of zuzu", k)
+	case "htmlLabels", "markdownAutoWrap":
+		// labelWrap reads them.
+		if _, ok := v.(bool); !ok {
+			return true, is.Add("config", "the setting %s: %v", k, v)
+		}
+		return true, nil
 	}
 	return false, nil
+}
+
+// The widths in pixels at which Mermaid 12 wraps a label: the label of a
+// node of a flowchart or of a state by default, and the label of an edge
+// always.
+const (
+	nodeWrap = 120
+	edgeWrap = 200
+)
+
+// wrapping is how the labels of a graph wrap, from the settings of the top
+// level of the config.
+type wrapping struct {
+	// html is htmlLabels, true by default. Mermaid draws its labels in
+	// HTML, which keeps a long word whole, or with htmlLabels: false in
+	// SVG, which breaks it.
+	html bool
+	// markdown is markdownAutoWrap, true by default. When it is false, a
+	// string of markdown in an HTML label does not wrap.
+	markdown bool
+}
+
+// labelWrap reads the settings of the top level of a config that change
+// how a label wraps, and sets them on a graph.
+func labelWrap(cfg map[string]any, g *graph.Graph) wrapping {
+	w := wrapping{html: true, markdown: true}
+	if v, ok := cfg["htmlLabels"].(bool); ok {
+		w.html = v
+	}
+	if v, ok := cfg["markdownAutoWrap"].(bool); ok {
+		w.markdown = v
+	}
+	g.BreakWords = !w.html
+	return w
+}
+
+// width returns the width at which a label wraps: limit, or 0 for a string
+// of markdown that does not wrap.
+func (w wrapping) width(limit float64, markdown bool) float64 {
+	if markdown && w.html && !w.markdown {
+		return 0
+	}
+	return limit
+}
+
+// wrapGraph sets the widths at which the labels of a class diagram, a
+// state diagram or an entity relationship diagram wrap: the label of each
+// node at node, or 0 for none, and the label of each edge at edgeWrap.
+func wrapGraph(cfg map[string]any, g *graph.Graph, node float64) {
+	labelWrap(cfg, g)
+	for _, n := range g.Nodes {
+		n.Wrap = node
+	}
+	for _, e := range g.Edges {
+		e.Wrap = edgeWrap
+	}
+}
+
+// wrapSetting reads the setting of a section of the config that sets the
+// width at which a label wraps, such as flowchart.wrappingWidth, or returns
+// def when the config does not set it. A value that is not a positive
+// number is an issue.
+func wrapSetting(is *graph.Issues, cfg map[string]any, def float64, section, key string) (float64, error) {
+	v, ok := configNumber(cfg, section, key)
+	if !ok {
+		if m, _ := cfg[section].(map[string]any); m != nil && m[key] != nil {
+			return def, is.Add("config", "the setting %s.%s: %v", section, key, m[key])
+		}
+		return def, nil
+	}
+	if !(v > 0) {
+		return def, is.Add("config", "the setting %s.%s: %v", section, key, v)
+	}
+	return v, nil
 }
 
 // css reads a style of CSS of a class or a node, as fill:#f9f,stroke:#333,

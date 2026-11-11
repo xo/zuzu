@@ -1,0 +1,13 @@
+---
+config:
+  state:
+    wrappingWidth: 80
+---
+stateDiagram-v2
+  [*] --> Long
+  state "A state name that is rather long and goes on and on" as Long
+  Long --> Moving : a transition label that is rather long and goes on and on
+  Moving : a description of a state that is rather long and goes on and on
+  note right of Moving : a note that is rather long and goes on and on
+  Moving --> Word
+  Word : Supercalifragilisticexpialidocious

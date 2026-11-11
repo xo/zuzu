@@ -17,6 +17,7 @@ import (
 
 	"github.com/xo/zuzu/icon"
 	"github.com/xo/zuzu/icons/fa"
+	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/theme"
 )
 
@@ -485,4 +486,79 @@ func TestDOTNodeSize(t *testing.T) {
 	if stroke["e"] != 5 {
 		t.Errorf("expected setlinewidth(5) to give a stroke of 5, got %v", stroke["e"])
 	}
+}
+
+// layoutRows draws a diagram and returns the rows of its layout by their
+// kind and their key.
+func layoutRows(t *testing.T, src string) map[string]map[string]any {
+	t.Helper()
+	c, _, err := Parse([]byte(src), WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _, err := c.NewView(t.Context(), WithIcons("fa", fa.Pack()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := v.Data("layout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]map[string]any{}
+	for _, r := range rows {
+		kind, _ := r["kind"].(string)
+		key, _ := r["key"].(string)
+		out[kind+" "+key] = r
+	}
+	return out
+}
+
+func TestWrap(t *testing.T) {
+	t.Parallel()
+	const long = "This is a rather long label of a node that goes on and on"
+	src := "flowchart LR\n" +
+		"  A[" + long + "] -->|an edge label that is also rather long and goes on and on| B[Supercalifragilisticexpialidocious_with_no_spaces]\n" +
+		"  B --> C[fa:fa-gear Shared Business Logic] --> D[Shared Business Logic]\n" +
+		"  subgraph S [A subgraph title that is rather long and goes on and on and on]\n    C\n  end"
+	m := text.NewEstimate()
+	font := text.Font{Family: text.Family, Size: 11, Weight: 400}
+	linesOf := func(r map[string]any) []string {
+		var out []string
+		ls, _ := r["lines"].([]any)
+		for _, l := range ls {
+			s, _ := l.(string)
+			out = append(out, s)
+		}
+		return out
+	}
+	check := func(name string, lines []string, limit float64, n int) {
+		t.Helper()
+		if len(lines) != n {
+			t.Errorf("%s: expected %d lines, got %q", name, n, lines)
+		}
+		for _, l := range lines {
+			if w := m.Width(font, l); w > limit {
+				t.Errorf("%s: the line %q is %g wide, wider than %g", name, l, w, limit)
+			}
+		}
+	}
+	rows := layoutRows(t, src)
+	check("A", linesOf(rows["node A"]), 120, 3)
+	if got := strings.Join(linesOf(rows["node A"]), " "); got != long {
+		t.Errorf("A: expected the words of the label, got %q", got)
+	}
+	check("the edge", linesOf(rows["edge 0"]), 200, 2)
+	// A word wider than the width keeps a line of its own.
+	check("B", linesOf(rows["node B"]), 1000, 1)
+	// The icon in the line takes 18 of the width.
+	check("C", linesOf(rows["node C"]), 120-18, 2)
+	check("D", linesOf(rows["node D"]), 120, 1)
+	if l, _ := rows["cluster S"]["label"].(string); strings.Contains(l, "\n") {
+		t.Errorf("expected the title of the subgraph on one line, got %q", l)
+	}
+	// SVG labels break the word, and DOT does not wrap.
+	rows = layoutRows(t, "---\nconfig:\n  htmlLabels: false\n---\n"+src)
+	check("B in SVG", linesOf(rows["node B"]), 120, 3)
+	rows = layoutRows(t, `digraph { a [label="`+long+`"] }`)
+	check("DOT", linesOf(rows["node a"]), 1000, 1)
 }

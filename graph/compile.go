@@ -174,6 +174,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if n.MinHeight > 0 {
 			r["minHeight"] = n.MinHeight
 		}
+		if n.Wrap > 0 && len(n.Fields) == 0 && n.HTML == "" {
+			r["wrap"] = n.Wrap
+		}
 		if m := n.Media; m != nil {
 			media = true
 			media2row(r, m)
@@ -215,6 +218,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if e.HTML != "" {
 			r["html"], r["lines"] = e.HTML, []any{}
 			html = true
+		}
+		if e.Wrap > 0 && e.Label != "" && e.HTML == "" {
+			r["wrap"] = e.Wrap
 		}
 		for _, l := range []struct{ name, text, src string }{
 			{"head", e.HeadLabel, e.HeadHTML}, {"tail", e.TailLabel, e.TailHTML}, {"x", e.XLabel, e.XHTML},
@@ -314,6 +320,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	if g.NodeSep > 0 {
 		layout["nodeSep"] = g.NodeSep
+	}
+	if g.BreakWords {
+		layout["breakWords"] = true
 	}
 	if g.TitleHTML != "" {
 		// The title of HTML takes the size of the title of a chart.

@@ -31,6 +31,12 @@ type flowchart struct {
 	curve       string
 	line        int
 	anon        int
+	// wrap is how the labels wrap, and nodeWrap the width at which the
+	// label of a node wraps. markdown holds the nodes whose label is a
+	// string of markdown.
+	wrap     wrapping
+	nodeWrap float64
+	markdown map[string]bool
 }
 
 func newFlowchart(d *Diagram, strict bool) *flowchart {
@@ -39,6 +45,7 @@ func newFlowchart(d *Diagram, strict bool) *flowchart {
 		nodes: map[string]*graph.Node{}, classes: map[string]map[string]string{}, nodeClasses: map[string][]string{},
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
+		nodeWrap: nodeWrap, markdown: map[string]bool{},
 	}
 }
 
@@ -67,7 +74,7 @@ func (f *flowchart) config() error {
 		case "flowchart":
 			m, _ := v.(map[string]any)
 			for fk := range m {
-				if fk != "curve" {
+				if fk != "curve" && fk != "wrappingWidth" {
 					if err := f.issues.Add("config", "the setting flowchart.%s", fk); err != nil {
 						return err
 					}
@@ -78,6 +85,11 @@ func (f *flowchart) config() error {
 				return err
 			}
 		}
+	}
+	f.wrap = labelWrap(cfg, f.g)
+	var err error
+	if f.nodeWrap, err = wrapSetting(f.issues, cfg, nodeWrap, "flowchart", "wrappingWidth"); err != nil {
+		return err
 	}
 	if c := str(cfg, "flowchart", "curve"); c != "" {
 		vc, ok := curves[c]
@@ -322,6 +334,8 @@ type link struct {
 	head, tail string
 	kind       string // normal, thick, dotted or invisible
 	minlen     int
+	// markdown says whether the text is a string of markdown.
+	markdown bool
 }
 
 // link reads a link, or returns nil when none comes next.
@@ -369,7 +383,7 @@ func (sc *scanner) link() *link {
 	}
 	if m := textLinkRE.FindStringSubmatch(r); m != nil && !strings.HasPrefix(strings.TrimSpace(m[3]), "|") {
 		l.tail, l.head = arrow(m[1]), arrow(m[5])
-		l.text = label(m[3])
+		l.text, l.markdown = label(m[3]), isMarkdown(m[3])
 		body(m[4], m[5] != "")
 		if strings.HasPrefix(m[2], "-.") {
 			l.kind = "dotted"
@@ -392,7 +406,8 @@ func (sc *scanner) link() *link {
 	if sc.i < len(sc.s) && sc.s[sc.i] == '|' {
 		end := strings.Index(sc.s[sc.i+1:], "|")
 		if end >= 0 {
-			l.text = label(sc.s[sc.i+1 : sc.i+1+end])
+			raw := sc.s[sc.i+1 : sc.i+1+end]
+			l.text, l.markdown = label(raw), isMarkdown(raw)
 			sc.i += end + 2
 		}
 	}
@@ -498,6 +513,7 @@ func (f *flowchart) nodeRef(sc *scanner) (string, error) {
 			end = start + e
 		}
 		n.Label = label(text)
+		f.markdown[id] = isMarkdown(text)
 		n.Shape = d.shape
 		sc.i = end + len(d.close)
 		if strings.Contains(text, "fa:fa-") || strings.Contains(text, "fab:fa-") || strings.Contains(text, "fas:fa-") || strings.Contains(text, "far:fa-") {
@@ -568,6 +584,7 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 			n.Shape = v
 		case "label":
 			n.Label = label(v)
+			f.markdown[n.ID] = isMarkdown(v)
 		case "icon":
 			media.Icon = v
 		case "img":
@@ -652,7 +669,10 @@ func inlineMap(body string) map[string]string {
 
 // edge adds an edge from a link.
 func (f *flowchart) edge(a, b string, l *link) {
-	e := &graph.Edge{Source: a, Target: b, Label: l.text, MinLen: l.minlen, Head: l.head, Tail: l.tail, Style: map[string]string{}, Curve: f.curve}
+	e := &graph.Edge{
+		Source: a, Target: b, Label: l.text, MinLen: l.minlen, Head: l.head, Tail: l.tail, Style: map[string]string{}, Curve: f.curve,
+		Wrap: f.wrap.width(edgeWrap, l.markdown),
+	}
 	switch l.kind {
 	case "thick":
 		e.Style["strokeWidth"] = "3"
@@ -758,6 +778,7 @@ func (f *flowchart) finish() error {
 	}
 	for _, n := range f.g.Nodes {
 		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)
+		n.Wrap = f.wrap.width(f.nodeWrap, f.markdown[n.ID])
 	}
 	for i, e := range f.g.Edges {
 		maps.Copy(e.Style, f.linkDefault)
@@ -786,6 +807,13 @@ func unquote(s string) string {
 // entities are the entities of a label, such as #quot and #35, each with a
 // semicolon after it.
 var entities = regexp.MustCompile(`#([a-z]+|\d+);`)
+
+// isMarkdown reports whether the text of a label is a string of markdown,
+// in backquotes.
+func isMarkdown(s string) bool {
+	s = unquote(s)
+	return len(s) >= 2 && strings.HasPrefix(s, "`") && strings.HasSuffix(s, "`")
+}
 
 // label reads the text of a label: quotes off, <br> as a new line,
 // entities, and a string of markdown as plain text.

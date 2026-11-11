@@ -272,7 +272,7 @@ markdown, can run over more lines, and each new line in it starts a new
 line of the label. This holds for a node, a link and the title of a
 subgraph. The value of a property in `A@{ ... }` can be in double quotes or
 in single quotes, and zuzu takes the quotes off. In single quotes, `''` is
-one quote, as in YAML.
+one quote, as in YAML. A long label wraps, as "Labels that wrap" says.
 
 A subgraph with a direction lays out in that direction, as Mermaid does,
 when no edge links a node inside it to a node outside it. zuzu lays out
@@ -387,7 +387,7 @@ nothing too.
 These parts are issues: `scale`, `click`, a floating note with no state,
 such as `note "text" as N1`, a kind of state other than `choice`, `fork`
 and `join`, which draws as a state, the settings of the section `state` of
-the config, the layout `elk`, the look `handDrawn`, the `theme` and the
+the config other than `wrappingWidth`, the layout `elk`, the look `handDrawn`, the `theme` and the
 `themeVariables` of Mermaid, and a style that a flowchart does not read.
 
 ### Class diagram
@@ -514,6 +514,45 @@ its own, or with its attributes, moves into the subgraph. `classDef`,
 These parts are issues: `click`, the settings of the section `er` of the
 config, the layout `elk`, the look `handDrawn`, the `theme` and the
 `themeVariables` of Mermaid, and a style that a flowchart does not read.
+
+### Labels that wrap
+
+Mermaid 12.3.0 wraps a long label of a flowchart, a state diagram, a class
+diagram and an entity relationship diagram. zuzu wraps the same labels at
+the same widths. It measures the words with the bundled font, so the lines
+are the same on each machine.
+
+| Label | Width |
+| --- | --- |
+| a node of a flowchart | `flowchart.wrappingWidth`, 120 pixels by default |
+| a state, and a note of a state | `state.wrappingWidth`, 120 pixels by default |
+| the text of a link, a transition, a relation and a relationship | 200 pixels |
+| a subgraph, a composite state, a state with more than one description, a class, a note of a class, an entity and its attributes | no wrap |
+
+A label wraps at the spaces between its words. A line that is wider than
+the width breaks before the first word that does not fit. Each line of a
+`<br>` wraps on its own. A word that is wider than the width stays whole
+on a line of its own, and the label is wider than the width. An icon in
+the line of a label, such as `fa:fa-gear`, takes its width and 4 pixels
+from the width. A string of markdown wraps as plain text does.
+
+zuzu reads two settings of the top level of the config:
+
+1. `htmlLabels: false` makes Mermaid draw its labels as SVG text, which
+   breaks a word that is wider than the width between two letters. zuzu
+   breaks such a word too.
+2. `markdownAutoWrap: false` keeps a string of markdown on one line, as
+   Mermaid does. With `htmlLabels: false`, Mermaid ignores it, and so does
+   zuzu.
+
+`flowchart.htmlLabels` is an old form of `htmlLabels`, and it is an issue.
+Another value of one of these settings, such as a width that is not a
+positive number, is an issue, and the label takes the default.
+
+A width is in the pixels of zuzu, which draws a label at 11 pixels.
+Mermaid draws a label at 14 pixels, so a line of zuzu holds more words. A
+node of zuzu fits its widest line. Mermaid makes the box of a label that
+wraps as wide as the width. DOT does not wrap a label.
 
 ### Charts
 

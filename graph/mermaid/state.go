@@ -34,6 +34,8 @@ type stateDiagram struct {
 	regions     int
 	line        int
 	acc         []string
+	// wrap is the width at which the label of a state wraps.
+	wrap float64
 }
 
 // state is a simple state: its node and its kind, which is empty, start,
@@ -89,6 +91,9 @@ func stateGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	if err := s.parse(); err != nil {
 		return nil, s.issues.Report, err
 	}
+	// Mermaid wraps the label of a state, of a note and of a transition. A
+	// state with more descriptions is a record, and does not wrap.
+	wrapGraph(d.Config, s.g, s.wrap)
 	return s.g, s.issues.Report, nil
 }
 
@@ -102,9 +107,14 @@ func (s *stateDiagram) errorf(format string, args ...any) error {
 
 // config reads the config of the front matter and the directives. The
 // settings of the section state set the spacing and the look of Mermaid,
-// so each one is an issue.
+// so each one is an issue, except wrappingWidth.
 func (s *stateDiagram) config() error {
-	return sectionConfig(s.d, s.issues, "state")
+	if err := sectionConfig(s.d, s.issues, "state", "wrappingWidth"); err != nil {
+		return err
+	}
+	var err error
+	s.wrap, err = wrapSetting(s.issues, s.d.Config, nodeWrap, "state", "wrappingWidth")
+	return err
 }
 
 // top returns the scope that holds the current line.

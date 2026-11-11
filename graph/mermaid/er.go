@@ -85,6 +85,8 @@ func erGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	if err := e.parse(); err != nil {
 		return nil, e.issues.Report, err
 	}
+	// Mermaid wraps the label of a relationship, and not an entity.
+	wrapGraph(d.Config, e.g, 0)
 	return e.g, e.issues.Report, nil
 }
 
