@@ -171,8 +171,28 @@ func moreSize(kind string, w, h float64) (float64, float64, bool) {
 		return d, d, true
 	case "fr-circ":
 		return 14, 14, true
+	case collapsedGroup:
+		return math.Max(w, 80), h + collapsedRow, true
 	}
 	return 0, 0, false
+}
+
+// collapsedGroup is the shape of a collapsed subgraph of Mermaid: a
+// rounded box with its title at the top, and a dashed line and three dots
+// under the title, in a band collapsedRow high.
+const (
+	collapsedGroup = "collapsedGroup"
+	collapsedRow   = 28.0
+)
+
+// TextOffset returns how far down from the center of a node of a shape
+// the center of its label goes: up by half the band of a collapsed
+// subgraph, and 0 for every other shape.
+func TextOffset(kind string) float64 {
+	if kind == collapsedGroup {
+		return -collapsedRow / 2
+	}
+	return 0
 }
 
 // hcylRadius is the radius across of an end of a cylinder on its side of
@@ -292,6 +312,22 @@ func morePath(kind string, w, h float64) (string, bool) {
 		// A ring and a dot. The dot is two small circles that the outline
 		// fills.
 		return circlePath(0, 0, x) + circlePath(0, 0, 0.7) + circlePath(0, 0, 1.9), true
+	case collapsedGroup:
+		// The dashed line is short strokes of 3 with gaps of 3, since
+		// the outline has one dash for the whole path. The dots sit in
+		// the middle of the band under it.
+		var b strings.Builder
+		b.WriteString(shapePath("rounded", w, h))
+		line := y - collapsedRow + 4
+		for at := -x + 8; at < x-8; at += 6 {
+			b.WriteString(stroke([2]float64{at, line}, [2]float64{math.Min(at+3, x-8), line}))
+		}
+		dots := y - collapsedRow/2 + 2
+		for i := -1; i <= 1; i++ {
+			// Two rings that the outline fills, as the dot of fr-circ.
+			b.WriteString(circlePath(float64(i)*10, dots, 2) + circlePath(float64(i)*10, dots, 0.8))
+		}
+		return b.String(), true
 	}
 	return "", false
 }

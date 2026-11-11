@@ -421,7 +421,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o[as[0]], o[as[1]], o[as[2]], o[as[3]] = np.X, np.Y, np.Width, np.Height
 		o[as[4]], o[as[5]] = float64(np.Rank), float64(np.Order)
 		o["path"] = graph.ShapePath(in.Nodes[i].Shape, np.Width, np.Height)
-		o["textX"], o["textY"] = np.X, np.Y
+		o["textX"], o["textY"] = np.X, np.Y+graph.TextOffset(in.Nodes[i].Shape)
 		o["xLabelX"], o["xLabelY"] = np.XLabelX, np.XLabelY
 		o["xLabelWidth"], o["xLabelHeight"] = in.Nodes[i].XLabelWidth, in.Nodes[i].XLabelHeight
 		if m, ok := medias[i]; ok {

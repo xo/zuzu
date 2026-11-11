@@ -79,7 +79,8 @@ type Node struct {
 	// Rank names a group of nodes of the same rank, or empty.
 	Rank string
 	// Style holds the paint of the node: fill, stroke, color, strokeWidth,
-	// strokeDash, fontWeight and so on, with the names of Vega. A fill of
+	// strokeDash, strokeDashOffset, fontWeight, fontStyle and so on, with
+	// the names of Vega. A fill of
 	// two colors of DOT, such as a:b, sets gradient to the list of colors,
 	// gradientAngle to its angle in degrees, and gradientType to radial
 	// for a radial gradient. Fill then holds the first color.
@@ -148,8 +149,9 @@ type Field struct {
 	// Align puts each line of the text at the left of the field, l, or at
 	// its center, the default.
 	Align string
-	// Fonts holds the font of each line of the text, or nil for the font
-	// of the node.
+	// Fonts holds the font of each line of the text, or of each cell of
+	// a row of cells, or nil for the font of the node. A cell draws no
+	// line under it.
 	Fonts []Font
 }
 

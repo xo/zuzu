@@ -37,8 +37,11 @@ type flowchart struct {
 	wrap     wrapping
 	nodeWrap float64
 	markdown map[string]bool
-	// edgeClasses are the classes of each edge with an id, in order.
+	// edgeClasses are the classes of each edge by its id, in order.
 	edgeClasses map[string][]string
+	// collapsed holds the line of each @{ view: collapsed } by the id that
+	// it names.
+	collapsed map[string]int
 	// head holds the statements after the direction on the first line,
 	// with a semicolon between them.
 	head []string
@@ -67,6 +70,7 @@ func newFlowchart(d *Diagram, strict bool) *flowchart {
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
 		nodeWrap: nodeWrap, markdown: map[string]bool{}, edgeClasses: map[string][]string{},
+		collapsed: map[string]int{},
 	}
 }
 
@@ -297,7 +301,7 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 			id = strings.TrimSpace(id)
 			// The id of an edge, as in A e1@--> B, gives the class to the
 			// edge.
-			if _, ok := f.edgeIDs[id]; ok {
+			if _, ok := f.link(id); ok {
 				f.edgeClasses[id] = append(f.edgeClasses[id], strings.TrimSpace(name))
 				continue
 			}
@@ -322,12 +326,57 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 	case "click", "callback", "href":
 		return f.add("the interaction %s", word)
 	}
+	if m := linkPropsRE.FindStringSubmatch(st); m != nil {
+		if e, ok := f.link(m[1]); ok {
+			return f.linkProps(e, m[2])
+		}
+	}
 	sc := &scanner{s: st}
 	group, err := f.group(sc)
 	if err != nil {
 		return err
 	}
 	return f.links(sc, group, last)
+}
+
+// linkPropsRE matches the properties of an edge by its id, in a statement
+// of their own: e1@{ curve: linear }.
+var linkPropsRE = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)@\{(.*)\}$`)
+
+// link returns the edge that an id names, when no node has the id. Every
+// edge has an id: its own, as in A e1@--> B, or the id that Mermaid gives
+// it, as L_A_B_0.
+func (f *flowchart) link(id string) (*graph.Edge, bool) {
+	e, ok := f.edgeIDs[id]
+	if _, node := f.nodes[id]; node {
+		return nil, false
+	}
+	return e, ok
+}
+
+// linkProps reads the properties of an edge: its curve, which wins over
+// the curve of the links, or an animation, which is an issue.
+func (f *flowchart) linkProps(e *graph.Edge, body string) error {
+	m := inlineMap(body)
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		v := m[k]
+		switch k {
+		case "curve":
+			c, ok := curves[v]
+			if !ok {
+				if err := f.add("the curve %s", v); err != nil {
+					return err
+				}
+				continue
+			}
+			f.linkCurves[slices.Index(f.g.Edges, e)] = c
+		default:
+			if err := f.add("the property %s of a link", k); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // startsLink reports whether a statement starts with a link, with no id
@@ -581,11 +630,16 @@ func (f *flowchart) links(sc *scanner, group []string, last bool) error {
 }
 
 // connect adds an edge of a link from each node of a group to each node of
-// the next group.
+// the next group. The id of the link names the edge from the last node of
+// the group to the first node of the next group, as in Mermaid.
 func (f *flowchart) connect(group, next []string, l *link) {
-	for _, a := range group {
-		for _, b := range next {
-			f.edge(a, b, l)
+	for i, a := range group {
+		for j, b := range next {
+			id := ""
+			if i == len(group)-1 && j == 0 {
+				id = l.id
+			}
+			f.edge(a, b, l, id)
 		}
 	}
 }
@@ -768,6 +822,14 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 			}
 		case "constraint":
 			media.Keep = v == "on"
+		case "view":
+			// finish collapses a subgraph. Any other view draws the
+			// subgraph open, as in Mermaid.
+			if v == "collapsed" {
+				f.collapsed[n.ID] = f.line
+			} else {
+				delete(f.collapsed, n.ID)
+			}
 		default:
 			if err := f.add("the property %s of a node", k); err != nil {
 				return err
@@ -783,11 +845,24 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 
 // bare gives a node of a shape that draws no text, as Mermaid does, its
 // size and no label: a fork or a join, a bar across the ranks, an
-// hourglass, a bolt, a crossed circle and a framed circle.
+// hourglass, a bolt, a crossed circle, a framed circle, a choice and an
+// anchor.
 func (f *flowchart) bare(n *graph.Node) {
 	kind, _ := graph.ShapeOf(n.Shape)
+	// A choice is a diamond and an anchor is a point by their shape, but
+	// each has a size of its own.
+	if n.Shape == "choice" || n.Shape == "anchor" {
+		kind = n.Shape
+	}
 	var w, h float64
 	switch kind {
+	case "choice":
+		// A small diamond, as the choice of a state diagram.
+		w, h = 28, 28
+	case "anchor":
+		// A dot in the color of the node, where edges meet.
+		w, h = 2, 2
+		n.Style["fillOpacity"] = "1"
 	case "bar":
 		w, h = 70, 10
 		if d := f.g.Direction; d == graph.LR || d == graph.RL {
@@ -859,7 +934,8 @@ func inlineMap(body string) map[string]string {
 }
 
 // edge adds an edge from a link.
-func (f *flowchart) edge(a, b string, l *link) {
+// edge adds an edge from a link, with an id or none.
+func (f *flowchart) edge(a, b string, l *link, id string) {
 	e := &graph.Edge{
 		Source: a, Target: b, Label: l.text, MinLen: l.minlen, Head: l.head, Tail: l.tail, Style: map[string]string{}, Curve: f.curve,
 		Wrap: f.wrap.width(edgeWrap, l.markdown),
@@ -873,10 +949,23 @@ func (f *flowchart) edge(a, b string, l *link) {
 		e.Style["stroke"] = "transparent"
 		e.Head, e.Tail = "none", "none"
 	}
-	if l.id != "" {
-		f.edgeIDs[l.id] = e
-		e.ID = l.id
+	if _, ok := f.edgeIDs[id]; id == "" || ok {
+		// An edge with no id, or with the id of an edge before it, takes
+		// the id that Mermaid gives it: L_a_b_0 for the first edge from a
+		// to b, and then L_a_b_2, L_a_b_3 and on.
+		n := 0
+		for _, o := range f.g.Edges {
+			if o.Source == a && o.Target == b {
+				n++
+			}
+		}
+		if n > 0 {
+			n++
+		}
+		id = fmt.Sprintf("L_%s_%s_%d", a, b, n)
 	}
+	e.ID = id
+	f.edgeIDs[id] = e
 	f.g.Edges = append(f.g.Edges, e)
 }
 
@@ -964,6 +1053,24 @@ func (f *flowchart) subgraphEdges() error {
 
 // finish applies the classes and the styles, and the styles of the links.
 func (f *flowchart) finish() error {
+	for _, i := range slices.Sorted(maps.Keys(f.linkStyles)) {
+		if i >= len(f.g.Edges) {
+			return fmt.Errorf("the linkStyle of the link %d, of %d links: %w", i, len(f.g.Edges), ErrSyntax)
+		}
+	}
+	for i, e := range f.g.Edges {
+		maps.Copy(e.Style, f.linkDefault)
+		for _, c := range f.edgeClasses[e.ID] {
+			maps.Copy(e.Style, f.classes[c])
+		}
+		maps.Copy(e.Style, f.linkStyles[i])
+		if c, ok := f.linkCurves[i]; ok {
+			e.Curve = c
+		}
+	}
+	if err := f.collapse(); err != nil {
+		return err
+	}
 	if err := f.subgraphEdges(); err != nil {
 		return err
 	}
@@ -974,23 +1081,86 @@ func (f *flowchart) finish() error {
 	if len(f.acc) > 0 {
 		f.g.Description = strings.Join(f.acc, " ")
 	}
-	for i, e := range f.g.Edges {
-		maps.Copy(e.Style, f.linkDefault)
-		if e.ID != "" {
-			for _, c := range f.edgeClasses[e.ID] {
-				maps.Copy(e.Style, f.classes[c])
+	return nil
+}
+
+// collapse draws each subgraph that @{ view: collapsed } names as one node,
+// as Mermaid does. The node takes the title of the subgraph, and the nodes
+// and the subgraphs inside it do not draw. An edge to a node inside it goes
+// to the node, and an edge between two nodes inside it does not draw. A
+// collapsed subgraph inside a collapsed subgraph goes into the outer one.
+func (f *flowchart) collapse() error {
+	if len(f.collapsed) == 0 {
+		return nil
+	}
+	clusters := map[string]*graph.Cluster{}
+	for _, c := range f.g.Clusters {
+		clusters[c.ID] = c
+	}
+	for _, id := range slices.Sorted(maps.Keys(f.collapsed)) {
+		if clusters[id] == nil {
+			if err := f.issues.Add(fmt.Sprintf("line %d", f.collapsed[id]), "the view collapsed of %s, which is not a subgraph", id); err != nil {
+				return err
 			}
 		}
-		maps.Copy(e.Style, f.linkStyles[i])
-		if c, ok := f.linkCurves[i]; ok {
-			e.Curve = c
+	}
+	// outer returns the outermost collapsed subgraph that holds a
+	// subgraph, or is it, or empty for none.
+	outer := func(id string) string {
+		top := ""
+		for c := clusters[id]; c != nil; c = clusters[c.Parent] {
+			if _, ok := f.collapsed[c.ID]; ok {
+				top = c.ID
+			}
+		}
+		return top
+	}
+	// into holds the collapsed subgraph that takes the place of each node
+	// that does not draw.
+	into := map[string]string{}
+	var nodes []*graph.Node
+	for _, n := range f.g.Nodes {
+		top := outer(n.Cluster)
+		if c := clusters[n.ID]; c != nil {
+			// The node of the id of a subgraph is the collapsed node, or
+			// goes into the collapsed subgraph that holds it.
+			top = outer(n.ID)
+			if top == n.ID {
+				n.Label, n.Shape, n.Cluster, n.Media = c.Label, "collapsedGroup", c.Parent, nil
+				top = ""
+			}
+		}
+		if top != "" {
+			into[n.ID] = top
+			continue
+		}
+		nodes = append(nodes, n)
+	}
+	f.g.Nodes = nodes
+	var kept []*graph.Cluster
+	for _, c := range f.g.Clusters {
+		if outer(c.ID) == "" {
+			kept = append(kept, c)
 		}
 	}
-	for _, i := range slices.Sorted(maps.Keys(f.linkStyles)) {
-		if i >= len(f.g.Edges) {
-			return fmt.Errorf("the linkStyle of the link %d, of %d links: %w", i, len(f.g.Edges), ErrSyntax)
+	f.g.Clusters = kept
+	var edges []*graph.Edge
+	for _, e := range f.g.Edges {
+		a, aok := into[e.Source]
+		b, bok := into[e.Target]
+		if !aok {
+			a = e.Source
 		}
+		if !bok {
+			b = e.Target
+		}
+		if a == b && (aok || bok) {
+			continue
+		}
+		e.Source, e.Target = a, b
+		edges = append(edges, e)
 	}
+	f.g.Edges = edges
 	return nil
 }
 

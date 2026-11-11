@@ -221,10 +221,27 @@ func css(s string, add func(format string, args ...any) error) (map[string]strin
 			st["color"] = v
 		case "stroke-dasharray":
 			st["strokeDash"] = strings.Join(strings.Fields(strings.ReplaceAll(v, ",", " ")), ",")
+		case "stroke-dashoffset":
+			st["strokeDashOffset"] = v
 		case "font-weight":
 			st["fontWeight"] = v
 		case "font-size":
 			st["fontSize"] = v
+		case "font-style":
+			switch v {
+			case "normal", "italic":
+				st["fontStyle"] = v
+			case "oblique":
+				// The bundled fonts slant only as italic.
+				st["fontStyle"] = "italic"
+			default:
+				if err := add("the font-style %s", v); err != nil {
+					return nil, err
+				}
+			}
+		case "border", "background":
+			// Mermaid puts the style on the shape of SVG of the node,
+			// where border and background change nothing.
 		default:
 			if err := add("the style %s", k); err != nil {
 				return nil, err

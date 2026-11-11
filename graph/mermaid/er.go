@@ -377,9 +377,10 @@ func (e *erDiagram) relationship(from, rest, t string) error {
 		}
 		text = label(r)
 	}
+	text, font := markdownFont(text)
 	// The cardinality u, the parent of Mermaid, draws no mark in Mermaid
 	// 12, so it draws none here either.
-	ed := &graph.Edge{Source: from, Target: to, Label: text, Head: "none", Tail: "none", ArrowSize: relationArrowSize, Style: map[string]string{}}
+	ed := &graph.Edge{Source: from, Target: to, Label: text, Head: "none", Tail: "none", ArrowSize: relationArrowSize, Style: fontStyle(font)}
 	if head != "u" {
 		ed.Head = head
 	}
@@ -418,22 +419,38 @@ func (e *erDiagram) finish() error {
 	if err := e.subgraphEnds(); err != nil {
 		return err
 	}
+	// fonts holds the font of the name of each entity with no attributes,
+	// from its markdown, which a class or a style can change.
+	fonts := map[string]map[string]string{}
 	for _, n := range e.g.Nodes {
 		ent := e.entities[n.ID]
-		n.Label = ent.name
+		name, font := markdownFont(ent.name)
+		n.Label = name
 		if len(ent.attrs) == 0 {
+			fonts[n.ID] = fontStyle(font)
 			continue
 		}
-		n.Fields = []graph.Field{{Text: ent.name, Fonts: []graph.Font{{Bold: true}}}}
+		font.Bold = true
+		n.Fields = []graph.Field{{Text: name, Fonts: []graph.Font{font}}}
 		for _, a := range ent.attrs {
-			n.Fields = append(n.Fields, graph.Field{
-				Cells: []string{a.typ, a.name, strings.Join(a.keys, ", "), a.comment}, Port: a.name,
-			})
+			typ, typFont := markdownFont(a.typ)
+			attr, attrFont := markdownFont(a.name)
+			comment, commentFont := markdownFont(a.comment)
+			f := graph.Field{Cells: []string{typ, attr, strings.Join(a.keys, ", "), comment}, Port: a.name}
+			if typFont != (graph.Font{}) || attrFont != (graph.Font{}) || commentFont != (graph.Font{}) {
+				f.Fonts = []graph.Font{typFont, attrFont, {}, commentFont}
+			}
+			n.Fields = append(n.Fields, f)
 		}
 		n.Stack = true
 	}
 	for _, n := range e.g.Nodes {
 		n.Style = classStyle(e.styles, e.nodeClasses[n.ID], e.nodeStyles[n.ID], n.Style)
+		for k, v := range fonts[n.ID] {
+			if _, ok := n.Style[k]; !ok {
+				n.Style[k] = v
+			}
+		}
 	}
 	if len(e.acc) > 0 {
 		e.g.Description = strings.Join(e.acc, " ")
@@ -467,4 +484,38 @@ func (e *erDiagram) subgraphEnds() error {
 		}
 	}
 	return nil
+}
+
+// markdownFont reads the marks of markdown in a name or a label of an
+// entity relationship diagram, as Mermaid does. It returns the text
+// without its marks, and the font that all of its text shares: bold,
+// italic, both or neither. A line of a record or of a label draws in one
+// font, so a part of the text that alone is bold or italic draws plain.
+func markdownFont(s string) (string, graph.Font) {
+	var b strings.Builder
+	bold, italic, some := true, true, false
+	for _, r := range markdownRuns(s) {
+		b.WriteString(r.text)
+		if strings.TrimSpace(r.text) == "" {
+			continue
+		}
+		some = true
+		bold, italic = bold && r.bold, italic && r.italic
+	}
+	if !some {
+		return b.String(), graph.Font{}
+	}
+	return b.String(), graph.Font{Bold: bold, Italic: italic}
+}
+
+// fontStyle returns the style of a label in a font.
+func fontStyle(f graph.Font) map[string]string {
+	st := map[string]string{}
+	if f.Bold {
+		st["fontWeight"] = graph.BoldWeight
+	}
+	if f.Italic {
+		st["fontStyle"] = "italic"
+	}
+	return st
 }

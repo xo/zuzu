@@ -656,6 +656,16 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 	in := l.in
 	type pair struct{ a, b int }
 	seen := map[pair]int{}
+	// direct holds the edges of each pair of nodes that go straight from
+	// one node to the other, with no point between them and no port.
+	direct := map[pair][]int{}
+	for i, e := range in.Edges {
+		a, b := ids[e.Source], ids[e.Target]
+		if a != b && l.straight(i, a, b) && e.SourcePort == nil && e.TargetPort == nil {
+			k := pair{min(a, b), max(a, b)}
+			direct[k] = append(direct[k], i)
+		}
+	}
 	for i, e := range in.Edges {
 		a, b := ids[e.Source], ids[e.Target]
 		na, nb := out.Nodes[a], out.Nodes[b]
@@ -679,9 +689,17 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 			ox, oy := tf(0, -(math.Max(l.vs[a].h, l.vs[b].h)/2 + l.sep.rank/2))
 			pts = [][2]float64{pts[0], {mx + ox, my + oy}, pts[1]}
 		}
-		// Edges between the same two nodes spread apart.
+		// Edges between the same two nodes spread apart. Straight edges
+		// run side by side, each with ends of its own on the borders, so
+		// that two edges in opposite directions do not meet at their ends.
 		k := pair{min(a, b), max(a, b)}
-		if c := seen[k]; c > 0 {
+		group := direct[k]
+		clipped := false
+		switch c := seen[k]; {
+		case len(group) > 1 && slices.Contains(group, i):
+			pts = parallel(na, nb, in.Nodes[a].Shape, in.Nodes[b].Shape, a > b, slices.Index(group, i), len(group))
+			clipped = true
+		case c > 0:
 			off := float64((c+1)/2) * 14
 			if c%2 == 0 {
 				off = -off
@@ -699,9 +717,11 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 			}
 		}
 		seen[k]++
-		pts[0][0], pts[0][1] = end(na, in.Nodes[a].Shape, e.SourcePort, pts[1])
 		last := len(pts) - 1
-		pts[last][0], pts[last][1] = end(nb, in.Nodes[b].Shape, e.TargetPort, pts[last-1])
+		if !clipped {
+			pts[0][0], pts[0][1] = end(na, in.Nodes[a].Shape, e.SourcePort, pts[1])
+			pts[last][0], pts[last][1] = end(nb, in.Nodes[b].Shape, e.TargetPort, pts[last-1])
+		}
 		label := l.label[i]
 		at := slices.Index(l.chains[i], label)
 		if l.flip[i] && at >= 0 {
@@ -729,6 +749,75 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 			ep.LabelX, ep.LabelY = (pts[m-1][0]+pts[m][0])/2, (pts[m-1][1]+pts[m][1])/2
 		}
 	}
+}
+
+// straight reports whether the edge i from the node a to the node b goes
+// straight from one node to the other: its chain has no point between its
+// ends, and it does not bend around the nodes of its rank.
+func (l *layout) straight(i, a, b int) bool {
+	return len(l.chains[i]) == 2 && (!l.flat[i] || absInt(l.vs[a].order-l.vs[b].order) <= 1)
+}
+
+// parallelGap is the space between two straight edges that join the same
+// two nodes.
+const parallelGap = 14
+
+// parallel returns the route of the edge k of n straight edges between the
+// nodes na and nb, of the shapes ka and kb: a line beside the line between
+// their centers, with its ends on their borders. The edges lie side by
+// side, n-1 gaps wide in all, around the line between the centers. back
+// says that the edge goes from the second node of its pair to the first,
+// so that the side of each edge does not hang on its direction. The gap
+// narrows so that each line starts inside both nodes.
+func parallel(na, nb NodePlace, ka, kb string, back bool, k, n int) [][2]float64 {
+	p, q := na, nb
+	if back {
+		p, q = nb, na
+	}
+	dx, dy := q.X-p.X, q.Y-p.Y
+	d := math.Hypot(dx, dy)
+	if d == 0 {
+		return [][2]float64{{na.X, na.Y}, {nb.X, nb.Y}}
+	}
+	// nx, ny is the unit normal of the line from p to q.
+	nx, ny := -dy/d, dx/d
+	// The half extent of a node across the line, which the lines stay
+	// inside, with some room to spare at each side.
+	across := func(m NodePlace) float64 {
+		return 0.8 / (math.Abs(nx)/(m.Width/2) + math.Abs(ny)/(m.Height/2))
+	}
+	gap := float64(parallelGap)
+	if half := float64(n-1) / 2 * gap; half > 0 {
+		gap *= math.Min(1, math.Min(across(na), across(nb))/half)
+	}
+	off := (float64(k) - float64(n-1)/2) * gap
+	ox, oy := nx*off, ny*off
+	a := [2]float64{na.X + ox, na.Y + oy}
+	b := [2]float64{nb.X + ox, nb.Y + oy}
+	return [][2]float64{border(na, ka, a, b), border(nb, kb, b, a)}
+}
+
+// border returns the point where the line from a point inside a node to a
+// point outside it meets the border of the node, as clip finds it from the
+// center.
+func border(n NodePlace, kind string, from, to [2]float64) [2]float64 {
+	inside := func(t float64) bool {
+		dx, dy := from[0]+t*(to[0]-from[0])-n.X, from[1]+t*(to[1]-from[1])-n.Y
+		// clip returns a point inside the node as it is, so it clips a
+		// point far out on the same ray.
+		bx, by := clip(n, kind, n.X+dx*1e6, n.Y+dy*1e6)
+		return math.Hypot(dx, dy) <= math.Hypot(bx-n.X, by-n.Y)
+	}
+	lo, hi := 0.0, 1.0
+	for range 40 {
+		mid := (lo + hi) / 2
+		if inside(mid) {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return [2]float64{from[0] + hi*(to[0]-from[0]), from[1] + hi*(to[1]-from[1])}
 }
 
 // loop routes an edge from a node to itself, on the side of the node

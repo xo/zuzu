@@ -1,0 +1,7 @@
+flowchart TD
+  start[Order in] --> pick@{ shape: choice, label: "In stock?" }
+  pick -->|yes| ship[Ship]
+  pick -->|no| wait[Back order]
+  ship --> join@{ shape: anchor }
+  wait --> join
+  join --> done[Done]

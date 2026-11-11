@@ -171,6 +171,11 @@ The layout follows dot in these steps:
    weight. `weight=0` counts as 1.
 4. A loop and its label take room at the side of their node, so that no
    other node or label covers them.
+5. Edges between the same two nodes spread apart. Straight edges from one
+   node to the next, in either direction, run side by side, 14 pixels
+   apart, each with ends of its own on the borders of the nodes. The gap
+   narrows to fit a small node. An edge that passes other ranks bends
+   away from the others at its middle.
 
 The flowcharts, the state, the class and the entity relationship diagrams
 of Mermaid use the same layout. Mermaid turns cycles around in the same
@@ -404,6 +409,8 @@ it, is an error, as in Mermaid.
 | a curve of links | `linkStyle default interpolate linear` |
 | an id of a link | `A e1@--> B`, `A e1@-- Text --> B` |
 | a class of a link | `class e1 hot`, after the link with the id `e1` |
+| a curve of a link, by its id | `e1@{ curve: linear }` |
+| a collapsed subgraph | `one@{ view: collapsed }` |
 | the text for a screen reader | `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` |
 
 The shapes of a node:
@@ -463,6 +470,8 @@ named shapes of Mermaid 12:
 | `bolt`, `com-link`, `lightning-bolt` | a lightning bolt of 35 by 70, with no text |
 | `cross-circ`, `summary`, `crossed-circle` | a circle of 40 with a cross in it, with no text |
 | `fr-circ`, `stop`, `framed-circle` | a ring of 14 with a dot in it, with no text |
+| `choice` | a diamond of 28 by 28, with no text |
+| `anchor` | a filled dot of 2, with no text |
 | `subprocess` | a subroutine |
 | `directory` | a folder |
 | `bpmn-activity` | a rounded rectangle |
@@ -523,9 +532,39 @@ and the edge stops where it meets the box. Mermaid picks that first node
 by its own order, so the layout around such a subgraph can differ from the
 layout of Mermaid.
 
-A class of a link sets its style as `linkStyle` does, and `linkStyle` goes
-over it. `accTitle` and `accDescr` join into the description of the Vega
-spec, as in a state diagram.
+A link without an id has the id that Mermaid gives it: `L_A_B_0` for the
+first link from `A` to `B`, then `L_A_B_2`, `L_A_B_3` and on. A link with
+the id of a link before it takes such an id too. The id of a link between
+two groups, as in `A & B e1@--> C & D`, names the link from the last node
+before it to the first node after it, `B` to `C`. `class` and the
+properties in `e1@{ ... }` name a link by its id, when no node has that
+id. A class of a link sets its style as `linkStyle` does, and `linkStyle`
+goes over it. `curve` sets the curve of the link, as `linkStyle` with
+`interpolate` does, and the later of the two wins. The curves are `basis`,
+`linear`, `cardinal`, `catmullRom`, `monotoneX`, `natural`, `step`,
+`stepAfter` and `stepBefore`. Another curve, such as `bumpY`, is an issue.
+mmdc 12.3.0 draws every link with round corners and does not read a
+curve, so the curves of zuzu follow the documentation of Mermaid.
+`accTitle` and `accDescr` join into the description of the Vega spec, as
+in a state diagram.
+
+`id@{ view: collapsed }` on the id of a subgraph draws the subgraph as one
+node, as Mermaid 12 does. The node is a rounded box with the title of the
+subgraph, and a dashed line and three dots under the title. The nodes and
+the subgraphs inside it do not draw. A link to a node inside it goes to
+the node, and a link between two nodes inside it does not draw. A
+collapsed subgraph inside a collapsed subgraph goes into the outer one.
+Another `view` draws the subgraph open, as in Mermaid. `view: collapsed`
+on the id of a node that is not a subgraph is an issue.
+
+A style reads `fill`, `stroke`, `stroke-width`, `color`,
+`stroke-dasharray`, `stroke-dashoffset`, `font-weight`, `font-size` and
+`font-style`. `font-style` is `normal` or `italic`, and `oblique` draws as
+`italic`. The scene has no offset of a dash, so `stroke-dashoffset` starts
+the dash of the line at the offset. If the offset falls in a gap, the dash
+starts at the next dash. Mermaid puts the style of a node on its shape of
+SVG, where `border` and `background` change nothing, so zuzu reads them
+and draws nothing for them.
 
 zuzu reads these settings of the section `flowchart` of the config:
 
@@ -557,13 +596,12 @@ Without `inheritDir`, a subgraph with no direction takes the direction of
 the subgraph that holds it, as the subgraphs above say. With
 `inheritDir: true`, it takes the direction of the flowchart, as in Mermaid.
 
-These parts are issues: `click`, a callback and `href`, the properties of
-a link such as `e1@{ animate: true }`, the
-layout `elk`, which draws with `zuzu.layered`, the look `handDrawn`, the
-`theme` and the `themeVariables` of Mermaid, which draw in the look of zuzu,
-the other settings of the section `flowchart`, such as `minNodeWidth`, and
-a style that is not `fill`, `stroke`, `stroke-width`, `color`,
-`stroke-dasharray`, `font-weight` or `font-size`.
+These parts are issues: `click`, a callback and `href`, the properties
+`animate` and `animation` of a link, the layout `elk`, which draws with
+`zuzu.layered`, the look `handDrawn`, the `theme` and the `themeVariables`
+of Mermaid, which draw in the look of zuzu, the other settings of the
+section `flowchart`, such as `minNodeWidth`, and any other style, such as
+`animation`.
 
 ### Icons and images
 
@@ -798,6 +836,19 @@ subgraph ends at its box. An entity that a subgraph names on a line of
 its own, or with its attributes, moves into the subgraph. `classDef`,
 `class`, `:::` and `style` read the same styles as a flowchart.
 `accTitle` and `accDescr` join into the description of the Vega spec.
+
+The name of an entity, the type, the name and the comment of an
+attribute, and the label of a relationship are markdown, as in Mermaid.
+Two stars or two underscores around a text make it bold, and one star or
+one underscore make it italic. An underscore inside a word, as in
+`first_name`, is text. zuzu draws the text without its marks. A line of
+an entity and a label draw in one font, so zuzu draws a text bold or
+italic only when all of its text is. `**string**` draws bold, and
+`*Customer Account*` italic. In `*first*Name`, only a part is italic, so
+it draws plain, and Mermaid draws `first` in italic. The name of an
+entity with attributes is bold, and markdown can make it italic too. A
+class or a style of an entity with no attributes wins over the font of
+its markdown.
 
 These parts are issues: `click`, the settings of the section `er` of the
 config, the layout `elk`, the look `handDrawn`, the `theme` and the

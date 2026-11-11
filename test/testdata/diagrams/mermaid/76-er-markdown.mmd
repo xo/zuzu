@@ -1,0 +1,12 @@
+erDiagram
+  person["*Person*"] {
+    string *first*Name
+    string **last_name**
+    int _age_ "in *years*"
+  }
+  account["**Account**"] {
+    **string** email
+  }
+  plain_table
+  person ||--o{ account : "__owns__"
+  account }o--|| plain_table : "*links*"

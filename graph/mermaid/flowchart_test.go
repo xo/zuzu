@@ -157,7 +157,9 @@ func TestNamedShapes(t *testing.T) {
   c@{ shape: braces }
   d@{ shape: fork, label: "hidden" }
   e@{ shape: hourglass }
-  f@{ shape: fr-circ }`
+  f@{ shape: fr-circ }
+  h@{ shape: choice, label: "hidden" }
+  i@{ shape: anchor }`
 	d, err := Read(src)
 	if err != nil {
 		t.Fatal(err)
@@ -173,9 +175,11 @@ func TestNamedShapes(t *testing.T) {
 	for _, n := range g.Nodes {
 		got = append(got, fmt.Sprintf("%s %s %q %vx%v", n.ID, n.Shape, n.Label, n.Width, n.Height))
 	}
-	// A fork, an hourglass and a framed circle draw no text, at the size
-	// of Mermaid. A fork across a flowchart LR stands up.
-	want := `a lined-document "Doc" 0x0|b comment "Note" 0x0|c braces "c" 0x0|d fork "" 10x70|e hourglass "" 30x30|f fr-circ "" 14x14`
+	// A fork, an hourglass, a framed circle, a choice and an anchor draw
+	// no text, at the size of Mermaid. A fork across a flowchart LR stands
+	// up.
+	want := `a lined-document "Doc" 0x0|b comment "Note" 0x0|c braces "c" 0x0|d fork "" 10x70|e hourglass "" 30x30|f fr-circ "" 14x14|` +
+		`h choice "" 28x28|i anchor "" 2x2`
 	if s := strings.Join(got, "|"); s != want {
 		t.Errorf("got  %s\nwant %s", s, want)
 	}
@@ -279,6 +283,150 @@ func TestSubgraphs(t *testing.T) {
 	}
 	if _, _, err := Graph(d, true); err != nil {
 		t.Errorf("expected no error in the strict mode, got %v", err)
+	}
+}
+
+func TestLinkProps(t *testing.T) {
+	t.Parallel()
+	src := `flowchart LR
+  A e1@--> B
+  A e2@--> C
+  A e3@--> D
+  e1@{ curve: linear }
+  e2@{ curve: natural }
+  linkStyle 1 interpolate step
+  e3@{ curve: bumpY, animate: true }
+  classDef dash stroke-dasharray: 9 5,stroke-dashoffset: 4
+  class e1 dash`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The id of a link is no node.
+	if len(g.Nodes) != 4 {
+		t.Errorf("expected 4 nodes, got %d", len(g.Nodes))
+	}
+	// A later curve wins, from a property or from a linkStyle.
+	var curves []string
+	for _, e := range g.Edges {
+		curves = append(curves, e.Curve)
+	}
+	if s := strings.Join(curves, ","); s != "linear,step," {
+		t.Errorf("expected the curves linear,step and none, got %s", s)
+	}
+	if st := g.Edges[0].Style; st["strokeDash"] != "9,5" || st["strokeDashOffset"] != "4" {
+		t.Errorf("expected the class on the link e1, got %v", st)
+	}
+	var issues []string
+	for _, i := range report {
+		issues = append(issues, i.Message)
+	}
+	if s := strings.Join(issues, "|"); s != "the property animate of a link|the curve bumpY" {
+		t.Errorf("unexpected issues %s", s)
+	}
+	// The id of a link in a group names the edge from the last node of
+	// the group before it to the first node after it. The other edges
+	// take the ids of Mermaid.
+	d, err = Read(`flowchart LR
+  A & B e1@--> C & D
+  A --> C
+  L_A_C_0@{ curve: linear }
+  L_A_C_2@{ curve: step }
+  e1@{ curve: natural }`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, _, err = Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	curves = nil
+	for _, e := range g.Edges {
+		curves = append(curves, e.Source+e.Target+":"+e.Curve)
+	}
+	if s := strings.Join(curves, ","); s != "AC:linear,AD:,BC:natural,BD:,AC:step" || len(g.Nodes) != 4 {
+		t.Errorf("unexpected curves %s, or nodes %d", s, len(g.Nodes))
+	}
+}
+
+func TestCollapsed(t *testing.T) {
+	t.Parallel()
+	src := `flowchart TD
+  Start --> inner
+  Start --> B
+  subgraph outer [Outer]
+    A --> B
+    subgraph inner [Inner]
+      C
+    end
+    B --> C
+  end
+  C --> End
+  B --> End
+  outer@{ view: collapsed }
+  inner@{ view: collapsed }
+  x@{ view: collapsed }`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nodes []string
+	for _, n := range g.Nodes {
+		nodes = append(nodes, fmt.Sprintf("%s %s %q", n.ID, n.Shape, n.Label))
+	}
+	if s := strings.Join(nodes, "|"); s != `Start rect "Start"|End rect "End"|outer collapsedGroup "Outer"|x rect "x"` {
+		t.Errorf("unexpected nodes %s", s)
+	}
+	if len(g.Clusters) != 0 {
+		t.Errorf("expected no clusters, got %d", len(g.Clusters))
+	}
+	// An edge into the collapsed subgraph goes to its node, and an edge
+	// inside it does not draw.
+	var edges []string
+	for _, e := range g.Edges {
+		edges = append(edges, e.Source+">"+e.Target)
+	}
+	if s := strings.Join(edges, ","); s != "Start>outer,Start>outer,outer>End,outer>End" {
+		t.Errorf("unexpected edges %s", s)
+	}
+	if len(report) != 1 || report[0].Message != "the view collapsed of x, which is not a subgraph" {
+		t.Errorf("unexpected report %v", report)
+	}
+}
+
+func TestStyles(t *testing.T) {
+	t.Parallel()
+	src := `flowchart LR
+  A --> B
+  style A font-style:italic,border:1px solid red,background:#bbb
+  style B font-style:oblique`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("expected no issues, got %v", report)
+	}
+	for _, n := range g.Nodes {
+		if n.Style["fontStyle"] != "italic" || n.Style["border"] != "" || n.Style["background"] != "" {
+			t.Errorf("node %s: unexpected style %v", n.ID, n.Style)
+		}
+	}
+	d, _ = Read("flowchart LR\nA\nstyle A font-style:wavy")
+	if _, _, err := Graph(d, true); err == nil {
+		t.Error("expected an error for the font-style wavy in the strict mode")
 	}
 }
 

@@ -56,17 +56,22 @@ type Cluster struct {
 var (
 	nodeRE = regexp.MustCompile(`<g class="[^"]*" id="my-svg-(?:flowchart|state)-([^"]+?)-\d+"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"`)
 	// A node with a link sits in an a element that holds its place.
-	linkedRE  = regexp.MustCompile(`<a [^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"><g class="[^"]*" id="my-svg-flowchart-([^"]+?)-\d+"`)
-	clusterRE = regexp.MustCompile(`<g class="cluster[^"]*" id="my-svg-([^"]+)"[^>]*><rect[^>]*x="([-\d.e]+)" y="([-\d.e]+)" width="([-\d.e]+)" height="([-\d.e]+)"`)
-	edgeRE    = regexp.MustCompile(`<path [^>]*data-id="(L_[^"]+)"[^>]*data-points="([^"]+)"`)
-	labelRE   = regexp.MustCompile(`<g class="label" data-id="([^"]+)"[^>]*>(.*?)</g>`)
-	textRE    = regexp.MustCompile(`<(?:p|span)[^>]*>([^<]*)</`)
-	tagRE     = regexp.MustCompile(`<br\s*/?>`)
+	linkedRE = regexp.MustCompile(`<a [^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"><g class="[^"]*" id="my-svg-flowchart-([^"]+?)-\d+"`)
+	// A collapsed subgraph is a node with the id of the subgraph.
+	collapsedRE = regexp.MustCompile(`<g class="node" id="my-svg-([^"]+)"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"><rect class="basic label-container collapsed-group"`)
+	clusterRE   = regexp.MustCompile(`<g class="cluster[^"]*" id="my-svg-([^"]+)"[^>]*><rect[^>]*x="([-\d.e]+)" y="([-\d.e]+)" width="([-\d.e]+)" height="([-\d.e]+)"`)
+	edgeRE      = regexp.MustCompile(`<path [^>]*data-id="(L_[^"]+)"[^>]*data-points="([^"]+)"`)
+	labelRE     = regexp.MustCompile(`<g class="label" data-id="([^"]+)"[^>]*>(.*?)</g>`)
+	textRE      = regexp.MustCompile(`<(?:p|span)[^>]*>([^<]*)</`)
+	tagRE       = regexp.MustCompile(`<br\s*/?>`)
+	// emRE matches the tags of bold and italic text inside a label.
+	emRE = regexp.MustCompile(`</?(?:em|strong)>`)
 )
 
 // text returns the text of the HTML of a label.
 func text(s string) string {
 	s = tagRE.ReplaceAllString(s, "\n")
+	s = emRE.ReplaceAllString(s, "")
 	var out []string
 	for _, m := range textRE.FindAllStringSubmatch(s, -1) {
 		if t := strings.TrimSpace(html.UnescapeString(m[1])); t != "" {
@@ -103,6 +108,15 @@ func main() {
 	for _, n := range ns {
 		ref.Nodes = append(ref.Nodes, n)
 		ids[n.ID] = true
+	}
+	for _, loc := range collapsedRE.FindAllStringSubmatchIndex(s, -1) {
+		sub := collapsedRE.FindStringSubmatch(s[loc[0]:loc[1]])
+		end := strings.Index(s[loc[1]:], ` id="my-svg-`)
+		if end < 0 {
+			end = len(s) - loc[1]
+		}
+		ref.Nodes = append(ref.Nodes, Node{ID: sub[1], Label: text(s[loc[1] : loc[1]+end]), X: num(sub[2]), Y: num(sub[3])})
+		ids[sub[1]] = true
 	}
 	for _, m := range linkedRE.FindAllStringSubmatch(s, -1) {
 		ref.Nodes = append(ref.Nodes, Node{ID: m[3], Label: m[3], X: num(m[1]), Y: num(m[2])})

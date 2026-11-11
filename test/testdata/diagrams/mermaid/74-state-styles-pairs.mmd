@@ -1,0 +1,16 @@
+stateDiagram-v2
+  classDef moving font-style:italic,border:1px solid red
+  classDef broken fill:#f00,color:white,font-weight:bold,background:#bbb
+  [*] --> Idle
+  state Active {
+    [*] --> Running
+    Running --> Paused
+    Paused --> Running
+    Running --> [*]
+  }
+  Idle --> Active
+  Active --> Idle
+  Active --> Broken
+  Broken --> [*]
+  class Active moving
+  class Broken broken

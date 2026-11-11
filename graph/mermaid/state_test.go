@@ -212,7 +212,7 @@ func TestStateIssues(t *testing.T) {
 		{"click a call cb()\na", "the interaction click"},
 		{`note "floating" as N1`, "a note that floats, with no state"},
 		{"state h <<history>>", "the kind of state history, drawn as a state"},
-		{"a\nclassDef x font-style:italic", "the style font-style"},
+		{"a\nclassDef x text-decoration:underline", "the style text-decoration"},
 		{"---\nconfig:\n  look: handDrawn\n---\nstateDiagram-v2\na", "the look handDrawn"},
 		{"---\nconfig:\n  theme: forest\n---\nstateDiagram-v2\na", "the theme of Mermaid, drawn in the look of zuzu"},
 		{"%%{init: {'state': {'nodeSpacing': 10}}}%%\nstateDiagram-v2\na", "the setting state.nodeSpacing"},

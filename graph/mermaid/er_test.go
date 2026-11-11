@@ -122,6 +122,50 @@ func TestERRelationships(t *testing.T) {
 	}
 }
 
+func TestERMarkdown(t *testing.T) {
+	t.Parallel()
+	g := classOf(t, `erDiagram
+  p["*Person*"] {
+    string *first*Name
+    **string** last_name
+    int _**age**_ "in *years*"
+  }
+  a["__Account__"]
+  b
+  style b font-style:normal
+  b["*Plain*"]
+  p ||--o{ a : "**owns**"`)
+	p := node(t, g, "p")
+	if f := p.Fields[0]; f.Text != "Person" || f.Fonts[0] != (graph.Font{Bold: true, Italic: true}) {
+		t.Errorf("expected the bold italic name Person, got %q %v", f.Text, f.Fonts)
+	}
+	rows := []struct {
+		cells []string
+		fonts []graph.Font
+	}{
+		// A part of a cell that is italic alone draws plain.
+		{[]string{"string", "firstName", "", ""}, nil},
+		{[]string{"string", "last_name", "", ""}, []graph.Font{{Bold: true}, {}, {}, {}}},
+		{[]string{"int", "age", "", "in years"}, []graph.Font{{}, {Bold: true, Italic: true}, {}, {}}},
+	}
+	for i, want := range rows {
+		f := p.Fields[i+1]
+		if !slices.Equal(f.Cells, want.cells) || !slices.Equal(f.Fonts, want.fonts) {
+			t.Errorf("row %d: expected %q %v, got %q %v", i, want.cells, want.fonts, f.Cells, f.Fonts)
+		}
+	}
+	if a := node(t, g, "a"); a.Label != "Account" || a.Style["fontWeight"] != graph.BoldWeight {
+		t.Errorf("expected the bold name Account, got %q %v", a.Label, a.Style)
+	}
+	// A style wins over the markdown.
+	if b := node(t, g, "b"); b.Label != "Plain" || b.Style["fontStyle"] != "normal" {
+		t.Errorf("expected the name Plain in the style normal, got %q %v", b.Label, b.Style)
+	}
+	if e := g.Edges[0]; e.Label != "owns" || e.Style["fontWeight"] != graph.BoldWeight {
+		t.Errorf("expected the bold label owns, got %q %v", e.Label, e.Style)
+	}
+}
+
 func TestERSubgraphsAndStyles(t *testing.T) {
 	t.Parallel()
 	g := classOf(t, `erDiagram

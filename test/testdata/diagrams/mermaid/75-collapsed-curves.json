@@ -1,0 +1,1 @@
+{"nodes":[{"id":"batch","label":"Batch jobs","x":247.5,"y":44.5},{"id":"sink","label":"Sink","x":407,"y":70.75},{"id":"src","label":"Source","x":88,"y":70.75}],"edges":[],"clusters":[]}

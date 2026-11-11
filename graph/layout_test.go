@@ -379,3 +379,51 @@ func TestLaySides(t *testing.T) {
 		t.Errorf("expected the arrowhead to point east, got %v", l.Edges[0].EndAngle)
 	}
 }
+
+func TestLayParallel(t *testing.T) {
+	t.Parallel()
+	// Two edges in opposite directions between two nodes, and two in the
+	// same direction, run side by side, with ends of their own on the
+	// borders of the nodes.
+	for _, dir := range []string{TB, LR} {
+		for _, back := range []bool{true, false} {
+			in := LayoutInput{
+				Direction: dir,
+				Nodes:     []LayoutNode{{ID: "a", Width: 60, Height: 30}, {ID: "b", Width: 60, Height: 30}},
+				Edges:     []LayoutEdge{{Source: "a", Target: "b"}, {Source: "b", Target: "a"}},
+			}
+			if !back {
+				in.Edges[1] = LayoutEdge{Source: "a", Target: "b"}
+			}
+			l, err := Lay(in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p, q := l.Edges[0].Points, l.Edges[1].Points
+			if len(p) != 2 || len(q) != 2 {
+				t.Fatalf("%s: expected two straight edges, got %v and %v", dir, p, q)
+			}
+			// The ends at each node are a gap apart.
+			ends := [2][2][2]float64{{p[0], p[1]}, {q[0], q[1]}}
+			if back {
+				ends[1] = [2][2]float64{q[1], q[0]}
+			}
+			for k := range 2 {
+				if d := math.Hypot(ends[0][k][0]-ends[1][k][0], ends[0][k][1]-ends[1][k][1]); math.Abs(d-parallelGap) > 0.01 {
+					t.Errorf("%s, back %v: the ends at node %d are %v apart, expected %v", dir, back, k, d, parallelGap)
+				}
+			}
+			// Each end is on the border of its node.
+			for i := range 2 {
+				for k := range 2 {
+					end, n := ends[i][k], l.Nodes[k]
+					onX := math.Abs(math.Abs(end[0]-n.X)-n.Width/2) < 0.01
+					onY := math.Abs(math.Abs(end[1]-n.Y)-n.Height/2) < 0.01
+					if !onX && !onY {
+						t.Errorf("%s, back %v: the end %v of edge %d is not on the border of %v", dir, back, end, i, n)
+					}
+				}
+			}
+		}
+	}
+}

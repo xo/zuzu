@@ -25,7 +25,7 @@ var shapes = map[string]string{
 	"circle": "circle", "circ": "circle", "sm-circ": "circle", "small-circle": "circle", "start": "circle",
 	"doublecircle": "doublecircle", "dbl-circ": "doublecircle", "double-circle": "doublecircle",
 	"ellipse": "ellipse", "oval": "ellipse",
-	"diamond": "diamond", "diam": "diamond", "decision": "diamond", "rhombus": "diamond", "question": "diamond",
+	"diamond": "diamond", "diam": "diamond", "decision": "diamond", "rhombus": "diamond", "question": "diamond", "choice": "diamond",
 	"hexagon": "hexagon", "hex": "hexagon", "prepare": "hexagon",
 	"lean-r": "lean-r", "lean-right": "lean-r", "parallelogram": "lean-r", "in-out": "lean-r",
 	"lean-l": "lean-l", "lean-left": "lean-l", "out-in": "lean-l",
@@ -36,7 +36,7 @@ var shapes = map[string]string{
 	"invtriangle": "invtriangle", "flip-tri": "invtriangle", "flipped-triangle": "invtriangle", "manual-file": "invtriangle",
 	"octagon": "octagon", "pentagon": "pentagon", "house": "house", "invhouse": "invhouse",
 	"note": "note", "doc": "doc", "document": "doc", "folder": "folder", "tab": "folder", "directory": "folder",
-	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point",
+	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point", "anchor": "point",
 	"bullseye": "bullseye", "bar": "bar",
 	"plaintext": "none", "plain": "none", "none": "none", "text": "none", "underline": "none",
 	// The shapes of DOT with lines across their corners.
@@ -68,6 +68,7 @@ var shapes = map[string]string{
 	"bolt": "bolt", "com-link": "bolt", "lightning-bolt": "bolt",
 	"cross-circ": "cross-circ", "summary": "cross-circ", "crossed-circle": "cross-circ",
 	"fr-circ": "fr-circ", "stop": "fr-circ", "framed-circle": "fr-circ",
+	collapsedGroup: collapsedGroup,
 }
 
 // ShapeOf returns the shape that draws a name of a shape, and false for a

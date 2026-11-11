@@ -1,0 +1,17 @@
+flowchart LR
+  src[Source] e1@--> batch
+  subgraph batch [Batch jobs]
+    load[Load] --> clean[Clean]
+    subgraph inner [Checks]
+      check[Check]
+    end
+    clean --> check
+  end
+  batch e2@--> sink[Sink]
+  src e3@--> sink
+  batch@{ view: collapsed }
+  e2@{ curve: linear }
+  e3@{ curve: step }
+  classDef dash stroke-dasharray: 9 5,stroke-dashoffset: 4,font-style:italic
+  class e3 dash
+  class sink dash

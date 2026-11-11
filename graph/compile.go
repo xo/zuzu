@@ -4,6 +4,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,7 +35,7 @@ const (
 var paintKeys = []string{"fill", "fillOpacity", "stroke", "strokeWidth", "strokeDash"}
 
 // textKeys are the keys of a style of a label.
-var textKeys = []string{"textColor", "fontSize", "fontWeight"}
+var textKeys = []string{"textColor", "fontSize", "fontWeight", "fontStyle"}
 
 // TextSignature writes the keys of the style of a label that a row sets
 // into its field _text, and returns them. The transform zuzu.layered calls
@@ -103,7 +104,7 @@ func style(r map[string]any, st map[string]string) {
 	}
 	for k, v := range st {
 		switch k {
-		case "fill", "stroke", "color", "fontWeight":
+		case "fill", "stroke", "color", "fontWeight", "fontStyle":
 			if k == "color" {
 				k = "textColor"
 			}
@@ -126,6 +127,12 @@ func style(r map[string]any, st map[string]string) {
 			}
 		}
 	}
+	if dash, ok := r["strokeDash"].([]any); ok && st["strokeDashOffset"] != "" {
+		var off float64
+		if _, err := fmt.Sscan(st["strokeDashOffset"], &off); err == nil {
+			r["strokeDash"] = shiftDash(dash, off)
+		}
+	}
 	// A fill of two colors draws as a gradient.
 	if list := st["gradient"]; list != "" {
 		angle, _ := strconv.ParseFloat(st["gradientAngle"], 64)
@@ -133,6 +140,58 @@ func style(r map[string]any, st map[string]string) {
 			r["fill"] = g
 		}
 	}
+}
+
+// shiftDash returns a dash that starts off along a dash, as the offset of
+// a dash of SVG does, since the scene has no offset of a dash. When the
+// offset falls in a dash, the dash starts with the rest of that dash and
+// ends with its first part and a gap of 0, so that the two parts join.
+// When it falls in a gap, the dash starts at the next dash, since a dash
+// of 0 draws a dot with round ends: the dashes come up to a gap early.
+func shiftDash(dash []any, off float64) []any {
+	var d []float64
+	for _, v := range dash {
+		f, _ := v.(float64)
+		d = append(d, f)
+	}
+	if len(d)%2 == 1 {
+		// SVG repeats a dash of an odd length to make it even.
+		d = append(d, d...)
+	}
+	var period float64
+	for _, v := range d {
+		period += v
+	}
+	if !(period > 0) {
+		return dash
+	}
+	off = math.Mod(off, period)
+	if off < 0 {
+		off += period
+	}
+	if off == 0 {
+		return dash
+	}
+	// Find the dash or the gap where the offset falls.
+	i := 0
+	for ; i < len(d)-1 && off >= d[i]; i++ {
+		off -= d[i]
+	}
+	var out []float64
+	if i%2 == 0 {
+		out = append(out, d[i]-off)
+		out = append(out, d[i+1:]...)
+		out = append(out, d[:i]...)
+		out = append(out, off, 0)
+	} else {
+		out = append(out, d[i+1:]...)
+		out = append(out, d[:i+1]...)
+	}
+	res := make([]any, 0, len(out))
+	for _, v := range out {
+		res = append(res, v)
+	}
+	return res
 }
 
 // Compile writes a graph as a Vega spec that draws it with the transform
@@ -200,14 +259,20 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		text := signature(r, textKeys, "_text")
 		add("nodeText", text)
 		if len(n.Fields) > 0 {
-			// A bold line of a field has a weight of its own, and a line
-			// under a line of text takes the color of the text.
+			// A bold line of a field has a weight of its own, an italic
+			// line a style of its own, and a line under a line of text
+			// takes the color of the text.
 			add("fieldText", text)
 			for _, f := range n.Fields {
 				for _, ft := range f.Fonts {
-					if ft.Bold {
+					if ft.Bold || ft.Italic {
 						c := maps.Clone(r)
-						c["fontWeight"] = BoldWeight
+						if ft.Bold {
+							c["fontWeight"] = BoldWeight
+						}
+						if ft.Italic {
+							c["fontStyle"] = "italic"
+						}
 						add("fieldText", signature(c, textKeys, "_text"))
 					}
 					if ft.Underline {

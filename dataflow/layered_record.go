@@ -15,7 +15,8 @@ type record struct {
 	across, stack bool
 	texts, ports  []string
 	// cells holds the cells of each field, aligns its alignment, and fonts
-	// the font of each line of its text, as b, i and u.
+	// the font of each line of its text, or of each of its cells, as b, i
+	// and u.
 	cells  [][]string
 	aligns []string
 	fonts  [][]string
@@ -77,7 +78,8 @@ func (rec *record) oneByOne(j int) bool {
 	return len(rec.fonts[j]) > 0 || rec.aligns[j] == "l"
 }
 
-// font returns the code of the font of the line k of the field j.
+// font returns the code of the font of the line or the cell k of the
+// field j.
 func (rec *record) font(j, k int) string {
 	if k < len(rec.fonts[j]) {
 		return rec.fonts[j][k]
@@ -105,6 +107,7 @@ func (rec *record) size(measure measureFunc, padding float64) (float64, float64)
 			// into one text.
 			if len(cs) > 0 && rec.texts[j] == "" {
 				rec.texts[j] = strings.Join(cs, " ")
+				rec.fonts[j] = nil
 			}
 			rec.cells[j] = nil
 			continue
@@ -113,7 +116,7 @@ func (rec *record) size(measure measureFunc, padding float64) (float64, float64)
 			for len(rec.cols) <= k {
 				rec.cols = append(rec.cols, 0)
 			}
-			if tw, _ := measure(c, ""); tw > 0 {
+			if tw, _ := measure(c, weight(rec.font(j, k))); tw > 0 {
 				rec.cols[k] = math.Max(rec.cols[k], tw+2*padding)
 			}
 		}
@@ -128,8 +131,8 @@ func (rec *record) size(measure measureFunc, padding float64) (float64, float64)
 		switch {
 		case len(rec.cells[j]) > 0:
 			tw = table - 2*padding
-			for _, c := range rec.cells[j] {
-				_, ch := measure(c, "")
+			for k, c := range rec.cells[j] {
+				_, ch := measure(c, weight(rec.font(j, k)))
 				th = math.Max(th, ch)
 			}
 		case rec.oneByOne(j):
@@ -203,7 +206,7 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 		f := clone(r)
 		f["kind"] = "field"
 		f["x"], f["y"], f["lines"], f["align"] = x, y, lines, align
-		f["fontStyle"] = "normal"
+		// A line takes the style of the font of its node, or italic.
 		if strings.Contains(code, "i") {
 			f["fontStyle"] = "italic"
 		}
@@ -242,7 +245,7 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 					xs = append(xs, x-np.X)
 				}
 				if c != "" {
-					out = append(out, text(x+padding, cy, split(c), "left", ""))
+					out = append(out, text(x+padding, cy, split(c), "left", rec.font(j, k)))
 				}
 				x += rec.cols[k]
 			}
