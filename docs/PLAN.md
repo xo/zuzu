@@ -1092,3 +1092,9 @@ stays true.
 
 16. Answered on 2026-11-11 by D31: the design of the diagrams of DOT and
     Mermaid and of the transform `zuzu.layered` is accepted.
+17. In which order does zuzu add the kinds of Mermaid that it does not draw
+    yet? On 2026-11-11 zuzu draws the flowchart, the sequence, state, class
+    and ER diagrams, the mindmap, the architecture diagram and the charts
+    of D31. The kinds that programs give it next are gitGraph, timeline,
+    C4, block and requirement diagrams. D31 keeps the order of the survey
+    until the maintainers answer.

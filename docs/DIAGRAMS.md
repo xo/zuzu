@@ -856,9 +856,10 @@ tune fcose, such as `numIter` and `seed`, are issues.
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
-relationship diagram, and the charts above. Every other kind of Mermaid is
-an error that wraps `mermaid.ErrKind`. D31 names the order of the next
-kinds.
+relationship diagram, and the charts above, which hold the sequence
+diagram, the mindmap and the architecture diagram. Every other kind of
+Mermaid is an error that wraps `mermaid.ErrKind`. The order of the next
+kinds is open question 17 of `docs/PLAN.md`.
 
 ## The look
 

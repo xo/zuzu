@@ -279,6 +279,15 @@ the ER diagrams, which the most programs draw, then the rest. The state,
 the class and the ER diagrams lay out with `zuzu.layered`, and a node of a
 class or of an entity is a table of fields, as a record of DOT is.
 
+On 2026-11-11 the maintainers added six kinds. The state, the class and
+the ER diagrams read into a graph and lay out with `zuzu.layered`. A class
+and an entity are records whose fields stack, with a line between the
+parts of a class. The sequence diagram, the mindmap and the architecture
+diagram are charts: each lays out in Go and compiles to Vega. A mindmap
+puts its root in the center and a tidy tree on each side, and an
+architecture diagram puts its services on a grid by the sides of its
+edges. The order of the rest of the kinds is still open.
+
 ## The look
 
 A node is a rounded rectangle with a tint of its color and an outline of

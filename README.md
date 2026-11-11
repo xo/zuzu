@@ -54,8 +54,9 @@ sankeys, chord diagrams, hex bins and trading days. Phase 6 added
 `raster`, which draws a chart with okage directly, without SVG, and
 `Chart.Image`. Phase 7 added the diagrams of DOT and Mermaid: a layered
 layout of graphs, the flowchart and nine charts of Mermaid, and icons, with
-four packs bundled. [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what zuzu
-reads.
+four packs bundled. Since then zuzu also draws the sequence, state, class
+and ER diagrams, the mindmap and the architecture diagram of Mermaid.
+[`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what zuzu reads.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.
 
