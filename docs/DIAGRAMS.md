@@ -217,8 +217,7 @@ such a subgraph on its own, and then places it as one node in the layout
 that holds it. A subgraph inside it without a direction lays out in the
 same direction. If an edge links a node inside the subgraph to a node outside
 it, the subgraph follows the direction of the layout that holds it.
-Mermaid does the same, and the report says so when the two directions
-differ.
+Mermaid does the same, so this is not an issue.
 
 An edge to the id of a subgraph ends at the box of the subgraph, as in
 Mermaid. If no edge links a node inside the subgraph to a node outside it,

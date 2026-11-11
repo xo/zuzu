@@ -778,28 +778,9 @@ func (f *flowchart) subgraphEdges() error {
 	return nil
 }
 
-// directions reports each subgraph whose direction the layout does not
-// keep, because an edge links a node inside it to a node outside it.
-// Mermaid draws such a subgraph in the direction that holds it too.
-func (f *flowchart) directions() error {
-	followed := graph.FollowedDirections(f.g)
-	for _, c := range f.g.Clusters {
-		if d, ok := followed[c.ID]; ok {
-			msg := "the direction %s of the subgraph %q, drawn %s as Mermaid draws it, because an edge links a node inside it to a node outside it"
-			if err := f.issues.Add("subgraph "+c.ID, msg, c.Direction, c.Label, d); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // finish applies the classes and the styles, and the styles of the links.
 func (f *flowchart) finish() error {
 	if err := f.subgraphEdges(); err != nil {
-		return err
-	}
-	if err := f.directions(); err != nil {
 		return err
 	}
 	for _, n := range f.g.Nodes {

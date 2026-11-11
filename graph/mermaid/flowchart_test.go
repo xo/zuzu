@@ -209,12 +209,13 @@ func TestSubgraphs(t *testing.T) {
 	if e := g.Edges[2]; e.Source != "x" || e.Target != "kept" {
 		t.Errorf("expected an edge from x to the subgraph kept, got %s to %s", e.Source, e.Target)
 	}
-	// Only the direction that an edge crosses is in the report.
-	if len(report) != 1 || !strings.Contains(report[0].Message, `"Lost"`) || report[0].Path != "subgraph lost" {
-		t.Errorf("expected one entry for the subgraph lost, got %v", report)
+	// A direction that an edge crosses draws as Mermaid draws it, so it
+	// is not in the report.
+	if len(report) != 0 {
+		t.Errorf("expected an empty report, got %v", report)
 	}
-	if _, _, err := Graph(d, true); err == nil {
-		t.Error("expected an error in the strict mode")
+	if _, _, err := Graph(d, true); err != nil {
+		t.Errorf("expected no error in the strict mode, got %v", err)
 	}
 }
 
