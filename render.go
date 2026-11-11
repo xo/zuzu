@@ -121,7 +121,11 @@ func (rt *runtime) render() (*scene.Scene, error) {
 	if c, ok := bg.(string); ok && c != "" {
 		sc.Background = scene.Paint{Color: c}
 	} else if bg == nil || expr.IsUndefined(bg) {
+		// The background of the config of the spec goes over the theme.
 		sc.Background = scene.Paint{Color: rt.theme.Background}
+		if c, ok := rt.config["background"].(string); ok && c != "" {
+			sc.Background = scene.Paint{Color: c}
+		}
 	}
 	return sc, nil
 }

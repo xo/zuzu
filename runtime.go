@@ -39,6 +39,10 @@ type runtime struct {
 	locale    *format.Locale
 	rand      *rand.Rand
 	theme     theme.Theme
+	// endLabels holds, for each scale of color, the names of the series
+	// that the ends of lines name, so that a legend of that scale can be
+	// left out.
+	endLabels map[string]map[string]bool
 	// fitW and fitH are the size of the plot area that the autosize fit
 	// asks for, or 0, which NewView renders again with.
 	fitW, fitH float64
@@ -79,6 +83,7 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
 	}
 	rt.theme = theme.New(o.mode, o.scheme)
 	rt.config = rt.theme.Config()
+	rt.endLabels = map[string]map[string]bool{}
 	for k, raw := range c.spec.Config {
 		var v any
 		if err := json.Unmarshal(raw, &v); err == nil {

@@ -212,9 +212,10 @@ func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Res
 }
 
 // guide reports whether a role belongs to a guide: an axis, a legend or a
-// title.
+// title, or to a mark that zuzu adds for its look, such as the line on top
+// of an area (D12), whose role starts with zuzu-.
 func guide(role string) bool {
-	for _, p := range []string{"axis", "legend", "title"} {
+	for _, p := range []string{"axis", "legend", "title", "zuzu-"} {
 		if strings.HasPrefix(role, p) {
 			return true
 		}

@@ -519,6 +519,13 @@ func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
 	r := d.Range
 	t := s.rt.theme
 	switch {
+	case r.Name != "" && r.Name != "width" && r.Name != "height":
+		if vals, ok := s.namedRange(r.Name, typ, len(o.Domain)); ok {
+			// The range of the config of the spec goes over the theme.
+			o.Range = vals
+			return nil
+		}
+		fallthrough
 	case r.Name != "":
 		switch r.Name {
 		case "width":

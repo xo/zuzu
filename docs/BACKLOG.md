@@ -25,30 +25,18 @@ name to it.
    `cardinal-closed`, `catmull-rom-open` and `catmull-rom-closed` return an
    error.
 
-### Make the rest of the Vega config of a theme
-
-D14 says that a theme becomes one Vega config. `theme.Theme.Config` gives
-the defaults of the marks, and the runtime applies it with the config of
-the spec over it, as Vega applies its config. The runtime still reads the
-other colors of `theme.Theme` directly: the guides, the background, and the
-ranges `category`, `ordinal`, `ramp`, `heatmap` and `diverging`, so the
-`axis`, `legend`, `title`, `background` and `range` of the config of a spec
-do not change them yet. A scheme that a spec names, such as `blues`, takes a
-ramp of the theme, and a scheme of categories, such as `tableau10`, takes
-the colors of the categories of the theme.
-
 ## Phase 3
 
 ### Draw the rest of the marks in the look of zuzu
 
-The config of the theme gives the colors of a mark with no color of its
-own, a line of 2 with round ends, the gap and the round corners of an arc,
-a filled point with a ring, and the round end of a bar, only on the last
-bar of a stack. These rules of `docs/STYLE.md` are not done: the gradient
-under an area, the gap between the segments of a stacked bar, the look of a
-box plot, the order of bubbles, a monotone line, and the annotations. A
-Vega-Lite spec that vega-lite.js compiled, as the gallery draws it with
-`-vl=false`, still names `#4c78a8`.
+These rules of `docs/STYLE.md` draw only in the targets, and the runtime
+does not apply them yet: the tint and the name of a group of a hierarchy,
+the total in the center of a donut, the opacity of the link of a sankey,
+and the node of a graph. A tooltip comes with the browser, in phase 8. A
+scheme that a spec names, such as `blues`, takes a ramp of the theme, and a
+scheme of categories, such as `tableau10`, takes the colors of the
+categories of the theme. A Vega-Lite spec that vega-lite.js compiled, as
+the gallery draws it with `-vl=false`, still names `#4c78a8`.
 
 ### Make the grid layout follow the layout of Vega
 

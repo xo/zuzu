@@ -22,6 +22,39 @@ const (
 	// is a rule of the look of zuzu that Vega has no config for, and 0
 	// turns it off (D14).
 	CornerRadiusEnd = "zuzu.cornerRadiusEnd"
+	// LargestFirst is the property of the config of a symbol that draws the
+	// largest first, when the symbols have sizes, so that the small ones
+	// stay on top.
+	LargestFirst = "zuzu.largestFirst"
+	// EndLabel is the property of the config of a line that names its
+	// series at its last point, with a dot.
+	EndLabel = "zuzu.endLabel"
+	// MarkHigh is the property of a style of an area that marks its highest
+	// point with its value.
+	MarkHigh = "zuzu.markHigh"
+	// Reference is the property of a style of a rule that dashes it and
+	// names its value where it starts.
+	Reference = "zuzu.reference"
+	// StyleReference is the style of a rule of Vega-Lite across the whole
+	// plot, a reference line.
+	StyleReference = "zuzu.reference"
+	// StackGap is the property of a style of a bar that opens a gap of that
+	// width between the bars of a stack.
+	StackGap = "zuzu.stackGap"
+	// StyleArea is the style of an area that stacks on no other, which
+	// draws its color as a gradient with a line on top.
+	StyleArea = "zuzu.area"
+	// StyleAreaStacked is the style of the layer of a stacked area.
+	StyleAreaStacked = "zuzu.area.stacked"
+	// StyleCurve is the style of a line or an area along x, which draws as
+	// a monotone curve.
+	StyleCurve = "zuzu.curve"
+	// Gradient is the property of a style of an area that fills it from an
+	// opacity at its line to an opacity at its base.
+	Gradient = "zuzu.gradient"
+	// TopLine is the property of a style of an area that draws a line of
+	// that width along its top.
+	TopLine = "zuzu.topLine"
 )
 
 // Config returns the theme as a Vega config (D14): the defaults of each
@@ -35,14 +68,14 @@ func (t Theme) Config() map[string]any {
 		"arc":  map[string]any{"fill": c, "padAngle": 0.01, "cornerRadius": 4},
 		"area": map[string]any{"fill": c},
 		"line": map[string]any{
-			"stroke": c, "strokeWidth": 2.0, "strokeCap": "round", "strokeJoin": "round",
+			"stroke": c, "strokeWidth": 2.0, "strokeCap": "round", "strokeJoin": "round", EndLabel: true,
 		},
 		"path":  map[string]any{"stroke": c},
 		"rect":  map[string]any{"fill": c},
 		"rule":  map[string]any{"stroke": t.Text},
 		"shape": map[string]any{"stroke": c},
 		// A point has a ring of 1 in the background color.
-		"symbol": map[string]any{"fill": c, "size": 64.0, "stroke": t.Background, "strokeWidth": 1.0},
+		"symbol": map[string]any{"fill": c, "size": 64.0, "stroke": t.Background, "strokeWidth": 1.0, LargestFirst: true},
 		"text":   map[string]any{"fill": t.Text},
 		"trail":  map[string]any{"fill": c, "size": 2.0},
 		"style": map[string]any{
@@ -50,8 +83,14 @@ func (t Theme) Config() map[string]any {
 			StyleStroke:             map[string]any{"stroke": c},
 			StyleText:               map[string]any{"fill": t.Text},
 			StylePoint:              map[string]any{"stroke": t.Background, "strokeWidth": 1.0},
-			StyleBar + "vertical":   map[string]any{CornerRadiusEnd: 3.0},
-			StyleBar + "horizontal": map[string]any{CornerRadiusEnd: 3.0},
+			StyleBar + "vertical":   map[string]any{CornerRadiusEnd: 3.0, StackGap: 1.5},
+			StyleBar + "horizontal": map[string]any{CornerRadiusEnd: 3.0, StackGap: 1.5},
+			StyleArea:               map[string]any{Gradient: []any{0.32, 0.02}, TopLine: 2.0, MarkHigh: true},
+			StyleReference:          map[string]any{Reference: true},
+			// The layers of a stacked area are full colors, with a line of
+			// the background between them.
+			StyleAreaStacked: map[string]any{"fillOpacity": 0.88, "stroke": t.Background, "strokeWidth": 1.0},
+			StyleCurve:       map[string]any{"interpolate": "monotone"},
 		},
 	}
 }

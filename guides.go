@@ -74,11 +74,15 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 		return nil, err
 	}
 	w, h := s.size()
+	cfg := s.rt.axisConfig(orient, sc)
 	ax := &layout.Axis{Orient: orient, Scale: sc, Length: w, Cross: h}
 	if orient == "left" || orient == "right" {
 		ax.Length, ax.Cross = h, w
 	}
 	ax.Grid = a.Grid != nil && *a.Grid
+	if g, ok := cfg["grid"].(bool); ok && a.Grid == nil {
+		ax.Grid = g
+	}
 	if ax.Labels, err = s.boolean(a.Labels, true); err != nil {
 		return nil, err
 	}
@@ -104,7 +108,7 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 			ax.Values = l
 		}
 	}
-	if ax.LabelAngle, err = s.num(a.LabelAngle, 0); err != nil {
+	if ax.LabelAngle, err = s.num(a.LabelAngle, configNum(cfg, "labelAngle", 0)); err != nil {
 		return nil, err
 	}
 	if ax.Offset, err = s.num(a.Offset, 0); err != nil {
@@ -129,10 +133,12 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 	// labelFlush is true for a distance of 1, or a distance, and none by
 	// default, as in Vega.
 	ax.LabelFlush = -1
-	if !a.LabelFlush.IsZero() {
-		v, err := s.value(a.LabelFlush)
-		if err != nil {
-			return nil, err
+	if flush, ok := cfg["labelFlush"]; ok || !a.LabelFlush.IsZero() {
+		v := flush
+		if !a.LabelFlush.IsZero() {
+			if v, err = s.value(a.LabelFlush); err != nil {
+				return nil, err
+			}
 		}
 		switch f := v.(type) {
 		case bool:
@@ -144,13 +150,15 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 		}
 	}
 	// The labels draw at most 180 wide by default, as in Vega.
-	if ax.LabelLimit, err = s.num(a.LabelLimit, 180); err != nil {
+	if ax.LabelLimit, err = s.num(a.LabelLimit, configNum(cfg, "labelLimit", 180)); err != nil {
 		return nil, err
 	}
 	if ax.Format, err = s.labelFormat(sc, a.Format, a.FormatType, ax); err != nil {
 		return nil, err
 	}
 	m := s.rt.style().Axis(ax)
+	// The config and the axis style its parts, over the look of zuzu.
+	styleGuide(&m, s.guideProps(cfg, a.Extra), axisParts)
 	if a.ZIndex != nil {
 		m.ZIndex = *a.ZIndex
 	}
@@ -348,6 +356,11 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 	if main == nil {
 		return nil, nil
 	}
+	if s.namedOnChart(l, lg) {
+		// The ends of the lines name each series, so the legend says
+		// nothing more (docs/STYLE.md).
+		return nil, nil
+	}
 	if lg.Title, err = s.titleText(l.Title); err != nil {
 		return nil, err
 	}
@@ -360,7 +373,7 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 			lg.Values = list
 		}
 	}
-	symbol, err := s.str(l.SymbolType, "")
+	symbol, err := s.str(l.SymbolType, configStr(s.rt.configObject("legend"), "symbolType", ""))
 	if err != nil {
 		return nil, err
 	}
@@ -371,17 +384,18 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 		color = lg.Stroke
 	}
 	lg.Gradient = typ == "gradient" || (typ == "" && color != nil && !scale.Discrete(color.Type()) && scale.Thresholds(color) == nil && lg.Size == nil)
-	if lg.GradientLength, err = s.num(l.GradientLength, 0); err != nil {
+	if lg.GradientLength, err = s.num(l.GradientLength, configNum(s.rt.configObject("legend"), "gradientLength", 0)); err != nil {
 		return nil, err
 	}
 	if lg.Format, err = s.labelFormat(main, l.Format, l.FormatType, nil); err != nil {
 		return nil, err
 	}
+	cfg := s.rt.configObject("legend")
 	place := legendPlace{}
-	if place.orient, err = s.str(l.Orient, ""); err != nil {
+	if place.orient, err = s.str(l.Orient, configStr(cfg, "orient", "")); err != nil {
 		return nil, err
 	}
-	if place.offset, err = s.num(l.Offset, guideGap); err != nil {
+	if place.offset, err = s.num(l.Offset, configNum(cfg, "offset", guideGap)); err != nil {
 		return nil, err
 	}
 	if place.x, err = s.num(l.LegendX, 0); err != nil {
@@ -396,10 +410,10 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 	if place.orient == "" || place.orient == "top" || place.orient == "bottom" {
 		dir = "horizontal"
 	}
-	if lg.Direction, err = s.str(l.Direction, dir); err != nil {
+	if lg.Direction, err = s.str(l.Direction, configStr(cfg, "direction", dir)); err != nil {
 		return nil, err
 	}
-	columns, err := s.num(l.Columns, 0)
+	columns, err := s.num(l.Columns, configNum(cfg, "columns", 0))
 	if err != nil {
 		return nil, err
 	}
@@ -409,6 +423,7 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 		lg.Width = w
 	}
 	m := s.rt.style().Legend(lg)
+	styleGuide(&m, s.guideProps(cfg, l.Extra), legendStyleParts)
 	if err := s.legendEncode(&m, l.Encode); err != nil {
 		return nil, err
 	}
@@ -552,6 +567,17 @@ func (s *scope) buildTitle(_ string, drawn []scene.Mark) ([]scene.Mark, error) {
 	m := s.rt.style().Title(lt)
 	if kind == "title" && s.parent == nil {
 		m.Name = "title"
+		props := s.guideProps(s.rt.configObject("title"), t.Extra)
+		for k, v := range map[string]vega.Value{"color": t.Color, "font": t.Font, "fontSize": t.FontSize} {
+			if !v.IsZero() {
+				x, err := s.value(v)
+				if err != nil {
+					return nil, err
+				}
+				props[k] = x
+			}
+		}
+		styleGuide(&m, props, titleParts)
 	}
 	return []scene.Mark{m}, nil
 }
@@ -724,4 +750,39 @@ func (s *scope) placeGuides(marks []scene.Mark) {
 		}
 		m.Items[0].Y = top - guideGap/2 - b.Y2
 	}
+}
+
+// configNum returns a number of the config of a guide, or def.
+func configNum(cfg map[string]any, key string, def float64) float64 {
+	if f, ok := cfg[key].(float64); ok {
+		return f
+	}
+	return def
+}
+
+// configStr returns a string of the config of a guide, or def.
+func configStr(cfg map[string]any, key, def string) string {
+	if v, ok := cfg[key].(string); ok {
+		return v
+	}
+	return def
+}
+
+// namedOnChart reports whether a legend of the stroke alone has each of its
+// values named at the end of a line.
+func (s *scope) namedOnChart(l *vega.Legend, lg *layout.Legend) bool {
+	if lg.Stroke == nil || lg.Fill != nil || lg.Shape != nil || lg.Size != nil || !l.Values.IsZero() {
+		return false
+	}
+	named := s.rt.endLabels[l.Stroke]
+	dom := lg.Stroke.Domain()
+	if len(named) == 0 || len(dom) == 0 {
+		return false
+	}
+	for _, v := range dom {
+		if !named[expr.String(v)] {
+			return false
+		}
+	}
+	return true
 }

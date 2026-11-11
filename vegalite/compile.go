@@ -161,19 +161,32 @@ func readConfig(raw []byte) *config {
 	return cfg
 }
 
-// styleConfig returns the styles of the config of a spec as a Vega config,
-// which the runtime applies to the marks that name them, as vega-lite.js
-// passes them on. It returns nil for a config with no styles.
+// passedConfig are the parts of the config of a spec that the Vega config
+// holds with the same names and meaning: the styles of marks, the guides,
+// the ranges and the background, which the runtime applies, as
+// vega-lite.js passes them on.
+var passedConfig = []string{
+	"style", "axis", "axisX", "axisY", "axisTop", "axisBottom", "axisLeft", "axisRight", "axisBand",
+	"legend", "title", "range", "background",
+}
+
+// styleConfig returns the parts of the config of a spec that pass on to the
+// Vega config, or nil for a config with none.
 func styleConfig(raw []byte) vega.Config {
 	var m map[string]jsontext.Value
 	if len(raw) == 0 || json.Unmarshal(raw, &m) != nil {
 		return nil
 	}
-	st, ok := m["style"]
-	if !ok {
-		return nil
+	var out vega.Config
+	for _, k := range passedConfig {
+		if v, ok := m[k]; ok {
+			if out == nil {
+				out = vega.Config{}
+			}
+			out[k] = v
+		}
 	}
-	return vega.Config{"style": st}
+	return out
 }
 
 // compile compiles the spec of the top level.

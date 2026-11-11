@@ -70,6 +70,23 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		styles = append(styles, theme.StyleBar+u.orient)
 	case "point", "circle", "square":
 		styles = append(styles, theme.StylePoint)
+	case "area":
+		// Vega-Lite stacks an area of one series too, so an area is a
+		// layer of a stack when it splits by a channel.
+		if u.stack != "" && (u.ch["color"] != nil || u.ch["fill"] != nil || len(u.detail) > 0) {
+			styles = append(styles, theme.StyleAreaStacked)
+		} else {
+			styles = append(styles, theme.StyleArea)
+		}
+	}
+	// A rule with one place across the whole plot is a reference line.
+	if u.mark == "rule" && (u.ch["x"] == nil) != (u.ch["y"] == nil) && u.ch["x2"] == nil && u.ch["y2"] == nil {
+		styles = append(styles, theme.StyleReference)
+	}
+	// A line or an area along x draws as a monotone curve, which keeps the
+	// order of its values (docs/STYLE.md).
+	if (u.mark == "line" || u.mark == "area") && u.orient != "horizontal" && u.ch["order"] == nil {
+		styles = append(styles, theme.StyleCurve)
 	}
 	m.Style = vega.List(styles...)
 	if c, ok := u.props["clip"].(bool); ok && c {

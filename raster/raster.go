@@ -589,6 +589,10 @@ func (d *drawer) text(it *scene.Item, ts okage.Transform) error {
 		return nil
 	}
 	t := shape.TextOf(it, d.measure)
+	if !(t.Size > 0) || math.IsInf(t.Size, 0) {
+		// A text of no size draws nothing, as in SVG.
+		return nil
+	}
 	if d.fonts == nil {
 		d.fonts = okagesvg.New()
 	}

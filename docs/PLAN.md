@@ -332,6 +332,44 @@ off with `{"config": {"style": {"zuzu.bar.vertical":
 `docs/STYLE.md` draws it, and `"filled": false` keeps it hollow. A point
 smaller than 20 square pixels has no ring, because the ring covers it.
 
+The config of the theme also names these rules of `docs/STYLE.md`, each a
+property whose name starts with `zuzu.`, which a spec turns off with its
+config:
+
+- `zuzu.area` fills an area that stacks on no other with a gradient of its
+  color, from 0.32 at its line to 0.02 at its base, draws a line of 2 on
+  top, and marks its highest point with its value, and with its month when
+  x is a time. `zuzu.area.stacked` draws the layers of a stacked area at
+  0.88, with a line of the background between them.
+- `zuzu.curve` draws a line or an area of Vega-Lite along x as a monotone
+  curve.
+- `zuzu.stackGap` opens a gap of 1.5 between the bars of a stack.
+- The parts of a box plot of Vega-Lite take the color of their box: the
+  box at the fill opacity of the theme with an outline of 1.5 and round
+  corners of 5, the whiskers at 1.5, and the median at 2.5.
+- `zuzu.largestFirst` draws the largest of a mark of symbols with sizes
+  first, so that the small ones stay on top.
+- `zuzu.endLabel` names the series of a line whose stroke comes from a
+  scale at its last point, with a dot, in its color. The names move apart
+  so that they do not overlap, and a legend of the stroke alone is left out
+  when each of its values has a name.
+- `zuzu.reference` dashes a rule of Vega-Lite with one place, a reference
+  line, and names its value where it starts. A mark of many rules draws
+  data and keeps its look.
+
+The marks that these rules add have roles that start with `zuzu-`, and the
+conformance check leaves them out, as it leaves out the guides.
+
+The config of a spec also styles the guides, over the look of zuzu, as the
+config of Vega does: `axis`, `axisX`, `axisY`, the axis of each orient and
+`axisBand` style the labels, the title, the grid and the domain of an axis,
+with the properties of the axis over them. `legend` styles the labels and
+the title of a legend, and gives its orient, its direction, its columns,
+its offset, its symbol and the length of its gradient. `title` styles the
+title, `range` replaces a named range of the theme, and `background`
+replaces the background. The compiler of Vega-Lite passes these parts of
+its config on.
+
 On 2026-11-11 the guides read these settings of a spec, where zuzu chose
 the rules that Vega leaves to its renderer (D12):
 

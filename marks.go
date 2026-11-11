@@ -1,6 +1,7 @@
 package zuzu
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -25,6 +26,13 @@ var markTypes = map[string]bool{
 // buildMarks builds the marks of a scope, in the order of the spec.
 func (s *scope) buildMarks(path string) ([]scene.Mark, error) {
 	var out []scene.Mark
+	// The styles of each mark of out, for the rules of the look that join
+	// marks, such as the parts of a box plot.
+	var styles [][]string
+	defer func() {
+		boxLook(out, styles, s.rt.theme.FillOpacity)
+		dodgeLabels(out)
+	}()
 	for i := range s.spec.Marks {
 		m := &s.spec.Marks[i]
 		p := fmt.Sprintf("%s/marks/%d", path, i)
@@ -43,6 +51,11 @@ func (s *scope) buildMarks(path string) ([]scene.Mark, error) {
 			continue
 		}
 		out = append(out, *sm)
+		styles = append(styles, m.Style.List)
+		for _, x := range s.look(m, &out[len(out)-1]) {
+			out = append(out, x)
+			styles = append(styles, nil)
+		}
 		if m.Name != "" {
 			s.markItems[m.Name] = sm.Items
 			s.markTypes[m.Name] = sm.Type
@@ -103,12 +116,24 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			return nil, err
 		}
 	}
-	if r := expr.Number(defaults[theme.CornerRadiusEnd]); r > 0 && !encodesCorners(m) {
-		for _, st := range m.Style.List {
-			if o, ok := strings.CutPrefix(st, theme.StyleBar); ok {
-				roundEnds(states, o == "horizontal", r)
-			}
+	for _, st := range m.Style.List {
+		o, ok := strings.CutPrefix(st, theme.StyleBar)
+		if !ok {
+			continue
 		}
+		if gap := expr.Number(defaults[theme.StackGap]); gap > 0 {
+			stackGaps(states, o == "horizontal", gap)
+		}
+		if r := expr.Number(defaults[theme.CornerRadiusEnd]); r > 0 && !encodesCorners(m) {
+			roundEnds(states, o == "horizontal", r)
+		}
+	}
+	if m.Type == scene.Symbol && expr.Truthy(defaults[theme.LargestFirst]) && (m.Sort == nil || m.Sort.Field.IsZero()) && encodes(m, "size") {
+		// The largest bubble draws first, so that the small ones stay on
+		// top (docs/STYLE.md).
+		slices.SortStableFunc(states, func(a, b *itemState) int {
+			return cmp.Compare(sizeOf(b.it), sizeOf(a.it))
+		})
 	}
 	if m.Sort != nil && !m.Sort.Field.IsZero() {
 		if err := s.sortItems(m.Sort, states, facets); err != nil {
@@ -832,4 +857,80 @@ func value(it *scene.Item, horizontal bool) float64 {
 		return it.X
 	}
 	return it.Y
+}
+
+// stackGaps opens a gap between the bars of each stack, half of it from
+// each of the two bars that meet (docs/STYLE.md). The bars at one place
+// across form a stack, and a stack of one bar keeps it whole.
+func stackGaps(states []*itemState, horizontal bool, gap float64) {
+	type side struct {
+		at, size float64
+		up       bool
+	}
+	stacks := map[side][]*scene.Item{}
+	var order []side
+	for _, st := range states {
+		it := st.it
+		k := side{math.Round(it.X*100) / 100, math.Round(it.Width*100) / 100, it.Y < it.Y2}
+		if horizontal {
+			k = side{math.Round(it.Y*100) / 100, math.Round(it.Height*100) / 100, it.X < it.X2}
+		}
+		if _, ok := stacks[k]; !ok {
+			order = append(order, k)
+		}
+		stacks[k] = append(stacks[k], it)
+	}
+	// lo and hi are the ends of a bar along the stack, in pixels.
+	ends := func(it *scene.Item) (float64, float64) {
+		if horizontal {
+			return math.Min(it.X, it.X+it.Width), math.Max(it.X, it.X+it.Width)
+		}
+		return math.Min(it.Y, it.Y+it.Height), math.Max(it.Y, it.Y+it.Height)
+	}
+	set := func(it *scene.Item, lo, hi float64) {
+		if hi < lo {
+			lo, hi = (lo+hi)/2, (lo+hi)/2
+		}
+		if horizontal {
+			it.X, it.Width = lo, hi-lo
+		} else {
+			it.Y, it.Height = lo, hi-lo
+		}
+	}
+	for _, k := range order {
+		bars := stacks[k]
+		if len(bars) < 2 {
+			continue
+		}
+		// The bars in order along the stack, from the lowest pixel.
+		slices.SortFunc(bars, func(a, b *scene.Item) int {
+			la, _ := ends(a)
+			lb, _ := ends(b)
+			return cmp.Compare(la, lb)
+		})
+		for i := 0; i+1 < len(bars); i++ {
+			lo, hi := ends(bars[i])
+			set(bars[i], lo, hi-gap/2)
+			lo, hi = ends(bars[i+1])
+			set(bars[i+1], lo+gap/2, hi)
+		}
+	}
+}
+
+// encodes reports whether the encoding of a mark sets a property.
+func encodes(m *vega.Mark, name string) bool {
+	for _, props := range m.Encode {
+		if _, ok := props[name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// sizeOf returns the size of a symbol, 64 when it sets none.
+func sizeOf(it *scene.Item) float64 {
+	if it.Size == nil {
+		return 64
+	}
+	return *it.Size
 }
