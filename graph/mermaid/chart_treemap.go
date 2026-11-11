@@ -47,7 +47,8 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 	// open holds the nodes that a deeper line can nest in, the outermost
 	// first.
 	var open []*treemapRow
-	for _, l := range c.d.Lines {
+	for i := 0; i < len(c.d.Lines); i++ {
+		l := c.d.Lines[i]
 		c.line = l.N
 		if rest, ok := keyword(l.Text, "title"); ok {
 			spec["title"] = map[string]any{"text": rest, "anchor": "start"}
@@ -62,10 +63,11 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 			classes[name] = st
 			continue
 		}
-		if ok, err := c.accText(l.Text); ok || err != nil {
+		if next, ok, err := c.accessibility(c.d.Lines, i); ok || err != nil {
 			if err != nil {
 				return nil, false, err
 			}
+			i = next
 			continue
 		}
 		m := treemapNode.FindStringSubmatch(l.Text)

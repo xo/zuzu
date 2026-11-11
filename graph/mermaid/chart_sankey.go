@@ -242,19 +242,6 @@ func (c *chart) settings(section string, read []string, own ...string) (map[stri
 	return m, nil
 }
 
-// accText reports a line of accessibility text, accTitle or accDescr, as
-// an issue, since a chart does not draw it. It reports whether the line is
-// one.
-func (c *chart) accText(text string) (bool, error) {
-	for _, word := range []string{"accTitle", "accDescr"} {
-		rest, ok := strings.CutPrefix(text, word)
-		if ok && (rest == "" || strings.ContainsAny(rest[:1], ": {")) {
-			return true, c.add("the accessibility text %s", word)
-		}
-	}
-	return false, nil
-}
-
 // settingNumber returns a number of a section of the config, or a default.
 func settingNumber(cfg map[string]any, key string, def float64) float64 {
 	switch v := cfg[key].(type) {

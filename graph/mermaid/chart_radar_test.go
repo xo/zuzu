@@ -145,7 +145,6 @@ func TestRadarIssues(t *testing.T) {
 		{"---\nconfig:\n  radar:\n    useWidth: 500\n---\n" + body, "radar.useWidth"},
 		{"---\nconfig:\n  themeVariables:\n    cScale0: \"#ff0000\"\n---\n" + body, "cScale"},
 		{"---\nconfig:\n  themeVariables:\n    fontSize: 20\n---\n" + body, "theme variable fontSize"},
-		{body + "accTitle: A radar\n", "accessibility"},
 	}
 	for _, test := range tests {
 		report, err := chartOf(test.src, false)

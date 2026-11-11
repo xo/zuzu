@@ -110,7 +110,8 @@ func wardleyChart(c *chart) (map[string]any, bool, error) {
 	var linkLines []Line
 	var evolveLines []Line
 	pipeline := ""
-	for _, l := range c.d.Lines {
+	for i := 0; i < len(c.d.Lines); i++ {
+		l := c.d.Lines[i]
 		c.line = l.N
 		t := l.Text
 		if pipeline != "" {
@@ -173,10 +174,11 @@ func wardleyChart(c *chart) (map[string]any, bool, error) {
 		case "annotation":
 			err = c.wardleyAnnotation(w, rest)
 		default:
-			if ok, err := c.accText(t); ok || err != nil {
+			if next, ok, err := c.accessibility(c.d.Lines, i); ok || err != nil {
 				if err != nil {
 					return nil, false, err
 				}
+				i = next
 				continue
 			}
 			if !wardleyLink.MatchString(t) {

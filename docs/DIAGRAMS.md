@@ -846,11 +846,11 @@ wraps as wide as the width. DOT does not wrap a label.
 ### Charts
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
-config that a chart does not read is an issue, and so are `accTitle` and
-`accDescr` where a chart does not use them, the `theme`, the `themeCSS`,
-and the look `handDrawn`. A `pie`, an `xychart`, a `quadrantChart`, a
-`gantt`, a `journey`, a `sequenceDiagram` and an `architecture-beta` join
-`accTitle` and `accDescr` into the description of the spec. Each chart has about 5 fixtures in
+config that a chart does not read is an issue, and so are the `theme`, the
+`themeCSS` and the look `handDrawn`. Each chart but `sankey` and `mindmap`
+joins `accTitle` and `accDescr` into the description of the spec. Mermaid
+does not read them in a sankey or a mindmap either, so there they are
+errors, as in Mermaid. Each chart has about 5 fixtures in
 `graph/mermaid/testdata`, and the gantt has 18. A test draws each fixture
 and checks that each value of the source draws once, with its label.
 

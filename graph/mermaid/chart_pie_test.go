@@ -383,6 +383,9 @@ func TestChartAccessibility(t *testing.T) {
 		"architecture-beta\n" + acc + "service a(server)[A]",
 		"quadrantChart\n" + acc + "A: [0.5, 0.5]",
 		"xychart\n" + acc + "bar [1]",
+		"treemap-beta\n" + acc + "\"A\"\n    \"B\": 1",
+		"radar-beta\n" + acc + "axis A, B, C\ncurve c{1, 2, 3}",
+		"wardley-beta\n" + acc + "component A [0.5, 0.5]",
 	} {
 		d, err := mermaid.Read(src)
 		if err != nil {

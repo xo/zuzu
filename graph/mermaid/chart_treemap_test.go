@@ -241,7 +241,6 @@ func TestTreemapIssues(t *testing.T) {
 		{body + "classDef c fill:red,font-weight:bold\n", "the style font-weight"},
 		{"---\nconfig:\n  treemap:\n    nodeWidth: 50\n---\n" + body, "treemap.nodeWidth"},
 		{"---\nconfig:\n  treemap:\n    valueFormat: 'zz'\n---\n" + body, "valueFormat zz"},
-		{body + "accDescr: A tree\n", "accessibility"},
 	}
 	for _, test := range tests {
 		report, err := chartOf(test.src, false)

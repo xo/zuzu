@@ -113,10 +113,11 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 				return nil, false, c.errorf("the graticule %q is not circle or polygon", rest)
 			}
 		default:
-			if ok, err := c.accText(l.Text); ok || err != nil {
+			if next, ok, err := c.accessibility(lines, i); ok || err != nil {
 				if err != nil {
 					return nil, false, err
 				}
+				i = next
 				continue
 			}
 			return nil, false, c.errorf("the statement %q", l.Text)
