@@ -2,6 +2,7 @@ package mermaid
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 )
@@ -13,6 +14,9 @@ type xyAxis struct {
 	cats     []string
 	min, max float64
 	ranged   bool
+	// guide holds the properties of the axis of Vega-Lite that the
+	// settings of the axis give.
+	guide map[string]any
 }
 
 // xyPlot is a bar or a line of an xychart.
@@ -111,6 +115,12 @@ func xyChart(c *chart) (map[string]any, bool, error) {
 		// zuzu draws an axis line along an axis of categories alone.
 		read = append(read, "xyChart.xAxis.axisLineWidth")
 	}
+	// The x axis is at the bottom of a vertical chart, and the y axis at
+	// the bottom of a horizontal one.
+	var xRead, yRead []string
+	xa.guide, xRead = xyShow(cfg, "xAxis", xa.cats != nil, !horizontal)
+	ya.guide, yRead = xyShow(cfg, "yAxis", false, horizontal)
+	read = append(append(read, xRead...), yRead...)
 	if err := c.unreadSettings(read...); err != nil {
 		return nil, false, err
 	}
@@ -150,7 +160,7 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 		}
 		if xa.cats != nil && len(p.values) > len(xa.cats) {
 			c.line = 0
-			if err := c.add("%d values of the %s %q, which have no category on the x axis", len(p.values)-len(xa.cats), p.kind, p.key); err != nil {
+			if err := c.add("%d values of the %s %q, which have no category on the x axis, and which Mermaid also does not draw", len(p.values)-len(xa.cats), p.kind, p.key); err != nil {
 				return nil, false, err
 			}
 		}
@@ -188,7 +198,9 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 		if !horizontal {
 			catAxis["labelAngle"] = 0
 		}
-	} else {
+	}
+	maps.Copy(catAxis, xa.guide)
+	if xa.cats == nil {
 		lo, hi := xa.min, xa.max
 		switch {
 		case len(barKeys) > 0:
@@ -199,7 +211,9 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 		catEnc["type"] = "quantitative"
 		catEnc["scale"] = map[string]any{"domain": []any{lo, hi}, "nice": false, "zero": false}
 	}
-	valEnc := map[string]any{"field": "y", "type": "quantitative", "axis": axisTitle(ya.title), "stack": nil}
+	valAxis := axisTitle(ya.title)
+	maps.Copy(valAxis, ya.guide)
+	valEnc := map[string]any{"field": "y", "type": "quantitative", "axis": valAxis, "stack": nil}
 	if ya.ranged {
 		valEnc["scale"] = map[string]any{"domain": []any{ya.min, ya.max}, "nice": false, "zero": false}
 	}
@@ -362,6 +376,51 @@ func xyDataLabels(horizontal, outside bool, barEnc map[string]any) map[string]an
 		"transform": []any{map[string]any{"filter": "datum.kind == 'bar'"}},
 		"encoding":  enc,
 	}
+}
+
+// xyShow reads the settings of an axis of an xychart that show or hide its
+// parts, and the rotation of its labels. It returns the properties of the
+// axis of Vega-Lite, and the settings that it reads. zuzu draws an axis line
+// only along an axis of categories, given by line, and no ticks. So
+// showAxisLine false on an axis of numbers, and showTick false, change
+// nothing, and showTick true is an issue. As in Mermaid, only the axis at
+// the bottom, given by bottom, turns its labels by labelRotation, and a
+// rotation outside -90 to 90 degrees is 0.
+func xyShow(cfg map[string]any, name string, line, bottom bool) (map[string]any, []string) {
+	guide := map[string]any{}
+	var read []string
+	path := "xyChart." + name + "."
+	if show, ok := configBool(cfg, "xyChart", name, "showLabel"); ok {
+		read = append(read, path+"showLabel")
+		if !show {
+			guide["labels"] = false
+		}
+	}
+	if show, ok := configBool(cfg, "xyChart", name, "showTitle"); ok {
+		read = append(read, path+"showTitle")
+		if !show {
+			guide["title"] = nil
+		}
+	}
+	if show, ok := configBool(cfg, "xyChart", name, "showTick"); ok && !show {
+		read = append(read, path+"showTick")
+	}
+	if show, ok := configBool(cfg, "xyChart", name, "showAxisLine"); ok && (line || !show) {
+		read = append(read, path+"showAxisLine")
+		if line && !show {
+			guide["domain"] = false
+		}
+	}
+	if v, ok := configNumber(cfg, "xyChart", name, "labelRotation"); ok {
+		read = append(read, path+"labelRotation")
+		if v < -90 || v > 90 {
+			v = 0
+		}
+		if bottom {
+			guide["labelAngle"] = v
+		}
+	}
+	return guide, read
 }
 
 // axisTitle returns the axis of an encoding with a title, or with none.

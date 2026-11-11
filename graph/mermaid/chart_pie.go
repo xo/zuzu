@@ -43,6 +43,13 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 		}
 	}
 	read := []string{"pie.donutHole", "pie.legendPosition", "pie.zuzu.textPlacement"}
+	// highlightSlice names a slice that Mermaid draws 5 percent larger.
+	// The value hover highlights a slice under the pointer, which an image
+	// does not have, so it stays an issue.
+	highlight := str(c.d.Config, "pie", "highlightSlice")
+	if highlight != "" && highlight != "hover" {
+		read = append(read, "pie.highlightSlice")
+	}
 	if placement == "bisector" {
 		read = append(read, "pie.textPosition")
 	}
@@ -193,23 +200,36 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 	if hole > 0 {
 		arc["innerRadius"] = hole * size / 2
 	}
+	arcEnc := map[string]any{
+		"theta": map[string]any{"field": "value", "type": "quantitative", "stack": true},
+		"order": map[string]any{"field": "i", "type": "quantitative"},
+		"color": map[string]any{
+			"field": "name", "type": "nominal",
+			"scale":  pieScale(domain, colors),
+			"legend": map[string]any{"title": nil, "orient": legend},
+		},
+	}
+	if highlight != "" && highlight != "hover" && seen[highlight] {
+		// The radius of each slice is a field, so that the highlighted
+		// slice reaches 5 percent past the rim, as in Mermaid. A slice of
+		// another label keeps the radius of the pie.
+		for _, r := range rows {
+			row, _ := r.(map[string]any)
+			row["r"] = ro
+			if row["label"] == highlight {
+				row["r"] = ro * pieHighlight
+			}
+		}
+		delete(arc, "outerRadius")
+		arcEnc["radius"] = map[string]any{"field": "r", "type": "quantitative",
+			"scale": map[string]any{"type": "linear", "domain": []any{0, ro * pieHighlight}, "range": []any{0, ro * pieHighlight}}}
+	}
 	spec := map[string]any{
 		"width":  size,
 		"height": size,
 		"data":   map[string]any{"values": rows},
 		"layer": []any{
-			map[string]any{
-				"mark": arc,
-				"encoding": map[string]any{
-					"theta": map[string]any{"field": "value", "type": "quantitative", "stack": true},
-					"order": map[string]any{"field": "i", "type": "quantitative"},
-					"color": map[string]any{
-						"field": "name", "type": "nominal",
-						"scale":  pieScale(domain, colors),
-						"legend": map[string]any{"title": nil, "orient": legend},
-					},
-				},
-			},
+			map[string]any{"mark": arc, "encoding": arcEnc},
 			pieLeader("px", "py", "ex", "ey", pieScale(domain, colors)),
 			pieLeader("ex", "ey", "lx", "ly", pieScale(domain, colors)),
 			map[string]any{
@@ -231,6 +251,10 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 
 // pieLabelSize is the font size of the percent of a slice.
 const pieLabelSize = 11
+
+// pieHighlight is the scale of the radius of the slice that
+// pie.highlightSlice names, as in Mermaid.
+const pieHighlight = 1.05
 
 // The leader line of a label outside the pie leaves the rim of the slice at
 // its middle angle, and bends at pieElbow pixels out from the rim. The

@@ -2,6 +2,7 @@ package dataflow
 
 import (
 	"cmp"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -37,7 +38,9 @@ type sankeyLabel struct {
 //
 //  1. The labels of the larger nodes go first. A label goes on the inner
 //     side of its node: at the right of a node in the left half of the
-//     extent, and at the left of the others. If it hits a label or a node
+//     extent, and at the left of the others. With the side layer, the
+//     inner side is the left for a node in a layer before the layer of the
+//     largest node, and the right for the others. If it hits a label or a node
 //     there, it goes on the other side. If it hits on both sides, it stays
 //     on the first side that is inside the extent and clear of the nodes,
 //     or else on the inner side.
@@ -80,6 +83,13 @@ func sankeylabels(p *params, rows []Row) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
+	sideBy, err := p.str("side", "position")
+	if err != nil {
+		return nil, err
+	}
+	if sideBy != "position" && sideBy != "layer" {
+		return nil, fmt.Errorf("zuzu.sankeylabels with the side %q: %w", sideBy, ErrParam)
+	}
 	as, err := p.as("labelX", "labelY", "labelAlign", "label")
 	if err != nil {
 		return nil, err
@@ -100,6 +110,15 @@ func sankeylabels(p *params, rows []Row) ([]Row, error) {
 	const nodeGap, labelGap = 2.0, 1.0
 	h := size
 	get := func(r Row, f string) float64 { return expr.Number(r[f]) }
+	// By layer, the inner side is the left for a node in a layer before the
+	// layer of the largest node, and the right for the others. The first
+	// of the largest nodes counts.
+	central, most := 0.0, 0.0
+	for _, r := range rows {
+		if v := get(r, "value"); v > most {
+			central, most = get(r, "layer"), v
+		}
+	}
 	nodes := make([]textBox, len(rows))
 	labels := make([]sankeyLabel, len(rows))
 	for i, r := range rows {
@@ -113,7 +132,12 @@ func sankeylabels(p *params, rows []Row) ([]Row, error) {
 		l.y = l.mid
 		l.reach = max((n.y2-n.y1-h)/2, h/2)
 		l.side = 1
-		if n.x1 >= (ex0+ex1)/2 {
+		switch {
+		case sideBy == "layer":
+			if get(r, "layer") < central {
+				l.side = -1
+			}
+		case n.x1 >= (ex0+ex1)/2:
 			l.side = -1
 		}
 	}

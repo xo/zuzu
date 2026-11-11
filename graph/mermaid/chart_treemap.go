@@ -221,6 +221,7 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 			"fill":        append(paint("fill"), map[string]any{"scale": "color", "field": "top"}),
 			"stroke":      paint("stroke"),
 			"strokeWidth": paint("strokeWidth"),
+			"strokeDash":  paint("strokeDash"),
 		}}}
 	}
 	marks := []any{box("sections", "sections"), box("leaves", "leaves")}
@@ -315,6 +316,20 @@ func (c *chart) css(s string) (map[string]any, error) {
 				return nil, c.errorf("the stroke-width %q is not a number", v)
 			}
 			st["strokeWidth"] = w
+		case "stroke-dasharray":
+			// Mermaid splits a style at commas, so a list of dashes has
+			// spaces between its lengths.
+			var dash []any
+			for f := range strings.FieldsSeq(v) {
+				n, err := strconv.ParseFloat(strings.TrimSuffix(f, "px"), 64)
+				if err != nil || n < 0 {
+					return nil, c.errorf("the stroke-dasharray %q is not a list of lengths", v)
+				}
+				dash = append(dash, n)
+			}
+			if len(dash) > 0 {
+				st["strokeDash"] = dash
+			}
 		default:
 			if err := c.add("the style %s", k); err != nil {
 				return nil, err

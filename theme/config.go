@@ -65,6 +65,10 @@ const (
 	StyleClusterTitle = "zuzu.clusterTitle"
 	StyleIcon         = "zuzu.icon"
 	StyleIconStroke   = "zuzu.icon.stroke"
+	// StyleHalo gives a text a halo: a stroke of 3 in the color of the
+	// background, which draws under the fill. A label that sits on a busy
+	// mark takes it after the style of its fill.
+	StyleHalo = "zuzu.halo"
 	// StackGap is the property of a style of a bar that opens a gap of that
 	// width between the bars of a stack.
 	StackGap = "zuzu.stackGap"
@@ -131,6 +135,7 @@ func (t Theme) Config() map[string]any {
 			StyleClusterTitle: map[string]any{"fill": t.Muted, "fontSize": 11.0, "fontWeight": "600"},
 			StyleIcon:         map[string]any{"fill": c},
 			StyleIconStroke:   map[string]any{"stroke": c, "strokeCap": "round", "strokeJoin": "round"},
+			StyleHalo:         map[string]any{"stroke": t.Background, "strokeWidth": 3.0, "strokeJoin": "round"},
 		},
 	}
 }

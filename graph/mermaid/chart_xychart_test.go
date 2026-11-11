@@ -145,7 +145,9 @@ func TestXYIssues(t *testing.T) {
 	}{
 		{"xychart\nx-axis [a]\nbar [1, 2]", "which have no category"},
 		{"xychart\nbar [1 \"one\"]", `the label "one" of a bar`},
-		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showTick: false\n---\nxychart\nbar [1]", "xyChart.xAxis"},
+		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showTick: true\n---\nxychart\nbar [1]", "xyChart.xAxis.showTick"},
+		{"---\nconfig:\n  xyChart:\n    yAxis:\n      showAxisLine: true\n---\nxychart\nbar [1]", "xyChart.yAxis.showAxisLine"},
+		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showAxisLine: true\n---\nxychart\nx-axis 1 --> 5\nbar [1]", "xyChart.xAxis.showAxisLine"},
 		{"---\nconfig:\n  themeVariables:\n    xyChart:\n      titleColor: red\n---\nxychart\nbar [1]", "themeVariables.xyChart.titleColor"},
 		// zuzu draws no ticks, puts the labels 8 from the plot and the title
 		// of an axis at its end, and draws no axis line along numbers.
@@ -168,6 +170,45 @@ func TestXYIssues(t *testing.T) {
 		}
 		if _, err := compileMermaid(t, test.src, true); err == nil {
 			t.Errorf("%q: expected an error in the strict mode", test.src)
+		}
+	}
+}
+
+func TestXYAxes(t *testing.T) {
+	t.Parallel()
+	items := renderMermaid(t, mmdFiles(t, "xychart")["07-axes.mmd"])
+	// The labels of the x axis turn by 45 degrees, and its title does not
+	// draw. The y axis is at the left, so its labels do not turn, and they
+	// do not draw.
+	for _, s := range []string{"January", "May"} {
+		n := 0
+		for _, it := range items {
+			if it.mark == scene.Text && it.text == s && it.item.Angle == 45 {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("the label %q draws %d times at 45 degrees", s, n)
+		}
+	}
+	for s, want := range map[string]int{"Month": 0, "Visits": 1, "20": 0, "100": 0} {
+		if n := textCount(items, s); n != want {
+			t.Errorf("%q draws %d times, not %d", s, n, want)
+		}
+	}
+	drawn, _ := drawFixture(t, "testdata/xychart/07-axes.mmd")
+	if n := countDrawn(drawn, scene.Rule, func(it drawnItem) bool { return it.role == "axis-domain" }); n != 0 {
+		t.Errorf("%d axis lines draw", n)
+	}
+	drawn, _ = drawFixture(t, "testdata/xychart/01-sales.mmd")
+	if n := countDrawn(drawn, scene.Rule, func(it drawnItem) bool { return it.role == "axis-domain" }); n != 1 {
+		t.Errorf("%d axis lines draw in a chart of categories, not 1", n)
+	}
+	// A rotation outside -90 to 90 degrees is 0, as in Mermaid.
+	items = renderMermaid(t, "---\nconfig:\n  xyChart:\n    xAxis:\n      labelRotation: 120\n---\nxychart\nx-axis [a, b]\nbar [1, 2]")
+	for _, it := range items {
+		if it.mark == scene.Text && it.text == "a" && it.item.Angle != 0 {
+			t.Errorf("the label a turns by %v", it.item.Angle)
 		}
 	}
 }

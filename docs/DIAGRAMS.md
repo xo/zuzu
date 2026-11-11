@@ -851,7 +851,7 @@ config that a chart does not read is an issue, and so are `accTitle` and
 and the look `handDrawn`. A `pie`, an `xychart`, a `quadrantChart`, a
 `gantt`, a `journey`, a `sequenceDiagram` and an `architecture-beta` join
 `accTitle` and `accDescr` into the description of the spec. Each chart has about 5 fixtures in
-`graph/mermaid/testdata`, and the gantt has 16. A test draws each fixture
+`graph/mermaid/testdata`, and the gantt has 18. A test draws each fixture
 and checks that each value of the source draws once, with its label.
 
 | Keyword | Compiles to |
@@ -876,6 +876,10 @@ is `"label" : value`. With `showData`, the legend shows each value. zuzu
 reads `pie.textPosition`, `pie.donutHole`, `pie.legendPosition` and the
 colors `pie1` and on. A negative value is an error, and a second slice with
 the same label is an issue.
+
+`pie.highlightSlice` names a slice that reaches 5 percent past the rim of
+the pie, as in Mermaid. The value `hover` highlights the slice under the
+pointer. An image has no pointer, so `hover` is an issue.
 
 The percent of a slice goes on the middle angle of the slice, with the
 center of the text on that point. The setting `pie.zuzu.textPlacement`
@@ -941,6 +945,25 @@ With `showDataLabel`, the value of a bar is 10 pixels from the end of the
 bar, inside it or outside it, as in Mermaid. In a horizontal chart, the
 value is on the middle line of the bar.
 
+Each axis, `xAxis` and `yAxis`, reads the settings that show its parts:
+
+| Setting | What zuzu does |
+| --- | --- |
+| `showLabel: false` | the axis has no labels |
+| `showTitle: false` | the axis has no title |
+| `showAxisLine: false` | the axis of categories has no axis line. An axis of numbers has none in the look of zuzu |
+| `showTick: false` | nothing, because an axis has no ticks in the look of zuzu |
+| `labelRotation` | the labels turn by that many degrees, clockwise |
+
+As in Mermaid, only the axis at the bottom turns its labels: the x axis
+of a vertical chart, and the y axis of a horizontal one. A rotation
+outside -90 to 90 degrees is 0. `showTick: true`, and `showAxisLine: true`
+on an axis of numbers, are issues.
+
+A bar or a line with more values than the x axis has categories draws a
+value for each category. The values past the last category are an issue.
+Mermaid does not draw them either.
+
 #### quadrantChart
 
 `title`, `x-axis` and `y-axis` with one end or both, `low --> high`,
@@ -970,10 +993,35 @@ starts it at the end of the task before it. It names its end as a date, as
 a duration such as `3d`, `12h` or `1.5w`, or as `until a b`. The tags are
 `done`, `active`, `crit`, `milestone` and `vert`. zuzu works out the start
 and the end of each task in Go, and a test compares them with mermaid.js.
-A cycle of `after` and `until` is an error. `click`, the mode `compact`,
-and `todayMarker` with a style are issues. A render has no time of its own,
-so zuzu draws no marker of today. A gantt with no task draws nothing but
+A cycle of `after` and `until` is an error. `click` and `todayMarker` with
+a style are issues. A render has no time of its own, so zuzu draws no
+marker of today. A gantt with no task draws nothing but
 its title, as in Mermaid.
+
+zuzu reads these settings of `gantt`, and `displayMode` at the top level
+of the front matter too:
+
+| Setting | What zuzu does |
+| --- | --- |
+| `axisFormat`, `tickInterval`, `topAxis`, `weekday` | as the statements of the same names |
+| `displayMode: compact` | the tasks of each section pack into as few rows as their times allow |
+| `numberSectionStyles` | the sections take that many colors in turn |
+| `rightPadding` | the padding at the right of the chart, in pixels |
+
+In the mode `compact`, the tasks of a section go in the order of their
+starts, as in Mermaid. Each task takes the first row of its section whose
+last task ends at or before its start. A row holds more than one task, so
+the axis writes no names. The name of each task goes in the middle of its
+bar, if it is no wider than the bar. Else it goes 4 pixels past the end of
+the bar, or 4 pixels before the start of the bar if it does not fit at the
+right of the axis. The name of a milestone goes beside its diamond. A name
+has a halo, so that it reads on a bar and on the grid.
+
+A long gantt follows two limits of Mermaid. If the tasks span more than 5
+whole years, zuzu draws no bands of the excluded days. If `tickInterval`
+gives more than 10000 ticks, the axis takes ticks of its own. Mermaid
+counts a month as 30 days for this. Each limit is an issue. A bar is at
+least 2 pixels wide, so that a short task in a long gantt still draws.
 
 As in Mermaid, the value of a statement is all the text after its keyword.
 In `dateFormat :YYYY-MM-DD`, the colon is part of the format, so no date
@@ -1001,6 +1049,15 @@ number, such as `size: 2rem`, is an issue. The step draws with its name
 and no face, and Mermaid draws its face in no place. A user journey with no
 step draws its title alone, as in Mermaid.
 
+The actors of a step go under its name, on one line that ends with an
+ellipsis when it is too long. Mermaid writes the actors in a legend, and
+wraps the name of each actor at `journey.maxLabelWidth`. zuzu has no
+legend of the actors. With `journey.maxLabelWidth`, the actors under a step
+wrap at that width, or at the width of the column of the step if it is
+less, by the rule of Mermaid. A line takes words while it fits. A word that
+is wider than the width breaks into parts, and each part but the last ends
+with a hyphen. zuzu measures the text in the bundled font.
+
 #### wardley-beta
 
 A place is `[visibility, evolution]`, each from 0 to 1. zuzu reads `title`,
@@ -1016,9 +1073,18 @@ of an accelerator or a deaccelerator is in double quotes or not, as
 
 Lines of CSV, `source,target,value`, with quotes as RFC 4180 says. zuzu
 reads `sankey.width`, `height`, `nodeAlignment`, `nodeWidth`,
-`nodePadding`, `showValues`, `prefix`, `suffix`, `nodeColors` and
-`linkColor`. A `linkColor` of `gradient` draws in the color of the source,
-and the report says so.
+`nodePadding`, `showValues`, `prefix`, `suffix`, `nodeColors`, `linkColor`
+and `labelStyle`.
+
+A link takes the color of its source by default. `linkColor` can be
+`source`, `target`, a color, or `gradient`. A link with `gradient` goes
+from the color of its source at the left to the color of its target at
+the right, as in Mermaid.
+
+`labelStyle: outlined` gives each label a halo, and changes the side of a
+label as Mermaid does. The label of a node in a layer before the layer of
+the largest node goes at the left of the node, and the others at the right.
+The default style is `legacy`.
 
 A label goes on the inner side of its node, as Mermaid puts it: at the
 right of a node in the left half, and at the left of the others. Mermaid
@@ -1042,7 +1108,9 @@ rule.
 
 Names in quotes, nested by their indent with spaces or tabs, and a value
 on a leaf, `"Leaf": 12`. `classDef` and `:::class` style a node with
-`fill`, `stroke`, `stroke-width` and `color`. zuzu reads `valueFormat`,
+`fill`, `stroke`, `stroke-width`, `stroke-dasharray` and `color`. Mermaid
+splits a style at commas, so the lengths of `stroke-dasharray` have spaces
+between them, as `stroke-dasharray:5 3`. zuzu reads `valueFormat`,
 `showValues`, `padding`, `diagramPadding`, `labelFontSize` and
 `valueFontSize`. A value on a section with children, and a leaf with no
 value, are issues.

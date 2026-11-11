@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -54,6 +55,10 @@ func TestTreemapFixtures(t *testing.T) {
 			sec("Source files", "113"), leaf("internal/render/okage.go", 60, "60"),
 			leaf("internal/render/svg_writer.go", 30, "30"), leaf("layout/axis_x.go", 14, "14"), leaf("cmd/main.go", 9, "9"),
 		},
+		"07-dashes.mmd": {
+			sec("Plans", "80"), leaf("Basic", 30, "30"), leaf("Pro", 50, "50"),
+			sec("Add-ons", "25"), leaf("Storage", 15, "15"), leaf("Support", 10, "10"),
+		},
 	}
 	files := fixtures(t, "treemap")
 	if len(files) != len(cases) {
@@ -89,6 +94,24 @@ func TestTreemapFixtures(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestTreemapDashes(t *testing.T) {
+	t.Parallel()
+	items, _ := drawFixture(t, "testdata/treemap/07-dashes.mmd")
+	for name, want := range map[string][]float64{"Basic": {6, 3}, "Add-ons": {2}, "Pro": nil} {
+		n := countDrawn(items, scene.Rect, func(it drawnItem) bool {
+			return it.datum["name"] == name && slices.Equal(it.item.StrokeDash, want)
+		})
+		if n != 1 {
+			t.Errorf("the box of %q does not draw the dashes %v", name, want)
+		}
+	}
+	// A dash that is not a length is an error.
+	src := "treemap-beta\n\"A\": 1:::c\nclassDef c stroke-dasharray:a b;"
+	if _, err := chartOf(src, false); !errors.Is(err, mermaid.ErrSyntax) {
+		t.Errorf("%q: the error %v", src, err)
 	}
 }
 

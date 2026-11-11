@@ -51,8 +51,12 @@ const dir = process.argv[2];
 const out = {};
 for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.mmd')).sort()) {
   // A title goes through DOMPurify, which needs a DOM. It does not move a
-  // task, so the script drops it.
-  const src = fs.readFileSync(path.join(dir, name), 'utf8').replace(/^\s*(title|accTitle|accDescr)\b.*$/gim, '');
+  // task, so the script drops it. The parser of the gantt does not read
+  // front matter. Its settings do not move a task either, so the script
+  // drops it too.
+  const src = fs.readFileSync(path.join(dir, name), 'utf8')
+    .replace(/^---\n[\s\S]*?\n---\n/, '')
+    .replace(/^\s*(title|accTitle|accDescr)\b.*$/gim, '');
   try {
     diagram.db.clear();
     diagram.parser.parser.yy = diagram.db;

@@ -71,6 +71,7 @@ made, and reads the fields `x0`, `x1`, `y0`, `y1` and `value` of each node.
 | `text` | `key` | the text of a label, as a field or an expression |
 | `extent` or `size` | none, one is required | the extent of the nodes. A label stays inside it from left to right |
 | `offset` | 6 | the space between a node and its label |
+| `side` | `position` | how a label finds the inner side of its node: `position` or `layer`. See step 1 |
 | `font`, `fontSize`, `fontWeight` | the theme, 11, `normal` | the font that measures a label |
 | `as` | see below | the names of the output fields |
 
@@ -81,7 +82,10 @@ The transform places the labels in four steps:
 
 1. The labels of the larger nodes go first. A label goes on the inner
    side of its node: at the right of a node in the left half of the
-   extent, and at the left of the others. If the label hits a label or a
+   extent, and at the left of the others. With the side `layer`, the
+   inner side is the left for a node in a layer before the layer of the
+   largest node, and the right for the others, as the outlined labels of
+   Mermaid go. If the label hits a label or a
    node there, it goes on the other side. If it hits on both sides, it
    stays on the first side that is inside the extent and clear of the
    nodes, or else on the inner side.

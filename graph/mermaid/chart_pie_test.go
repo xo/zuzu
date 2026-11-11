@@ -152,6 +152,23 @@ func TestPieFixtures(t *testing.T) {
 	}
 }
 
+func TestPieHighlight(t *testing.T) {
+	t.Parallel()
+	items := renderMermaid(t, mmdFiles(t, "pie")["06-highlight.mmd"])
+	// The slice that highlightSlice names reaches 5 percent past the rim.
+	for label, want := range map[string]float64{"Rent": 157.5, "Food": 150, "Fun": 150} {
+		n := itemCount(items, scene.Arc, "slice", func(d map[string]any) bool { return d["label"] == label })
+		if n != 1 {
+			t.Fatalf("the slice %s draws %d times", label, n)
+		}
+		for _, it := range items {
+			if it.mark == scene.Arc && it.datum["label"] == label && it.item.OuterRadius != want {
+				t.Errorf("the slice %s has the radius %v, not %v", label, it.item.OuterRadius, want)
+			}
+		}
+	}
+}
+
 func TestPieErrors(t *testing.T) {
 	t.Parallel()
 	tests := []string{
@@ -175,7 +192,7 @@ func TestPieIssues(t *testing.T) {
 		src, part string
 	}{
 		{"pie\n\"A\" : 1\n\"A\" : 2", `the second slice "A"`},
-		{"---\nconfig:\n  pie:\n    highlightSlice: A\n---\npie\n\"A\" : 1", "pie.highlightSlice"},
+		{"---\nconfig:\n  pie:\n    highlightSlice: hover\n---\npie\n\"A\" : 1", "pie.highlightSlice"},
 		{"---\nconfig:\n  pie:\n    legendPosition: center\n---\npie\n\"A\" : 1", "legend position center"},
 		{"---\nconfig:\n  theme: forest\n---\npie\n\"A\" : 1", "theme"},
 		{"---\nconfig:\n  themeVariables:\n    pie2: red\n---\npie\n\"A\" : 1", "themeVariables"},

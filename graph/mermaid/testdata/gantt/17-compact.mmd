@@ -1,0 +1,14 @@
+---
+displayMode: compact
+---
+gantt
+    title Compact rows
+    dateFormat YYYY-MM-DD
+    section Build
+    Design       :a1, 2024-03-01, 4d
+    Code         :a2, 2024-03-03, 6d
+    Test         :after a1, 3d
+    Ship         :milestone, 2024-03-12, 0d
+    section Run
+    Monitor      :2024-03-02, 10d
+    Report       :2024-03-04, 2d

@@ -190,7 +190,9 @@ func TestGanttIssues(t *testing.T) {
 		{"gantt\ntodayMarker stroke-width:5px\na : 2024-01-01, 1d", "todayMarker"},
 		{"gantt\nexcludes weekdays\na : 2024-01-01, 1d", "excludes \"weekdays\""},
 		{"gantt\nincludes monday\na : 2024-01-01, 1d", "includes \"monday\""},
-		{"---\ndisplayMode: compact\n---\ngantt\na : 2024-01-01, 1d", "display mode compact"},
+		{"---\ndisplayMode: wide\n---\ngantt\na : 2024-01-01, 1d", "display mode wide"},
+		{"---\nconfig:\n  gantt:\n    numberSectionStyles: 0\n---\ngantt\na : 2024-01-01, 1d", "gantt.numberSectionStyles 0"},
+		{"---\nconfig:\n  gantt:\n    rightPadding: -4\n---\ngantt\na : 2024-01-01, 1d", "gantt.rightPadding -4"},
 		{"---\nconfig:\n  gantt:\n    barHeight: 30\n---\ngantt\na : 2024-01-01, 1d", "gantt.barHeight"},
 		{"gantt\na : a1, 2024-01-01, 1d\nb : a1, 2024-01-01, 1d", "more than one task"},
 	}

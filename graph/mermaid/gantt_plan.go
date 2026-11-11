@@ -3,6 +3,7 @@ package mermaid
 import (
 	"fmt"
 	"maps"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -30,6 +31,13 @@ type gantt struct {
 	lists []ganttListStmt
 	// weekend is the first day of the weekend: Saturday, or Friday.
 	weekend time.Weekday
+	// compact packs the tasks of each section into as few rows as their
+	// times allow. sectionStyles is the number of colors that the sections
+	// take in turn, or 0 for a color of each section. rightPadding is the
+	// padding at the right of the chart, or nil for the default.
+	compact       bool
+	sectionStyles int
+	rightPadding  *float64
 
 	tasks []*ganttTask
 	byID  map[string]*ganttTask
@@ -163,14 +171,15 @@ func readGantt(c *chart, today time.Time, loc *time.Location) (*gantt, error) {
 // config reads the settings of a gantt from the front matter and the
 // directives.
 func (g *gantt) config() error {
-	if m, ok := g.c.d.Config["displayMode"].(string); ok && m != "" {
-		if err := g.c.add("zuzu does not draw the display mode %s of a gantt", m); err != nil {
+	if m, ok := g.c.d.Config["displayMode"].(string); ok {
+		if err := g.displayMode(m); err != nil {
 			return err
 		}
 	}
 	cfg, _ := g.c.d.Config["gantt"].(map[string]any)
 	for _, k := range slices.Sorted(maps.Keys(cfg)) {
 		v := cfg[k]
+		n, isNumber := configNumber(cfg, k)
 		switch k {
 		case "axisFormat":
 			g.axisFormat, _ = v.(string)
@@ -182,11 +191,26 @@ func (g *gantt) config() error {
 			s, _ := v.(string)
 			g.weekday = strings.ToLower(s)
 		case "displayMode":
-			if s, _ := v.(string); s != "" {
-				if err := g.c.add("zuzu does not draw the display mode %s of a gantt", s); err != nil {
+			s, _ := v.(string)
+			if err := g.displayMode(s); err != nil {
+				return err
+			}
+		case "numberSectionStyles":
+			if !isNumber || n < 1 || n != math.Trunc(n) {
+				if err := g.c.add("the setting gantt.numberSectionStyles %v, which is not a whole number of 1 or more", v); err != nil {
 					return err
 				}
+				continue
 			}
+			g.sectionStyles = int(n)
+		case "rightPadding":
+			if !isNumber || n < 0 {
+				if err := g.c.add("the setting gantt.rightPadding %v, which is not a number of 0 or more", v); err != nil {
+					return err
+				}
+				continue
+			}
+			g.rightPadding = &n
 		default:
 			if inert(g.c.d.Kind, "gantt."+k) {
 				continue
@@ -195,6 +219,19 @@ func (g *gantt) config() error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// displayMode reads the display mode of a gantt: compact, or the default
+// with an empty value. Another mode is an issue.
+func (g *gantt) displayMode(m string) error {
+	switch m {
+	case "":
+	case "compact":
+		g.compact = true
+	default:
+		return g.c.add("zuzu does not draw the display mode %s of a gantt", m)
 	}
 	return nil
 }

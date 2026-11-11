@@ -236,6 +236,55 @@ func TestSankeyLabelsApart(t *testing.T) {
 	}
 }
 
+func TestSankeyGradient(t *testing.T) {
+	t.Parallel()
+	items, _ := drawFixture(t, "testdata/sankey/07-gradient.mmd")
+	// colors holds the color of each node, from nodeColors or the theme.
+	colors := map[string]string{}
+	for _, it := range items {
+		if key, ok := it.datum["key"].(string); ok && it.mark == scene.Rect {
+			colors[key] = it.item.Fill.Color
+		}
+	}
+	if colors["Grid"] != "#4e79a7" || colors["Homes"] != "#e15759" || colors["Coal"] == "" {
+		t.Fatalf("the colors of the nodes: %v", colors)
+	}
+	links := 0
+	for _, it := range items {
+		if it.mark != scene.Path {
+			continue
+		}
+		links++
+		g := it.item.Fill.Gradient
+		src, _ := it.datum["source"].(string)
+		dst, _ := it.datum["target"].(string)
+		// The gradient runs from left to right across the bounds of the
+		// band, from the color of the source to the color of the target.
+		if g == nil || g.Type != scene.Linear || g.X1 != 0 || g.Y1 != 0 || g.X2 != 1 || g.Y2 != 0 || len(g.Stops) != 2 ||
+			g.Stops[0].Color != colors[src] || g.Stops[1].Color != colors[dst] || g.Stops[0].Offset != 0 || g.Stops[1].Offset != 1 {
+			t.Errorf("the link from %s to %s has the fill %+v", src, dst, it.item.Fill)
+		}
+	}
+	// An outlined label has a halo. The label of Plant, in a layer before
+	// the layer of Grid, the largest node, is at the left of its node. In
+	// the legacy style, it is at the right, since Plant is in the left half.
+	for _, it := range items {
+		if it.mark != scene.Text {
+			continue
+		}
+		if it.item.Stroke.IsZero() || it.item.StrokeWidth == nil || *it.item.StrokeWidth != 3 {
+			t.Errorf("the label %q has no halo: %+v, %v", it.text, it.item.Stroke, it.item.StrokeWidth)
+		}
+		x0, _ := it.datum["x0"].(float64)
+		if key := it.datum["key"]; key == "Plant" && (it.item.Align != "right" || it.item.X != x0-6 || x0 >= 300) {
+			t.Errorf("the label of Plant is at %v, %s, and its node at %v", it.item.X, it.item.Align, x0)
+		}
+	}
+	if links != 7 {
+		t.Errorf("%d links, want 7", links)
+	}
+}
+
 func TestSankeyErrors(t *testing.T) {
 	t.Parallel()
 	tests := []string{
@@ -259,8 +308,7 @@ func TestSankeyIssues(t *testing.T) {
 	tests := []struct {
 		src, issue string
 	}{
-		{"---\nconfig:\n  sankey:\n    linkColor: gradient\n---\nsankey\nA,B,1\n", "gradient"},
-		{"---\nconfig:\n  sankey:\n    labelStyle: outlined\n---\nsankey\nA,B,1\n", "labelStyle outlined"},
+		{"---\nconfig:\n  sankey:\n    labelStyle: boxed\n---\nsankey\nA,B,1\n", "labelStyle boxed"},
 		{"---\nconfig:\n  sankey:\n    useWidth: 500\n---\nsankey\nA,B,1\n", "sankey.useWidth"},
 		{"---\nconfig:\n  sankey:\n    nodeAlignment: top\n---\nsankey\nA,B,1\n", "nodeAlignment top"},
 		{"---\nconfig:\n  theme: forest\n---\nsankey\nA,B,1\n", "theme of Mermaid"},

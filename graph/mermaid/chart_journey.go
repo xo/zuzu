@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/xo/zuzu/text"
 )
 
 // journeyTask is a task of a user journey: its section, its name, its
@@ -22,8 +24,23 @@ type journeyTask struct {
 // have no band. Under the plot, each task has its
 // name, and its actors under that.
 func journeyChart(c *chart) (map[string]any, bool, error) {
-	if err := c.unreadSettings(); err != nil {
+	// maxLabelWidth is the width at which Mermaid wraps the name of an
+	// actor in its legend. zuzu has no legend of the actors, and wraps the
+	// actors under each task at that width instead. A width that is not a
+	// number stays an issue.
+	wrap, wrapped := configNumber(c.d.Config, "journey", "maxLabelWidth")
+	var read []string
+	if wrapped {
+		read = append(read, "journey.maxLabelWidth")
+	}
+	if err := c.unreadSettings(read...); err != nil {
 		return nil, false, err
+	}
+	if wrapped && wrap <= 0 {
+		if err := c.add("the setting journey.maxLabelWidth %v, which is not more than 0", wrap); err != nil {
+			return nil, false, err
+		}
+		wrapped = false
 	}
 	if c.d.Header != "" {
 		c.line = c.d.N
@@ -86,14 +103,22 @@ func journeyChart(c *chart) (map[string]any, bool, error) {
 		// Mermaid draws the title of a user journey with no task.
 		return emptyChart(title, ""), false, nil
 	}
-	return journeySpec(title, tasks), true, nil
+	if !wrapped {
+		wrap = 0
+	}
+	return journeySpec(title, tasks, wrap), true, nil
 }
 
-// journeySpec writes the spec of a user journey.
-func journeySpec(title string, tasks []journeyTask) map[string]any {
+// journeySpec writes the spec of a user journey. When wrap is more than 0,
+// the actors under a task wrap at that width, or at the width of the
+// column of the task if it is less.
+func journeySpec(title string, tasks []journeyTask, wrap float64) map[string]any {
+	n := float64(len(tasks))
+	step := max(560/n, 120)
 	var rows, sections []any
 	var band map[string]any
 	var x0 float64
+	lines := 0
 	for i, t := range tasks {
 		if band == nil || t.section != band["section"] {
 			if !slices.Contains(sections, any(t.section)) {
@@ -109,13 +134,20 @@ func journeySpec(title string, tasks []journeyTask) map[string]any {
 		// The band of a section grows to its last task.
 		band["x1"] = float64(i) + 0.5
 		band["cx"] = (x0 + float64(i) + 0.5) / 2
-		rows = append(rows, map[string]any{
+		row := map[string]any{
 			"kind": "task", "section": t.section, "label": t.name, "x": i,
 			"score": t.score, "base": 0, "actors": strings.Join(t.actors, ", "),
-		})
+		}
+		rows = append(rows, row)
+		if wrap > 0 && len(t.actors) > 0 {
+			// Each line of the actors is a row of its own, so that each
+			// draws as a text of one line.
+			for k, l := range journeyWrap(strings.Join(t.actors, ", "), min(wrap, step-8)) {
+				rows = append(rows, map[string]any{"kind": "actors", "section": t.section, "x": i, "line": k, "label": l})
+				lines = max(lines, k+1)
+			}
+		}
 	}
-	n := float64(len(tasks))
-	step := max(560/n, 120)
 	text := func(filter string, mark map[string]any, y any, field string) map[string]any {
 		mark["type"] = "text"
 		mark["align"] = "center"
@@ -166,8 +198,17 @@ func journeySpec(title string, tasks []journeyTask) map[string]any {
 			"mark":      map[string]any{"type": "circle", "size": 220, "opacity": 1},
 		},
 		text("datum.kind == 'task'", map[string]any{"baseline": "top", "dy": 8, "limit": step - 8}, bottom, "label"),
-		text("datum.kind == 'task' && datum.actors != ''",
-			map[string]any{"baseline": "top", "dy": 24, "fontSize": 10, "opacity": 0.7, "limit": step - 8}, bottom, "actors"),
+	}
+	if wrap > 0 {
+		// The lines of the actors are 13 apart.
+		for k := range lines {
+			layers = append(layers, text("datum.kind == 'actors' && datum.line == "+strconv.Itoa(k),
+				map[string]any{"baseline": "top", "dy": 24 + 13*k, "fontSize": journeyActorSize, "opacity": 0.7},
+				bottom, "label"))
+		}
+	} else {
+		layers = append(layers, text("datum.kind == 'task' && datum.actors != ''",
+			map[string]any{"baseline": "top", "dy": 24, "fontSize": journeyActorSize, "opacity": 0.7, "limit": step - 8}, bottom, "actors"))
 	}
 	spec := map[string]any{
 		"width":  step * n,
@@ -194,4 +235,55 @@ func journeySpec(title string, tasks []journeyTask) map[string]any {
 		spec["title"] = map[string]any{"text": title, "anchor": "start"}
 	}
 	return spec
+}
+
+// journeyActorSize is the font size of the actors under a task.
+const journeyActorSize = 10
+
+// journeyWrap wraps a text into lines no wider than a width, as Mermaid
+// wraps the name of an actor: a text that fits stays one line. Else each
+// word goes on the line before it when the line still fits, and on a new
+// line when not. A word wider than the width breaks into parts that each
+// end with a hyphen. zuzu measures the text in the bundled font.
+func journeyWrap(s string, width float64) []string {
+	m := text.NewEstimate()
+	font := text.Font{Family: text.Family, Size: journeyActorSize, Weight: 400}
+	fits := func(t string) bool { return m.Width(font, t) <= width }
+	if fits(s) {
+		return []string{s}
+	}
+	var lines []string
+	line := ""
+	for word := range strings.SplitSeq(s, " ") {
+		test := word
+		if line != "" {
+			test = line + " " + word
+		}
+		if fits(test) {
+			line = test
+			continue
+		}
+		if line != "" {
+			lines = append(lines, line)
+		}
+		line = word
+		if fits(word) {
+			continue
+		}
+		// The word breaks before the first letter that makes the part
+		// with its hyphen too wide. A part keeps at least one letter.
+		part := ""
+		for _, r := range word {
+			if part != "" && !fits(part+string(r)+"-") {
+				lines = append(lines, part+"-")
+				part = ""
+			}
+			part += string(r)
+		}
+		line = part
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
 }
