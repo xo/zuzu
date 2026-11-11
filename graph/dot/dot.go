@@ -465,7 +465,7 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 			}
 		}
 	}
-	for k := range attrs {
+	for _, k := range slices.Sorted(maps.Keys(attrs)) {
 		switch k {
 		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "penwidth", "pencolor", "gradientangle":
 		default:
@@ -571,7 +571,8 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 	}
 	placed := false
 	e.LabelDistance, e.LabelAngle = 1, -25
-	for k, v := range a {
+	for _, k := range slices.Sorted(maps.Keys(a)) {
+		v := a[k]
 		switch k {
 		case "label", "headlabel", "taillabel", "xlabel":
 			var err error
@@ -678,7 +679,8 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 
 // graphAttrs reads the attributes of the graph.
 func (p *parser) graphAttrs(a map[string]string) error {
-	for k, v := range a {
+	for _, k := range slices.Sorted(maps.Keys(a)) {
+		v := a[k]
 		switch k {
 		case "label":
 			var err error
@@ -804,7 +806,7 @@ func (p *parser) finish() error {
 		} else if a["shape"] == "plain" {
 			n.Margin = []float64{0, 0}
 		}
-		for k := range a {
+		for _, k := range slices.Sorted(maps.Keys(a)) {
 			switch k {
 			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle":
 			case "sides", "skew", "distortion":

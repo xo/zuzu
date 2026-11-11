@@ -2,7 +2,9 @@ package mermaid
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -167,7 +169,8 @@ func (g *gantt) config() error {
 		}
 	}
 	cfg, _ := g.c.d.Config["gantt"].(map[string]any)
-	for k, v := range cfg {
+	for _, k := range slices.Sorted(maps.Keys(cfg)) {
+		v := cfg[k]
 		switch k {
 		case "axisFormat":
 			g.axisFormat, _ = v.(string)
