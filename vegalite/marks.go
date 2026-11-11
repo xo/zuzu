@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -59,6 +60,17 @@ func (u *unit) markOf() (*vega.Mark, error) {
 			styles = append(styles, expr.String(x))
 		}
 	}
+	if u.paintStyle != "" {
+		styles = append(styles, u.paintStyle)
+	}
+	// The styles of the look of zuzu, which the config of the theme gives
+	// (D14): the round end of a bar, and the ring of a point.
+	switch u.mark {
+	case "bar":
+		styles = append(styles, theme.StyleBar+u.orient)
+	case "point", "circle", "square":
+		styles = append(styles, theme.StylePoint)
+	}
 	m.Style = vega.List(styles...)
 	if c, ok := u.props["clip"].(bool); ok && c {
 		m.Clip = lit(true)
@@ -93,7 +105,9 @@ func (u *unit) markOf() (*vega.Mark, error) {
 func (u *unit) color(e enc) {
 	filled := true
 	switch u.mark {
-	case "point", "line", "rule", "trail":
+	case "line", "rule", "trail":
+		// A point is filled in the look of zuzu (docs/STYLE.md), and
+		// "filled": false keeps it hollow.
 		filled = false
 	}
 	if u.mark == "trail" {
@@ -110,14 +124,25 @@ func (u *unit) color(e enc) {
 	if filled {
 		prop = "fill"
 	}
-	ref := map[string]any{"value": defaultColor}
+	// A mark with no color of its own takes the color of the theme, through
+	// a style of its config (D14).
+	var ref map[string]any
 	if c, ok := u.props["color"].(string); ok {
 		ref = map[string]any{"value": c}
 	}
 	if c := u.channelRef("color"); c != nil {
 		ref = c
 	}
-	e.set(prop, ref)
+	switch {
+	case ref != nil:
+		e.set(prop, ref)
+	case u.mark == "text":
+		u.paintStyle = theme.StyleText
+	case filled:
+		u.paintStyle = theme.StyleFill
+	default:
+		u.paintStyle = theme.StyleStroke
+	}
 	if (u.mark == "point" || u.mark == "geoshape") && !filled {
 		e.set("fill", map[string]any{"value": "transparent"})
 	}
@@ -131,11 +156,6 @@ func (u *unit) color(e enc) {
 			e.set(name, c)
 		} else if v, ok := u.props[name]; ok {
 			e.set(name, map[string]any{"value": v})
-		}
-	}
-	if u.mark == "text" {
-		if _, ok := e["fill"]; !ok || u.ch["color"] == nil && u.props["color"] == nil {
-			e.set("fill", map[string]any{"value": "black"})
 		}
 	}
 }
@@ -249,9 +269,9 @@ func (u *unit) axis(e enc, ch, size string) {
 			e.set(p, map[string]any{"value": 0})
 			e.set(size, map[string]any{"field": map[string]any{"group": "height"}})
 		case ch == "x":
-			e.set(p, map[string]any{"signal": "width", "mult": 0.5})
+			e.set(p, map[string]any{"signal": u.v.sizeName(0), "mult": 0.5})
 		default:
-			e.set(p, map[string]any{"signal": "height", "mult": 0.5})
+			e.set(p, map[string]any{"signal": u.v.sizeName(1), "mult": 0.5})
 		}
 		return
 	}
@@ -437,9 +457,11 @@ func joinAnd(parts []string) string {
 
 // arc sets the angles and the radii of an arc from theta and radius.
 func (u *unit) arc(e enc) {
-	e.set("x", map[string]any{"signal": "width", "mult": 0.5})
-	e.set("y", map[string]any{"signal": "height", "mult": 0.5})
-	outer := map[string]any{"signal": "min(width,height)/2"}
+	// The size of a view in a facet or a concatenation has its own name.
+	w, h := u.v.sizeName(0), u.v.sizeName(1)
+	e.set("x", map[string]any{"signal": w, "mult": 0.5})
+	e.set("y", map[string]any{"signal": h, "mult": 0.5})
+	outer := map[string]any{"signal": "min(" + w + "," + h + ")/2"}
 	inner := map[string]any{"value": 0}
 	if r := u.ch["radius"]; r != nil && r.isField() {
 		if u.stack == "radius" {

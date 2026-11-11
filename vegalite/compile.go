@@ -20,7 +20,6 @@ const schemaVega = "https://vega.github.io/schema/vega/v6.json"
 const (
 	continuousSize = 300
 	discreteStep   = 20
-	defaultColor   = "#4c78a8"
 )
 
 // CompileOption is a setting of Compile.
@@ -162,6 +161,21 @@ func readConfig(raw []byte) *config {
 	return cfg
 }
 
+// styleConfig returns the styles of the config of a spec as a Vega config,
+// which the runtime applies to the marks that name them, as vega-lite.js
+// passes them on. It returns nil for a config with no styles.
+func styleConfig(raw []byte) vega.Config {
+	var m map[string]jsontext.Value
+	if len(raw) == 0 || json.Unmarshal(raw, &m) != nil {
+		return nil
+	}
+	st, ok := m["style"]
+	if !ok {
+		return nil
+	}
+	return vega.Config{"style": st}
+}
+
 // compile compiles the spec of the top level.
 func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	c.top = s
@@ -170,6 +184,7 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	if s.Description != nil {
 		out.Description = *s.Description
 	}
+	out.Config = styleConfig(s.Config)
 	out.Padding = s.Padding
 	if out.Padding.IsZero() {
 		out.Padding = lit(5)

@@ -11,6 +11,7 @@ import (
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -77,20 +78,30 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s/from: %w", path, err)
 	}
+	defaults := s.rt.markDefaults(m)
 	states := make([]*itemState, len(data))
 	for i, d := range data {
 		st := newItemState(d)
 		st.facet = i
+		for k, v := range defaults {
+			setProp(st, k, v)
+		}
 		if err := s.encodeItem(m.Encode, st, d, path); err != nil {
 			return nil, err
 		}
 		geometry(m.Type, st)
-		s.rt.defaultPaint(m.Type, st)
 		states[i] = st
 	}
 	if len(m.Transform) > 0 {
 		if states, err = s.transformItems(m, states, path); err != nil {
 			return nil, err
+		}
+	}
+	if r := expr.Number(defaults[theme.CornerRadiusEnd]); r > 0 && !encodesCorners(m) {
+		for _, st := range m.Style.List {
+			if o, ok := strings.CutPrefix(st, theme.StyleBar); ok {
+				roundEnds(states, o == "horizontal", r)
+			}
 		}
 	}
 	if m.Sort != nil && !m.Sort.Field.IsZero() {
@@ -694,27 +705,121 @@ func setItem(it *scene.Item, r dataflow.Row) {
 	}
 }
 
-// defaultPaint paints an item whose encodings set neither a fill nor a
-// stroke, as the config of Vega does, in the colors of the theme: the first
-// color of the series fills an arc, an area, a rect, a symbol and a trail,
-// and strokes a line, a path and a shape. The text color strokes a rule and
-// fills a text.
-func (rt *runtime) defaultPaint(typ string, st *itemState) {
-	if st.set["fill"] || st.set["stroke"] {
-		return
+// markDefaults returns the defaults of the items of a mark from the config
+// of the render, as Vega applies its config. First comes the config of
+// every mark and of the type of the mark, or of a group for a group, for
+// each property that the encoding of the mark does not set, with no fill
+// and no stroke when the encoding sets either. Then come the styles of the
+// mark in order, for each property that the encoding does not set.
+func (rt *runtime) markDefaults(m *vega.Mark) map[string]any {
+	encoded := map[string]bool{}
+	for _, props := range m.Encode {
+		for k := range props {
+			encoded[k] = true
+		}
 	}
-	color := ""
-	if len(rt.theme.Category) > 0 {
-		color = rt.theme.Category[0]
+	out := map[string]any{}
+	var props []map[string]any
+	if m.Type == scene.Group {
+		props = append(props, configMap(rt.config["group"]))
+	} else {
+		props = append(props, configMap(rt.config["mark"]), configMap(rt.config[m.Type]))
 	}
-	switch typ {
-	case scene.Arc, scene.Area, scene.Rect, scene.Symbol, scene.Trail:
-		st.it.Fill = scene.Paint{Color: color}
-	case scene.Line, scene.Path, scene.Shape:
-		st.it.Stroke = scene.Paint{Color: color}
-	case scene.Rule:
-		st.it.Stroke = scene.Paint{Color: rt.theme.Text}
-	case scene.Text:
-		st.it.Fill = scene.Paint{Color: rt.theme.Text}
+	paint := encoded["fill"] || encoded["stroke"]
+	for _, p := range props {
+		for k, v := range p {
+			if encoded[k] || paint && (k == "fill" || k == "stroke") {
+				continue
+			}
+			out[k] = v
+		}
 	}
+	styles := configMap(rt.config["style"])
+	for _, name := range m.Style.List {
+		for k, v := range configMap(styles[name]) {
+			if !encoded[k] {
+				out[k] = v
+			}
+		}
+	}
+	return out
+}
+
+// configMap returns a value of the config as an object, or nil.
+func configMap(v any) map[string]any {
+	m, _ := v.(map[string]any)
+	return m
+}
+
+// encodesCorners reports whether the encoding of a mark sets a corner.
+func encodesCorners(m *vega.Mark) bool {
+	for _, props := range m.Encode {
+		for k := range props {
+			if strings.HasPrefix(k, "cornerRadius") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// roundEnds rounds the end of each bar away from zero, the end at y, or at
+// x for a horizontal bar, with a radius. The bars at one place across form a
+// stack, and only the outermost bar of each side of the stack is rounded
+// (docs/STYLE.md).
+func roundEnds(states []*itemState, horizontal bool, r float64) {
+	type place struct{ at, size float64 }
+	type ends struct{ low, high *scene.Item }
+	stacks := map[place]*ends{}
+	var order []place
+	for _, st := range states {
+		it := st.it
+		p := place{math.Round(it.X*100) / 100, math.Round(it.Width*100) / 100}
+		end, start := it.Y, it.Y2
+		if horizontal {
+			p = place{math.Round(it.Y*100) / 100, math.Round(it.Height*100) / 100}
+			end, start = it.X, it.X2
+		}
+		e := stacks[p]
+		if e == nil {
+			e = &ends{}
+			stacks[p] = e
+			order = append(order, p)
+		}
+		switch {
+		case end < start:
+			if e.low == nil || end < value(e.low, horizontal) {
+				e.low = it
+			}
+		case end > start:
+			if e.high == nil || end > value(e.high, horizontal) {
+				e.high = it
+			}
+		}
+	}
+	for _, p := range order {
+		e := stacks[p]
+		if it := e.low; it != nil {
+			if horizontal {
+				it.CornerRadiusTopLeft, it.CornerRadiusBottomLeft = r, r
+			} else {
+				it.CornerRadiusTopLeft, it.CornerRadiusTopRight = r, r
+			}
+		}
+		if it := e.high; it != nil {
+			if horizontal {
+				it.CornerRadiusTopRight, it.CornerRadiusBottomRight = r, r
+			} else {
+				it.CornerRadiusBottomLeft, it.CornerRadiusBottomRight = r, r
+			}
+		}
+	}
+}
+
+// value returns the end of a bar: y, or x for a horizontal bar.
+func value(it *scene.Item, horizontal bool) float64 {
+	if horizontal {
+		return it.X
+	}
+	return it.Y
 }

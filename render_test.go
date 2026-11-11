@@ -230,7 +230,7 @@ func findMark(m *scene.Mark, name string) *scene.Mark {
 
 // TestLabelMarks runs the transform label on the text of the items of a
 // mark, and checks the places that it writes back, and the default paint of
-// a mark that sets none.
+// a mark that sets none, from the config of the theme.
 func TestLabelMarks(t *testing.T) {
 	t.Parallel()
 	src := []byte(`{"$schema": "https://vega.github.io/schema/vega/v5.json",
@@ -286,8 +286,9 @@ func TestLabelMarks(t *testing.T) {
 	if s := base.Items[0].Stroke.Color; s == "" {
 		t.Error("a rule with no stroke has no default stroke")
 	}
-	if s := points.Items[0].Stroke; !s.IsZero() {
-		t.Errorf("the symbol has the stroke %v, want none", s)
+	// A point has a ring in the background color (docs/STYLE.md).
+	if s := points.Items[0].Stroke.Color; s != "#ffffff" {
+		t.Errorf("the symbol has the stroke %q, want the ring #ffffff", s)
 	}
 }
 
@@ -328,5 +329,72 @@ func TestImage(t *testing.T) {
 	}
 	if share := float64(n) / float64(len(img.Pix)/4); share > 0.01 {
 		t.Errorf("%.2f%% of the pixels differ, more than 1%%", 100*share)
+	}
+}
+
+// TestBarEnds checks the look of zuzu on the bars of a Vega-Lite spec: the
+// color of the theme, and a round end only on the last bar of each stack,
+// which the config of the spec turns off.
+func TestBarEnds(t *testing.T) {
+	t.Parallel()
+	spec := func(config string) []byte {
+		return []byte(`{"$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+			"data": {"values": [{"a": "x", "b": 1, "c": "p"}, {"a": "x", "b": 2, "c": "q"}, {"a": "y", "b": 3, "c": "p"}]},
+			"mark": "bar",
+			"encoding": {"x": {"field": "a", "type": "nominal"}, "y": {"field": "b", "type": "quantitative", "aggregate": "sum"}, "color": {"field": "c"}}` + config + `}`)
+	}
+	bars := func(src []byte) []scene.Item {
+		t.Helper()
+		c, _, err := Parse(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, _, err := c.Render(t.Context(), WithLocation(time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []scene.Item
+		var walk func(m *scene.Mark)
+		walk = func(m *scene.Mark) {
+			for i := range m.Items {
+				if m.Type == scene.Rect && m.Role == "mark" {
+					out = append(out, m.Items[i])
+				}
+				for j := range m.Items[i].Items {
+					walk(&m.Items[i].Items[j])
+				}
+			}
+		}
+		walk(&s.Root)
+		return out
+	}
+	items := bars(spec(""))
+	if len(items) != 3 {
+		t.Fatalf("%d bars, want 3", len(items))
+	}
+	rounded := 0
+	for _, it := range items {
+		if it.CornerRadiusTopLeft == 3 && it.CornerRadiusTopRight == 3 {
+			rounded++
+		}
+		if it.CornerRadiusBottomLeft != 0 {
+			t.Errorf("a bar has a round bottom: %+v", it)
+		}
+	}
+	// The stack at x has two bars, and only its top one is round.
+	if rounded != 2 {
+		t.Errorf("%d bars have a round end, want 2", rounded)
+	}
+	for _, it := range bars(spec(`, "config": {"style": {"zuzu.bar.vertical": {"zuzu.cornerRadiusEnd": 0}}}`)) {
+		if it.CornerRadiusTopLeft != 0 {
+			t.Errorf("the config does not turn the round end off: %+v", it)
+		}
+	}
+	// A bar with no color takes the first color of the theme.
+	one := bars([]byte(`{"$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+		"data": {"values": [{"a": "x", "b": 1}]}, "mark": "bar",
+		"encoding": {"x": {"field": "a", "type": "nominal"}, "y": {"field": "b", "type": "quantitative"}}}`))
+	if len(one) != 1 || one[0].Fill.Color != "#5b6ee1" {
+		t.Errorf("the bar is %+v, want the fill #5b6ee1", one)
 	}
 }

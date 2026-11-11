@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"math/rand/v2"
 	"time"
@@ -38,9 +39,12 @@ type runtime struct {
 	locale    *format.Locale
 	rand      *rand.Rand
 	theme     theme.Theme
-	report    Report
-	progs     map[string]*expr.Program
-	root      *scope
+	// config is the config of the theme with the config of the spec over
+	// it (D14).
+	config map[string]any
+	report Report
+	progs  map[string]*expr.Program
+	root   *scope
 	// measure measures the width of text, for the guides and the bounds.
 	measure *text.Estimate
 	// err is the first error of a signal that an expression read, which
@@ -71,6 +75,13 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
 		rt.rand = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) //nolint:gosec // A chart asks for random data, not a secret (D28).
 	}
 	rt.theme = theme.New(o.mode, o.scheme)
+	rt.config = rt.theme.Config()
+	for k, raw := range c.spec.Config {
+		var v any
+		if err := json.Unmarshal(raw, &v); err == nil {
+			rt.config[k] = mergeConfig(rt.config[k], v)
+		}
+	}
 	rt.root = rt.newScope(nil, &c.spec.Scope, "", nil)
 	rt.root.builtins(c.spec)
 	return rt
@@ -702,4 +713,20 @@ func (s *scope) datasetOrItems(name string) ([]dataflow.Row, error) {
 		out[i] = s.itemDatum(s.findMarkType(name), &items[i])
 	}
 	return out, nil
+}
+
+// mergeConfig returns a value of a config with another over it: two objects
+// merge key by key, and any other value replaces the first.
+func mergeConfig(base, over any) any {
+	b, ok1 := base.(map[string]any)
+	o, ok2 := over.(map[string]any)
+	if !ok1 || !ok2 {
+		return over
+	}
+	out := make(map[string]any, len(b)+len(o))
+	maps.Copy(out, b)
+	for k, v := range o {
+		out[k] = mergeConfig(b[k], v)
+	}
+	return out
 }

@@ -317,6 +317,20 @@ of the look are not config values in Vega, such as the round corners of a
 bar, a label at the end of a line, or a halo behind a label. Those are the
 defaults of the zuzu renderer, and a theme can turn each one off.
 
+`theme.Theme.Config` gives the config of a theme. The runtime applies the
+config of every mark and of each type of mark to each property that an
+encoding does not set, with no fill and no stroke when the encoding sets
+either, and then the styles of the mark, as Vega does. The compiler of
+Vega-Lite writes no color for a mark with no color of its own. It names a
+style of the theme instead: `zuzu.fill`, `zuzu.stroke` or `zuzu.text`. It
+also names `zuzu.point` for a point and `zuzu.bar.vertical` or
+`zuzu.bar.horizontal` for a bar. The style of a bar holds
+`zuzu.cornerRadiusEnd`, the radius of the end of the bar away from zero,
+which the runtime gives only to the last bar of each stack. A spec turns it
+off with `{"config": {"style": {"zuzu.bar.vertical":
+{"zuzu.cornerRadiusEnd": 0}}}}`. A point of Vega-Lite is filled, as
+`docs/STYLE.md` draws it, and `"filled": false` keeps it hollow.
+
 The survey shows why a theme matters. Of the 13 libraries in
 `compare.html`, Vega, ECharts, ApexCharts, Mermaid, Highcharts and Matplotlib
 switch to dark with one setting, and Observable Plot takes the text color of

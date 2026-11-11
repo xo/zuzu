@@ -465,9 +465,18 @@ func fixed(v vega.Value) bool {
 }
 
 // hasMarkWithout reports whether the view has no channel on an axis, so
-// that its size is one step.
+// that its size is one step. A view of arcs, which place by theta and
+// radius, has the continuous size, as Vega-Lite gives it.
 func hasMarkWithout(v *view, ch string) bool {
-	return len(v.marks) > 0 && v.scales[v.key(ch)] == nil
+	if len(v.marks) == 0 || v.scales[v.key(ch)] != nil {
+		return false
+	}
+	for _, m := range v.marks {
+		if m.Type == "arc" {
+			return false
+		}
+	}
+	return true
 }
 
 // num writes a number as JavaScript does.
@@ -867,7 +876,7 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 	case "theta":
 		return vega.ScaleRange{Values: []vega.Value{lit(0), lit(2 * math.Pi)}}
 	case "radius":
-		return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "min(width,height)/2"}}}
+		return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: "min(" + v.sizeName(0) + "," + v.sizeName(1) + ")/2"}}}
 	case "angle":
 		return vega.ScaleRange{Values: []vega.Value{lit(0), lit(360)}}
 	}

@@ -21,15 +21,18 @@ var channelOrder = []string{
 
 // unit holds a single view while the compiler reads it.
 type unit struct {
-	c       *compiler
-	v       *view
-	mark    string
-	props   map[string]any
-	ch      map[string]*channelDef
-	detail  []*channelDef
-	tooltip []*channelDef
-	data    *dataNode
-	path    string
+	c     *compiler
+	v     *view
+	mark  string
+	props map[string]any
+	// paintStyle is the style of the theme that gives the color of a mark
+	// with no color of its own.
+	paintStyle string
+	ch         map[string]*channelDef
+	detail     []*channelDef
+	tooltip    []*channelDef
+	data       *dataNode
+	path       string
 	// stack is the channel that stacks, such as y, and stackBy the fields
 	// that it stacks by.
 	stack   string

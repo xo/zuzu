@@ -249,7 +249,12 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		child.scalePrefix, child.prefixAll = np, true
 	}
 	child.facetFields = extra
+	// The scale of theta is independent in a facet by default, as Vega-Lite
+	// documents it, so that each cell draws a whole pie.
 	indep, axisIndep := map[string]bool{}, map[string]bool{}
+	if _, ok := cell.Encoding["theta"]; ok {
+		indep["theta"] = true
+	}
 	if len(s.Resolve) > 0 {
 		var r struct {
 			Scale map[string]string `json:"scale"`
@@ -257,8 +262,11 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		}
 		if json.Unmarshal(s.Resolve, &r) == nil {
 			for ch, mode := range r.Scale {
-				if mode == "independent" && (ch == "x" || ch == "y") {
+				switch {
+				case mode == "independent" && (ch == "x" || ch == "y"):
 					indep[ch] = true
+				case mode == "shared" && ch == "theta":
+					delete(indep, "theta")
 				}
 			}
 			for ch, mode := range r.Axis {
@@ -287,6 +295,9 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		src.open = false
 	}
 	before := len(c.data)
+	// The child names its size child_width and child_height, which the
+	// marks of an arc and the projections read.
+	child.sizeNames = [2]string{cw, chh}
 	if err := c.view(cell, child, src, path+"/spec", repeat); err != nil {
 		return err
 	}
@@ -294,9 +305,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	if main == "" {
 		return c.issue(path+"/spec", "a facet whose cells draw no data, such as a facet of a facet")
 	}
-	// The child names its size child_width and child_height.
 	sizes := &vega.Spec{}
-	child.sizeNames = [2]string{cw, chh}
 	child.finish(sizes)
 	// The child draws in each cell, from the data of the cell. A facet
 	// sorted by an aggregate of a field facets the rows before the
