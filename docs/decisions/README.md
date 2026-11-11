@@ -44,4 +44,4 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D28](D028-random-numbers-are-random-and-the-caller-can-give-a-source.md) | Random numbers are random, and the caller can give a source | Decided |
 | [D29](D029-zuzu-builds-with-tinygo-for-webassembly-and-has-no-size.md) | zuzu builds with TinyGo for WebAssembly, and has no size target | Decided |
 | [D30](D030-the-transforms-and-the-scale-that-zuzu-adds-for-tiers-1-and-2.md) | The transforms and the scale that zuzu adds for tiers 1 and 2 | Decided |
-| [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Proposed |
+| [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Decided |

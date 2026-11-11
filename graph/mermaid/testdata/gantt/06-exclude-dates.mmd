@@ -1,0 +1,14 @@
+gantt
+    title Excluded dates and days
+    dateFormat DD-MM-YYYY
+    axisFormat %d %b
+    excludes weekends
+    %% week 7 is winter break
+    excludes 10-02-2025 11-02-2025 12-02-2025
+    excludes 2025-02-13, 14-02-2025
+    excludes Wednesday
+    section Work
+    plan    :p, 03-02-2025, 4d
+    build   :b, after p, 6d
+    test    :after b, 3d
+    release :milestone, 03-03-2025, 0d

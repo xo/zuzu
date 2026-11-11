@@ -1,0 +1,6 @@
+flowchart LR
+  subgraph S [Service]
+    s1 --> s2
+  end
+  client --> S
+  S --> db

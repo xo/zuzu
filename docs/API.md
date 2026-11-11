@@ -54,8 +54,10 @@ report, err = chart.SVG(ctx, w, zuzu.WithMode(theme.Dark))
 ```go
 package zuzu
 
-// Parse reads a Vega or a Vega-Lite spec. The $schema field decides which.
-// A spec without $schema needs WithDialect. Parse never guesses.
+// Parse reads a Vega or a Vega-Lite spec, or a diagram of DOT or Mermaid
+// (D31). The $schema field decides between Vega and Vega-Lite. A diagram
+// is found by its first word, as D31 says. Another source without $schema
+// needs WithDialect.
 func Parse(src []byte, opts ...Option) (*Chart, Report, error)
 
 // FromVega and FromVegaLite take a spec that a program built as Go values.
@@ -133,7 +135,7 @@ the wrong place does not compile.
 
 | Option | Default | What it sets |
 | --- | --- | --- |
-| `WithDialect(Dialect)` | from `$schema` | `Vega` or `VegaLite`, for a spec without `$schema` |
+| `WithDialect(Dialect)` | from `$schema`, or the first word of a diagram | `Vega`, `VegaLite`, `DOT` or `Mermaid` |
 | `WithStrict(bool)` | loose | the feature mode (D26) |
 | `WithFunction(name string, fn expr.Func)` | none | a Go function that an expression can call |
 | `WithEvaluator(expr.Evaluator)` | the native evaluator | the evaluator of expressions, such as the goja one (D9) |
@@ -154,6 +156,8 @@ the wrong place does not compile.
 | `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with |
 | `WithSize(width, height float64)` | from the spec | the size of the chart |
 | `WithRenderLogger(*slog.Logger)` | none | where a render logs |
+| `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
+| `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |
 
 A Go function cannot have two types, so the logger of a render is
 `WithRenderLogger`, and `WithLogger` is the logger of `Parse`.
@@ -190,6 +194,49 @@ func FSLoader(fsys fs.FS) Loader
 
 Without a loader, a spec with a `url` fails with an error that wraps
 `ErrNoLoader`, in either feature mode.
+
+### Icons
+
+A diagram names an icon as `name:icon`, such as `fa:user`. A render looks
+for it in the packs of `WithIcons`, then asks the icon loader. A name with
+no prefix names a built-in icon: `cloud`, `database`, `disk`, `internet` or
+`server`. A missing icon draws as a box with a question mark. It is an
+error in the strict mode and a line of the report in the loose mode
+(D31).
+
+```go
+// IconLoader gives the icons that no pack holds. zuzu asks it once for each
+// icon of a render.
+type IconLoader interface {
+	LoadIcon(ctx context.Context, req IconRequest) (io.ReadCloser, error)
+}
+
+// IconRequest names an icon: aws and lambda, for aws:lambda.
+type IconRequest struct {
+	Prefix, Name string
+}
+
+// IconLoaderFunc makes an IconLoader of a function.
+type IconLoaderFunc func(context.Context, IconRequest) (io.ReadCloser, error)
+
+// FSIconLoader reads <prefix>/<name>.svg, or else the pack of Iconify
+// <prefix>.json, from fsys.
+func FSIconLoader(fsys fs.FS) IconLoader
+```
+
+The bytes are an SVG document, an icon of Iconify, or a pack of Iconify.
+The package `icon` reads packs and icons, and zuzu bundles four packs, each
+in a package of its own: `icons/carbon`, `icons/fa`, `icons/mdi` and
+`icons/k8s`. Each has `Pack() *icon.Pack`.
+
+```go
+c, _, err := zuzu.Parse(src)
+// ...
+_, err = c.SVG(ctx, w, zuzu.WithIcons("fa", fa.Pack()), zuzu.WithIcons("fas", fa.Pack()))
+```
+
+An image of a node, `img: "url"` in Mermaid, comes through the loader of
+data, `WithLoader`, with the format `image`.
 
 ### Result sets
 

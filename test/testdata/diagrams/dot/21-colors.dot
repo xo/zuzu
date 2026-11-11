@@ -1,0 +1,2 @@
+digraph { node [style=filled, fillcolor=lightblue]; a [fillcolor="#ffcc00"]; b [color=red, penwidth=2];
+  c [fontcolor=blue]; a -> b [color=green]; b -> c [style=dashed]; a -> c [style=dotted, color="0.6 0.5 0.8"] }

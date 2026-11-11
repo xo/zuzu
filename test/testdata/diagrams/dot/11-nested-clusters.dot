@@ -1,0 +1,6 @@
+digraph {
+  subgraph cluster_outer { label="Outer"; x;
+    subgraph cluster_inner { label="Inner"; y -> z }
+    x -> y }
+  w -> x; z -> v
+}

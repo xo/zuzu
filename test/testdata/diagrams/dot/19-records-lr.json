@@ -1,0 +1,40 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,145.75,74.5",
+  "rankdir": "LR",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "a",
+      "height": "1.0347",
+      "label": "<p1> id|<p2> name|<p3> email",
+      "pos": "118.75,37.25",
+      "rects": "91.75,49.5,145.75,74 91.75,25,145.75,49.5 91.75,0.5,145.75,25",
+      "shape": "record",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 1,
+      "name": "b",
+      "height": "0.69444",
+      "label": "<k> user_id|total",
+      "pos": "27.875,49.25",
+      "rects": "0,49.25,55.75,73.75 0,24.75,55.75,49.25",
+      "shape": "record",
+      "width": "0.77431"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 1,
+      "head": 0,
+      "headport": "p1",
+      "pos": "e,91.75,61.75 55.75,61.5 67.125,61.5 72.435,61.626 80.303,61.699",
+      "tailport": "k"
+    }
+  ]
+}

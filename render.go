@@ -132,6 +132,9 @@ func (rt *runtime) render() (*scene.Scene, error) {
 		Width:  cw,
 		Height: ch,
 		Root:   scene.Mark{Type: scene.Group, Role: "frame", Name: "root", Items: []scene.Item{*item}},
+		// The licenses of the icons that the scene draws ask for these
+		// credits (D31).
+		Credits: rt.credits,
 	}
 	bg, err := s.signal("background")
 	if err != nil {

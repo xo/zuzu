@@ -1,0 +1,367 @@
+package dataflow
+
+import (
+	"fmt"
+	"math"
+	"strings"
+
+	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/graph"
+)
+
+// layered lays out a graph in ranks (D31). It runs on the rows of the
+// nodes, reads the edges and the clusters from the datasets that it names,
+// and makes one row for each node, each edge and each cluster, which the
+// field kind tells apart.
+func layered(p *params, rows []Row) ([]Row, error) {
+	str := func(name, def string) (*Accessor, error) {
+		if _, ok := p.t.Param(name); !ok {
+			return FieldAccessor(def), nil
+		}
+		return p.field(name)
+	}
+	edgesName, err := p.str("edges", "")
+	if err != nil {
+		return nil, err
+	}
+	if edgesName == "" {
+		return nil, fmt.Errorf("the edges: %w", ErrParam)
+	}
+	edges, err := p.env.Data(edgesName)
+	if err != nil {
+		return nil, err
+	}
+	clustersName, err := p.str("clusters", "")
+	if err != nil {
+		return nil, err
+	}
+	var clusters []Row
+	if clustersName != "" {
+		if clusters, err = p.env.Data(clustersName); err != nil {
+			return nil, err
+		}
+	}
+	fields := map[string]*Accessor{}
+	for name, def := range map[string]string{
+		"key": "key", "cluster": "cluster", "source": "source", "target": "target", "minlen": "minlen",
+		"weight": "weight", "rank": "rank", "width": "width", "height": "height", "label": "label", "shape": "shape",
+	} {
+		if fields[name], err = str(name, def); err != nil {
+			return nil, err
+		}
+	}
+	dir, err := p.str("direction", graph.TB)
+	if err != nil {
+		return nil, err
+	}
+	switch dir {
+	case graph.TB, graph.BT, graph.LR, graph.RL:
+	default:
+		return nil, fmt.Errorf("the direction %q: %w", dir, ErrParam)
+	}
+	num := func(name string, def float64) float64 {
+		if err != nil {
+			return 0
+		}
+		var v float64
+		v, err = p.number(name, def)
+		return v
+	}
+	rankSep, nodeSep, pad := num("rankSep", 40), num("nodeSep", 24), num("clusterPadding", 12)
+	fontSize, padding := num("fontSize", 11), num("padding", 8)
+	if err != nil {
+		return nil, err
+	}
+	as, err := p.as("x", "y", "width", "height", "rank", "order")
+	if err != nil {
+		return nil, err
+	}
+	te, _ := p.env.(TextEnv)
+	measure := func(v any, weight string) (float64, float64) {
+		if v == nil || expr.IsUndefined(v) {
+			return 0, 0
+		}
+		s := expr.String(v)
+		if s == "" {
+			return 0, 0
+		}
+		var text any = s
+		if strings.Contains(s, "\n") {
+			var lines []any
+			for l := range strings.SplitSeq(s, "\n") {
+				lines = append(lines, l)
+			}
+			text = lines
+		}
+		if te == nil {
+			n := float64(strings.Count(s, "\n") + 1)
+			return 0.6 * fontSize * float64(len(s)) / n, fontSize * n
+		}
+		return te.TextSize(text, "", fontSize, weight)
+	}
+	in := graph.LayoutInput{Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad}
+	text := func(r Row, f *Accessor) string {
+		v := f.Get(r)
+		if v == nil || expr.IsUndefined(v) {
+			return ""
+		}
+		return expr.String(v)
+	}
+	// A record lays its fields out across the ranks: side by side when the
+	// ranks run down, and one under another when they run across.
+	across := dir == graph.TB || dir == graph.BT
+	type record struct {
+		texts, ports []string
+		sizes        []float64
+	}
+	records := map[int]*record{}
+	medias := map[int]*media{}
+	for i, r := range rows {
+		fs, ok := r["fields"].([]any)
+		if !ok || len(fs) == 0 {
+			continue
+		}
+		rec := &record{}
+		ps, _ := r["ports"].([]any)
+		for j, f := range fs {
+			rec.texts = append(rec.texts, expr.String(f))
+			port := ""
+			if j < len(ps) && ps[j] != nil {
+				port = expr.String(ps[j])
+			}
+			rec.ports = append(rec.ports, port)
+		}
+		records[i] = rec
+	}
+	for i, r := range rows {
+		n := graph.LayoutNode{ID: text(r, fields["key"]), Cluster: text(r, fields["cluster"]), Rank: text(r, fields["rank"])}
+		kind, ok := graph.ShapeOf(text(r, fields["shape"]))
+		if !ok {
+			kind = "rounded"
+		}
+		n.Shape = kind
+		n.Width, n.Height = expr.Number(fields["width"].Get(r)), expr.Number(fields["height"].Get(r))
+		if rec, ok := records[i]; ok {
+			n.Width, n.Height = 0, 0
+			for _, t := range rec.texts {
+				tw, th := measure(t, "")
+				fw, fh := math.Max(tw+2*padding, 24), math.Max(th+1.6*padding, 24)
+				if across {
+					rec.sizes = append(rec.sizes, fw)
+					n.Width += fw
+					n.Height = math.Max(n.Height, fh)
+				} else {
+					rec.sizes = append(rec.sizes, fh)
+					n.Height += fh
+					n.Width = math.Max(n.Width, fw)
+				}
+			}
+		}
+		if m, ok := mediaOf(r, padding); ok {
+			medias[i] = m
+			m.tw, m.th = measure(fields["label"].Get(r), "")
+			if m.inline {
+				n.Width, n.Height = graph.NodeSize(kind, m.tw+m.w+4, math.Max(m.th, m.h), padding)
+			} else {
+				n.Shape = "rect"
+				n.Width, n.Height = math.Max(m.fw, m.tw), m.fh
+				if m.tw > 0 {
+					n.Height += 4 + m.th
+				}
+			}
+		}
+		if !(n.Width > 0) || !(n.Height > 0) {
+			tw, th := measure(fields["label"].Get(r), "")
+			n.Width, n.Height = graph.NodeSize(kind, tw, th, padding)
+		}
+		in.Nodes = append(in.Nodes, n)
+	}
+	index := map[string]int{}
+	for i, n := range in.Nodes {
+		index[n.ID] = i
+	}
+	// port returns the place of a port of a node from its center, or nil.
+	port := func(id string, v any) []float64 {
+		name, ok := v.(string)
+		if !ok || name == "" {
+			return nil
+		}
+		// A port of DOT can end in a side, as p:n, which zuzu does not
+		// follow.
+		name, _, _ = strings.Cut(name, ":")
+		i, ok := index[id]
+		if !ok {
+			return nil
+		}
+		rec, ok := records[i]
+		if !ok {
+			return nil
+		}
+		at := 0.0
+		for j, p := range rec.ports {
+			if p == name {
+				c := at + rec.sizes[j]/2
+				if across {
+					return []float64{c - in.Nodes[i].Width/2, 0}
+				}
+				return []float64{0, c - in.Nodes[i].Height/2}
+			}
+			at += rec.sizes[j]
+		}
+		return nil
+	}
+	for _, r := range edges {
+		e := graph.LayoutEdge{Source: text(r, fields["source"]), Target: text(r, fields["target"])}
+		e.SourcePort, e.TargetPort = port(e.Source, r["sourcePort"]), port(e.Target, r["targetPort"])
+		if m := expr.Number(fields["minlen"].Get(r)); m > 0 {
+			e.MinLen = int(m)
+		}
+		if w := expr.Number(fields["weight"].Get(r)); w > 0 {
+			e.Weight = w
+		}
+		if c, ok := r["constraint"].(bool); ok && !c {
+			e.NoConstraint = true
+		}
+		if c, ok := r["curve"].(string); ok {
+			e.Curve = c
+		}
+		lw, lh := measure(fields["label"].Get(r), "")
+		if lw > 0 {
+			e.LabelWidth, e.LabelHeight = lw+8, lh+4
+		}
+		in.Edges = append(in.Edges, e)
+	}
+	for _, r := range clusters {
+		c := graph.LayoutCluster{ID: text(r, fields["key"]), Parent: expr.String(r["parent"])}
+		if r["parent"] == nil {
+			c.Parent = ""
+		}
+		tw, th := measure(fields["label"].Get(r), "600")
+		if tw > 0 {
+			c.TitleWidth, c.TitleHeight = tw, th+4
+		}
+		in.Clusters = append(in.Clusters, c)
+	}
+	l, err := graph.Lay(in)
+	if err != nil {
+		return nil, fmt.Errorf("laying out the graph: %w: %w", ErrParam, err)
+	}
+	out := make([]Row, 0, len(rows)+len(edges)+len(clusters))
+	for i, r := range rows {
+		o := clone(r)
+		np := l.Nodes[i]
+		o["kind"] = "node"
+		o[as[0]], o[as[1]], o[as[2]], o[as[3]] = np.X, np.Y, np.Width, np.Height
+		o[as[4]], o[as[5]] = float64(np.Rank), float64(np.Order)
+		o["path"] = graph.ShapePath(in.Nodes[i].Shape, np.Width, np.Height)
+		o["textX"], o["textY"] = np.X, np.Y
+		if m, ok := medias[i]; ok {
+			m.place(o, np)
+		}
+		out = append(out, o)
+		rec, ok := records[i]
+		if !ok {
+			continue
+		}
+		o["path"] = graph.RecordPath(in.Nodes[i].Shape, np.Width, np.Height, across, rec.sizes)
+		at := 0.0
+		for j, t := range rec.texts {
+			f := clone(r)
+			f["kind"] = "field"
+			c := at + rec.sizes[j]/2
+			if across {
+				f["x"], f["y"] = np.X-np.Width/2+c, np.Y
+			} else {
+				f["x"], f["y"] = np.X, np.Y-np.Height/2+c
+			}
+			lines := []any{}
+			for l := range strings.SplitSeq(t, "\n") {
+				lines = append(lines, l)
+			}
+			f["lines"] = lines
+			at += rec.sizes[j]
+			out = append(out, f)
+		}
+	}
+	for i, r := range edges {
+		o := clone(r)
+		ep := l.Edges[i]
+		o["kind"] = "edge"
+		o["path"] = ep.Path
+		o["labelX"], o["labelY"] = ep.LabelX, ep.LabelY
+		o["labelWidth"], o["labelHeight"] = in.Edges[i].LabelWidth, in.Edges[i].LabelHeight
+		o["endX"], o["endY"], o["endAngle"] = ep.EndX, ep.EndY, ep.EndAngle
+		o["startX"], o["startY"], o["startAngle"] = ep.StartX, ep.StartY, ep.StartAngle
+		pts := make([]any, len(ep.Points))
+		for j, pt := range ep.Points {
+			pts[j] = []any{pt[0], pt[1]}
+		}
+		o["points"] = pts
+		out = append(out, o)
+	}
+	for i, r := range clusters {
+		o := clone(r)
+		cp := l.Clusters[i]
+		o["kind"] = "cluster"
+		o["x"], o["y"], o["width"], o["height"] = cp.X, cp.Y, cp.Width, cp.Height
+		o["depth"], o["titleX"], o["titleY"] = float64(cp.Depth), cp.TitleX, cp.TitleY
+		out = append(out, o)
+	}
+	return out, nil
+}
+
+// media is the icon or the image of a node, which the transform zuzu.icon
+// sized: the size of the icon, the size of its form, and the size of the
+// label.
+type media struct {
+	w, h, fw, fh, tw, th float64
+	form, pos            string
+	inline               bool
+}
+
+// mediaOf returns the media of a row of a node, or false for none.
+func mediaOf(r Row, padding float64) (*media, bool) {
+	w, h := expr.Number(r["mediaWidth"]), expr.Number(r["mediaHeight"])
+	if !(w > 0) || !(h > 0) {
+		return nil, false
+	}
+	m := &media{w: w, h: h, fw: w, fh: h, form: strOf(r["iconForm"]), pos: strOf(r["iconPos"])}
+	m.inline, _ = r["iconInline"].(bool)
+	switch m.form {
+	case "square", "rounded":
+		m.fw, m.fh = w+2*padding, h+2*padding
+	case "circle":
+		d := math.Hypot(w, h) + padding
+		m.fw, m.fh = d, d
+	default:
+		m.form = ""
+	}
+	return m, true
+}
+
+// place writes the places of the media and the label of a node: mediaX
+// and mediaY, the center of the icon, mediaLeft and mediaTop, its top
+// left, textX and textY, the center of the label, and formPath, the path of
+// the form around the icon.
+func (m *media) place(o Row, np graph.NodePlace) {
+	x, y := np.X, np.Y
+	if m.inline {
+		left := x - (m.w+4+m.tw)/2
+		o["mediaX"], o["mediaY"] = left+m.w/2, y
+		o["textX"] = left + m.w + 4 + m.tw/2
+	} else {
+		o["path"] = ""
+		top := y - np.Height/2
+		my, ty := top+m.fh/2, top+m.fh+4+m.th/2
+		if m.pos == "t" && m.tw > 0 {
+			ty, my = top+m.th/2, top+m.th+4+m.fh/2
+		}
+		o["mediaX"], o["mediaY"], o["textY"] = x, my, ty
+		if m.form != "" {
+			kind := map[string]string{"square": "rect", "rounded": "rounded", "circle": "circle"}[m.form]
+			o["formPath"] = graph.ShapePath(kind, m.fw, m.fh)
+		}
+	}
+	o["mediaLeft"] = expr.Number(o["mediaX"]) - m.w/2
+	o["mediaTop"] = expr.Number(o["mediaY"]) - m.h/2
+}

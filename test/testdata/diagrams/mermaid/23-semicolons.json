@@ -1,0 +1,1 @@
+{"nodes":[{"id":"a","label":"a","x":88,"y":34.5},{"id":"b","label":"b","x":88,"y":119.5},{"id":"c","label":"c","x":88,"y":204.5},{"id":"d","label":"d","x":88,"y":289.5}],"edges":[{"source":"a","target":"b","points":[[88,57],[88,97]]},{"source":"b","target":"c","points":[[88,142],[88,182]]},{"source":"c","target":"d","points":[[88,227],[88,267]]}],"clusters":[]}

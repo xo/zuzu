@@ -1,0 +1,19 @@
+wardley-beta
+title Link Types
+
+component User [0.90, 0.95]
+component App [0.75, 0.75]
+component API [0.60, 0.60]
+component Cache [0.65, 0.45]
+component Database [0.15, 0.80]
+component real-time processing [0.40, 0.30]
+
+User -> App
+App +> API
+API -> Database; persists
+API +<> Cache
+Cache +'backup'> Database
+App -.-> real-time processing
+real-time processing +< API
+
+evolve Cache 0.70

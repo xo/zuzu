@@ -1,0 +1,3 @@
+digraph { rankdir=LR; node [shape=record];
+  a [label="<p1> id|<p2> name|<p3> email"]; b [label="<k> user_id|total"];
+  b:k -> a:p1 }

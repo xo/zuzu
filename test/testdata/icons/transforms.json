@@ -1,0 +1,18 @@
+{"prefix":"t","width":24,"height":16,"left":1,"top":2,
+ "icons":{
+  "a":{"body":"<path d=\"M0 0h1v1z\"/>"},
+  "b":{"body":"<defs><linearGradient id=\"g\"/></defs><path fill=\"url(#g)\" d=\"M0 0h2\"/>","width":10,"height":30},
+  "r1":{"body":"<path d=\"M1 1h3\"/>","rotate":1},
+  "r2":{"body":"<path d=\"M1 1h3\"/>","rotate":2},
+  "r3":{"body":"<path d=\"M1 1h3\"/>","rotate":3,"left":0,"top":0},
+  "h":{"body":"<path d=\"M1 1h3\"/>","hFlip":true},
+  "v":{"body":"<path d=\"M1 1h3\"/>","vFlip":true},
+  "hv":{"body":"<path d=\"M1 1h3\"/>","hFlip":true,"vFlip":true}},
+ "aliases":{
+  "a1":{"parent":"a","rotate":1},
+  "a2":{"parent":"a1","hFlip":true},
+  "a3":{"parent":"a2","vFlip":true,"rotate":2},
+  "a4":{"parent":"h","hFlip":true},
+  "b1":{"parent":"b","rotate":3,"vFlip":true},
+  "b2":{"parent":"b","width":12},
+  "r5":{"parent":"r3","rotate":2}}}

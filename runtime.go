@@ -53,8 +53,12 @@ type runtime struct {
 	// it (D14).
 	config map[string]any
 	report Report
-	progs  map[string]*expr.Program
-	root   *scope
+	// icons holds each icon that the render loaded, and credits the
+	// attribution that their licenses ask for.
+	icons   map[string]iconEntry
+	credits []string
+	progs   map[string]*expr.Program
+	root    *scope
 	// measure measures the width of text, for the guides and the bounds.
 	measure *text.Estimate
 	// err is the first error of a signal that an expression read, which

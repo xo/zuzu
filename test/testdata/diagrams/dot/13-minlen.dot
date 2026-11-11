@@ -1,0 +1,1 @@
+digraph { a -> b [minlen=3]; a -> c; c -> b }

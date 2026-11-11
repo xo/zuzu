@@ -1,0 +1,22 @@
+{
+ "carbon": {
+  "count": 2808,
+  "sha256": "3d34867d1459b5b75012c67b354126e472fe767de33b13a7dc1057caff350273"
+ },
+ "fa": {
+  "count": 2000,
+  "sha256": "b818e028629398c96328b2125d1ca65025c45d9a37e0bbe7d8abc821ad023b46"
+ },
+ "k8s": {
+  "count": 38,
+  "sha256": "6a1e2092c3140e9d7dadc5f9fe0ae7a71614ef629d70a517e866d2619e71b57b"
+ },
+ "mdi": {
+  "count": 14001,
+  "sha256": "792f0861e93908ef6615c90aa7f0f95b2a495df95119de07ff0f8eac5a4ecfcc"
+ },
+ "transforms": {
+  "count": 15,
+  "sha256": "3e4a8d6e86f64d700f7c68ef002b58c9ca022b793cb86f68655e8785aa79843a"
+ }
+}

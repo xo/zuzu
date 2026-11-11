@@ -1,0 +1,9 @@
+flowchart TB
+  subgraph outer [Outer box]
+    x --> y
+    subgraph inner [Inner box]
+      y --> z
+    end
+  end
+  w --> x
+  z --> v

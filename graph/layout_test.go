@@ -1,0 +1,166 @@
+package graph
+
+import (
+	"fmt"
+	"math"
+	"math/rand/v2"
+	"reflect"
+	"strconv"
+	"testing"
+)
+
+// randomGraph makes a graph of n nodes and m edges, in clusters, from a
+// seed.
+func randomGraph(seed uint64, n, m int, clusters bool) LayoutInput {
+	r := rand.New(rand.NewPCG(seed, 1))
+	in := LayoutInput{}
+	if clusters {
+		in.Clusters = []LayoutCluster{{ID: "c0", TitleWidth: 20, TitleHeight: 12}, {ID: "c1", Parent: "c0", TitleWidth: 20, TitleHeight: 12}, {ID: "c2", TitleWidth: 20, TitleHeight: 12}}
+	}
+	for i := range n {
+		c := ""
+		if clusters {
+			c = []string{"", "c0", "c1", "c2"}[r.IntN(4)]
+		}
+		in.Nodes = append(in.Nodes, LayoutNode{ID: strconv.Itoa(i), Cluster: c, Width: 20 + float64(r.IntN(40)), Height: 20 + float64(r.IntN(20))})
+	}
+	for range m {
+		a, b := r.IntN(n), r.IntN(n)
+		e := LayoutEdge{Source: strconv.Itoa(a), Target: strconv.Itoa(b), MinLen: 1 + r.IntN(2)}
+		if r.IntN(4) == 0 {
+			e.LabelWidth, e.LabelHeight = 30, 12
+		}
+		in.Edges = append(in.Edges, e)
+	}
+	return in
+}
+
+// checkRules checks the hard rules of D31 on a layout: no two nodes
+// overlap, and each cluster holds its nodes and the clusters inside it.
+func checkRules(t *testing.T, name string, in LayoutInput, l *Layout) {
+	t.Helper()
+	for i, a := range l.Nodes {
+		for j := range i {
+			b := l.Nodes[j]
+			if math.Abs(a.X-b.X) < (a.Width+b.Width)/2-0.01 && math.Abs(a.Y-b.Y) < (a.Height+b.Height)/2-0.01 {
+				t.Errorf("%s: the nodes %s and %s overlap", name, in.Nodes[i].ID, in.Nodes[j].ID)
+			}
+		}
+	}
+	cidx := map[string]int{}
+	for i, c := range in.Clusters {
+		cidx[c.ID] = i
+	}
+	inside := func(c ClusterPlace, x1, y1, x2, y2 float64) bool {
+		return x1 >= c.X-0.01 && y1 >= c.Y-0.01 && x2 <= c.X+c.Width+0.01 && y2 <= c.Y+c.Height+0.01
+	}
+	for i, n := range in.Nodes {
+		if n.Cluster == "" {
+			continue
+		}
+		p := l.Nodes[i]
+		for c := n.Cluster; c != ""; c = in.Clusters[cidx[c]].Parent {
+			if !inside(l.Clusters[cidx[c]], p.X-p.Width/2, p.Y-p.Height/2, p.X+p.Width/2, p.Y+p.Height/2) {
+				t.Errorf("%s: the cluster %s does not hold the node %s", name, c, n.ID)
+			}
+		}
+	}
+	for i, c := range in.Clusters {
+		// A cluster that holds no node has no box.
+		if c.Parent == "" || l.Clusters[i].Width == 0 {
+			continue
+		}
+		b := l.Clusters[i]
+		if !inside(l.Clusters[cidx[c.Parent]], b.X, b.Y, b.X+b.Width, b.Y+b.Height) {
+			t.Errorf("%s: the cluster %s does not hold the cluster %s", name, c.Parent, c.ID)
+		}
+	}
+	// No node of another cluster lies in a cluster.
+	for i, c := range in.Clusters {
+		b := l.Clusters[i]
+		for j, n := range in.Nodes {
+			member := false
+			for x := n.Cluster; x != ""; x = in.Clusters[cidx[x]].Parent {
+				if x == c.ID {
+					member = true
+				}
+			}
+			p := l.Nodes[j]
+			if !member && p.X > b.X && p.X < b.X+b.Width && p.Y > b.Y && p.Y < b.Y+b.Height {
+				t.Errorf("%s: the node %s lies in the cluster %s", name, n.ID, c.ID)
+			}
+		}
+	}
+}
+
+func TestLayRules(t *testing.T) {
+	t.Parallel()
+	for seed := range uint64(40) {
+		for _, dir := range []string{TB, LR} {
+			in := randomGraph(seed, 4+int(seed%20), 3+int(seed%30), seed%2 == 0)
+			in.Direction = dir
+			l, err := Lay(in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			name := fmt.Sprintf("seed %d %s", seed, dir)
+			checkRules(t, name, in, l)
+			// The edges that keep their direction go down the ranks by at
+			// least their minlen, when no edge reverses them.
+			again, err := Lay(in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(l, again) {
+				t.Errorf("%s: two layouts differ", name)
+			}
+		}
+	}
+}
+
+func TestLayRanks(t *testing.T) {
+	t.Parallel()
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 10, Height: 10}, {ID: "b", Width: 10, Height: 10}, {ID: "c", Width: 10, Height: 10}, {ID: "d", Width: 10, Height: 10, Rank: "same"}, {ID: "e", Width: 10, Height: 10, Rank: "same"}},
+		Edges: []LayoutEdge{{Source: "a", Target: "b"}, {Source: "b", Target: "c", MinLen: 2}, {Source: "a", Target: "d"}, {Source: "c", Target: "e"}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := func(i int) int { return l.Nodes[i].Rank }
+	if r(1)-r(0) < 1 || r(2)-r(1) < 2 {
+		t.Errorf("the ranks %d %d %d do not keep the minlen", r(0), r(1), r(2))
+	}
+	if r(3) != r(4) {
+		t.Errorf("the nodes of one rank group have the ranks %d and %d", r(3), r(4))
+	}
+}
+
+func TestLayNoCrossings(t *testing.T) {
+	t.Parallel()
+	// Two chains that a first order crosses.
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 20, Height: 20}, {ID: "b", Width: 20, Height: 20}, {ID: "c", Width: 20, Height: 20}, {ID: "d", Width: 20, Height: 20}, {ID: "e", Width: 20, Height: 20}, {ID: "f", Width: 20, Height: 20}},
+		Edges: []LayoutEdge{{Source: "a", Target: "d"}, {Source: "b", Target: "c"}, {Source: "c", Target: "e"}, {Source: "d", Target: "f"}, {Source: "a", Target: "c"}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := Crossings(l); n != 0 {
+		t.Errorf("%d crossings, want 0", n)
+	}
+}
+
+func TestLayErrors(t *testing.T) {
+	t.Parallel()
+	for _, in := range []LayoutInput{
+		{Nodes: []LayoutNode{{ID: "a"}, {ID: "a"}}},
+		{Nodes: []LayoutNode{{ID: "a"}}, Edges: []LayoutEdge{{Source: "a", Target: "b"}}},
+	} {
+		if _, err := Lay(in); err == nil {
+			t.Errorf("%v lays out", in)
+		}
+	}
+}

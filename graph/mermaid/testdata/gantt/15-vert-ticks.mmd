@@ -1,0 +1,13 @@
+gantt
+    title Markers and weekly ticks
+    dateFormat YYYY-MM-DD
+    axisFormat %d/%m
+    tickInterval 1week
+    section Build
+    design :d1, 2024-04-01, 10d
+    code   :c1, after d1, 15d
+    freeze :vert, v1, 2024-04-20, 1d
+    ship   :milestone, after c1, 0d
+    section Run
+    deploy :crit, after c1, 3d
+    watch  :2w

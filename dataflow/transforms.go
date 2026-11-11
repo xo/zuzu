@@ -30,6 +30,8 @@ var transforms = map[string]transformFunc{
 	"countpattern":      countpattern,
 	"dotbin":            dotbin,
 	"force":             force,
+	"zuzu.layered":      layered,
+	"zuzu.icon":         iconOf,
 	"label":             label,
 	"geojson":           geojson,
 	"geopath":           geopath,

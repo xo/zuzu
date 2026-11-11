@@ -1,0 +1,1 @@
+digraph { a -> b:n; a:s -> c; b -> c [arrowhead=dot, arrowtail=inv, dir=both] }

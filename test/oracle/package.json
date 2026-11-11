@@ -4,6 +4,7 @@
   "description": "Runs vega.js and vega-lite.js over the corpus and writes the references of D17. See oracle.mjs.",
   "type": "module",
   "dependencies": {
+    "@iconify/utils": "3.1.7",
     "vega": "6.4.0",
     "vega-lite": "6.5.0"
   }

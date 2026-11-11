@@ -1,0 +1,21 @@
+wardley-beta
+title Pipeline Evolution
+size [800, 500]
+
+evolution Genesis@0.2 -> Custom@0.4 -> Product@0.75 -> Commodity@1.0
+
+anchor Analyst [0.90, 0.60]
+component Database [0.40, 0.60] label [-60, 10]
+component Reports [0.70, 0.70] label [10, -10]
+
+pipeline Database {
+  component "File System" [0.25]
+  component "SQL DB" [0.50]
+  component "NoSQL" [0.70]
+  component "Cloud DB" [0.85]
+}
+
+Analyst -> Reports
+Reports -> Database
+
+note "Pick a store per workload" [0.25, 0.30]

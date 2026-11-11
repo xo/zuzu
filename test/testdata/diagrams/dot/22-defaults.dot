@@ -1,0 +1,2 @@
+digraph { node [shape=box, style=rounded]; edge [arrowhead=vee, label=e];
+  a -> b; b -> c; edge [label=""]; c -> d }

@@ -94,7 +94,7 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 	if ax.Title, err = s.titleText(a.Title); err != nil {
 		return nil, err
 	}
-	count, err := s.num(a.TickCount, 0)
+	count, err := s.tickCount(a.TickCount, sc, ax)
 	if err != nil {
 		return nil, err
 	}
@@ -641,6 +641,40 @@ func (s *scope) num(v vega.Value, def float64) (float64, error) {
 		return def, err
 	}
 	return number(x, def), nil
+}
+
+// tickCount reads the tickCount of an axis: a number, or an interval of
+// time with a step, {"interval": "week", "step": 2}, which sets the values
+// of the ticks of a time scale.
+func (s *scope) tickCount(v vega.Value, sc scale.Scale, ax *layout.Axis) (float64, error) {
+	if v.IsZero() {
+		return 0, nil
+	}
+	x, err := s.value(v)
+	if err != nil {
+		return 0, err
+	}
+	m, ok := x.(map[string]any)
+	if !ok {
+		return number(x, 0), nil
+	}
+	unit := expr.String(m["interval"])
+	step := int(number(m["step"], 1))
+	dom := sc.Domain()
+	if len(dom) < 2 {
+		return 0, nil
+	}
+	t0, ok0 := dom[0].(time.Time)
+	t1, ok1 := dom[len(dom)-1].(time.Time)
+	ticks, ok := scale.IntervalTicks(t0, t1, unit, step)
+	if !ok0 || !ok1 || !ok {
+		return 0, s.rt.issue(vega.ErrUnsupported, "axis", "the tickCount %v of a scale of type %s", m, sc.Type())
+	}
+	ax.Values = make([]any, len(ticks))
+	for i, t := range ticks {
+		ax.Values[i] = t
+	}
+	return float64(len(ticks)), nil
 }
 
 // boolean reads a property that is a boolean or a signal.

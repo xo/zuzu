@@ -1,0 +1,15 @@
+gantt
+    title Tags in sections
+    dateFormat YYYY-MM-DD
+    section Alpha
+    plain          :2024-02-01, 4d
+    done task      :done, 3d
+    active task    :active, 5d
+    crit task      :crit, 2d
+    section Beta
+    crit done      :crit, done, 2024-02-03, 4d
+    crit active    :active, crit, 4d
+    crit milestone :crit, milestone, 2024-02-12, 0d
+    section Gamma
+    plain          :2024-02-05, 6d
+    review         :done, 2024-02-02, 2024-02-06

@@ -58,6 +58,9 @@ func Write(w io.Writer, s *scene.Scene) error {
 	if !s.Background.IsZero() {
 		bg = fmt.Sprintf(`<rect width="%s" height="%s"%s/>`, num(s.Width), num(s.Height), wr.paint("fill", s.Background))
 	}
+	if len(s.Credits) > 0 {
+		fmt.Fprintf(&doc, "<metadata>%s</metadata>", esc(strings.Join(s.Credits, "\n")))
+	}
 	if wr.defs.Len() != 0 {
 		fmt.Fprintf(&doc, "<defs>%s</defs>", wr.defs.String())
 	}
@@ -72,9 +75,12 @@ func Write(w io.Writer, s *scene.Scene) error {
 
 // writer holds the state of one call of Write.
 type writer struct {
-	out     *strings.Builder
-	defs    strings.Builder
-	ids     int
+	out  *strings.Builder
+	defs strings.Builder
+	ids  int
+	// images holds the id of each image in the definitions, by its
+	// attributes.
+	images  map[string]string
 	measure *text.Estimate
 }
 
@@ -277,13 +283,30 @@ func (w *writer) image(it *scene.Item) {
 		// document itself.
 		return
 	}
-	fmt.Fprintf(w.out, `<image x="%s" y="%s" width="%s" height="%s" href="%s"`,
-		num(it.X), num(it.Y), num(it.Width), num(it.Height), esc(it.URL))
+	// Each image of a URL of data goes once in the definitions, with its
+	// size, and each item uses it, so that an icon that draws many times
+	// writes its bytes once (D31).
+	var def strings.Builder
+	fmt.Fprintf(&def, `width="%s" height="%s" href="%s"`, num(it.Width), num(it.Height), esc(it.URL))
 	if it.Aspect != nil && !*it.Aspect {
-		w.out.WriteString(` preserveAspectRatio="none"`)
+		def.WriteString(` preserveAspectRatio="none"`)
 	}
 	if it.Smooth != nil && !*it.Smooth {
-		w.out.WriteString(` image-rendering="optimizeSpeed"`)
+		def.WriteString(` image-rendering="optimizeSpeed"`)
+	}
+	if !strings.HasPrefix(it.URL, "data:") {
+		fmt.Fprintf(w.out, `<image x="%s" y="%s" %s`, num(it.X), num(it.Y), def.String())
+	} else {
+		id, ok := w.images[def.String()]
+		if !ok {
+			if w.images == nil {
+				w.images = map[string]string{}
+			}
+			id = w.id("zi")
+			w.images[def.String()] = id
+			fmt.Fprintf(&w.defs, `<image id="%s" %s/>`, id, def.String())
+		}
+		fmt.Fprintf(w.out, `<use x="%s" y="%s" href="#%s"`, num(it.X), num(it.Y), id)
 	}
 	if it.Opacity != nil {
 		fmt.Fprintf(w.out, ` opacity="%s"`, num(*it.Opacity))

@@ -1,0 +1,1 @@
+{"nodes":[{"id":"a","label":"Ünïcödé","x":88,"y":34.5},{"id":"b","label":"日本語","x":280,"y":34.5},{"id":"c","label":"emoji ok","x":472,"y":34.5}],"edges":[{"source":"a","target":"b","points":[[164,34.5],[204,34.5]]},{"source":"b","target":"c","points":[[356,34.5],[396,34.5]]}],"clusters":[]}

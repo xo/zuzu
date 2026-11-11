@@ -12,8 +12,9 @@ On 2026-11-11 phases 0, 1 and 2 are done: a maintainer accepted
 `docs/targets/compare.html`. Phase 3 is done: zuzu runs static Vega
 specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is done: zuzu
 draws the charts of tiers 1 and 2. Phase 6 is done: `raster` draws a scene
-with okage directly. Code follows the plan (D3).
-The decisions run from D1 to D31. D31 is proposed, and the rest are decided. The open questions are at the end of `docs/PLAN.md`.
+with okage directly. Phase 7 is done: zuzu draws the diagrams of DOT
+and Mermaid of D31. Code follows the plan (D3).
+Every decision from D1 to D31 is decided. The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules
 
@@ -49,7 +50,7 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | naming a package | D21 |
 | deciding whether zuzu supports a feature of Vega | "The Vega subset" in [docs/PLAN.md](docs/PLAN.md), then D6 and D7 |
 | testing against vega.js or the corpus | "Conformance" in [docs/PLAN.md](docs/PLAN.md), then D17 |
-| working on DOT, Mermaid or a graph layout | "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18 |
+| working on DOT, Mermaid, icons or a graph layout | [docs/DIAGRAMS.md](docs/DIAGRAMS.md), then "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18 and D31 |
 | working on the browser component | "The browser" in [docs/PLAN.md](docs/PLAN.md), then D19 |
 | working on charts for `usql` | "usql" in [docs/PLAN.md](docs/PLAN.md), then D20 |
 | adding an outside package | D5, then the table of dependencies in [docs/PLAN.md](docs/PLAN.md) |
@@ -155,6 +156,7 @@ On 2026-11-10 the repository holds these files:
 | `docs/BACKLOG.md` | the work that is known and not done |
 | `docs/decisions/` | the decisions, one file each, with an index |
 | `docs/STYLE.md` | the rules and the tokens of the look (D12, D14) |
+| `docs/DIAGRAMS.md` | the parts of DOT and of Mermaid that zuzu reads (D31) |
 | `docs/survey/` | the survey of other libraries and the page that compares them (D23) |
 | `docs/targets/` | the script that draws the target SVGs and their gallery, which git ignores (D13) |
 | `*.go`, `testdata/` | the package `zuzu`: the API of D24 and the runtime that runs a spec, with its golden files, and the tests of the documents |
@@ -172,6 +174,9 @@ On 2026-11-10 the repository holds these files:
 | `svg/` | the SVG writer, with its golden files in `svg/testdata` (D10) |
 | `raster/` | the direct okage renderer (D11) |
 | `internal/shape/` | the geometry of the items as path data, which `svg` and `raster` share |
+| `graph/` | the model of a diagram, the layered layout and its compile to Vega, with the readers of DOT in `graph/dot` and of Mermaid in `graph/mermaid` (D31) |
+| `icon/` | the reader of icons of Iconify and of SVG, and the cleaning of an SVG (D31) |
+| `icons/` | the bundled packs of icons, one package each, each with its license (D31) |
 | `text/` | the measurement of text and the bundled IBM Plex Sans, in `text/fonts` with its license (D11, D16) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
 | `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |

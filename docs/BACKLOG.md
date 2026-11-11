@@ -29,13 +29,11 @@ name to it.
 
 ### Draw the rest of the marks in the look of zuzu
 
-The node of a graph in `docs/STYLE.md`, a rounded rectangle with a tint of
-its color and an outline of 1.25, is the node of a diagram of DOT or
-Mermaid, and comes with phase 7. A tooltip comes with the browser, in phase
-8. A scheme that a spec names, such as `blues`, takes a ramp of the theme, and a
-scheme of categories, such as `tableau10`, takes the colors of the
-categories of the theme. A Vega-Lite spec that vega-lite.js compiled, as
-the gallery draws it with `-vl=false`, still names `#4c78a8`.
+A tooltip comes with the browser, in phase 8. A scheme that a spec names,
+such as `blues`, takes a ramp of the theme, and a scheme of categories,
+such as `tableau10`, takes the colors of the categories of the theme. A
+Vega-Lite spec that vega-lite.js compiled, as the gallery draws it with
+`-vl=false`, still names `#4c78a8`.
 
 ### Make the grid layout follow the layout of Vega
 
@@ -69,6 +67,57 @@ A domain sorted with `sort: true` that mixes strings and numbers, such as
 the titles of `bar_grouped_thin`, has an order in vega.js that depends on the
 sort of JavaScript, which is not a total order on mixed types. zuzu sorts
 numbers before strings.
+
+## Phase 7
+
+### Draw the parts of Mermaid that draw another way
+
+1. A subgraph draws in the direction of the graph, not in its own.
+2. An edge to a subgraph ends at the first node of the subgraph, not at
+   its box.
+3. A named shape that zuzu does not draw yet, such as a shape of BPMN, draws
+   as a rounded rectangle.
+4. The properties of a link, such as `animate`, are issues.
+5. A side of a port of DOT, such as `:n`, and a label of HTML are issues.
+6. The error of the first line of a diagram says line 1, even after front
+   matter, because `Diagram` does not keep the number of that line.
+
+### Give a chart of Mermaid the time of the render
+
+A gantt draws no marker of today, and a `dateFormat` with no date, such as
+`HH:mm`, puts its tasks on 1970-01-01, because the compile has no time of
+the render. A time that the caller gives fixes both.
+
+### Fix the gaps of the Vega-Lite compiler that the charts found
+
+The compilers of the charts work around each of these:
+
+1. A bar on a continuous x with no width does not draw. Vega-Lite gives it
+   a size.
+2. A nominal y with a fixed height draws its first category at the bottom.
+   Vega-Lite draws it at the top.
+3. `y2: {datum}` is dropped, and `y2: {field}` beside a datum `y` takes the
+   value of `y`.
+4. A text mark of an arc does not read `theta` and `radius`.
+5. An axis has no `labelExpr` and no `titlePadding`. They are issues.
+6. A mark's own `style` goes before the style of its paint, so a mark cannot
+   take the colors of `zuzu.edge`, and an unfilled point draws with a
+   stroke in the color of the background.
+7. A rule of Vega-Lite with one item takes the look of a reference, and its
+   label writes a time as a number.
+
+### Fix the text of the direct renderer
+
+A rotated text whose mark holds a glyph that the font lacks, such as ❤,
+also draws a mirrored copy of each text. `dx` and `dy` on a rotated text
+move it on the page, not along the text as in Vega.
+
+### Give the look a color of a critical task
+
+A critical task of a gantt has an outline of `#e5484d`, which is not a
+token of `docs/STYLE.md`. A text on a leaf of a treemap takes the style
+`zuzu.edgeLabelBox` for the color of the background. A style of text on a
+color is cleaner.
 
 ## Themes
 

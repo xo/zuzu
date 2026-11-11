@@ -1,0 +1,3 @@
+digraph { a [shape=box]; b [shape=ellipse]; c [shape=circle]; d [shape=diamond];
+  e [shape=hexagon]; f [shape=cylinder]; g [shape=doublecircle]; h [shape=note]; i [shape=folder]; j [shape=house];
+  a -> b -> c -> d; a -> e -> f; d -> g; e -> h; h -> i; f -> j }

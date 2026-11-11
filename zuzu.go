@@ -19,6 +19,7 @@ import (
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/icon"
 	"github.com/xo/zuzu/raster"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
@@ -66,6 +67,10 @@ const (
 	Vega Dialect = iota + 1
 	// VegaLite is a Vega-Lite spec.
 	VegaLite
+	// DOT is a graph in the DOT language of Graphviz (D31).
+	DOT
+	// Mermaid is a diagram of Mermaid (D31).
+	Mermaid
 )
 
 // Option is a setting of Parse.
@@ -117,12 +122,23 @@ type Chart struct {
 	report Report
 }
 
-// Parse reads a Vega or a Vega-Lite spec. The $schema field decides which.
-// A spec without $schema needs WithDialect.
+// Parse reads a Vega or a Vega-Lite spec, or a diagram of DOT or Mermaid
+// (D31). The $schema field decides between Vega and Vega-Lite, and the
+// first word of a source finds a diagram. Another source needs
+// WithDialect.
 func Parse(src []byte, opts ...Option) (*Chart, Report, error) {
 	var o options
 	for _, opt := range opts {
 		opt(&o)
+	}
+	d := o.dialect
+	if d == DOT || d == Mermaid {
+		return parseDiagram(src, d, o)
+	}
+	if d == 0 {
+		if g := sniffDiagram(src); g != 0 {
+			return parseDiagram(src, g, o)
+		}
 	}
 	var head struct {
 		Schema string `json:"$schema"`
@@ -130,7 +146,6 @@ func Parse(src []byte, opts ...Option) (*Chart, Report, error) {
 	if err := json.Unmarshal(src, &head); err != nil {
 		return nil, nil, fmt.Errorf("reading the $schema of a spec: %w: %w", vega.ErrInvalidSpec, err)
 	}
-	d := o.dialect
 	switch {
 	case strings.Contains(head.Schema, "/vega-lite/"):
 		d = VegaLite
@@ -224,6 +239,8 @@ type renderOptions struct {
 	width      float64
 	height     float64
 	logger     *slog.Logger
+	icons      map[string]*icon.Pack
+	iconLoader IconLoader
 }
 
 // WithLoader sets how the data of a url is read (D25).

@@ -143,3 +143,42 @@ func TimeTickUnit(t0, t1 time.Time, count float64) (string, int) {
 	s := tickInterval(t0, t1, count)
 	return s.unit, s.step
 }
+
+// intervalUnits are the units of time of the tickCount of Vega, by the
+// names of the intervals of format.
+var intervalUnits = map[string]string{
+	"millisecond": "milliseconds", "second": "seconds", "minute": "minutes", "hour": "hours",
+	"day": "date", "week": "week", "month": "month", "year": "year",
+}
+
+// IntervalTicks returns the times from t0 to t1, inclusive, at the start
+// of every step of a unit, as a tickCount of Vega such as {"interval":
+// "week", "step": 2} asks for. A day and a unit below it count from the
+// start of the next unit up, as d3 counts them, and a week counts from the
+// first tick. It returns false for a unit that Vega does not name.
+func IntervalTicks(t0, t1 time.Time, unit string, step int) ([]time.Time, bool) {
+	name, ok := intervalUnits[unit]
+	if !ok {
+		return nil, false
+	}
+	if t1.Before(t0) {
+		t0, t1 = t1, t0
+	}
+	step = max(step, 1)
+	s := timeStep{unit: name, step: step}
+	iv := format.Interval(name)
+	var out []time.Time
+	n := 0
+	for t := iv.Ceil(t0); !t.After(t1) && len(out) < 10000; {
+		if name == "week" && n%step == 0 || name != "week" && s.on(t) {
+			out = append(out, t)
+		}
+		n++
+		next := iv.Floor(iv.Offset(t, 1))
+		if !next.After(t) {
+			break
+		}
+		t = next
+	}
+	return out, true
+}

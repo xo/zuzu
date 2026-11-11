@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/draw"
+	"image/jpeg"
 	"math"
 	"net/url"
 	"slices"
@@ -94,6 +96,8 @@ type drawer struct {
 	// the SVG writer measures it.
 	fonts   *okagesvg.Renderer
 	measure *text.Estimate
+	// images holds each image that the call decoded, by its URL.
+	images map[string]*picture
 }
 
 // mark draws one mark and its items, with the transform of its group.
@@ -515,19 +519,26 @@ func parseColor(s string, opacity float64) (okage.Color, bool) {
 	return okage.ColorFromRGBAUnchecked(ch(c.R), ch(c.G), ch(c.B), float32(math.Round(a*255))/255), true
 }
 
-// image draws an image item from a URL of data. An image that does not
-// decode, or whose URL is not data, draws nothing, as okage draws it from
-// SVG.
+// image draws an image item from a URL of data: a PNG, a JPEG or an SVG.
+// An image that does not decode, or whose URL is not data, draws nothing,
+// as okage draws it from SVG. Each URL decodes once in a call of Draw
+// (D31).
 func (d *drawer) image(it *scene.Item, ts okage.Transform) {
-	data, ok := dataURL(it.URL)
-	if !ok || it.Width <= 0 || it.Height <= 0 {
+	if it.Width <= 0 || it.Height <= 0 {
 		return
 	}
-	img, err := okage.DecodePNG(data)
-	if err != nil {
+	src, ok := d.images[it.URL]
+	if !ok {
+		src = d.decode(it.URL)
+		if d.images == nil {
+			d.images = map[string]*picture{}
+		}
+		d.images[it.URL] = src
+	}
+	if src == nil {
 		return
 	}
-	iw, ih := float64(img.Width()), float64(img.Height())
+	iw, ih := src.w, src.h
 	sx, sy := it.Width/iw, it.Height/ih
 	x, y := it.X, it.Y
 	if it.Aspect == nil || *it.Aspect {
@@ -537,12 +548,21 @@ func (d *drawer) image(it *scene.Item, ts okage.Transform) {
 		y += (it.Height - ih*k) / 2
 		sx, sy = k, k
 	}
+	opacity := float32(opacityOf(it.Opacity))
+	if src.tree != nil {
+		if opacity <= 0 {
+			return
+		}
+		t := ts.PreTranslate(float32(x), float32(y)).PreScale(float32(sx), float32(sy))
+		m := d.pm.AsMut()
+		okagesvg.Render(src.tree, t, &m)
+		return
+	}
 	quality := okage.FilterQualityBicubic
 	if it.Smooth != nil && !*it.Smooth {
 		quality = okage.FilterQualityNearest
 	}
-	opacity := float32(opacityOf(it.Opacity))
-	pattern := okage.NewPattern(img.AsRef(), okage.SpreadModePad, quality, opacity,
+	pattern := okage.NewPattern(src.pm.AsRef(), okage.SpreadModePad, quality, opacity,
 		okage.TransformFromRow(float32(sx), 0, 0, float32(sy), float32(x), float32(y)))
 	paint := okage.DefaultPaint()
 	paint.Shader = pattern
@@ -555,6 +575,61 @@ func (d *drawer) image(it *scene.Item, ts okage.Transform) {
 	if p, ok := pb.Finish(); ok {
 		d.pm.FillPath(p, &paint, okage.FillRuleWinding, ts, nil)
 	}
+}
+
+// picture is a decoded image: its pixels, or the tree of an SVG, and its
+// size.
+type picture struct {
+	pm   *okage.Pixmap
+	tree *okagesvg.Tree
+	w, h float64
+}
+
+// decode decodes the image of a URL of data, or returns nil.
+func (d *drawer) decode(u string) *picture {
+	data, ok := dataURL(u)
+	if !ok {
+		return nil
+	}
+	switch {
+	case bytes.HasPrefix(data, []byte("\x89PNG")):
+		img, err := okage.DecodePNG(data)
+		if err != nil {
+			return nil
+		}
+		return &picture{pm: img, w: float64(img.Width()), h: float64(img.Height())}
+	case bytes.HasPrefix(data, []byte("\xff\xd8")):
+		img, err := jpeg.Decode(bytes.NewReader(data))
+		if err != nil {
+			return nil
+		}
+		b := img.Bounds()
+		if b.Dx() <= 0 || b.Dy() <= 0 || b.Dx() > 1<<15 || b.Dy() > 1<<15 {
+			return nil
+		}
+		pm, ok := okage.NewPixmap(uint32(b.Dx()), uint32(b.Dy())) //nolint:gosec // The size is checked above.
+		if !ok {
+			return nil
+		}
+		rgba := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+		draw.Draw(rgba, rgba.Bounds(), img, b.Min, draw.Src)
+		copy(pm.DataMut(), rgba.Pix)
+		return &picture{pm: pm, w: float64(b.Dx()), h: float64(b.Dy())}
+	}
+	r := d.fonts
+	if r == nil {
+		r = okagesvg.New(okagesvg.WithLoadSystemFonts(false))
+	}
+	doc, err := r.Parse(data)
+	if err != nil {
+		return nil
+	}
+	tree := doc.Tree()
+	size := tree.Size()
+	if size.Width() <= 0 || size.Height() <= 0 {
+		return nil
+	}
+	return &picture{tree: tree, w: float64(size.Width()), h: float64(size.Height())}
 }
 
 // dataURL returns the bytes of a URL of data in base64 or in plain text.

@@ -139,6 +139,33 @@ The time zone is New York, so that the cases of local time cross a change
 of the clock. `oracle/exprs.mjs` reads the expressions from
 `expr/testdata/exprs.txt`.
 
+## Check the diagrams and the icons
+
+The test in `diagrams` checks the fixtures of DOT and of the flowcharts of
+Mermaid in `testdata/diagrams` against their references (D31). It asks that
+every node, edge, cluster and label of the reference exists, that the hard
+rules of the layout hold, and that the crossings and the span of the edges
+are no worse than those of the reference, plus 10 percent and 1. The
+references come from `dot -Tjson0` of Graphviz 16, and from `mmdc` of
+mermaid-cli 12.2.0, which bundles Mermaid 12.3.0, through `cmd/mmdcref`.
+Run this in this folder to write them again:
+
+```bash
+./oracle/diagrams.sh
+```
+
+If `mmdc` cannot find its Chrome, give it a config of puppeteer, a file
+that holds `{"executablePath": "..."}`, in `PUPPETEER_CONFIG`.
+
+The test in `icons` checks that the package `icon` reads each bundled icon
+with the same view box and the same body as `@iconify/utils`, and a small
+pack of turns and flips in `testdata/icons`. Run this in this folder after
+`npm install` in `oracle` to write the digests again:
+
+```bash
+node oracle/icons.mjs
+```
+
 ## Write the meshes of TopoJSON
 
 The test in `topojson` compares the mesh of a topology with the rows that

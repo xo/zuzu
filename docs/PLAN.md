@@ -852,7 +852,34 @@ Mermaid (D18).
 Exit: a set of fixtures for each language, with references from Graphviz
 and from Mermaid.
 
-D31 proposes the design on 2026-11-11, and waits for the maintainers.
+The maintainers accepted D31, the design of phase 7, on 2026-11-11.
+
+The package `graph` holds the model of a diagram, the layered layout and
+its compile to Vega. The layout ranks the nodes by network simplex, orders
+each rank by the weighted median, keeps each cluster in one block with a
+border in each rank, and places the nodes by the four alignments of Brandes
+and Köpf. An edge draws as a B-spline through the points of its chain, and
+its label sits on the curve. A record of DOT is a box of fields, and an edge
+to a port ends at its field. `docs/DIAGRAMS.md` lists the parts of DOT and
+of Mermaid that zuzu reads.
+
+The package `icon` reads icons of Iconify and of SVG, and cleans an SVG.
+The transform `zuzu.icon` gives an icon of one color as a path, and another
+icon or an image as a URL of data, which the SVG writer writes once in its
+definitions. The direct renderer draws a PNG, a JPEG and an SVG. Four packs
+are bundled under `icons/`.
+
+The test module checks 32 fixtures of DOT and 32 of the flowcharts of
+Mermaid against `dot -Tjson0` and `mmdc`, and every bundled icon against
+`@iconify/utils`. `test/README.md` says how to write the references again.
+
+The nine charts of Mermaid that D31 names compile to Vega-Lite or Vega in
+`graph/mermaid`, each with its fixtures. The plan of a gantt is worked out
+in Go, and its 16 fixtures give the same start and end of each task as
+mermaid.js. An axis of time reads a `tickCount` of an interval and a step.
+The known gaps are in `docs/BACKLOG.md`, under "Phase 7".
+
+On 2026-11-11 phase 7 is done.
 
 ### Phase 8. The browser
 
@@ -1058,5 +1085,5 @@ stays true.
     a list of the days to skip or a calendar of weekdays. Phase 5 waits for
     this answer to draw those four targets from a spec.
 
-16. Is D31, the design of the diagrams of DOT and Mermaid and of the
-    transform `zuzu.layered`, accepted? Phase 7 waits for this answer.
+16. Answered on 2026-11-11 by D31: the design of the diagrams of DOT and
+    Mermaid and of the transform `zuzu.layered` is accepted.

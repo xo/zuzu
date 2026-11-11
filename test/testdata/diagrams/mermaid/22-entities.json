@@ -1,0 +1,1 @@
+{"nodes":[{"id":"a","label":"A \"quote\"","x":88,"y":45},{"id":"b","label":"Line one\nline two","x":280,"y":45},{"id":"c","label":"x # y","x":472,"y":45}],"edges":[{"source":"a","target":"b","points":[[164,45],[204,45]]},{"source":"b","target":"c","points":[[356,45],[396,45]]}],"clusters":[]}

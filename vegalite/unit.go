@@ -3,6 +3,7 @@ package vegalite
 import (
 	"encoding/json/v2"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -107,6 +108,9 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 		}
 		d, err := readChannel(name, ch.Def(), repeat)
 		if err != nil {
+			return err
+		}
+		if err := guideKeys(c, path+"/encoding/"+name, name, d); err != nil {
 			return err
 		}
 		u.ch[name] = d
@@ -1094,4 +1098,36 @@ func producedFields(ts []Transform) map[string]bool {
 		walk(t.fields())
 	}
 	return out
+}
+
+// axisKeys and legendKeys are the properties of an axis and of a legend of
+// a channel that the compiler reads.
+var (
+	axisKeys = []string{"title", "grid", "orient", "format", "formatType", "labelAngle", "labelAlign", "labelOverlap",
+		"tickCount", "values", "domain", "labels", "ticks", "offset"}
+	legendKeys = []string{"title", "orient", "direction", "format", "type", "values", "symbolType", "columns"}
+)
+
+// guideKeys reports each property of the axis or the legend of a channel
+// that the compiler does not read, such as labelExpr.
+func guideKeys(c *compiler, path, name string, d *channelDef) error {
+	if d == nil || d.def == nil {
+		return nil
+	}
+	g, keys, kind := d.def.Axis, axisKeys, "an axis"
+	if !isPositional(name) {
+		g, keys, kind = d.def.Legend, legendKeys, "a legend"
+	}
+	m, ok := valueOf(g).(map[string]any)
+	if !ok {
+		return nil
+	}
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		if !slices.Contains(keys, k) {
+			if err := c.issue(path, "the property %s of %s", k, kind); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

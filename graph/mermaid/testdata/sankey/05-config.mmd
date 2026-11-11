@@ -1,0 +1,22 @@
+---
+config:
+  sankey:
+    nodeAlignment: left
+    linkColor: target
+    nodeWidth: 15
+    nodePadding: 20
+    prefix: "$"
+    suffix: " bn"
+    nodeColors:
+      Electricity grid: "#4e79a7"
+      Industry: "#e15759"
+---
+sankey
+
+Coal,Electricity grid,40
+Gas,Electricity grid,60
+Wind,Electricity grid,25
+Electricity grid,Industry,70
+Electricity grid,Homes,45
+Electricity grid,Losses,10
+Gas,Homes,20

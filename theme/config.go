@@ -49,6 +49,22 @@ const (
 	// the links of a sankey at 0.32 opacity and its nodes with round
 	// corners.
 	Sankey = "zuzu.sankey"
+	// StyleNode and the styles after it are the styles of the marks of a
+	// diagram of DOT or Mermaid (D31): a node,
+	// its label, an edge, its arrowheads, filled and open, its label and the
+	// box under the label, a cluster and its title, and an icon of one
+	// color, filled and stroked.
+	StyleNode         = "zuzu.node"
+	StyleNodeLabel    = "zuzu.nodeLabel"
+	StyleEdge         = "zuzu.edge"
+	StyleArrow        = "zuzu.arrow"
+	StyleArrowOpen    = "zuzu.arrow.open"
+	StyleEdgeLabel    = "zuzu.edgeLabel"
+	StyleEdgeLabelBox = "zuzu.edgeLabelBox"
+	StyleCluster      = "zuzu.cluster"
+	StyleClusterTitle = "zuzu.clusterTitle"
+	StyleIcon         = "zuzu.icon"
+	StyleIconStroke   = "zuzu.icon.stroke"
 	// StackGap is the property of a style of a bar that opens a gap of that
 	// width between the bars of a stack.
 	StackGap = "zuzu.stackGap"
@@ -102,6 +118,19 @@ func (t Theme) Config() map[string]any {
 			// the background between them.
 			StyleAreaStacked: map[string]any{"fillOpacity": 0.88, "stroke": t.Background, "strokeWidth": 1.0},
 			StyleCurve:       map[string]any{"interpolate": "monotone"},
+			// A node is a tint of its color with an outline of 1.25, and an
+			// edge a line of 1.25 in the color of the axis (D31).
+			StyleNode:         map[string]any{"fill": c, "fillOpacity": 0.14, "stroke": c, "strokeWidth": 1.25},
+			StyleNodeLabel:    map[string]any{"fill": t.Text, "fontSize": 11.0},
+			StyleEdge:         map[string]any{"stroke": t.Axis, "strokeWidth": 1.25, "strokeCap": "round", "strokeJoin": "round"},
+			StyleArrow:        map[string]any{"fill": t.Axis, "stroke": t.Axis, "strokeWidth": 1.0},
+			StyleArrowOpen:    map[string]any{"fill": t.Background, "stroke": t.Axis, "strokeWidth": 1.25},
+			StyleEdgeLabel:    map[string]any{"fill": t.Muted, "fontSize": 11.0},
+			StyleEdgeLabelBox: map[string]any{"fill": t.Background, "fillOpacity": 0.9, "cornerRadius": 3.0},
+			StyleCluster:      map[string]any{"fill": t.Panel, "stroke": t.Axis, "strokeWidth": 1.0, "cornerRadius": 6.0},
+			StyleClusterTitle: map[string]any{"fill": t.Muted, "fontSize": 11.0, "fontWeight": "600"},
+			StyleIcon:         map[string]any{"fill": c},
+			StyleIconStroke:   map[string]any{"stroke": c, "strokeCap": "round", "strokeJoin": "round"},
 		},
 	}
 }

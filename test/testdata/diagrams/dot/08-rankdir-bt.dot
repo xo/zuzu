@@ -1,0 +1,1 @@
+digraph { rankdir=BT; a -> b; a -> c; b -> d; c -> d }

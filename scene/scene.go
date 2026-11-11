@@ -22,6 +22,9 @@ type Scene struct {
 	Height     float64 `json:"height"`
 	Background Paint   `json:"background,omitzero"`
 	Root       Mark    `json:"root"`
+	// Credits are the attributions that the licenses of the icons of the
+	// scene ask for, which the SVG writer writes in its metadata (D31).
+	Credits []string `json:"credits,omitzero"`
 }
 
 // Mark is a mark of the scene graph: a kind of shape and its items. A group

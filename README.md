@@ -35,9 +35,9 @@ own design, at the quality of nivo and visx, with a light and a dark mode and
 color schemes that swap. zuzu renders the SVG to an image with
 [`okage`][okage], a pure Go port of resvg.
 
-Later, zuzu reads the DOT language of Graphviz and the syntax of Mermaid,
-sends live charts to a web browser, and draws the results of a query for
-[`usql`][usql].
+zuzu also reads the DOT language of Graphviz and the syntax of Mermaid, and
+draws a diagram in the same look. Later, zuzu sends live charts to a web
+browser, and draws the results of a query for [`usql`][usql].
 
 # Status
 
@@ -52,7 +52,10 @@ Vega-Lite specs. Phase 5 added the transforms of statistics, hierarchies,
 maps, contours and labels, and the transforms and the scale of zuzu for
 sankeys, chord diagrams, hex bins and trading days. Phase 6 added
 `raster`, which draws a chart with okage directly, without SVG, and
-`Chart.Image`.
+`Chart.Image`. Phase 7 added the diagrams of DOT and Mermaid: a layered
+layout of graphs, the flowchart and nine charts of Mermaid, and icons, with
+four packs bundled. [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what zuzu
+reads.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.
 
@@ -106,6 +109,7 @@ of vega.js for each, measures how far zuzu agrees with Vega.
 | [`docs/decisions/`](docs/decisions/README.md) | every decision, one file each, with an index |
 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | the work that is known and not done |
 | [`docs/STYLE.md`](docs/STYLE.md) | the rules and the tokens of the look, the modes and the color schemes |
+| [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) | the parts of DOT and of Mermaid that zuzu reads |
 | [`docs/targets/`](docs/targets/README.md) | the target SVGs that show the look zuzu aims for |
 | [`docs/survey/`](docs/survey/README.md) | the survey of other libraries, and the page that compares them |
 | [`AGENTS.md`](AGENTS.md) | the rules for a coding agent, which apply to a person too |

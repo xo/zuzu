@@ -1,0 +1,1 @@
+{"nodes":[{"id":"x","label":"x","x":472,"y":34.5},{"id":"y","label":"y","x":280,"y":34.5},{"id":"z","label":"z","x":88,"y":34.5}],"edges":[{"source":"x","target":"y","points":[[396,34.5],[356,34.5]]},{"source":"y","target":"z","points":[[204,34.5],[164,34.5]]}],"clusters":[]}
