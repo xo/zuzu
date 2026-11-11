@@ -16,6 +16,9 @@ type chart struct {
 	// line is the number of the line that the compile reads, for the
 	// report.
 	line int
+	// acc holds the texts of accTitle and accDescr, which join into the
+	// description of the spec.
+	acc []string
 }
 
 // add reports a part of the source that zuzu does not draw: an error in
@@ -81,6 +84,9 @@ func Chart(d *Diagram, strict bool) ([]byte, bool, vega.Report, error) {
 		spec["$schema"] = "https://vega.github.io/schema/vega-lite/v6.json"
 	} else {
 		spec["$schema"] = "https://vega.github.io/schema/vega/v5.json"
+	}
+	if _, ok := spec["description"]; !ok && len(c.acc) > 0 {
+		spec["description"] = strings.Join(c.acc, " ")
 	}
 	if _, ok := spec["title"]; !ok && d.Title != "" {
 		spec["title"] = map[string]any{"text": d.Title, "anchor": "start"}

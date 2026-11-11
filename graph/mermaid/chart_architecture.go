@@ -167,7 +167,7 @@ func (a *arch) parse(spec map[string]any) error {
 			spec["title"] = map[string]any{"text": rest, "anchor": "start"}
 			continue
 		}
-		j, ok, err := c.skipAccessibility(lines, i)
+		j, ok, err := c.accessibility(lines, i)
 		if err != nil {
 			return err
 		}

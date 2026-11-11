@@ -37,6 +37,27 @@ type flowchart struct {
 	wrap     wrapping
 	nodeWrap float64
 	markdown map[string]bool
+	// edgeClasses are the classes of each edge with an id, in order.
+	edgeClasses map[string][]string
+	// head holds the statements after the direction on the first line,
+	// with a semicolon between them.
+	head []string
+	// cont is the last group of nodes of a chain that ends a line, which
+	// a line that starts with a link goes on from. pending is a link at
+	// the end of a line, which goes to the first group of nodes of the
+	// next line.
+	cont    []string
+	pending *pendingLink
+	// acc holds the texts of accTitle and accDescr, which join into the
+	// description of the graph.
+	acc []string
+}
+
+// pendingLink is a link at the end of a line and the group of nodes that
+// it goes from.
+type pendingLink struct {
+	from []string
+	l    *link
 }
 
 func newFlowchart(d *Diagram, strict bool) *flowchart {
@@ -45,7 +66,7 @@ func newFlowchart(d *Diagram, strict bool) *flowchart {
 		nodes: map[string]*graph.Node{}, classes: map[string]map[string]string{}, nodeClasses: map[string][]string{},
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
-		nodeWrap: nodeWrap, markdown: map[string]bool{},
+		nodeWrap: nodeWrap, markdown: map[string]bool{}, edgeClasses: map[string][]string{},
 	}
 }
 
@@ -100,7 +121,9 @@ func (f *flowchart) config() error {
 		}
 		f.curve = vc
 	}
-	if h := strings.Fields(f.d.Header); len(h) > 0 {
+	head := statements(f.d.Header)
+	f.head = head[1:]
+	if h := strings.Fields(head[0]); len(h) > 0 {
 		dir, err := direction(h[0])
 		if err != nil {
 			return fmt.Errorf("line %d: %w", f.d.N, err)
@@ -122,20 +145,29 @@ func direction(s string) (string, error) {
 	return "", fmt.Errorf("the direction %s: %w", s, ErrSyntax)
 }
 
-// statements splits a line at each semicolon outside quotes and brackets.
+// entityEnd matches the start of an entity, such as #quot or #35, at the
+// end of a text, so that the semicolon after it does not end a statement.
+var entityEnd = regexp.MustCompile(`#(?:[A-Za-z]+|\d+)$`)
+
+// statements splits a line at each semicolon outside quotes, brackets and
+// the text of a link between pipes. The semicolon at the end of an
+// entity, such as #quot, does not split.
 func statements(s string) []string {
 	var out []string
-	depth, quote, start := 0, false, 0
+	depth, quote, pipe, start := 0, false, false, 0
 	for i := range len(s) {
 		switch c := s[i]; {
 		case c == '"':
 			quote = !quote
 		case quote:
+		case c == '|':
+			pipe = !pipe
+		case pipe:
 		case c == '[' || c == '(' || c == '{':
 			depth++
 		case c == ']' || c == ')' || c == '}':
 			depth--
-		case c == ';' && depth <= 0:
+		case c == ';' && depth <= 0 && !entityEnd.MatchString(s[start:i]):
 			out = append(out, s[start:i])
 			start = i + 1
 		}
@@ -147,22 +179,54 @@ func statements(s string) []string {
 // as a string of markdown, can run over more lines, and each new line in it
 // starts a new line of the label.
 func (f *flowchart) parse() error {
-	for _, l := range joinOpen(f.d.Lines, `"`) {
+	lines, err := f.accessibility(f.d.Lines)
+	if err != nil {
+		return err
+	}
+	if len(f.head) > 0 {
+		lines = append([]Line{{Text: strings.Join(f.head, ";"), N: f.d.N}}, lines...)
+	}
+	for _, l := range joinOpen(lines, `"`) {
 		f.line = l.N
+		var sts []string
 		for _, st := range statements(l.Text) {
-			st = strings.TrimSpace(st)
-			if st == "" {
-				continue
+			if st = strings.TrimSpace(st); st != "" {
+				sts = append(sts, st)
 			}
-			if err := f.stmt(st); err != nil {
+		}
+		for i, st := range sts {
+			if err := f.stmt(st, i == 0, i == len(sts)-1); err != nil {
 				return err
 			}
 		}
+	}
+	if f.pending != nil {
+		return fmt.Errorf("line %d: a link with no node after it: %w", f.line, ErrSyntax)
 	}
 	if len(f.clusters) > 0 {
 		return fmt.Errorf("a subgraph with no end: %w", ErrSyntax)
 	}
 	return f.finish()
+}
+
+// accessibility takes the lines of accTitle and accDescr out of the
+// lines, and keeps their texts for the description of the graph. An
+// accDescr in braces runs over more lines.
+func (f *flowchart) accessibility(lines []Line) ([]Line, error) {
+	var out []Line
+	for i := 0; i < len(lines); i++ {
+		if !accRE.MatchString(lines[i].Text) {
+			out = append(out, lines[i])
+			continue
+		}
+		text, n, ok := ganttAccText(lines, i)
+		if !ok {
+			return nil, fmt.Errorf("line %d: an accDescr with no end brace: %w", lines[i].N, ErrSyntax)
+		}
+		f.acc = append(f.acc, text)
+		i = n
+	}
+	return out, nil
 }
 
 func (f *flowchart) cluster() string {
@@ -172,10 +236,35 @@ func (f *flowchart) cluster() string {
 	return f.clusters[len(f.clusters)-1].ID
 }
 
-// stmt reads one statement.
-func (f *flowchart) stmt(st string) error {
+// keywords are the first words of the statements that are not chains.
+var keywords = []string{"subgraph", "end", "direction", "classDef", "class", "style", "linkStyle", "click", "callback", "href"}
+
+// stmt reads one statement. first and last say whether it is the first
+// and the last statement of its line. A chain goes on from the line
+// before when the line before ends with a link, or when the statement is
+// the first of its line and starts with a link, as Mermaid reads a link
+// over a line break.
+func (f *flowchart) stmt(st string, first, last bool) error {
 	word, rest, _ := strings.Cut(st, " ")
 	rest = strings.TrimSpace(rest)
+	cont := f.cont
+	f.cont = nil
+	if p := f.pending; p != nil {
+		f.pending = nil
+		if slices.Contains(keywords, word) {
+			return fmt.Errorf("line %d: a link with no node after it: %w", f.line, ErrSyntax)
+		}
+		sc := &scanner{s: st}
+		next, err := f.group(sc)
+		if err != nil {
+			return err
+		}
+		f.connect(p.from, next, p.l)
+		return f.links(sc, next, last)
+	}
+	if first && cont != nil && startsLink(st) {
+		return f.links(&scanner{s: st}, cont, last)
+	}
 	switch word {
 	case "subgraph":
 		return f.subgraph(rest)
@@ -210,6 +299,12 @@ func (f *flowchart) stmt(st string) error {
 		ids, name, _ := strings.Cut(rest, " ")
 		for id := range strings.SplitSeq(ids, ",") {
 			id = strings.TrimSpace(id)
+			// The id of an edge, as in A e1@--> B, gives the class to the
+			// edge.
+			if _, ok := f.edgeIDs[id]; ok {
+				f.edgeClasses[id] = append(f.edgeClasses[id], strings.TrimSpace(name))
+				continue
+			}
 			f.node(id)
 			f.nodeClasses[id] = append(f.nodeClasses[id], strings.TrimSpace(name))
 		}
@@ -230,10 +325,22 @@ func (f *flowchart) stmt(st string) error {
 		return f.linkStyle(rest)
 	case "click", "callback", "href":
 		return f.add("the interaction %s", word)
-	case "accTitle:", "accDescr:", "accTitle", "accDescr":
-		return f.add("the accessibility text %s", strings.TrimSuffix(word, ":"))
 	}
-	return f.chain(st)
+	sc := &scanner{s: st}
+	group, err := f.group(sc)
+	if err != nil {
+		return err
+	}
+	return f.links(sc, group, last)
+}
+
+// startsLink reports whether a statement starts with a link, with no id
+// of an edge before it.
+func startsLink(st string) bool {
+	if edgeIDRE.MatchString(st) {
+		return false
+	}
+	return (&scanner{s: st}).link() != nil
 }
 
 // subgraph opens a subgraph: subgraph id, subgraph id[title], subgraph
@@ -321,12 +428,29 @@ func (sc *scanner) id() string {
 }
 
 // linkRE matches a link with no text, or with its text between pipes after
-// it. textLinkRE matches a link with its text in its middle.
+// it: a normal, a thick, a dotted or an invisible link. A dotted link is
+// a dash, if any, then dots, then a dash, as in .-> or -..->.
 var (
-	linkRE     = regexp.MustCompile(`^([<ox])?(-{2,}|={2,}|-\.+-|~{3,})(>|[ox](?:[^A-Za-z0-9_]|$))?`)
-	textLinkRE = regexp.MustCompile(`(?s)^([<ox])?(--|==|-\.)\s*([^-=.>].*?)\s*(-{2,}|={2,}|\.+-)([>ox])?(?:\s|$)`)
-	edgeIDRE   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)@([-=~<ox.])`)
+	linkRE   = regexp.MustCompile(`^([<ox])?(-{2,}|={2,}|-?\.+-|~{3,})(>|[ox](?:[^A-Za-z0-9_]|$))?`)
+	edgeIDRE = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)@([-=~<ox.])`)
 )
+
+// textLinks are the links with their text in their middle, by kind. Each
+// pattern matches the mark before the start, the start, the blanks after
+// it, the text, and the end with its head. A head can touch the node
+// after it, as in A-- text -->B. A normal or a thick end with no head can
+// also end at a blank, which Mermaid does not read.
+// plain holds the marks that, right after the start, make a link with no
+// text instead, such as the - of --- or the > of -->.
+var textLinks = []struct {
+	re    *regexp.Regexp
+	kind  string
+	plain string
+}{
+	{regexp.MustCompile(`(?s)^([<ox])?(--)(\s*)(.+?)\s*(-{2,})([->ox]|\s|$)`), "normal", "->ox"},
+	{regexp.MustCompile(`(?s)^([<ox])?(==)(\s*)(.+?)\s*(={2,})([=>ox]|\s|$)`), "thick", "=>ox"},
+	{regexp.MustCompile(`(?s)^([<ox])?(-\.)(\s*)(.+?)\s*(-?\.+-)([>ox]?)`), "dotted", ".-"},
+}
 
 // link is a link between two groups of nodes.
 type link struct {
@@ -347,17 +471,6 @@ func (sc *scanner) link() *link {
 		l.id = m[1]
 		sc.i += len(m[1]) + 1
 		r = sc.s[sc.i:]
-	}
-	arrow := func(c string) string {
-		switch c {
-		case ">", "<":
-			return "normal"
-		case "o":
-			return "circle"
-		case "x":
-			return "cross"
-		}
-		return "none"
 	}
 	body := func(b string, hasHead bool) {
 		switch {
@@ -381,12 +494,28 @@ func (sc *scanner) link() *link {
 			}
 		}
 	}
-	if m := textLinkRE.FindStringSubmatch(r); m != nil && !strings.HasPrefix(strings.TrimSpace(m[3]), "|") {
-		l.tail, l.head = arrow(m[1]), arrow(m[5])
-		l.text, l.markdown = label(m[3]), isMarkdown(m[3])
-		body(m[4], m[5] != "")
-		if strings.HasPrefix(m[2], "-.") {
-			l.kind = "dotted"
+	for _, t := range textLinks {
+		m := t.re.FindStringSubmatch(r)
+		if m == nil || strings.HasPrefix(m[4], "|") || m[3] == "" && strings.ContainsAny(m[4][:1], t.plain) {
+			continue
+		}
+		end, head := m[5], strings.TrimSpace(m[6])
+		if head == "-" || head == "=" {
+			end, head = end+head, ""
+		}
+		l.text, l.markdown = label(m[4]), isMarkdown(m[4])
+		body(end, head != "")
+		l.kind = t.kind
+		// Mermaid reads the mark before the start only when it is the
+		// head of the end, as in <-- text -->. Another mark, as in
+		// <-- text ---, makes a link that Mermaid draws as -->.
+		l.head, l.tail = arrow(head), "none"
+		switch {
+		case m[1] == "":
+		case arrow(m[1]) == l.head:
+			l.tail = l.head
+		default:
+			l.kind, l.head, l.minlen = "normal", "normal", 1
 		}
 		sc.i += len(m[0])
 		return l
@@ -399,8 +528,18 @@ func (sc *scanner) link() *link {
 	if len(head) > 1 {
 		head = head[:1]
 	}
-	l.tail, l.head = arrow(m[1]), arrow(head)
+	l.head, l.tail = arrow(head), "none"
 	body(m[2], head != "")
+	// Mermaid reads the mark before a link with no text only when it is
+	// the head, as in <--> or o--o. Another mark counts in the length of
+	// a normal or a thick link.
+	switch {
+	case m[1] == "":
+	case arrow(m[1]) == l.head:
+		l.tail = l.head
+	case l.kind == "normal" || l.kind == "thick":
+		l.minlen++
+	}
 	sc.i += len(m[1]) + len(m[2]) + len(head)
 	sc.space()
 	if sc.i < len(sc.s) && sc.s[sc.i] == '|' {
@@ -414,30 +553,58 @@ func (sc *scanner) link() *link {
 	return l
 }
 
-// chain reads a chain of groups of nodes joined by links: A & B --> C.
-func (f *flowchart) chain(st string) error {
-	sc := &scanner{s: st}
-	group, err := f.group(sc)
-	if err != nil {
-		return err
-	}
+// links reads the links of a chain and the groups of nodes after them, A &
+// B --> C, from the group of nodes before them to the end of the
+// statement. last says whether the statement is the last of its line: then
+// a link at its end goes to the next line, and its last group is the one
+// that a line that starts with a link goes on from.
+func (f *flowchart) links(sc *scanner, group []string, last bool) error {
 	for !sc.done() {
 		l := sc.link()
 		if l == nil {
 			return fmt.Errorf("line %d: %q where a link goes: %w", f.line, sc.s[sc.i:], ErrSyntax)
 		}
+		if sc.done() {
+			if !last {
+				return fmt.Errorf("line %d: a link with no node after it: %w", f.line, ErrSyntax)
+			}
+			f.pending = &pendingLink{from: group, l: l}
+			return nil
+		}
 		next, err := f.group(sc)
 		if err != nil {
 			return err
 		}
-		for _, a := range group {
-			for _, b := range next {
-				f.edge(a, b, l)
-			}
-		}
+		f.connect(group, next, l)
 		group = next
 	}
+	if last {
+		f.cont = group
+	}
 	return nil
+}
+
+// connect adds an edge of a link from each node of a group to each node of
+// the next group.
+func (f *flowchart) connect(group, next []string, l *link) {
+	for _, a := range group {
+		for _, b := range next {
+			f.edge(a, b, l)
+		}
+	}
+}
+
+// arrow returns the arrow of a mark at an end of a link.
+func arrow(c string) string {
+	switch c {
+	case ">", "<":
+		return "normal"
+	case "o":
+		return "circle"
+	case "x":
+		return "cross"
+	}
+	return "none"
 }
 
 // group reads nodes joined by &.
@@ -808,8 +975,16 @@ func (f *flowchart) finish() error {
 		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)
 		n.Wrap = f.wrap.width(f.nodeWrap, f.markdown[n.ID])
 	}
+	if len(f.acc) > 0 {
+		f.g.Description = strings.Join(f.acc, " ")
+	}
 	for i, e := range f.g.Edges {
 		maps.Copy(e.Style, f.linkDefault)
+		if e.ID != "" {
+			for _, c := range f.edgeClasses[e.ID] {
+				maps.Copy(e.Style, f.classes[c])
+			}
+		}
 		maps.Copy(e.Style, f.linkStyles[i])
 		if c, ok := f.linkCurves[i]; ok {
 			e.Curve = c

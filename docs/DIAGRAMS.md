@@ -337,7 +337,12 @@ The keywords are `flowchart`, `graph` and `flowchart-elk`. The direction is
 `TB`, `TD`, `BT`, `LR` or `RL`, and `TB` by default.
 
 A statement is a chain of nodes and links. A semicolon or a new line ends
-it.
+it. A semicolon in quotes, in the text of a link between pipes, or at the
+end of an entity such as `#quot;` does not end it. Statements can follow
+the direction on the first line, as in `graph TB;A-->B`. A chain goes on
+over a line break, as in Mermaid, when a line ends with a link or the next
+line starts with one. A link at the end of the source, with no node after
+it, is an error, as in Mermaid.
 
 | Part | Example |
 | --- | --- |
@@ -350,7 +355,9 @@ it.
 | a style of a node | `style A fill:#f9f,stroke-width:2px` |
 | a style of a link | `linkStyle 0,1 stroke:#f00`, `linkStyle default stroke:#999` |
 | a curve of links | `linkStyle default interpolate linear` |
-| an id of a link | `A e1@--> B` |
+| an id of a link | `A e1@--> B`, `A e1@-- Text --> B` |
+| a class of a link | `class e1 hot`, after the link with the id `e1` |
+| the text for a screen reader | `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` |
 
 The shapes of a node:
 
@@ -428,13 +435,21 @@ The links:
 | --- | --- |
 | `A --> B` | an arrow |
 | `A --- B` | a line |
-| `A -.-> B`, `A -.- B` | a dotted arrow and line |
+| `A -.-> B`, `A -.- B`, `A .-> B`, `A .- B` | a dotted arrow and line |
 | `A ==> B`, `A === B` | a thick arrow and line |
 | `A ~~~ B` | an invisible link, which still takes part in the layout |
 | `A --o B`, `A --x B` | a circle and a cross at the end |
 | `A <--> B`, `A o--o B`, `A x--x B` | an end at each side |
-| `A -->|Text| B`, `A -- Text --> B` | a link with text |
-| `A ---> B`, `A ----> B` | a longer link, which spans more ranks |
+| `A -->|Text| B`, `A -- Text --> B`, `A-- Text ---B` | a link with text |
+| `A -. Text .-> B`, `A -. Text -.-> B`, `A == Text ==> B` | a dotted and a thick link with text |
+| `A ---> B`, `A ----> B`, `A -..-> B` | a longer link, which spans more ranks |
+
+A dotted link is a dash, if any, then dots, then a dash, with a head after
+it if any. Each dot makes it longer. Mermaid reads the mark before a link,
+`<`, `o` or `x`, only when it is the head at the other end, as in `<-->`
+or `o.-o`. Another mark, as in `<---`, draws no arrow at the start and
+makes a link with no text one rank longer. A link with text whose marks do
+not agree, as in `<-- Text ---`, draws as `-->`, as in Mermaid.
 
 The text of a label can hold `<br>` as a new line, an entity such as
 `#quot;` or `#35;`, and a string of markdown in backquotes, which draws as
@@ -461,8 +476,12 @@ and the edge stops where it meets the box. Mermaid picks that first node
 by its own order, so the layout around such a subgraph can differ from the
 layout of Mermaid.
 
-These parts are issues: `click`, a callback and `href`, `accTitle` and
-`accDescr`, the properties of a link such as `e1@{ animate: true }`, the
+A class of a link sets its style as `linkStyle` does, and `linkStyle` goes
+over it. `accTitle` and `accDescr` join into the description of the Vega
+spec, as in a state diagram.
+
+These parts are issues: `click`, a callback and `href`, the properties of
+a link such as `e1@{ animate: true }`, the
 layout `elk`, which draws with `zuzu.layered`, the look `handDrawn`, the
 `theme` and the `themeVariables` of Mermaid, which draw in the look of zuzu,
 and a style that is not `fill`, `stroke`, `stroke-width`, `color`,
@@ -730,7 +749,9 @@ wraps as wide as the width. DOT does not wrap a label.
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
 config that a chart does not read is an issue, and so are `accTitle` and
 `accDescr` where a chart does not use them, the `theme`, the `themeCSS`,
-and the look `handDrawn`. Each chart has about 5 fixtures in
+and the look `handDrawn`. A `pie`, an `xychart`, a `quadrantChart`, a
+`gantt`, a `journey`, a `sequenceDiagram` and an `architecture-beta` join
+`accTitle` and `accDescr` into the description of the spec. Each chart has about 5 fixtures in
 `graph/mermaid/testdata`, and the gantt has 16. A test draws each fixture
 and checks that each value of the source draws once, with its label.
 
@@ -994,7 +1015,7 @@ of Mermaid. The families of the fonts are issues, as are the other
 settings.
 
 The menus of a participant, `link`, `links`, `properties` and `details`,
-are issues, and so are `accTitle` and `accDescr`. A type or a key of the
+are issues. A type or a key of the
 metadata that zuzu does not know is an issue, and the participant draws as
 a box. A color of a rect that does not read is an issue, and the rect draws
 as a panel.
@@ -1086,8 +1107,8 @@ second item with an id, a parent that is not a group, a parent that no
 group statement declares, a group in a group that comes after it, an edge
 to a group or to an id that does not exist,
 `{group}` on an edge whose two ends are in one group, and an alignment of
-fewer than two services or junctions. `{group}` on a service in no group,
-`accTitle` and `accDescr` are issues.
+fewer than two services or junctions. `{group}` on a service in no group
+is an issue.
 
 zuzu draws the built-in icons `cloud`, `database`, `disk`, `internet` and
 `server` in its own look, with no pack (D31). Another icon is `pack:name`.

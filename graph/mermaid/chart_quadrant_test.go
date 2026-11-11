@@ -124,7 +124,6 @@ func TestQuadrantIssues(t *testing.T) {
 		src, part string
 	}{
 		{"quadrantChart\nA:::nope: [0.5, 0.5]", "the class nope"},
-		{"quadrantChart\naccDescr: points\nA: [0.5, 0.5]", "accDescr"},
 		{"---\nconfig:\n  quadrantChart:\n    quadrantPadding: 9\n---\nquadrantChart\nA: [0.5, 0.5]", "quadrantChart.quadrantPadding"},
 		{"---\nconfig:\n  themeVariables:\n    quadrant1Fill: red\n---\nquadrantChart\nA: [0.5, 0.5]", "themeVariables"},
 	}

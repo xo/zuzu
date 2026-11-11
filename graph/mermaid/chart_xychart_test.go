@@ -145,7 +145,6 @@ func TestXYIssues(t *testing.T) {
 	}{
 		{"xychart\nx-axis [a]\nbar [1, 2]", "which have no category"},
 		{"xychart\nbar [1 \"one\"]", `the label "one" of a bar`},
-		{"xychart\naccTitle: T\nbar [1]", "accTitle"},
 		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showTick: false\n---\nxychart\nbar [1]", "xyChart.xAxis"},
 		{"---\nconfig:\n  themeVariables:\n    xyChart:\n      titleColor: red\n---\nxychart\nbar [1]", "themeVariables.xyChart.titleColor"},
 		// zuzu draws no ticks, puts the labels 8 from the plot and the title

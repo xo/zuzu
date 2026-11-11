@@ -175,8 +175,6 @@ func TestPieIssues(t *testing.T) {
 		src, part string
 	}{
 		{"pie\n\"A\" : 1\n\"A\" : 2", `the second slice "A"`},
-		{"pie\naccTitle: Pets\n\"A\" : 1", "accTitle"},
-		{"pie\naccDescr {\nmore\n}\n\"A\" : 1", "accDescr"},
 		{"---\nconfig:\n  pie:\n    highlightSlice: A\n---\npie\n\"A\" : 1", "pie.highlightSlice"},
 		{"---\nconfig:\n  pie:\n    legendPosition: center\n---\npie\n\"A\" : 1", "legend position center"},
 		{"---\nconfig:\n  theme: forest\n---\npie\n\"A\" : 1", "theme"},
@@ -356,5 +354,37 @@ func TestPieLeaderColor(t *testing.T) {
 	}
 	if textCount(items, "Dogs") != 1 {
 		t.Error("expected the legend to name Dogs once")
+	}
+}
+
+func TestChartAccessibility(t *testing.T) {
+	t.Parallel()
+	acc := "accTitle: The title\naccDescr {\n  It has\n  two lines\n}\n"
+	for _, src := range []string{
+		"pie\n" + acc + "\"A\" : 1",
+		"journey\n" + acc + "section S\nTask: 3: Me",
+		"architecture-beta\n" + acc + "service a(server)[A]",
+		"quadrantChart\n" + acc + "A: [0.5, 0.5]",
+		"xychart\n" + acc + "bar [1]",
+	} {
+		d, err := mermaid.Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _, report, err := mermaid.Chart(d, true)
+		if err != nil || len(report) != 0 {
+			t.Errorf("%q: the report %v and the error %v", src, report, err)
+			continue
+		}
+		if want := `"description":"The title It has two lines"`; !strings.Contains(string(b), want) {
+			t.Errorf("%q: the spec has no %s", src, want)
+		}
+	}
+	d, err := mermaid.Read("pie\naccDescr {\nnever ends\n\"A\" : 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := mermaid.Chart(d, false); !errors.Is(err, mermaid.ErrSyntax) {
+		t.Errorf("an accDescr with no end: the error %v", err)
 	}
 }

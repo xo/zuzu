@@ -287,7 +287,6 @@ func TestArchitectureIssues(t *testing.T) {
 	}{
 		{"---\nconfig:\n  architecture:\n    numIter: 10\n---\n" + body, "architecture.numIter"},
 		{"---\nconfig:\n  theme: dark\n---\n" + body, "the theme of Mermaid"},
-		{body + "accTitle: Services\n", "accTitle"},
 		{body + "a{group}:B -- T:b\n", "the {group} of a"},
 	}
 	for _, test := range tests {

@@ -88,7 +88,6 @@ func TestJourneyIssues(t *testing.T) {
 	tests := []struct {
 		src, part string
 	}{
-		{"journey\naccTitle: Day\nTask: 3: Me", "accTitle"},
 		{"---\nconfig:\n  journey:\n    taskFontSize: 20\n---\njourney\nTask: 3: Me", "journey.taskFontSize"},
 	}
 	for _, test := range tests {

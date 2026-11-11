@@ -45,7 +45,7 @@ func xyChart(c *chart) (map[string]any, bool, error) {
 	for i := 0; i < len(c.d.Lines); i++ {
 		l := c.d.Lines[i]
 		c.line = l.N
-		next, ok, err := c.skipAccessibility(c.d.Lines, i)
+		next, ok, err := c.accessibility(c.d.Lines, i)
 		if err != nil {
 			return nil, false, err
 		}

@@ -1,0 +1,13 @@
+flowchart TB
+  accTitle: Lines that go on
+  accDescr {
+    A chain that goes on over line breaks,
+    and statements split by semicolons.
+  }
+  a{{"Lorem #quot;ipsum#quot; dolor"}}
+  --> b{{"sit 'amet'"}}
+  b -->
+  c[End]
+  c --> d;d --> e;
+  e & a
+  -- both --> f

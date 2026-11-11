@@ -83,7 +83,7 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 	for i := 0; i < len(c.d.Lines); i++ {
 		l := c.d.Lines[i]
 		c.line = l.N
-		next, ok, err := c.skipAccessibility(c.d.Lines, i)
+		next, ok, err := c.accessibility(c.d.Lines, i)
 		if err != nil {
 			return nil, false, err
 		}
@@ -475,38 +475,20 @@ func (c *chart) unreadIn(m map[string]any, prefix string, read []string) error {
 	return nil
 }
 
-// skipAccessibility reads the line i when it is accTitle or accDescr, in
-// one line or in a block of braces. zuzu does not write them, so each is
-// an issue. It returns the last line that it read, and whether it read
+// accessibility reads the line i when it is accTitle or accDescr, in one
+// line or in a block of braces, and keeps its text for the description of
+// the spec. It returns the last line that it read, and whether it read
 // one.
-func (c *chart) skipAccessibility(lines []Line, i int) (int, bool, error) {
-	t := lines[i].Text
-	var key string
-	switch {
-	case strings.HasPrefix(t, "accTitle"):
-		key = "accTitle"
-	case strings.HasPrefix(t, "accDescr"):
-		key = "accDescr"
-	default:
+func (c *chart) accessibility(lines []Line, i int) (int, bool, error) {
+	if !accRE.MatchString(lines[i].Text) {
 		return i, false, nil
 	}
-	rest := strings.TrimSpace(strings.TrimPrefix(t, key))
-	switch {
-	case strings.HasPrefix(rest, ":"):
-	case key == "accDescr" && strings.HasPrefix(rest, "{"):
-		for !strings.Contains(lines[i].Text, "}") {
-			i++
-			if i >= len(lines) {
-				return i, false, c.errorf("an accDescr block with no end brace")
-			}
-		}
-	default:
-		return i, false, nil
+	text, n, ok := ganttAccText(lines, i)
+	if !ok {
+		return i, false, c.errorf("an accDescr block with no end brace")
 	}
-	if err := c.add("the %s of the chart", key); err != nil {
-		return i, false, err
-	}
-	return i, true, nil
+	c.acc = append(c.acc, text)
+	return n, true, nil
 }
 
 // configNumber returns a number of a config by a path of keys. A string

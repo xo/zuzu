@@ -59,6 +59,37 @@ func TestLinks(t *testing.T) {
 		{"A --> B[\"x;y\"]", "A>B::normal:none:1\n"},
 		{"Ab --> oB", "Ab>oB::normal:none:1\n"},
 		{"A --> xyz", "A>xyz::normal:none:1\n"},
+		// The dotted links: a dash, if any, dots, then a dash.
+		{"A .-> B", "A>B::normal:none:1\n"},
+		{"A <.-> B", "A>B::normal:normal:1\n"},
+		{"A .- B", "A>B::none:none:1\n"},
+		{"A ..-> B", "A>B::normal:none:2\n"},
+		{"A o.-o B", "A>B::circle:circle:1\n"},
+		{"A -. go -.-> B", "A>B:go:normal:none:1\n"},
+		{"A -. go ..- B", "A>B:go:none:none:2\n"},
+		// The mark before a link counts only when it is its head.
+		{"A <.- B", "A>B::none:none:1\n"},
+		{"A <--- B", "A>B::none:none:2\n"},
+		{"A o--> B", "A>B::normal:none:2\n"},
+		{"A <-- go --> B", "A>B:go:normal:normal:1\n"},
+		{"A <-- go --- B", "A>B:go:normal:none:1\n"},
+		// The end of a link with text can touch the node after it.
+		{"A-- This is the text! ---B", "A>B:This is the text!:none:none:1\n"},
+		{"A-- go -->B", "A>B:go:normal:none:1\n"},
+		{"A-- go --oB", "A>B:go:circle:none:1\n"},
+		{`id1(Start) link@-- "go" -->id2(Stop)`, "id1>id2:go:normal:none:1\n"},
+		// A semicolon in the text of a link, or of an entity, does not
+		// end a statement.
+		{"A-->|x;y|B", "A>B:x;y:normal:none:1\n"},
+		{"A-- a #35; b -->B", "A>B:a # b:normal:none:1\n"},
+		// A chain goes on over a line break before or after a link.
+		{"A\n--> B", "A>B::normal:none:1\n"},
+		{"A -->\nB", "A>B::normal:none:1\n"},
+		{"A\n-- go --> B", "A>B:go:normal:none:1\n"},
+		{"A --> B\n--> C", "A>B::normal:none:1\nB>C::normal:none:1\n"},
+		{"A --> B\nC\n--> D", "A>B::normal:none:1\nC>D::normal:none:1\n"},
+		{"A & B\n--> C", "A>C::normal:none:1\nB>C::normal:none:1\n"},
+		{"A -->\nB -->\nC", "A>B::normal:none:1\nB>C::normal:none:1\n"},
 	}
 	for _, test := range tests {
 		t.Run(test.src, func(t *testing.T) {
@@ -261,6 +292,10 @@ func TestErrors(t *testing.T) {
 		"flowchart TD\nA --> B\nlinkStyle 3 stroke:#f00",
 		"flowchart TD\nsubgraph a\ndirection XY\nA\nend",
 		"flowchart TD\nsubgraph a\nend\nB --> a",
+		"flowchart TD\nA -->;B",
+		"flowchart TD\nA -->\nend",
+		"flowchart TD\nA -. go --> B",
+		"flowchart TD\naccDescr {\nnever ends\nA",
 	} {
 		d, err := Read(src)
 		if err == nil {
@@ -273,5 +308,87 @@ func TestErrors(t *testing.T) {
 	d, _ := Read("sequenceDiagram\nA->>B: hi")
 	if _, _, err := Graph(d, false); !errors.Is(err, ErrKind) {
 		t.Errorf("expected ErrKind, got %v", err)
+	}
+}
+
+func TestLinkKinds(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		src, dash string
+	}{
+		{"A .-> B", "3,3"},
+		{"A -. go -.-> B", "3,3"},
+		{"A --> B", ""},
+		// Mermaid draws a link with text whose marks at its ends do not
+		// agree as -->.
+		{"A <-. go .- B", ""},
+	}
+	for _, test := range tests {
+		d, err := Read("flowchart LR\n" + test.src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, _, err := Graph(d, true)
+		if err != nil {
+			t.Fatalf("%q: %v", test.src, err)
+		}
+		if dash := g.Edges[0].Style["strokeDash"]; dash != test.dash {
+			t.Errorf("%q: the dash %q, expected %q", test.src, dash, test.dash)
+		}
+	}
+}
+
+func TestFlowchartAccessibility(t *testing.T) {
+	t.Parallel()
+	src := "graph LR\n  accTitle: Big Decisions\n  accDescr {\n    The process\n    of a decision\n  }\n  accDescr: in short\n  A --> B"
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	if want := "Big Decisions The process of a decision in short"; g.Description != want {
+		t.Errorf("the description %q, expected %q", g.Description, want)
+	}
+	if len(g.Nodes) != 2 || len(g.Edges) != 1 {
+		t.Errorf("%d nodes and %d edges, expected 2 and 1", len(g.Nodes), len(g.Edges))
+	}
+}
+
+func TestHeaderStatements(t *testing.T) {
+	t.Parallel()
+	d, err := Read(`graph TB;subgraph "number as labels";1;end;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, _, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Direction != "TB" || len(g.Nodes) != 1 || g.Nodes[0].ID != "1" || len(g.Clusters) != 1 ||
+		g.Clusters[0].Label != "number as labels" || g.Nodes[0].Cluster != g.Clusters[0].ID {
+		t.Errorf("the direction %s, the nodes %v and the clusters %v", g.Direction, g.Nodes, g.Clusters)
+	}
+}
+
+func TestEdgeClass(t *testing.T) {
+	t.Parallel()
+	src := "graph LR\n  id1 link@-- go --> id2\n  classDef c stroke:#f66,color:white\n  class link c\n  linkStyle 0 stroke:#0f0"
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, _, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(g.Nodes) != 2 {
+		t.Errorf("%d nodes, expected 2", len(g.Nodes))
+	}
+	// linkStyle goes over the class, as in Mermaid.
+	if st := g.Edges[0].Style; st["stroke"] != "#0f0" || st["color"] != "white" {
+		t.Errorf("the style of the edge %v", st)
 	}
 }
