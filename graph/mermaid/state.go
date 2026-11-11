@@ -64,12 +64,14 @@ type scope struct {
 }
 
 // The patterns of a line that starts with state, after the word state:
-// "Text" as id, id <<kind>> or id [[kind]], and id {. noteRE matches a
+// "Text" as id, id <<kind>> or id [[kind]], and id {. stateWords matches
+// two words before a brace, which Mermaid does not read. noteRE matches a
 // note of a state, and accRE the text of accTitle or accDescr.
 var (
-	stateDescAs = regexp.MustCompile(`^"([^"]*)"\s+as\s+(\S+?)(\s*\{)?$`)
+	stateDescAs = regexp.MustCompile(`^"([^"]*)"\s+as\s+([^{]*?)(\s*\{)?$`)
 	stateKind   = regexp.MustCompile(`^(\S+?)\s*(?:<<(\w+)>>|\[\[(\w+)\]\])$`)
 	stateOpen   = regexp.MustCompile(`^(\S+?)\s*\{$`)
+	stateWords  = regexp.MustCompile(`^\w+\s+\w+.*?\{`)
 	noteRE      = regexp.MustCompile(`^note\s+(left|right)\s+of\s+([^\s:]+)\s*(?::\s*(.*))?$`)
 	accRE       = regexp.MustCompile(`^acc(?:Title\s*:|Descr\s*[:{])`)
 )
@@ -135,7 +137,7 @@ func (s *stateDiagram) dir() string {
 
 // parse reads the lines of the body.
 func (s *stateDiagram) parse() error {
-	lines := s.d.Lines
+	lines := braces(s.d.Lines)
 	for i := 0; i < len(lines); i++ {
 		s.line = lines[i].N
 		t := lines[i].Text
@@ -164,6 +166,28 @@ func (s *stateDiagram) parse() error {
 		return fmt.Errorf("the composite state %s has no end brace: %w", s.top().name, ErrSyntax)
 	}
 	return s.finish()
+}
+
+// braces joins a line that starts with state to a brace at the start of
+// the next line, so that state id, and { on the line after it, open a
+// composite state, as in Mermaid. A blank line between them is not
+// allowed. The text after the brace stays a line of its own.
+func braces(lines []Line) []Line {
+	var out []Line
+	for i := 0; i < len(lines); i++ {
+		l := lines[i]
+		if i+1 < len(lines) && lines[i+1].N == l.N+1 && strings.HasPrefix(lines[i+1].Text, "{") &&
+			strings.HasPrefix(l.Text, "state ") && !strings.HasSuffix(l.Text, "{") && !stateKind.MatchString(strings.TrimSpace(l.Text[6:])) {
+			l.Text += " {"
+			i++
+			if rest := strings.TrimSpace(lines[i].Text[1:]); rest != "" {
+				out = append(out, l)
+				l = Line{Text: rest, N: lines[i].N, Indent: lines[i].Indent}
+			}
+		}
+		out = append(out, l)
+	}
+	return out
 }
 
 // stmt reads one statement.
@@ -333,16 +357,34 @@ func (s *stateDiagram) transition(a, b string) error {
 
 // declare reads a line that starts with state: state "Text" as id, state
 // id <<choice>>, state id [[fork]], or state id { to open a composite
-// state.
+// state. In state "Text" as id: more, more is a second description, as in
+// Mermaid.
 func (s *stateDiagram) declare(rest string, lines []Line, i int) error {
 	if m := stateDescAs.FindStringSubmatch(rest); m != nil {
-		id, cls, _ := strings.Cut(m[2], ":::")
-		s.descs[id] = append(s.descs[id], label(m[1]))
 		if m[3] != "" {
+			id := strings.TrimSpace(m[2])
+			s.descs[id] = append(s.descs[id], label(m[1]))
 			return s.open(id, lines, i)
 		}
+		id, cls, ok := strings.Cut(m[2], ":::")
+		more := ""
+		if !ok {
+			// Mermaid keeps the text up to the second colon.
+			var parts []string
+			if parts = strings.Split(m[2], ":"); len(parts) > 1 {
+				id, more = parts[0], strings.TrimSpace(parts[1])
+			}
+		}
+		id = strings.TrimSpace(id)
+		if id == "" || strings.ContainsAny(id, " \t\"") {
+			return s.errorf("the state %q", rest)
+		}
+		s.descs[id] = append(s.descs[id], label(m[1]))
+		if more != "" {
+			s.descs[id] = append(s.descs[id], label(more))
+		}
 		s.ref(id)
-		s.class(id, cls)
+		s.class(id, strings.TrimSpace(cls))
 		return nil
 	}
 	if m := stateKind.FindStringSubmatch(rest); m != nil {
@@ -375,15 +417,13 @@ func (s *stateDiagram) declare(rest string, lines []Line, i int) error {
 	if m := stateOpen.FindStringSubmatch(rest); m != nil {
 		return s.open(m[1], lines, i)
 	}
-	id, cls, desc := s.split(rest)
-	if id == "" || id == pseudo {
+	if strings.HasPrefix(rest, `"`) || stateWords.MatchString(rest) || strings.Contains(rest, "{") {
 		return s.errorf("the state %q", rest)
 	}
-	s.ref(id)
-	s.class(id, cls)
-	if desc != "" {
-		s.descs[id] = append(s.descs[id], label(desc))
-	}
+	// Mermaid reads the words of state id, with no brace, and draws
+	// nothing for them: state id : text adds no description, and
+	// state id <<kind>> in HTML entities draws a plain state. The state
+	// draws when a transition or another line names it.
 	return nil
 }
 

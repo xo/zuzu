@@ -74,6 +74,10 @@ func TestWardleyFixtures(t *testing.T) {
 			notes:       []string{"Build mobile-first experience", "Migrate to cloud-native database"},
 			stages:      []string{"Genesis / Concept", "Custom / Emerging", "Product / Converging", "Commodity / Accepted"},
 		},
+		"06-forces.mmd": {
+			components: []string{"Thing"},
+			forces:     []string{"Fast Lane", "License Play"},
+		},
 	}
 	files := fixtures(t, "wardley")
 	if len(files) != len(cases) {
@@ -194,6 +198,7 @@ func TestWardleyErrors(t *testing.T) {
 		"wardley-beta\nsize [800]\n",
 		"wardley-beta\nannotation x,[0.5, 0.5] \"text\"\n",
 		"wardley-beta\nfoo bar\n",
+		"wardley-beta\naccelerator Fast Lane\n",
 	}
 	for _, src := range tests {
 		if _, err := chartOf(src, false); !errors.Is(err, mermaid.ErrSyntax) {

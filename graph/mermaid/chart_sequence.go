@@ -79,6 +79,10 @@ type seqParticipant struct {
 	// created and destroyed are the indexes of the events of the messages
 	// that create and destroy the participant, or -1.
 	created, destroyed int
+	// destroyAt is the index of the event after destroy, or -1. The
+	// participant is destroyed only when that event is a message that names
+	// it, as in Mermaid.
+	destroyAt int
 	// used reports whether an event names the participant.
 	used bool
 }
@@ -140,7 +144,8 @@ type sequence struct {
 	// placeholder holds until the text is drawn.
 	entities []string
 	// pendingCreate and pendingDestroy are the participants whose next
-	// message creates or destroys them.
+	// message creates or destroys them. A create goes first: the message
+	// after it clears only the create, as in Mermaid.
 	pendingCreate, pendingDestroy string
 	// active counts the activations of each participant, to find a
 	// deactivation of a participant that is not active.
@@ -238,8 +243,6 @@ func (s *sequence) parse() error {
 		return s.c.errorf("a %s with no end", s.blocks[len(s.blocks)-1])
 	case s.pendingCreate != "":
 		return s.c.errorf("the participant %s is created and no message follows to it", s.pendingCreate)
-	case s.pendingDestroy != "":
-		return s.c.errorf("the participant %s is destroyed and no message names it after", s.pendingDestroy)
 	case len(s.participants) == 0:
 		return s.c.errorf("a sequence diagram with no participant")
 	}
@@ -380,7 +383,7 @@ func (s *sequence) keyword(word, arg string, lines []Line, i *int) error {
 		if p.destroyed >= 0 {
 			return s.c.errorf("the participant %s is destroyed twice", p.id)
 		}
-		s.pendingDestroy = p.id
+		s.pendingDestroy, p.destroyAt = p.id, len(s.events)
 	}
 	return nil
 }
@@ -496,10 +499,15 @@ func (s *sequence) declare(create bool, kind, rest string, box int) error {
 		return s.c.errorf("the participant %s is in two boxes", id)
 	}
 	p := s.participant(id)
-	p.kind = kind
 	if box >= 0 {
 		p.box = box
 	}
+	if old != nil && !hasAlias {
+		// As in Mermaid, a participant that is named again with no alias
+		// keeps its kind.
+		return nil
+	}
+	p.kind = kind
 	if hasAlias {
 		p.label = s.text(alias)
 	}
@@ -543,7 +551,7 @@ func (s *sequence) participant(id string) *seqParticipant {
 	if p := s.byID[id]; p != nil {
 		return p
 	}
-	p := &seqParticipant{id: id, kind: "participant", box: -1, created: -1, destroyed: -1}
+	p := &seqParticipant{id: id, kind: "participant", box: -1, created: -1, destroyed: -1, destroyAt: -1}
 	p.label = seqText{lines: []string{s.decode(id)}}
 	s.byID[id] = p
 	s.participants = append(s.participants, p)
@@ -655,11 +663,15 @@ func (s *sequence) message(st string) error {
 		s.active[from]--
 	}
 	n := len(s.events)
-	if s.pendingCreate == to {
+	if s.pendingCreate != "" {
 		tp.created, s.pendingCreate = n, ""
+	} else {
+		s.pendingDestroy = ""
 	}
-	if s.pendingDestroy == to || s.pendingDestroy == from {
-		s.byID[s.pendingDestroy].destroyed, s.pendingDestroy = n, ""
+	for _, p := range []*seqParticipant{fp, tp} {
+		if p.destroyAt == n {
+			p.destroyed = n
+		}
 	}
 	s.events = append(s.events, e)
 	return nil
@@ -667,12 +679,13 @@ func (s *sequence) message(st string) error {
 
 // lifecycle checks a message against a create or a destroy before it: a
 // created participant receives the next message, and a destroyed one sends
-// or receives it.
+// or receives it. As in Mermaid, a create goes before a destroy: a message
+// that a create waits for does not check the destroy.
 func (s *sequence) lifecycle(e seqEvent) error {
 	if s.pendingCreate != "" && s.pendingCreate != e.to {
 		return s.c.errorf("the participant %s is created and the next message does not go to it", s.pendingCreate)
 	}
-	if s.pendingDestroy != "" && s.pendingDestroy != e.to && s.pendingDestroy != e.from {
+	if s.pendingCreate == "" && s.pendingDestroy != "" && s.pendingDestroy != e.to && s.pendingDestroy != e.from {
 		return s.c.errorf("the participant %s is destroyed and the next message does not name it", s.pendingDestroy)
 	}
 	for _, id := range []string{e.from, e.to} {

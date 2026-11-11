@@ -25,6 +25,9 @@ var (
 	wardleyAnnotation = regexp.MustCompile(`^(\d+)\s*,\s*\[\s*([-+\d.]+)\s*,\s*([-+\d.]+)\s*\]\s*(?:"([^"]*)")?$`)
 	// wardleyText matches a text in quotes and a place, as a note has.
 	wardleyText = regexp.MustCompile(`^"([^"]*)"\s*\[\s*([-+\d.]+)\s*,\s*([-+\d.]+)\s*\]$`)
+	// wardleyForce matches the name of an accelerator or a deaccelerator,
+	// in quotes or not, and its place.
+	wardleyForce = regexp.MustCompile(`^(.+?)\s*\[\s*([-+\d.]+)\s*,\s*([-+\d.]+)\s*\]$`)
 )
 
 // wardleyThing is a component or an anchor of a map.
@@ -151,10 +154,11 @@ func wardleyChart(c *chart) (map[string]any, bool, error) {
 		case "note":
 			err = c.wardleyNote(w, rest)
 		case "accelerator", "deaccelerator":
-			m := wardleyText.FindStringSubmatch(rest)
+			m := wardleyForce.FindStringSubmatch(rest)
 			if m == nil {
-				return nil, false, c.errorf("an %s is %s \"text\" [visibility, evolution]", word, word)
+				return nil, false, c.errorf("an accelerator or a deaccelerator is %s Name [visibility, evolution]", word)
 			}
+			m[1] = unquoteName(m[1])
 			vis, evo, err := c.wardleyPlace(m[2], m[3])
 			if err != nil {
 				return nil, false, err

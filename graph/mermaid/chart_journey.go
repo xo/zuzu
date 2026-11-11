@@ -7,10 +7,11 @@ import (
 )
 
 // journeyTask is a task of a user journey: its section, its name, its
-// score from 1 to 5 and its actors.
+// score and its actors. The score is a number from 1 to 5, or nil when the
+// source gives no number.
 type journeyTask struct {
 	section, name string
-	score         float64
+	score         any
 	actors        []string
 }
 
@@ -54,14 +55,24 @@ func journeyChart(c *chart) (map[string]any, bool, error) {
 			return nil, false, c.errorf("the line %q of a user journey", l.Text)
 		}
 		t := journeyTask{section: section, name: strings.TrimSpace(parts[0])}
-		score, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		if err != nil || t.name == "" {
+		if t.name == "" {
 			return nil, false, c.errorf("the task %q", l.Text)
 		}
-		if score < 1 || score > 5 {
+		text := strings.TrimSpace(parts[1])
+		score, err := strconv.ParseFloat(text, 64)
+		switch {
+		case err != nil:
+			// Mermaid reads a score that is not a number, such as size:
+			// 2rem, as a task with no number, and draws its face in no
+			// place.
+			if err := c.add("the score %q of the task %q is not a number, so the task has no face", text, t.name); err != nil {
+				return nil, false, err
+			}
+		case score < 1 || score > 5:
 			return nil, false, c.errorf("the score %v of the task %q is not from 1 to 5", score, t.name)
+		default:
+			t.score = score
 		}
-		t.score = score
 		if len(parts) == 3 {
 			for a := range strings.SplitSeq(parts[2], ",") {
 				if a = strings.TrimSpace(a); a != "" {
@@ -71,9 +82,9 @@ func journeyChart(c *chart) (map[string]any, bool, error) {
 		}
 		tasks = append(tasks, t)
 	}
-	c.line = 0
 	if len(tasks) == 0 {
-		return nil, false, c.errorf("a user journey with no task")
+		// Mermaid draws the title of a user journey with no task.
+		return emptyChart(title, ""), false, nil
 	}
 	return journeySpec(title, tasks), true, nil
 }

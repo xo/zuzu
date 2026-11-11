@@ -526,11 +526,11 @@ of its own sets it. A statement ends at a new line.
 | Part | Example |
 | --- | --- |
 | a state | `Still`, `Still:::hot` |
-| a state with a description | `state "Waiting for input" as Wait`, `Wait : press a key` |
+| a state with a description | `state "Waiting for input" as Wait`, `Wait : press a key`, `state "Waiting" as Wait: press a key` |
 | a transition | `Still --> Moving` |
 | a transition with text | `Still --> Moving : push` |
 | the start and the end | `[*] --> Still`, `Still --> [*]` |
-| a composite state | `state Moving { ... }`, `state "Text" as Moving { ... }` |
+| a composite state | `state Moving { ... }`, `state "Text" as Moving { ... }`, and the brace can be on the next line |
 | a choice | `state check <<choice>>`, `state check [[choice]]` |
 | a fork and a join | `state split <<fork>>`, `state merge <<join>>` |
 | regions of a composite state | `--` on a line of its own, inside the braces |
@@ -573,6 +573,17 @@ A class or a style on a composite state paints its cluster. `accTitle` and
 `hide empty description` is a line of the first version of the state
 diagram, and Mermaid draws nothing for it, so zuzu reads it and draws
 nothing too.
+
+A line `state` and words with no brace draws nothing, as in Mermaid. The
+words are not a state, so `state Idle` and `state Idle: text` add no state
+and no description. The state draws only when a transition or another line
+names it. Thus `state Idle: text` draws the name `Idle`, and `Idle : text`
+draws the description `text`. `state fork_state &lt;&lt;fork&gt;&gt;` is
+not a fork, and `fork_state` draws as a state. In `state "Text" as id:
+more`, `more` is a second description, up to the next colon.
+`state "Text" as id`, or `state id`, opens a composite state when the next
+line starts with a brace. A blank line between them is an error, as in
+Mermaid.
 
 These parts are issues: `scale`, `click`, a floating note with no state,
 such as `note "text" as N1`, a kind of state other than `choice`, `fork`
@@ -873,7 +884,8 @@ a duration such as `3d`, `12h` or `1.5w`, or as `until a b`. The tags are
 and the end of each task in Go, and a test compares them with mermaid.js.
 A cycle of `after` and `until` is an error. `click`, the mode `compact`,
 and `todayMarker` with a style are issues. A render has no time of its own,
-so zuzu draws no marker of today.
+so zuzu draws no marker of today. A gantt with no task draws nothing but
+its title, as in Mermaid.
 
 As in Mermaid, the value of a statement is all the text after its keyword.
 In `dateFormat :YYYY-MM-DD`, the colon is part of the format, so no date
@@ -896,7 +908,10 @@ name.
 #### journey
 
 `title`, `section`, and steps, `Name: score: actor, actor`, with a score
-from 1 to 5. A score outside 1 to 5 is an error.
+from 1 to 5. A score outside 1 to 5 is an error. A score that is not a
+number, such as `size: 2rem`, is an issue. The step draws with its name
+and no face, and Mermaid draws its face in no place. A user journey with no
+step draws its title alone, as in Mermaid.
 
 #### wardley-beta
 
@@ -905,7 +920,9 @@ A place is `[visibility, evolution]`, each from 0 to 1. zuzu reads `title`,
 with `label` offsets and the decorators `build`, `buy`, `outsource`,
 `market` and `inertia`, the links `->`, `-->`, `-.->`, `+>`, `+<`, `+<>`
 and `+'text'>` with `; label`, `evolve`, `pipeline`, `note`,
-`annotation`, `annotations`, `accelerator` and `deaccelerator`.
+`annotation`, `annotations`, `accelerator` and `deaccelerator`. The name
+of an accelerator or a deaccelerator is in double quotes or not, as
+`deaccelerator License Play [0.13, 0.78]`.
 
 #### sankey
 
@@ -926,7 +943,8 @@ rule.
 #### radar-beta
 
 `title`, `axis` with ids and labels, `a["Label"]`, on one line or more,
-`curve` with values by place, `{1, 2, 3}`, or by axis, `{a: 1, b: 2}`,
+`curve` with values by place, `{1, 2, 3}`, or by axis, `{a: 1, b: 2}` or
+`{a 1, b 2}`, on one line or more up to the closing brace,
 `min`, `max`, `ticks`, `showLegend`, and `graticule` `circle` or
 `polygon`. zuzu reads the sizes and the margins of `radar`,
 `axisScaleFactor`, `axisLabelFactor`, `curveTension`, and the colors
@@ -967,11 +985,14 @@ zuzu lays out a sequence diagram in Go. Each participant has a lifeline,
 and the messages, the notes and the blocks go down the page in the order of
 the source. The spec holds the place of each part as rows of data.
 
+A participant that a line names again with no alias keeps its kind, as in
+Mermaid. A line with an alias gives it a new kind and a new label.
+
 | Statement | What zuzu draws |
 | --- | --- |
 | `participant A`, `actor B`, `participant A as Alice` | a participant as a box, or an actor as a figure over its name. An alias is the label, and `<br/>` starts a new line |
 | `participant A@{ "type": "database" }` | `boundary`, `control` and `entity` as icons over the name, and `database`, `collections` and `queue` as boxes of their shape. The key `alias` gives the label, and `as` wins over it |
-| `create participant B`, `destroy B` | the head of B at the message that creates it, and its foot at the message that destroys it. The next message after `create` goes to B, and the next message after `destroy` names B |
+| `create participant B`, `destroy B` | the head of B at the message that creates it, and its foot at the message that destroys it. The next message after `create` goes to B, and the next message after `destroy` names B. As in Mermaid, a `create` goes first: when a `create` follows a `destroy`, the message after them is for the `create`. B is then destroyed only if the next message names it, and else its lifeline runs to the end |
 | `box Aqua Title`, then `end` | a panel behind its participants, with its title. The color is the first word: a name of CSS, `rgb()`, `rgba()`, `hsl()` or `hsla()` |
 | `A->>B: Text` | a line with its text above it, as the next table says |
 | `A->>+B`, `B-->>-A`, `activate A`, `deactivate A` | an activation, a narrow bar on the lifeline. An activation inside another moves to the right |
@@ -1046,8 +1067,16 @@ The text of a node can be in double quotes, or a string of markdown in
 double quotes and backquotes, which can run over more lines. In every
 label, as in Mermaid, `**bold**` and `__bold__` draw in a bold font, and
 `*italic*` and `_italic_` in an italic font. An underscore inside a word is
-text. `<br>` and a new line in a string of markdown start a new line. A
-label wraps at the spaces to fit `mindmap.maxNodeWidth`, 200 by default.
+text. Text between two backquotes is code, and it draws as it is written,
+with its backquotes and its marks. `<br>` and a new line in a string of
+markdown start a new line. A label wraps at the spaces to fit
+`mindmap.maxNodeWidth`, 200 by default.
+
+The text in a shape can run over more lines, up to the line that ends the
+shape, as `root(`, then `The root`, then `)`. zuzu drops the spaces at the
+start and the end of each line and the blank lines. As in Mermaid, the
+text draws on one line when it fits, and else each line of the source
+starts a new line.
 
 | Line after a node | What zuzu does |
 | --- | --- |

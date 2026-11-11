@@ -70,7 +70,9 @@ func labelText(s string) string {
 // markdownRuns splits a label at the marks of markdown: two stars or two
 // underscores around bold text, and one star or one underscore around
 // italic text. A mark with no mark to close it is text, and so is an
-// underscore inside a word. A new line is a run of its own, "\n".
+// underscore inside a word. A new line is a run of its own, "\n". Text
+// between two backticks is code, which Mermaid draws as it is written, with
+// its backticks and its marks.
 func markdownRuns(s string) []textRun {
 	var out []textRun
 	bold, italic := false, false
@@ -94,6 +96,17 @@ func markdownRuns(s string) []textRun {
 			flush()
 			out = append(out, textRun{text: "\n"})
 			i++
+		case s[i] == '`' && strings.Contains(s[i+1:], "`"):
+			j := i + 1 + strings.Index(s[i+1:], "`")
+			for _, c := range s[i : j+1] {
+				if c == '\n' {
+					flush()
+					out = append(out, textRun{text: "\n"})
+					continue
+				}
+				b.WriteRune(c)
+			}
+			i = j + 1
 		case strings.HasPrefix(s[i:], "**") || strings.HasPrefix(s[i:], "__"):
 			m := s[i : i+2]
 			if bold || strings.Contains(s[i+2:], m) {

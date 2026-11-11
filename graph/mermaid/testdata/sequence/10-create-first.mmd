@@ -1,0 +1,11 @@
+sequenceDiagram
+  participant A
+  create participant B
+  A ->> B: Hello B
+  destroy B
+  create participant C@{ "type" : "actor" }
+  A ->> C: Hello C
+  create participant D
+  A ->> D: Hello D
+  destroy D
+  D ->> A: Bye

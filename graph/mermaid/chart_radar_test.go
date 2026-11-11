@@ -60,6 +60,11 @@ func TestRadarFixtures(t *testing.T) {
 			curves: map[string][]float64{"c1": {1, 2, 3, 4, 5}, "c2": {5, 4, 3, 2, 1}, "c3": {3, 3, 3, 3, 3}},
 			legend: true,
 		},
+		"06-lines.mmd": {
+			axes:   letters,
+			curves: map[string][]float64{"One": {1, 2, 3, 4, 5}, "c2": {5, 4, 3, 2, 1}},
+			legend: true,
+		},
 	}
 	files := fixtures(t, "radar")
 	if len(files) != len(cases) {

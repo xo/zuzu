@@ -55,7 +55,9 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 	minV, maxV := 0.0, math.NaN()
 	ticks := 5
 	polygon, legend := false, true
-	for _, l := range c.d.Lines {
+	lines := c.d.Lines
+	for i := 0; i < len(lines); i++ {
+		l := lines[i]
 		c.line = l.N
 		word, rest, _ := strings.Cut(l.Text, " ")
 		rest = strings.TrimSpace(rest)
@@ -71,6 +73,12 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 				axes = append(axes, radarEntry{id: m[1], label: m[2]})
 			}
 		case "curve":
+			// The values of a curve can run over more lines, up to the
+			// brace that ends them.
+			for strings.Count(rest, "{") > strings.Count(rest, "}") && i+1 < len(lines) {
+				i++
+				rest += " " + lines[i].Text
+			}
 			// The curves read after the axes, since a curve can name them.
 			curveLines = append(curveLines, curveLine{rest, l.N})
 		case "showLegend":
@@ -115,7 +123,7 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 		}
 	}
 	if len(axes) < 3 {
-		c.line = 0
+		c.line = c.d.N
 		return nil, false, c.errorf("a radar with %d axes, and it needs 3 or more", len(axes))
 	}
 	byID := map[string]int{}
@@ -134,11 +142,11 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 			if len(vals) != len(axes) {
 				return nil, false, c.errorf("the curve %s has %d values for %d axes", e.id, len(vals), len(axes))
 			}
-			keyed := strings.Contains(vals[0], ":")
+			_, _, keyed := radarValue(vals[0])
 			done := map[int]bool{}
 			for i, v := range vals {
 				at := i
-				if k, x, ok := field(v); ok != keyed {
+				if k, x, ok := radarValue(v); ok != keyed {
 					return nil, false, c.errorf("the curve %s mixes values with keys and values without", e.id)
 				} else if ok {
 					j, found := byID[k]
@@ -352,6 +360,18 @@ func pathPoint(x, y float64) string {
 // pathNum writes a number of a path with at most two decimals.
 func pathNum(f float64) string {
 	return strconv.FormatFloat(math.Round(f*100)/100, 'f', -1, 64)
+}
+
+// radarValue reads a value of a curve: a number alone, or the id of an
+// axis and a number, with a colon or a space between them.
+func radarValue(s string) (string, string, bool) {
+	if k, v, ok := field(s); ok {
+		return k, v, true
+	}
+	if f := strings.Fields(s); len(f) == 2 {
+		return f[0], f[1], true
+	}
+	return "", s, false
 }
 
 // splitTop splits a list at its commas, except the commas inside quotes,

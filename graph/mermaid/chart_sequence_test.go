@@ -227,6 +227,36 @@ func seqText(text string) func(d map[string]any) bool {
 	return func(d map[string]any) bool { return d["text"] == text }
 }
 
+func TestSequenceCreateFirst(t *testing.T) {
+	t.Parallel()
+	// As in Mermaid, a message that a create waits for does not check a
+	// destroy before it, and a participant whose destroy no message
+	// follows lives to the end.
+	items := seqFixture(t, "10-create-first.mmd")
+	foot := func(key string) float64 {
+		return seqNum(seqFind(t, items, func(d map[string]any) bool { return d["key"] == key && d["kind"] == "foot" }, "shapes"), "y")
+	}
+	if foot("B") != foot("A") {
+		t.Errorf("B ends at %v, and A at %v", foot("B"), foot("A"))
+	}
+	bye := seqFind(t, items, seqText("Bye"), "messages")
+	if foot("D") != seqNum(bye, "y") {
+		t.Errorf("D ends at %v, and the message that destroys it at %v", foot("D"), bye["y"])
+	}
+}
+
+func TestSequenceDeclareAgain(t *testing.T) {
+	t.Parallel()
+	// As in Mermaid, a participant named again with no alias keeps its
+	// kind, and one named again with an alias takes the new kind.
+	src := "sequenceDiagram\nA->>B: hi\nparticipant A@{ \"type\" : \"actor\" }\nactor B\nparticipant C\nactor C as Cee\n"
+	items := seqRender(t, src, theme.Light)
+	for _, key := range []string{"A", "B"} {
+		seqFind(t, items, func(d map[string]any) bool { return d["key"] == key && d["kind"] == "head" }, "shapes")
+	}
+	seqFind(t, items, func(d map[string]any) bool { return d["key"] == "C" && d["kind"] == "head" }, "icons")
+}
+
 func TestSequenceLifecycle(t *testing.T) {
 	t.Parallel()
 	items := seqFixture(t, "06-lifecycle.mmd")
@@ -389,6 +419,7 @@ func TestSequenceErrors(t *testing.T) {
 		"sequenceDiagram\ncreate participant B",
 		"sequenceDiagram\nA->>B: hi\ncreate participant B\nA->>B: again",
 		"sequenceDiagram\nA->>B: hi\ndestroy B\nA->>C: no",
+		"sequenceDiagram\nA->>B: hi\ndestroy B\ncreate participant C\nA->>C: hi\nA->>C: no",
 		"sequenceDiagram\nA->>B: hi\ndestroy B\nA->>B: bye\nA->>B: again",
 		"sequenceDiagram\nbox Blue\nA->>B: hi\nend",
 		"sequenceDiagram\nbox Blue\nparticipant A",

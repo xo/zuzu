@@ -3,6 +3,7 @@ package mermaid_test
 import (
 	"errors"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -67,10 +68,7 @@ func TestJourneyFixtures(t *testing.T) {
 func TestJourneyErrors(t *testing.T) {
 	t.Parallel()
 	tests := []string{
-		"journey",
-		"journey\nsection A",
 		"journey\nTask with no score",
-		"journey\nTask: high: Me",
 		"journey\nTask: 6: Me",
 		"journey\nTask: 0",
 		"journey\n: 3: Me",
@@ -89,6 +87,7 @@ func TestJourneyIssues(t *testing.T) {
 		src, part string
 	}{
 		{"---\nconfig:\n  journey:\n    taskFontSize: 20\n---\njourney\nTask: 3: Me", "journey.taskFontSize"},
+		{"journey\nTask: 3: Me\nTask: high: Me", "the score \"high\""},
 	}
 	for _, test := range tests {
 		report, err := compileMermaid(t, test.src, false)
@@ -101,6 +100,29 @@ func TestJourneyIssues(t *testing.T) {
 		}
 		if _, err := compileMermaid(t, test.src, true); err == nil {
 			t.Errorf("%q: expected an error in the strict mode", test.src)
+		}
+	}
+}
+
+func TestEmptyCharts(t *testing.T) {
+	t.Parallel()
+	// As in Mermaid, a user journey or a gantt with no task draws its
+	// title alone.
+	tests := []struct{ src, title string }{
+		{"journey\ntitle Day\nsection Order", "Day"},
+		{"journey", ""},
+		{"gantt\ntitle Plan\ntickInterval 1week\nweekday monday", "Plan"},
+		{"gantt\nsection A", ""},
+	}
+	for _, test := range tests {
+		var texts []string
+		for _, it := range renderMermaid(t, test.src) {
+			if it.text != "" {
+				texts = append(texts, it.text)
+			}
+		}
+		if len(texts) > 1 || test.title != "" && !slices.Contains(texts, test.title) {
+			t.Errorf("%q: the texts %q, expected the title %q alone", test.src, texts, test.title)
 		}
 	}
 }

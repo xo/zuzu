@@ -39,6 +39,10 @@ func ganttChart(c *chart) (map[string]any, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	if len(g.tasks) == 0 {
+		// Mermaid draws a gantt with no task with nothing in it.
+		return emptyChart(g.title, g.desc), false, nil
+	}
 	spec, err := g.spec()
 	return spec, true, err
 }

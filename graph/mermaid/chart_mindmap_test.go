@@ -117,6 +117,10 @@ func TestMindmapFixtures(t *testing.T) {
 			n("Nine", "default", "Topics"), n("Ten", "default", "Topics"), n("Eleven", "default", "Topics"),
 			n("Twelve", "default", "Topics"),
 		},
+		"07-lines.mmd": {
+			n("The root", "circle", ""), n("Two lines that fit", "rect", "The root"),
+			n("`**Code** stays as written` and the text of this node is long, so it breaks where the source breaks", "rounded", "The root"),
+		},
 	}
 	files := fixtures(t, "mindmap")
 	if len(files) != len(cases) {
@@ -376,5 +380,44 @@ func TestMindmapIssues(t *testing.T) {
 	}
 	if _, _, err := drawDiagram(t, src, true); !errors.Is(err, icon.ErrMissing) {
 		t.Errorf("an icon that does not load, in the strict mode: the error %v", err)
+	}
+}
+
+func TestMindmapLines(t *testing.T) {
+	t.Parallel()
+	// The text of a shape that runs over more lines draws on one line when
+	// it fits, and breaks where the source breaks when it does not. Text
+	// between backticks draws as it is written, as in Mermaid.
+	src, err := os.ReadFile(filepath.Join("testdata", "mindmap", "07-lines.mmd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, _, err := drawDiagram(t, string(src), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := map[float64]map[float64]bool{}
+	code := false
+	for _, it := range drawnOf(items, "labels") {
+		id := num(it.datum["node"])
+		if lines[id] == nil {
+			lines[id] = map[float64]bool{}
+		}
+		lines[id][num(it.datum["line"])] = true
+		if strings.Contains(it.text, "**Code**") {
+			code = true
+			if num(it.datum["fontWeight"]) > 400 {
+				t.Errorf("the code %q draws bold", it.text)
+			}
+		}
+	}
+	if !code {
+		t.Error("the code does not keep its marks")
+	}
+	if len(lines[1]) != 1 {
+		t.Errorf("the text that fits draws on %d lines, expected 1", len(lines[1]))
+	}
+	if len(lines[2]) < 2 {
+		t.Errorf("the long text draws on %d lines, expected at least 2", len(lines[2]))
 	}
 }

@@ -16,6 +16,10 @@ import (
 type mindmapNode struct {
 	id    int
 	label string
+	// soft is true for a label that runs over more lines of the source.
+	// Its new lines are spaces when the label fits on one line, as in
+	// Mermaid.
+	soft bool
 	// shape is default, rect, rounded, circle, bang, cloud or hexagon.
 	shape  string
 	icon   string
@@ -170,11 +174,25 @@ func (c *chart) mindmapNodes() ([]*mindmapNode, error) {
 			}
 			t = strings.Join(parts, "\n")
 		}
+		// The text of a shape can run over more lines, up to the line that
+		// ends the shape.
+		soft := false
+		if mindmapOpen(t) {
+			parts := []string{t}
+			for i+1 < len(lines) {
+				i++
+				parts = append(parts, lines[i].Text)
+				if strings.ContainsAny(lines[i].Text, ")](}") {
+					break
+				}
+			}
+			t, soft = strings.Join(parts, "\n"), len(parts) > 1
+		}
 		n, err := c.mindmapNode(t)
 		if err != nil {
 			return nil, err
 		}
-		n.id, n.indent, n.line = len(nodes), l.Indent, l.N
+		n.id, n.indent, n.line, n.soft = len(nodes), l.Indent, l.N, soft
 		if len(nodes) > 0 {
 			for _, p := range slices.Backward(nodes) {
 				if p.indent < n.indent {
@@ -191,10 +209,22 @@ func (c *chart) mindmapNodes() ([]*mindmapNode, error) {
 		nodes = append(nodes, n)
 	}
 	if len(nodes) == 0 {
-		c.line = 0
+		c.line = c.d.N
 		return nil, c.errorf("a mindmap with no nodes")
 	}
 	return nodes, nil
+}
+
+// mindmapOpen reports whether a line opens the shape of a node and does not
+// end it: the text after the first (, ), [ or { holds no ), ], ( or }, and
+// is not a string.
+func mindmapOpen(t string) bool {
+	i := strings.IndexAny(t, "([{)")
+	if i < 0 {
+		return false
+	}
+	rest := strings.TrimLeft(t[i:], "([{)")
+	return !strings.HasPrefix(rest, `"`) && !strings.ContainsAny(rest, ")](}")
 }
 
 // mindmapNode reads a node: an id and a shape around its text, as
@@ -263,6 +293,17 @@ func (c *chart) mindmapNode(s string) (*mindmapNode, error) {
 	case "{{":
 		n.shape = "hexagon"
 	}
+	if strings.Contains(body, "\n") {
+		// Mermaid drops the space at the start and the end of each line of
+		// a text that runs over more lines.
+		var lines []string
+		for l := range strings.SplitSeq(body, "\n") {
+			if l = strings.TrimSpace(l); l != "" {
+				lines = append(lines, l)
+			}
+		}
+		body = strings.Join(lines, "\n")
+	}
 	n.label = labelText(body)
 	return n, nil
 }
@@ -326,7 +367,15 @@ func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, m text.Measurer) {
 	if n.isz > 0 {
 		limit -= n.isz + 6
 	}
-	n.lines = wrapRuns(markdownRuns(n.label), n.size, int(n.weight), max(limit, 40), m)
+	label := n.label
+	if n.soft {
+		// Mermaid draws the text on one line, with no break, when it fits.
+		one := strings.ReplaceAll(label, "\n", " ")
+		if l := wrapRuns(markdownRuns(one), n.size, int(n.weight), 0, m); len(l) == 1 && l[0].w <= max(limit, 40) {
+			label = one
+		}
+	}
+	n.lines = wrapRuns(markdownRuns(label), n.size, int(n.weight), max(limit, 40), m)
 	for _, l := range n.lines {
 		n.tw = max(n.tw, l.w)
 	}

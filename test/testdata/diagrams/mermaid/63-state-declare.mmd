@@ -1,0 +1,14 @@
+stateDiagram-v2
+    state "Some long name" as S1: The description
+    state fork_state &lt;&lt;fork&gt;&gt;
+    state Idle: not a description
+    [*] --> S1
+    S1 --> fork_state
+    fork_state --> Idle
+    fork_state --> Busy
+    state Busy
+    {
+        [*] --> b1
+        b1 --> [*]
+    }
+    Idle --> [*]

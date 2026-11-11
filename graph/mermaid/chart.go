@@ -98,6 +98,20 @@ func Chart(d *Diagram, strict bool) ([]byte, bool, vega.Report, error) {
 	return b, lite, c.issues.Report, nil
 }
 
+// emptyChart returns the spec of Vega of a chart with nothing in it but its
+// title and its description, as Mermaid draws a gantt or a user journey
+// with no task.
+func emptyChart(title, desc string) map[string]any {
+	spec := map[string]any{"width": 0, "height": 0}
+	if title != "" {
+		spec["title"] = map[string]any{"text": title, "anchor": "start"}
+	}
+	if desc != "" {
+		spec["description"] = desc
+	}
+	return spec
+}
+
 // field splits a line at its first colon into a key and a value, both
 // trimmed.
 func field(s string) (string, string, bool) {
