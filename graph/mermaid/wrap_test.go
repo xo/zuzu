@@ -88,6 +88,7 @@ func TestScaleWrap(t *testing.T) {
 	for kind, want := range map[string]float64{
 		"timeline": 110, "mindmap": 110, "flowchart": 160.0 * 11 / 14, "sequenceDiagram": 160.0 * 11 / 14.5,
 		"C4Context": 160.0 * 11 / 14, "journey": 160.0 * 11 / 14, "usecase-beta": 160.0 * 11 / 14,
+		"eventmodeling": 110,
 	} {
 		if got := scaleWrap(kind, "", 160); got != want {
 			t.Errorf("%s: scaleWrap(160) is %g, want %g", kind, got, want)

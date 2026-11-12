@@ -1,0 +1,15 @@
+eventmodeling accTitle: The grammar
+  // A comment of two slashes, and one of a slash and a star
+  /* that runs over
+     two lines */
+  tf 01 ui CartUI tf 02 cmd
+    AddItem title The title of the body
+  tf 03 evt ItemAdded accDescr: An event model that uses each part of the grammar
+  entity Cart.Item
+  note 03 {
+    a note draws nothing
+  }
+  gwt 03 given evt ItemAdded when cmd AddItem then evt ItemAdded
+  data Unused `md` {
+}
+  tf 004 evt ItemAddedAgain

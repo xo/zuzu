@@ -1,0 +1,17 @@
+eventmodeling
+
+timeframe 01 ui CartUI
+timeframe 02 command AddItem [[AddItem01]]
+timeframe 03 event ItemAdded `json` { description: string }
+timeframe 04 command AddItem 'quoted data draws nothing'
+timeframe 05 event ItemAdded [[Missing]]
+
+data AddItem01 {
+  description: 'john'
+  image: 'avatar_john'
+  price: 20.4
+}
+
+data AddItem01 {
+  description: 'a second block of the same name'
+}

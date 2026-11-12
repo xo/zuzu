@@ -1655,6 +1655,7 @@ the source draws once, with its label.
 | `packet`, `packet-beta` | Vega rects and text, laid out in Go: the fields on rows of bits |
 | `railroad-beta`, `railroad-ebnf-beta`, `railroad-abnf-beta`, `railroad-peg-beta` | Vega rects, paths and text, laid out in Go with the sizes of Mermaid: a track for each rule |
 | `treeView-beta` | Vega rules, rects, paths, text and icons, laid out in Go: a row for each item, indented by its depth |
+| `eventmodeling` | Vega rects, paths, symbols and text, laid out in Go: the frames along a time axis, each in the swimlane of its kind |
 
 #### pie
 
@@ -3217,6 +3218,122 @@ category scheme with an outline, and an icon takes that color too.
 zuzu draws a tree view in another way than Mermaid 12.3.0 in one place.
 Mermaid draws no title, from the front matter or from `title`. zuzu draws
 the title, as in the other kinds.
+
+#### eventmodeling
+
+The keyword is `eventmodeling`. An event model is a time axis of frames
+from left to right. Each frame is a box in the swimlane of its kind, and an
+arrow goes to each frame from the frame that leads to it. A statement can
+run over more lines, and a line can hold more statements, as in Mermaid
+12.3.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `tf 01 ui CartUI`, `timeframe 01 ui CartUI` | a frame: a box with its name, at the next place on the time axis |
+| `rf 04 evt Stock.Changed`, `resetframe 04 evt Stock.Changed` | a frame that takes no arrow from the frame before it |
+| `->> 02` after a frame, one time or more | an arrow from each frame that the frame names |
+| `[[Item]]` after a frame | the data of the data block `Item` in the box, under the name |
+| `{ price: number }`, `'text'` or `"text"` at the end of a frame, with a type such as `` `json` `` before it or not | the data in the box, under the name |
+| `data Item {`, its lines and a `}` at the start of a line | a data block, which a frame names with `[[Item]]` |
+| `entity Cart.Item`, `note 01 {` up to its `}`, `gwt 01 given evt A when cmd B then evt C` | nothing, as in Mermaid 12.3 (D32) |
+| `accTitle: Text`, `accDescr: Text` or `accDescr { ... }` after a space in a line | the description of the Vega spec, the texts joined in order |
+| `title Text` after a space in a line | the title |
+
+The id of a frame is one to three digits. `1` and `01` are two frames.
+The kind is `ui`, `cmd` or `command`, `evt` or `event`, `rmo` or
+`readmodel`, and `pcr` or `processor`. The name is a word of letters,
+digits and underscores, or more such words with a dot between two. A
+keyword of the grammar, such as `data` or `ui`, is not a name.
+
+| Kind | Swimlane | Color |
+| --- | --- | --- |
+| `ui` | UI/Automation | the neutral color `muted` |
+| `pcr`, `processor` | UI/Automation | the fourth color of the category scheme |
+| `cmd`, `command` | Command/Read Model | the first color |
+| `rmo`, `readmodel` | Command/Read Model | the second color |
+| `evt`, `event` | Events | the third color |
+
+Mermaid colors a frame by its kind: a screen white, a processor pink, a
+command blue, a read model green and an event orange. The colors of the
+table are near these in the scheme `zuzu`. A name with one dot, such as
+`Cart.ItemAdded`, has a namespace. Its box shows `ItemAdded`, in a
+swimlane of its own under the swimlanes of its kind, with the label
+`UI/A: Cart`, `C/RM: Cart` or `Stream: Cart`. Each such frame takes a new
+swimlane, also when a frame before it has the same namespace, as in
+Mermaid 12.3. A name with two dots or more shows whole, in the swimlane of
+its kind.
+
+zuzu lays out an event model in Go with the rules and the sizes of Mermaid
+12.3, scaled by 11/16, because Mermaid draws the text of an event model at
+16 pixels (D32):
+
+1. The frames take their places in the order of the source. The first box
+   starts 172 pixels from the left, 250 in Mermaid. A box in the swimlane
+   of the box before it starts 6.9 pixels after that box. A box in another
+   swimlane starts 48 pixels before the end of the box before it, so that
+   the boxes make steps.
+2. A box is at least 69 pixels wide and 69 pixels high, 100 in Mermaid.
+   Mermaid measures the name with its tags of HTML, `<b>` and `</b>`, and
+   zuzu measures the same text, so that a box is as wide as in Mermaid.
+3. The swimlanes go from top to bottom: UI/Automation, Command/Read Model
+   and Events, each followed by the swimlanes of its namespaces. Each
+   swimlane is as wide as the model, and as high as its highest box with a
+   padding.
+4. A frame with `->>` takes an arrow from each frame that it names, in the
+   order of the source, when that frame is before it or is itself. A frame
+   that it names and that is not there, or that comes later, gives no
+   arrow. A frame with no `->>` takes an arrow from the last frame before
+   it in another swimlane. The first frame and a reset frame take none.
+5. An arrow is a straight line from two thirds of the width of its source
+   to one third of the width of its target. It goes from the bottom of one
+   box to the top of the other, or from the top to the bottom when the
+   target is in a higher swimlane.
+
+The name wraps at 430 pixels of Mermaid, scaled by 11/16, as "Labels that
+wrap" says. A name that is wider breaks with a hyphen, as in Mermaid. The
+data is the text after the first `{`, and after its new line in a data
+block, up to the character before the last `}`, as in Mermaid 12.3. So
+`{a: 1}` shows `a:`, and data in quotes shows nothing. zuzu draws each
+line of the data on a line of its own, at the left of the box, under an
+empty line. Each line wraps at 430 pixels of Mermaid. Mermaid draws the
+lines of the data as one text in a font of code, which wraps where the box
+ends.
+
+These are errors, as in Mermaid: a frame id of more than three digits, a
+frame id two times, a kind that is not in the table above, such as `UI`, a
+keyword as a name, a dot at the end of a name, a character that is not in
+the grammar, such as `-`, a `->>` with no frame id, a type of data that
+Mermaid does not have, a data block in the line of a frame, data in braces
+on one line after `data` or `note`, a `}` of a data block that does not
+start a line, a text right after the `}` of a data block, a namespace in a
+`gwt` or in the name of a data block, a `/*` with no `*/`, and the keyword
+`eventmodeling` after the first line. `title`, `accTitle` and `accDescr` at
+the start of a line are errors too, because Mermaid reads them as names
+there.
+
+zuzu reads no setting of `eventmodeling`. Mermaid 12.3 does not read
+`eventmodeling.rowHeight`, so zuzu accepts it with no issue (D32). The other
+settings, such as `eventmodeling.padding`, are issues, and so are the
+colors of `themeVariables`, such as `emUiFill`.
+
+zuzu draws an event model in other ways than Mermaid 12.3.0 in five
+places:
+
+1. Mermaid draws no title. zuzu draws the `title` of the source, or the
+   `title` of the front matter when the source has none.
+2. Mermaid puts the text of `accTitle` and `accDescr` in the SVG with the
+   keyword, as `accTitle: Text`. zuzu puts the text only in the description.
+3. The first box starts right of the widest label of a swimlane, when that
+   label is wider than the space before the first box in Mermaid.
+4. A box starts after the last box of its swimlane. Mermaid can draw a box
+   over the box before it when the boxes are narrow.
+5. zuzu draws the lines of the data as lines, as the paragraph above says.
+
+The look is the look of zuzu. A box is a tint of the color of its kind,
+with an outline and its name in bold in the middle. A swimlane is a panel
+with its label at its top left. An arrow and its arrowhead take the color
+`edge`, `edgeWidth` and `arrowLength`, and draw over the boxes, as in
+Mermaid.
 
 ### Other kinds
 

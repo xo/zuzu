@@ -1,0 +1,10 @@
+eventmodeling
+
+tf 01 rmo CartUI ->> 02 ->> 03
+tf 02 evt CartCreated
+tf 03 evt ItemAdded
+tf 04 rmo CartItems ->> 03 ->> 02 ->> 99
+tf 05 pcr Notifier
+tf 06 cmd Notify ->> 05 ->> 06
+tf 07 ui Screen
+tf 08 ui OtherScreen
