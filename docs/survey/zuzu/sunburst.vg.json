@@ -1,0 +1,30 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "width": 420,
+  "height": 280,
+  "padding": 4,
+  "autosize": "none",
+  "data": [
+    {
+      "name": "tree",
+      "url": "data/flare.json",
+      "transform": [
+        {"type": "stratify", "key": "id", "parentKey": "parent"},
+        {"type": "partition", "field": "size", "sort": {"field": "value"}, "size": [{"signal": "2 * PI"}, {"signal": "min(width, height) / 2"}], "as": ["a0", "r0", "a1", "r1", "depth", "children"]}
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "color", "type": "ordinal", "domain": {"data": "tree", "field": "depth"}, "range": "category"}
+  ],
+  "marks": [
+    {
+      "type": "arc",
+      "from": {"data": "tree"},
+      "encode": {
+        "enter": {"x": {"signal": "width / 2"}, "y": {"signal": "height / 2"}, "fill": {"scale": "color", "field": "depth"}},
+        "update": {"startAngle": {"field": "a0"}, "endAngle": {"field": "a1"}, "innerRadius": {"field": "r0"}, "outerRadius": {"field": "r1"}}
+      }
+    }
+  ]
+}

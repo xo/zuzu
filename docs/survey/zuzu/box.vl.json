@@ -1,0 +1,13 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 380,
+  "height": 230,
+  "data": {"url": "data/penguins.json"},
+  "transform": [{"filter": "isValid(datum['Body Mass (g)'])"}],
+  "mark": "boxplot",
+  "encoding": {
+    "x": {"field": "Species", "type": "nominal"},
+    "y": {"field": "Body Mass (g)", "type": "quantitative", "scale": {"zero": false}},
+    "color": {"field": "Species", "type": "nominal", "legend": null}
+  }
+}

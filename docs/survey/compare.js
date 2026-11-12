@@ -1,5 +1,8 @@
 // compare.js draws compare.html. Each library has one adapter for each kind
 // of chart, and every adapter draws the same rows from data.js.
+// zuzu and Matplotlib do not draw in the browser. Their adapters show the
+// static SVG files in static/, which test/cmd/survey and gen-static.py
+// write from the same files of vega-datasets.
 //
 // The adapters keep each library's defaults: its palette, fonts, spacing and
 // animation. Only the dark mode is set by hand, and only for a library that
@@ -144,7 +147,10 @@
 
   // ---------------------------------------------------------- libraries
 
+  // zuzu comes first, next to Vega-Lite and Vega, because its specs are
+  // Vega-Lite and Vega specs.
   const LIBS = [
+    { id: "zuzu", name: "zuzu", ver: "v0.7.1, static SVG", tech: "SVG, drawn in Go", theme: "WithMode(Dark)" },
     { id: "vegalite", name: "Vega-Lite", ver: "vega-lite 6.5.0, vega 6.4.0", tech: "SVG", theme: "theme \"dark\" from vega-themes" },
     { id: "vega", name: "Vega", ver: "vega 6.4.0", tech: "SVG", theme: "theme \"dark\" from vega-themes" },
     { id: "echarts", name: "ECharts", ver: "6.1.0", tech: "SVG renderer", theme: "built-in \"dark\" theme" },
@@ -339,15 +345,22 @@
     return () => el.replaceChildren();
   };
 
-  // st shows a static SVG made by gen-static.py.
-  const st = (name) => (el, t) => {
+  // file shows a static SVG of a library that does not draw in the
+  // browser: static/<prefix>-<row>-<light|dark>.svg. how names the
+  // program that makes the file.
+  const file = (prefix, lib, how) => (name) => (el, t) => {
     const img = new Image();
-    img.alt = `Matplotlib, ${name}`;
-    img.src = `static/mpl-${name}-${t.dark ? "dark" : "light"}.svg`;
-    img.onerror = () => { el.innerHTML = '<p class="msg">Not generated. Run <code>gen-static.py</code>, as docs/survey/README.md says.</p>'; };
+    img.alt = `${lib}, ${name}`;
+    img.src = `static/${prefix}-${name}-${t.dark ? "dark" : "light"}.svg`;
+    img.onerror = () => { el.innerHTML = `<p class="msg">Not generated. Run ${how}, as docs/survey/README.md says.</p>`; };
     el.append(img);
     return () => el.replaceChildren();
   };
+  // st shows a static SVG made by gen-static.py.
+  const st = file("mpl", "Matplotlib", "<code>gen-static.py</code>");
+  // zz shows a static SVG that zuzu drew from the spec of the row in
+  // docs/survey/zuzu, made by test/cmd/survey.
+  const zz = file("zuzu", "zuzu", "<code>go run ./cmd/survey</code> in the test folder");
 
   // A palette for the libraries that have none. uPlot, Lightweight Charts
   // and a Recharts pie draw every series in one color unless told otherwise.
@@ -355,6 +368,7 @@
 
   // ---------------------------------------------------------------- line
 
+  def("line", "zuzu", "native", "Vega-Lite spec. Names each line at its end", zz("line"));
   def("line", "vegalite", "native", "", vl({
     data: { values: P.stocks.map((r) => ({ symbol: r.symbol, date: r.iso, price: r.price })) },
     mark: "line",
@@ -408,6 +422,7 @@
 
   // ---------------------------------------------------------------- area
 
+  def("area", "zuzu", "native", "Vega-Lite spec, aggregates the raw rows itself", zz("area"));
   def("area", "vegalite", "native", "aggregates the raw rows itself", vl({
     data: { values: D.weather },
     mark: "area",
@@ -454,6 +469,7 @@
 
   // --------------------------------------------------------------- group
 
+  def("group", "zuzu", "native", "Vega-Lite spec, xOffset groups the bars", zz("group"));
   def("group", "vegalite", "native", "xOffset groups the bars", vl({
     data: { values: D.barley },
     mark: "bar",
@@ -497,6 +513,7 @@
 
   // --------------------------------------------------------------- stack
 
+  def("stack", "zuzu", "native", "Vega-Lite spec. The sort puts the first site at the bottom, where Vega-Lite puts it at the top", zz("stack"));
   def("stack", "vegalite", "native", "", vl({
     data: { values: D.barley },
     mark: "bar",
@@ -542,6 +559,7 @@
 
   // ------------------------------------------------------------- scatter
 
+  def("scatter", "zuzu", "native", "Vega-Lite spec", zz("scatter"));
   def("scatter", "vegalite", "native", "", vl({
     data: { values: D.cars },
     mark: "point",
@@ -580,6 +598,7 @@
 
   // ---------------------------------------------------------------- hist
 
+  def("hist", "zuzu", "native", "Vega-Lite spec, bins the raw rows", zz("hist"));
   def("hist", "vegalite", "native", "bins the raw rows", vl({
     data: { values: D.cars },
     mark: "bar",
@@ -615,6 +634,7 @@
 
   // ----------------------------------------------------------------- pie
 
+  def("pie", "zuzu", "native", "Vega-Lite spec, arc mark with theta, counts the raw rows", zz("pie"));
   def("pie", "vegalite", "native", "arc mark with theta", vl({
     data: { values: P.wCounts },
     mark: "arc",
@@ -644,6 +664,7 @@
 
   // ---------------------------------------------------------------- heat
 
+  def("heat", "zuzu", "native", "Vega-Lite spec, rect mark, aggregates the raw rows", zz("heat"));
   def("heat", "vegalite", "native", "rect mark, aggregates the raw rows", vl({
     data: { values: D.weather },
     mark: "rect",
@@ -688,6 +709,7 @@
 
   // ----------------------------------------------------------------- box
 
+  def("box", "zuzu", "native", "Vega-Lite spec, computes the quartiles. The outliers are at the left edge of the band, not at its center", zz("box"));
   def("box", "vegalite", "native", "computes the quartiles", vl({
     data: { values: P.penguins },
     mark: "boxplot",
@@ -724,6 +746,7 @@
 
   // -------------------------------------------------------------- candle
 
+  def("candle", "zuzu", "composed", "Vega-Lite spec, a rule and a bar, layered. The bars have no width, so the bodies are missing", zz("candle"));
   def("candle", "vegalite", "composed", "a rule and a bar, layered", vl((t) => ({
     data: { values: D.ohlc },
     encoding: {
@@ -771,6 +794,7 @@
 
   // --------------------------------------------------------------- radar
 
+  def("radar", "zuzu", "composed", "Vega spec, lines and rules placed by polar signals. zuzu also reads radar-beta of Mermaid", zz("radar"));
   none("radar", "vegalite", "no polar coordinates for lines. Arcs only");
   def("radar", "echarts", "native", "", ec(() => ({
     tooltip: {}, legend: { bottom: 0 },
@@ -804,6 +828,7 @@
 
   // ------------------------------------------------------------- treemap
 
+  def("treemap", "zuzu", "native", "Vega spec, stratify and treemap transforms", zz("treemap"));
   none("treemap", "vegalite", "no hierarchy. Vega has it");
   def("treemap", "vega", "native", "stratify and treemap transforms", vg({
     data: [{ name: "tree", values: D.flare, transform: [
@@ -849,6 +874,7 @@
 
   // ------------------------------------------------------------ sunburst
 
+  def("sunburst", "zuzu", "native", "Vega spec, stratify and partition transforms", zz("sunburst"));
   none("sunburst", "vegalite", "no hierarchy. Vega has it");
   def("sunburst", "vega", "native", "stratify and partition transforms", vg({
     autosize: "none",
@@ -881,6 +907,7 @@
 
   // -------------------------------------------------------------- sankey
 
+  def("sankey", "zuzu", "native", "Vega spec, the transforms zuzu.sankey and zuzu.sankeylinks", zz("sankey"));
   none("sankey", "vegalite", "no sankey layout");
   def("sankey", "echarts", "native", "", ec(() => ({
     tooltip: {}, series: [{ type: "sankey", left: 10, right: 90, data: P.nodes.map((n) => ({ name: n })), links: P.links, emphasis: { focus: "adjacency" } }],
@@ -905,6 +932,7 @@
 
   // ----------------------------------------------------------------- map
 
+  def("map", "zuzu", "native", "Vega-Lite spec, geoshape with a projection", zz("map"));
   def("map", "vegalite", "native", "geoshape with a projection", vl({
     data: { values: D.us, format: { type: "topojson", feature: "states" } },
     transform: [{ lookup: "id", from: { data: { values: D.states }, key: "id", fields: ["engineers", "state"] } }, { calculate: "datum.engineers * 1000", as: "per 1,000" }],
@@ -971,6 +999,7 @@
     return { series: [{ type: "graph", layout: "force", force: { repulsion: 160, edgeLength: 50 }, roam: true, label: { show: true, fontSize: 10 }, edgeSymbol: ["none", "arrow"],
       data: ids.map((name) => ({ name })), links: edges.map(([source, target]) => ({ source, target })) }] };
   }));
+  def("dag", "zuzu", "native", "the DOT of the Graphviz card, layered layout", zz("dag"));
   none("dag", "vegalite", "no graph layout. Vega has a force transform only");
 
   // ---------------------------------------------------------------- page

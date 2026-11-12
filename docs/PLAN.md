@@ -68,9 +68,10 @@ said the features, the license and the fit with the rest of a project decide
 it, and that a good look is a minimum that every winner meets.
 
 [`survey/compare.html`](survey/compare.html) draws the same real data with
-14 libraries, side by side, in a light and a dark theme. Open it to see what
-each library draws without help, what needs a plugin, and what the caller must
-prepare first. [`survey/README.md`](survey/README.md) says how to open it.
+zuzu and 14 other libraries, side by side, in a light and a dark theme. Open
+it to see what each library draws without help, what needs a plugin, and what
+the caller must prepare first. [`survey/README.md`](survey/README.md) says how
+to open it.
 
 ## The targets
 
@@ -422,7 +423,7 @@ the rules that Vega leaves to its renderer (D12):
 - `WithSize` replaces the size of the spec, even one that a signal works
   out from a step, as Vega-Lite does for a discrete x.
 
-The survey shows why a theme matters. Of the 14 libraries in
+The survey shows why a theme matters. Of the 14 other libraries in
 `compare.html`, Vega-Lite, Vega, ECharts, ApexCharts, Mermaid, Highcharts and Matplotlib
 switch to dark with one setting, and Observable Plot takes the text color of
 the page. Chart.js, Plotly, Recharts, uPlot, Lightweight Charts and Graphviz

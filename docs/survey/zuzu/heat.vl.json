@@ -1,0 +1,12 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 340,
+  "height": 230,
+  "data": {"url": "data/seattle-weather.csv"},
+  "mark": "rect",
+  "encoding": {
+    "x": {"timeUnit": "month", "field": "date", "type": "ordinal"},
+    "y": {"timeUnit": "year", "field": "date", "type": "ordinal"},
+    "color": {"aggregate": "mean", "field": "temp_max", "type": "quantitative"}
+  }
+}

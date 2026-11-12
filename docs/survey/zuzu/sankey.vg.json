@@ -1,0 +1,73 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "width": 420,
+  "height": 280,
+  "padding": 4,
+  "data": [
+    {
+      "name": "links",
+      "url": "data/cars.json",
+      "transform": [
+        {"type": "formula", "as": "cyl", "expr": "datum.Cylinders + ' cylinders'"},
+        {"type": "aggregate", "groupby": ["Origin", "cyl"]},
+        {"type": "project", "fields": ["Origin", "cyl", "count"], "as": ["source", "target", "value"]}
+      ]
+    },
+    {
+      "name": "nodes",
+      "source": "links",
+      "transform": [
+        {"type": "zuzu.sankey", "extent": [[60, 0], [330, 280]], "nodeWidth": 10, "nodePadding": 12}
+      ]
+    },
+    {
+      "name": "bands",
+      "source": "links",
+      "transform": [{"type": "zuzu.sankeylinks", "nodes": "nodes"}]
+    }
+  ],
+  "scales": [
+    {"name": "color", "type": "ordinal", "domain": ["Europe", "Japan", "USA"], "range": "category"}
+  ],
+  "marks": [
+    {
+      "type": "path",
+      "from": {"data": "bands"},
+      "encode": {
+        "enter": {
+          "path": {"field": "path"},
+          "fill": {"scale": "color", "field": "source"}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "nodes"},
+      "encode": {
+        "enter": {
+          "x": {"field": "x0"},
+          "x2": {"field": "x1"},
+          "y": {"field": "y0"},
+          "y2": {"field": "y1"},
+          "fill": [
+            {"test": "indexof(domain('color'), datum.key) >= 0", "scale": "color", "field": "key"},
+            {"value": "#a0a7b4"}
+          ]
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "nodes"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "datum.x0 < 200 ? datum.x0 - 6 : datum.x1 + 6"},
+          "y": {"signal": "(datum.y0 + datum.y1) / 2"},
+          "align": {"signal": "datum.x0 < 200 ? 'right' : 'left'"},
+          "baseline": {"value": "middle"},
+          "text": {"signal": "datum.key + '  ' + datum.value"}
+        }
+      }
+    }
+  ]
+}

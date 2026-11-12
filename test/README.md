@@ -21,6 +21,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `cmd/gallery/` | the tool that draws the specs of the corpus with zuzu, on a page |
 | `cmd/review/` | the tool that writes a page that shows each source drawn by its original renderer next to the same source drawn by zuzu |
 | `cmd/compile/` | the tool that prints the Vega spec that zuzu compiles from a Vega-Lite spec |
+| `cmd/survey/` | the tool that draws the zuzu cards of `docs/survey/compare.html` |
 | `cmd/mmdcref/` | the tool that reads an SVG that `mmdc` drew and writes the reference of a fixture of Mermaid (D31) |
 | `conform/` | the comparison of datasets, scales and marks that `cmd/conform` runs |
 | `testdata/diagrams/` | the fixtures of DOT and of Mermaid, each with its reference |
@@ -126,6 +127,10 @@ It draws each spec of the first target with zuzu, and writes the SVG files
 and a page, `index.html`, that shows them with the issues of each. Add
 `-dark` for the dark mode, `-only text` to draw some specs, and `-n` to draw
 at most that many.
+
+`go run ./cmd/survey` draws each spec in `docs/survey/zuzu` in the light and
+the dark mode. It writes the zuzu images of `docs/survey/compare.html` to
+`docs/survey/static`. `docs/survey/README.md` says more.
 
 ## Compare zuzu with the originals
 

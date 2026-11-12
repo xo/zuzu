@@ -1,0 +1,10 @@
+digraph zuzu {
+  rankdir=LR; node [shape=box, fontname="Helvetica", fontsize=11]; edge [fontsize=10];
+  vl [label="Vega-Lite spec"]; c [label="compile"]; v [label="Vega spec"];
+  df [label="dataflow and transforms"]; sql [label="SQL result", shape=cylinder];
+  sc [label="scales, axes, legends"]; sg [label="scene graph"]; th [label="theme: light, dark"];
+  dot [label="DOT or Mermaid"]; gl [label="graph layout"]; svg [label="SVG writer"];
+  ok [label="okage svg raster"]; dr [label="direct okage draw"]; js [label="browser canvas, live"];
+  vl -> c -> v -> df -> sc -> sg; sql -> df [style=dashed]; th -> sg; dot -> gl -> sg;
+  sg -> svg -> ok; sg -> dr; sg -> js [style=dashed];
+}

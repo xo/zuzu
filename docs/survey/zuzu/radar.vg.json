@@ -1,0 +1,120 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "width": 340,
+  "height": 270,
+  "padding": 4,
+  "config": {"line": {"zuzu.endLabel": false}},
+  "signals": [
+    {"name": "cx", "update": "width / 2"},
+    {"name": "cy", "update": "height / 2"},
+    {"name": "radius", "update": "height / 2 - 22"},
+    {"name": "measures", "value": ["Beak Length (mm)", "Beak Depth (mm)", "Flipper Length (mm)", "Body Mass (g)"]},
+    {"name": "names", "value": ["Beak length", "Beak depth", "Flipper length", "Body mass"]}
+  ],
+  "data": [
+    {
+      "name": "means",
+      "url": "data/penguins.json",
+      "transform": [
+        {"type": "fold", "fields": ["Beak Length (mm)", "Beak Depth (mm)", "Flipper Length (mm)", "Body Mass (g)"]},
+        {"type": "filter", "expr": "isValid(datum.value)"},
+        {"type": "aggregate", "groupby": ["Species", "key"], "fields": ["value"], "ops": ["mean"], "as": ["mean"]},
+        {"type": "joinaggregate", "groupby": ["key"], "fields": ["mean"], "ops": ["max"], "as": ["top"]},
+        {"type": "formula", "as": "share", "expr": "datum.mean / datum.top"},
+        {"type": "formula", "as": "order", "expr": "indexof(measures, datum.key)"},
+        {"type": "formula", "as": "angle", "expr": "-PI / 2 + datum.order * 2 * PI / 4"}
+      ]
+    },
+    {
+      "name": "rings",
+      "values": [{"r": 0.25}, {"r": 0.5}, {"r": 0.75}, {"r": 1}],
+      "transform": [
+        {"type": "formula", "as": "spokes", "expr": "[0, 1, 2, 3]"},
+        {"type": "flatten", "fields": ["spokes"], "as": ["i"]},
+        {"type": "formula", "as": "angle", "expr": "-PI / 2 + datum.i * 2 * PI / 4"}
+      ]
+    },
+    {
+      "name": "spokes",
+      "values": [{"i": 0}, {"i": 1}, {"i": 2}, {"i": 3}],
+      "transform": [
+        {"type": "formula", "as": "angle", "expr": "-PI / 2 + datum.i * 2 * PI / 4"},
+        {"type": "formula", "as": "name", "expr": "names[datum.i]"}
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "color", "type": "ordinal", "domain": ["Adelie", "Chinstrap", "Gentoo"], "range": "category"}
+  ],
+  "legends": [{"fill": "color", "orient": "right"}],
+  "marks": [
+    {
+      "type": "group",
+      "from": {"facet": {"name": "ring", "data": "rings", "groupby": "r"}},
+      "marks": [
+        {
+          "type": "line",
+          "from": {"data": "ring"},
+          "sort": {"field": "datum.i"},
+          "style": ["zuzu.guide"],
+          "encode": {
+            "enter": {
+              "x": {"signal": "cx + cos(datum.angle) * radius * datum.r"},
+              "y": {"signal": "cy + sin(datum.angle) * radius * datum.r"},
+              "interpolate": {"value": "linear-closed"},
+              "strokeWidth": {"value": 1}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "rule",
+      "from": {"data": "spokes"},
+      "style": ["zuzu.guide"],
+      "encode": {
+        "enter": {
+          "x": {"signal": "cx"},
+          "y": {"signal": "cy"},
+          "x2": {"signal": "cx + cos(datum.angle) * radius"},
+          "y2": {"signal": "cy + sin(datum.angle) * radius"},
+          "strokeWidth": {"value": 1}
+        }
+      }
+    },
+    {
+      "type": "group",
+      "from": {"facet": {"name": "species", "data": "means", "groupby": "Species"}},
+      "marks": [
+        {
+          "type": "line",
+          "from": {"data": "species"},
+          "sort": {"field": "datum.order"},
+          "encode": {
+            "enter": {
+              "x": {"signal": "cx + cos(datum.angle) * radius * datum.share"},
+              "y": {"signal": "cy + sin(datum.angle) * radius * datum.share"},
+              "interpolate": {"value": "linear-closed"},
+              "stroke": {"scale": "color", "field": "Species"},
+              "fill": {"scale": "color", "field": "Species"},
+              "fillOpacity": {"value": 0.16}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "from": {"data": "spokes"},
+      "encode": {
+        "enter": {
+          "x": {"signal": "cx + cos(datum.angle) * (radius + 8)"},
+          "y": {"signal": "cy + sin(datum.angle) * (radius + 8)"},
+          "align": {"signal": "abs(cos(datum.angle)) < 0.01 ? 'center' : cos(datum.angle) > 0 ? 'left' : 'right'"},
+          "baseline": {"signal": "abs(sin(datum.angle)) < 0.01 ? 'middle' : sin(datum.angle) > 0 ? 'top' : 'bottom'"},
+          "text": {"field": "name"}
+        }
+      }
+    }
+  ]
+}

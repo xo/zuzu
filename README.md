@@ -74,9 +74,9 @@ report, err := chart.SVG(ctx, w, zuzu.WithLoader(zuzu.FSLoader(os.DirFS("data"))
 
 The first step was a survey of what other libraries do. Open
 [`docs/survey/compare.html`](docs/survey/compare.html) to see the same real
-data drawn by 14 chart and diagram libraries, side by side, in a light and a
-dark theme. [`docs/survey/README.md`](docs/survey/README.md) says how to open
-it.
+data drawn by zuzu and 14 other chart and diagram libraries, side by side, in
+a light and a dark theme. [`docs/survey/README.md`](docs/survey/README.md)
+says how to open it.
 
 The second step was the look. Open
 [`docs/targets/index.html`](docs/targets/index.html) to see 33 target charts,

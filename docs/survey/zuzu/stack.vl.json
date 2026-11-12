@@ -1,0 +1,12 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 300,
+  "height": 230,
+  "data": {"url": "data/barley.json"},
+  "mark": "bar",
+  "encoding": {
+    "y": {"field": "site", "type": "nominal", "sort": ["Waseca", "Crookston", "Morris", "University Farm", "Duluth", "Grand Rapids"]},
+    "x": {"aggregate": "sum", "field": "yield", "type": "quantitative"},
+    "color": {"field": "variety", "type": "nominal"}
+  }
+}

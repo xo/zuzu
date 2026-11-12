@@ -1,0 +1,13 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 340,
+  "height": 230,
+  "data": {"url": "data/us-10m.json", "format": {"type": "topojson", "feature": "states"}},
+  "transform": [
+    {"lookup": "id", "from": {"data": {"url": "data/population_engineers_hurricanes.csv"}, "key": "id", "fields": ["engineers", "state"]}},
+    {"calculate": "datum.engineers * 1000", "as": "per 1,000"}
+  ],
+  "projection": {"type": "albersUsa"},
+  "mark": "geoshape",
+  "encoding": {"color": {"field": "per 1,000", "type": "quantitative"}}
+}

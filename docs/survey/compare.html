@@ -97,6 +97,7 @@ section.row { display: grid; gap: 12px; scroll-margin-top: 64px; }
   <header style="display:grid;gap:10px">
     <h1>Chart Library Comparison</h1>
     <p>The same real data, drawn by each of the main chart and diagram libraries with its defaults. Read it to see what each library draws by itself, what it needs a plugin for, and what the caller must prepare first. Only the dark mode is set by hand where a library has no dark theme of its own. The colors, fonts, spacing and animation are each library's own.</p>
+    <p>zuzu is the first column. It draws in Go, not in the browser, so its cards are static SVG files. <code>test/cmd/survey</code> draws them from the Vega-Lite, Vega and DOT specs in <code>docs/survey/zuzu</code>.</p>
     <p class="muted" id="source"></p>
   </header>
 

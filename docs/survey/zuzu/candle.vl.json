@@ -1,0 +1,14 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 400,
+  "height": 230,
+  "data": {"url": "data/ohlc.json"},
+  "encoding": {
+    "x": {"field": "date", "type": "temporal", "title": null},
+    "color": {"condition": {"test": "datum.open < datum.close", "value": "#06982d"}, "value": "#ae1325"}
+  },
+  "layer": [
+    {"mark": "rule", "encoding": {"y": {"field": "low", "type": "quantitative", "scale": {"zero": false}}, "y2": {"field": "high"}}},
+    {"mark": {"type": "bar", "width": 5}, "encoding": {"y": {"field": "open", "type": "quantitative"}, "y2": {"field": "close"}}}
+  ]
+}

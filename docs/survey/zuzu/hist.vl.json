@@ -1,0 +1,11 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 400,
+  "height": 230,
+  "data": {"url": "data/cars.json"},
+  "mark": "bar",
+  "encoding": {
+    "x": {"field": "Miles_per_Gallon", "type": "quantitative", "bin": {"step": 2, "extent": [8, 48]}},
+    "y": {"aggregate": "count", "type": "quantitative"}
+  }
+}

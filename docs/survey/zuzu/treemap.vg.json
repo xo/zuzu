@@ -1,0 +1,56 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "width": 420,
+  "height": 280,
+  "padding": 4,
+  "data": [
+    {
+      "name": "tree",
+      "url": "data/flare.json",
+      "transform": [
+        {"type": "stratify", "key": "id", "parentKey": "parent"},
+        {"type": "treemap", "field": "size", "sort": {"field": "value"}, "round": true, "method": "squarify", "size": [{"signal": "width"}, {"signal": "height"}]}
+      ]
+    },
+    {"name": "nodes", "source": "tree", "transform": [{"type": "filter", "expr": "datum.children"}]},
+    {
+      "name": "leaves",
+      "source": "tree",
+      "transform": [
+        {"type": "filter", "expr": "!datum.children"},
+        {"type": "lookup", "from": "nodes", "key": "id", "fields": ["parent"], "as": ["up"]}
+      ]
+    }
+  ],
+  "scales": [
+    {"name": "color", "type": "ordinal", "domain": {"data": "nodes", "field": "name"}, "range": "category"}
+  ],
+  "marks": [
+    {
+      "type": "rect",
+      "from": {"data": "nodes"},
+      "interactive": false,
+      "encode": {
+        "enter": {"fill": {"scale": "color", "field": "name"}},
+        "update": {"x": {"field": "x0"}, "y": {"field": "y0"}, "x2": {"field": "x1"}, "y2": {"field": "y1"}}
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "leaves"},
+      "encode": {
+        "enter": {"fill": {"scale": "color", "field": "up.name"}},
+        "update": {"x": {"field": "x0"}, "y": {"field": "y0"}, "x2": {"field": "x1"}, "y2": {"field": "y1"}}
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "nodes"},
+      "interactive": false,
+      "encode": {
+        "enter": {"align": {"value": "center"}, "baseline": {"value": "middle"}, "text": {"field": "name"}, "fontSize": {"value": 11}, "fillOpacity": {"signal": "datum.depth === 1 ? 1 : 0"}},
+        "update": {"x": {"signal": "0.5 * (datum.x0 + datum.x1)"}, "y": {"signal": "0.5 * (datum.y0 + datum.y1)"}}
+      }
+    }
+  ]
+}
