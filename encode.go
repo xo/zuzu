@@ -271,10 +271,16 @@ func (s *scope) fieldRef(f vega.Field, datum any) (any, error) {
 	return readField(datum, f.Name), nil
 }
 
-// fieldName returns the name that a field reference gives.
+// fieldName returns the name that a field reference gives. The name can
+// itself be a field reference: in {"parent": {"datum": "key"}}, the value
+// of the field key of the datum names the field of the parent.
 func (s *scope) fieldName(f vega.Field, datum any) (string, error) {
-	if f.Signal != "" {
+	switch {
+	case f.Signal != "":
 		x, err := s.eval(f.Signal, datum)
+		return expr.String(x), err
+	case f.Datum != nil || f.Group != nil || f.Parent != nil:
+		x, err := s.fieldRef(f, datum)
 		return expr.String(x), err
 	}
 	return f.Name, nil

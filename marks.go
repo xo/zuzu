@@ -571,6 +571,18 @@ func geometry(typ string, st *itemState) {
 		if st.set["yc"] && !st.set["y"] {
 			it.Y = st.yc
 		}
+		if typ == scene.Area {
+			// The width of a horizontal area and the height of a vertical
+			// one can take the place of x2 and y2.
+			if st.set["width"] && (!st.set["x"] || !st.set["x2"]) {
+				x, w := span(st, it.X, it.X2, it.Width, st.xc, "x", "x2", "xc", "width")
+				it.X, it.X2 = x, x+w
+			}
+			if st.set["height"] && (!st.set["y"] || !st.set["y2"]) {
+				y, h := span(st, it.Y, it.Y2, it.Height, st.yc, "y", "y2", "yc", "height")
+				it.Y, it.Y2 = y, y+h
+			}
+		}
 	case scene.Rule:
 		if !st.set["x2"] {
 			it.X2 = it.X

@@ -96,6 +96,19 @@ func TestTransforms(t *testing.T) {
 	}
 }
 
+// TestGeoPointRadiusExpr makes sure that an expression for pointRadius
+// runs on each GeoJSON object, so that each point gets its own radius.
+func TestGeoPointRadiusExpr(t *testing.T) {
+	t.Parallel()
+	rows := `[{"type":"Feature","properties":{"r":2},"geometry":{"type":"Point","coordinates":[10,20]}},` +
+		`{"type":"Feature","properties":{"r":3},"geometry":{"type":"Point","coordinates":[30,40]}}]`
+	ts := `[{"type":"geopath","pointRadius":{"expr":"datum.properties.r"}},{"type":"project","fields":["path"]}]`
+	want := `[{"path":"M10,20m0,2a2,2 0 1,1 0,-4a2,2 0 1,1 0,4z"},{"path":"M30,40m0,3a3,3 0 1,1 0,-6a3,3 0 1,1 0,6z"}]`
+	if got := run(t, newEnv(), rows, ts); got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+}
+
 func TestExtentSetsSignal(t *testing.T) {
 	t.Parallel()
 	e := newEnv()

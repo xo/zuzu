@@ -113,14 +113,19 @@ func newContinuous(o Options) (Scale, error) {
 	for i, v := range d {
 		s.tdomain[i] = s.fwd(v)
 	}
-	// A range of more values than the domain spreads the domain over it, as
-	// a color ramp does.
-	if s.color && len(s.colors) > len(d) && len(d) == 2 {
-		n := len(s.colors)
-		t0, t1 := s.tdomain[0], s.tdomain[1]
+	// A range of more colors than a domain of two values spreads the domain
+	// over it, as a color ramp does. A scheme spreads over a domain of any
+	// length: the first value of the domain takes the first color, the
+	// last value the last color, and the middle of a diverging domain the
+	// middle color.
+	if s.color && len(s.colors) > len(d) && (len(d) == 2 || o.Scheme && len(d) > 2) {
+		n, segs := len(s.colors), float64(len(d)-1)
+		td := s.tdomain
 		s.tdomain = make([]float64, n)
 		for i := range n {
-			s.tdomain[i] = t0 + (t1-t0)*float64(i)/float64(n-1)
+			f := float64(i) / float64(n-1) * segs
+			j := min(int(f), len(td)-2)
+			s.tdomain[i] = td[j] + (td[j+1]-td[j])*(f-float64(j))
 		}
 	}
 	return s, nil

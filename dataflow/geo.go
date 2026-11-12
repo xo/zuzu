@@ -143,11 +143,12 @@ func geoPaths(p *params, rows []Row, def *Accessor, as string) ([]Row, error) {
 	if field == nil {
 		field = def
 	}
-	radius := 4.5
+	fallback := 4.5
 	if proj != nil {
-		radius = proj.Radius
+		fallback = proj.Radius
 	}
-	if radius, err = p.number("pointRadius", radius); err != nil {
+	radius, err := p.pointRadius(fallback)
+	if err != nil {
 		return nil, err
 	}
 	names, err := p.as(as)
@@ -161,7 +162,7 @@ func geoPaths(p *params, rows []Row, def *Accessor, as string) ([]Row, error) {
 		if field != nil {
 			o = field.Get(r)
 		}
-		if path, ok := geo.Path(proj, o, radius); ok {
+		if path, ok := geo.Path(proj, o, radius(o)); ok {
 			c[names[0]] = path
 		} else {
 			c[names[0]] = nil
@@ -169,6 +170,45 @@ func geoPaths(p *params, rows []Row, def *Accessor, as string) ([]Row, error) {
 		out[i] = c
 	}
 	return out, nil
+}
+
+// pointRadius reads the radius of a point of a geographic path: a
+// number, or an expression. The expression runs on each GeoJSON object
+// that the path draws, as its datum, so that a radius can follow a
+// property of a feature. A value that is not a number gives def.
+func (p *params) pointRadius(def float64) (func(any) float64, error) {
+	v, ok, err := p.raw("pointRadius")
+	if err != nil {
+		return nil, err
+	}
+	if !ok || v == nil {
+		return func(any) float64 { return def }, nil
+	}
+	m, isMap := v.(map[string]any)
+	if !isMap {
+		r := expr.Number(v)
+		return func(any) float64 { return r }, nil
+	}
+	src, isExpr := m["expr"].(string)
+	if !isExpr {
+		return nil, fmt.Errorf("reading the pointRadius %v: %w", v, ErrParam)
+	}
+	prog, err := p.env.Compile(src)
+	if err != nil {
+		return nil, err
+	}
+	env := p.env
+	return func(o any) float64 {
+		out, err := prog.Eval(env.Scope(o))
+		if err != nil {
+			return def
+		}
+		r := expr.Number(out)
+		if math.IsNaN(r) {
+			return def
+		}
+		return r
+	}, nil
 }
 
 // graticule makes one row: the lines of a grid of meridians and parallels,

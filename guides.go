@@ -631,10 +631,19 @@ func (s *scope) str(v vega.Value, def string) (string, error) {
 	return expr.String(x), nil
 }
 
-// num reads a property that is a number or a signal.
+// num reads a property that is a number, a signal or a value reference,
+// such as an offset of an axis that a scale gives:
+// {"scale": "x", "value": "a"}.
 func (s *scope) num(v vega.Value, def float64) (float64, error) {
 	if v.IsZero() {
 		return def, nil
+	}
+	if v.Signal == "" && v.JSON.Kind() == '{' {
+		x, err := s.numberRef(v, nil, nil)
+		if err != nil {
+			return def, err
+		}
+		return number(x, def), nil
 	}
 	x, err := s.value(v)
 	if err != nil {

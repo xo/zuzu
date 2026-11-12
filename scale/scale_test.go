@@ -69,6 +69,32 @@ func TestLinear(t *testing.T) {
 	}
 }
 
+// TestDivergingScheme makes sure that a scheme of many colors spreads over
+// a domain of three values, so that the middle value takes the middle
+// color and the last value the last color, not the third.
+func TestDivergingScheme(t *testing.T) {
+	t.Parallel()
+	o := Defaults("linear")
+	o.Domain = []any{-6.0, 0.0, 6.0}
+	o.Range = []any{"#000000", "#202020", "#404040", "#606060", "#808080", "#a0a0a0", "#c0c0c0", "#e0e0e0", "#ffffff"}
+	o.Scheme = true
+	s, err := New(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Type() != "diverging-linear" {
+		t.Errorf("Type = %s, want diverging-linear", s.Type())
+	}
+	for _, c := range []struct {
+		v    float64
+		want string
+	}{{-6, "#000000"}, {-3, "#404040"}, {0, "#808080"}, {6, "#ffffff"}} {
+		if got := s.Map(c.v); got != c.want {
+			t.Errorf("Map(%v) = %v, want %s", c.v, got, c.want)
+		}
+	}
+}
+
 func TestTicks(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -62,8 +62,11 @@ func (rt *runtime) render() (*scene.Scene, error) {
 		return nil, err
 	}
 	w, h, pad := number(wv, 0), number(hv, 0), readPadding(pv)
-	item := &scene.Item{X: pad.left, Y: pad.top, Width: w, Height: h}
+	item := &scene.Item{Width: w, Height: h}
 	s.item = item
+	// dx and dy are the x and the y that the encode of the spec gives the
+	// root group. They move its content inside the padding, as in Vega.
+	var dx, dy float64
 	if len(s.spec.Encode) > 0 {
 		st := &itemState{it: item, set: map[string]bool{}}
 		if err := s.encodeItem(s.spec.Encode, st, map[string]any{}, ""); err != nil {
@@ -73,8 +76,9 @@ func (rt *runtime) render() (*scene.Scene, error) {
 		if err := s.linkIssue(item, "", &badLink); err != nil {
 			return nil, err
 		}
-		item.X, item.Y = pad.left, pad.top
+		dx, dy = item.X, item.Y
 	}
+	item.X, item.Y = pad.left+dx, pad.top+dy
 	// Every dataset of the top level runs, whether a mark draws it or not,
 	// as in Vega, so that its errors show.
 	for _, d := range s.spec.Data {
@@ -101,14 +105,14 @@ func (rt *runtime) render() (*scene.Scene, error) {
 		for i := range marks {
 			m := st.MarkBounds(&marks[i])
 			if !m.IsEmpty() {
-				b.X1, b.Y1 = math.Min(b.X1, m.X1), math.Min(b.Y1, m.Y1)
-				b.X2, b.Y2 = math.Max(b.X2, m.X2), math.Max(b.Y2, m.Y2)
+				b.X1, b.Y1 = math.Min(b.X1, m.X1+dx), math.Min(b.Y1, m.Y1+dy)
+				b.X2, b.Y2 = math.Max(b.X2, m.X2+dx), math.Max(b.Y2, m.Y2+dy)
 			}
 		}
 		if !b.IsEmpty() {
 			x1, y1 := math.Min(0, b.X1), math.Min(0, b.Y1)
 			x2, y2 := math.Max(w, b.X2), math.Max(h, b.Y2)
-			item.X, item.Y = pad.left-x1, pad.top-y1
+			item.X, item.Y = pad.left-x1+dx, pad.top-y1+dy
 			cw, ch = math.Ceil(x2-x1+pad.left+pad.right), math.Ceil(y2-y1+pad.top+pad.bottom)
 			// The autosize fit keeps the size of the spec for the whole
 			// chart, so the plot area gives up what the guides take. With
@@ -131,6 +135,11 @@ func (rt *runtime) render() (*scene.Scene, error) {
 				rt.fitH = h - padH
 			}
 		}
+	} else if containsPadding(av) {
+		// With the autosize none, the size of the spec holds the padding
+		// too, and the canvas does not grow.
+		rt.fitW = w - pad.left - pad.right
+		rt.fitH = h - pad.top - pad.bottom
 	}
 	sc := &scene.Scene{
 		Width:  cw,
