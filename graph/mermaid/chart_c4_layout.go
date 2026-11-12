@@ -555,7 +555,7 @@ func (p *c4Diagram) spec() map[string]any {
 	})...)
 	marks = append(marks, sigMarks(&data, "arrows", arrows, []string{"fill", "stroke"}, nil, func() map[string]any {
 		return map[string]any{"type": "symbol", "style": []any{graph.StyleArrow}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("glyph"), "size": value(36),
+			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("glyph"), "size": value(graph.ArrowSymbolSize),
 		}}}
 	})...)
 	marks = append(marks,

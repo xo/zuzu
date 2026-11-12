@@ -199,12 +199,13 @@ func TestClassAndERDiagrams(t *testing.T) {
     string name PK "the name"
     int age
   }`
-	// The circle of the arrowhead crowodot draws at 1.4 times its size.
+	// The circle of the arrowhead crowodot draws at 1.4 times its size: a
+	// radius of 0.4 of theme.ArrowLength, 8, times 1.4.
 	s, report, err = svgOf(t, er, true)
 	if err != nil {
 		t.Fatalf("%v (%v)", err, report)
 	}
-	for _, want := range []string{">CUSTOMER<", ">string<", ">name<", ">PK<", ">the name<", ">int<", ">age<", ">places<", "A3.36 3.36"} {
+	for _, want := range []string{">CUSTOMER<", ">string<", ">name<", ">PK<", ">the name<", ">int<", ">age<", ">places<", "A4.48 4.48"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("the ER diagram has no %s", want)
 		}
@@ -363,9 +364,9 @@ func TestEndLabelsAndHTML(t *testing.T) {
 			t.Errorf("the SVG draws %s as plain text", not)
 		}
 	}
-	// The circle of the arrowhead crowodot, 0.8 of the size of the symbol
-	// across.
-	if !strings.Contains(s, "A2.4 2.4") {
+	// The circle of the arrowhead crowodot, 0.8 of the length of the shape
+	// normal across: a radius of 0.4 of theme.ArrowLength, 8.
+	if !strings.Contains(s, "A3.2 3.2") {
 		t.Error("the SVG has no circle of the arrowhead crowodot")
 	}
 }

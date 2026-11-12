@@ -32,6 +32,12 @@ const (
 	StyleBand         = theme.StyleBand
 )
 
+// ArrowSymbolSize is the size of the symbol of an arrowhead at an
+// arrowsize of 1. ArrowPaths draws the shape normal 2 long in a symbol of
+// size 4, so that the shape is the square root of the size long, and this
+// size makes it theme.ArrowLength long (docs/STYLE.md).
+const ArrowSymbolSize = theme.ArrowLength * theme.ArrowLength
+
 // paintKeys are the keys of a style of a node, an edge or a cluster that
 // a mark encodes, by the name of their field.
 var paintKeys = []string{"fill", "fillOpacity", "stroke", "strokeWidth", "strokeDash"}
@@ -356,7 +362,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		r["head"], r["tail"] = head, tail
 		r["headFill"], r["headOpen"] = ArrowPaths(head)
 		r["tailFill"], r["tailOpen"] = ArrowPaths(tail)
-		size := 36.0
+		size := ArrowSymbolSize
 		if e.ArrowSize > 0 {
 			size *= e.ArrowSize * e.ArrowSize
 		}

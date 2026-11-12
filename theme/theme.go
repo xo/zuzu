@@ -46,17 +46,27 @@ type Neutrals struct {
 // and the labels under it still show.
 const BandOpacity = 0.06
 
+// The sizes of an edge of a diagram, from "Edges" in docs/STYLE.md.
+const (
+	// EdgeWidth is the width of the line of an edge, and of the outline of
+	// an open arrowhead.
+	EdgeWidth = 1.5
+	// ArrowLength is the length of the arrowhead normal of DOT at an
+	// arrowsize of 1. It is 0.8 of this length wide.
+	ArrowLength = 8.0
+)
+
 // neutrals returns the neutrals of a mode, from docs/STYLE.md.
 func neutrals(m Mode) Neutrals {
 	if m == Dark {
 		return Neutrals{
 			Background: "#10141b", Panel: "#171c25", Text: "#e7ebf2", Muted: "#9ba5b7",
-			Faint: "#6a7487", Grid: "#1e242e", Axis: "#333c4a", Edge: "#707a8d", Band: "#1d2128",
+			Faint: "#6a7487", Grid: "#1e242e", Axis: "#333c4a", Edge: "#bcc4d2", Band: "#1d2128",
 		}
 	}
 	return Neutrals{
 		Background: "#ffffff", Panel: "#f5f6f8", Text: "#1b2230", Muted: "#5f6b7d",
-		Faint: "#98a2b3", Grid: "#eceff3", Axis: "#cfd5de", Edge: "#848e9f", Band: "#f1f2f3",
+		Faint: "#98a2b3", Grid: "#eceff3", Axis: "#cfd5de", Edge: "#414a5b", Band: "#f1f2f3",
 	}
 }
 

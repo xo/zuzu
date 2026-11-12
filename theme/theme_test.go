@@ -2,9 +2,11 @@ package theme
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -152,6 +154,80 @@ func TestTheEdgesTakeTheColorOfAnEdge(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestTheSizesOfAnEdgeMatchTheStyle checks the width of an edge and the
+// length of an arrowhead against the table "Edges" in docs/STYLE.md, and
+// that the styles of an edge and of an open arrowhead take the width.
+func TestTheSizesOfAnEdgeMatchTheStyle(t *testing.T) {
+	t.Parallel()
+	rows := regexp.MustCompile("(?m)^\\| `(edgeWidth|arrowLength)` \\| ([0-9.]+) \\|").FindAllStringSubmatch(style(t), -1)
+	if len(rows) != 2 {
+		t.Fatalf("docs/STYLE.md has %d rows of the sizes of an edge, expected 2", len(rows))
+	}
+	got := map[string]string{"edgeWidth": fmt.Sprint(EdgeWidth), "arrowLength": fmt.Sprint(ArrowLength)}
+	for _, row := range rows {
+		if got[row[1]] != row[2] {
+			t.Errorf("%s: the package has %s and docs/STYLE.md has %s", row[1], got[row[1]], row[2])
+		}
+	}
+	styles, _ := New(Light, Zuzu).Config()["style"].(map[string]any)
+	for _, name := range []string{StyleEdge, StyleArrowOpen} {
+		if s, _ := styles[name].(map[string]any); s["strokeWidth"] != EdgeWidth {
+			t.Errorf("the width of %s is %v, want %v", name, s["strokeWidth"], EdgeWidth)
+		}
+	}
+}
+
+// TestTheEdgeReadsApartFromItsLabel checks the contrast ratios of the
+// table under the modes in docs/STYLE.md: the color of an edge with the
+// background, with muted, the color of its label, and with the text. It
+// also checks that an edge lies between muted and the text, and that it
+// has at least 3:1 with the background.
+func TestTheEdgeReadsApartFromItsLabel(t *testing.T) {
+	t.Parallel()
+	rows := regexp.MustCompile(`(?m)^\| (light|dark) \| ([0-9.]+):1 \| ([0-9.]+):1 \| ([0-9.]+):1 \|$`).
+		FindAllStringSubmatch(style(t), -1)
+	if len(rows) != 2 {
+		t.Fatalf("docs/STYLE.md has %d rows of the contrast of an edge, expected 2", len(rows))
+	}
+	for _, row := range rows {
+		n := neutrals(Light)
+		if row[1] == "dark" {
+			n = neutrals(Dark)
+		}
+		bg, muted, text := contrast(n.Edge, n.Background), contrast(n.Edge, n.Muted), contrast(n.Edge, n.Text)
+		for i, got := range []float64{bg, muted, text} {
+			// The table rounds a ratio to one or two places.
+			places := len(row[i+2]) - strings.Index(row[i+2], ".") - 1
+			if s := strconv.FormatFloat(got, 'f', places, 64); s != row[i+2] {
+				t.Errorf("%s: a contrast of the edge is %s, and docs/STYLE.md has %s", row[1], s, row[i+2])
+			}
+		}
+		if bg < 3 || contrast(n.Muted, n.Background) > bg || contrast(n.Text, n.Background) < bg {
+			t.Errorf("%s: the edge %s does not lie between muted and the text, or has less than 3:1", row[1], n.Edge)
+		}
+	}
+}
+
+// contrast returns the contrast ratio of two colors, as WCAG 2.1 defines it.
+func contrast(a, b string) float64 {
+	lum := func(s string) float64 {
+		c := parse(s)
+		var out float64
+		for i, v := range []float64{c.r, c.g, c.b} {
+			v /= 255
+			if v <= 0.04045 {
+				v /= 12.92
+			} else {
+				v = math.Pow((v+0.055)/1.055, 2.4)
+			}
+			out += []float64{0.2126, 0.7152, 0.0722}[i] * v
+		}
+		return out
+	}
+	la, lb := lum(a), lum(b)
+	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
 // TestTheMermaidSchemesMatchTheStyle checks the schemes of the themes of

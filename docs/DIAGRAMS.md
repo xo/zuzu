@@ -234,6 +234,11 @@ its right half, as seen along the edge toward the node. `o` changes only
 `oinv`, `vee`, `lvee` and `odiamond`. Another name, or a row of more than
 four shapes, is an issue, and draws as `normal`.
 
+An arrowhead takes the color of its edge. Its size comes from the token
+`arrowLength` of [`STYLE.md`](STYLE.md): at an `arrowsize` of 1, `normal`
+is 8 long and 6.4 wide, and `arrowsize` multiplies the length. The tip ends
+on the border of the node at each size.
+
 An entity relationship diagram in crow's foot notation uses `teeodot` for
 zero or one, `teetee` for one, `crowodot` for zero or more, and `crowtee`
 for one or more. A class diagram of UML uses `empty` for a generalization,
@@ -2525,9 +2530,10 @@ measure an emoji with the font.
 ## The look
 
 A node is a shape with a tint of its color and an outline of 1.25. An edge
-is a line of 1.25 in the color `edge` of `docs/STYLE.md`, with a small
-arrowhead in the same color (D32). The messages of a sequence diagram and
-their arrowheads take `edge` too. A guide line, such as a lifeline or a
+is a line of `edgeWidth`, 1.5, in the color `edge` of `docs/STYLE.md`, with
+an arrowhead of `arrowLength`, 8, in the same color (D32). The messages of
+a sequence diagram, the links of an architecture diagram and their
+arrowheads take the same tokens. A guide line, such as a lifeline or a
 divider of a sequence diagram, or a ring of a radar, takes the lighter
 color `axis`. A label
 is 11 pixels. A cluster is a panel with its title at the top left. A color

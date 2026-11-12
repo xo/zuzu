@@ -136,12 +136,12 @@ func (t Theme) Config() map[string]any {
 			StyleAreaStacked: map[string]any{"fillOpacity": 0.88, "stroke": t.Background, "strokeWidth": 1.0},
 			StyleCurve:       map[string]any{"interpolate": "monotone"},
 			// A node is a tint of its color with an outline of 1.25, and an
-			// edge a line of 1.25 in the color of an edge (D31, D32).
+			// edge a line of EdgeWidth in the color of an edge (D31, D32).
 			StyleNode:         map[string]any{"fill": c, "fillOpacity": 0.14, "stroke": c, "strokeWidth": 1.25},
 			StyleNodeLabel:    map[string]any{"fill": t.Text, "fontSize": 11.0},
-			StyleEdge:         map[string]any{"stroke": t.Edge, "strokeWidth": 1.25, "strokeCap": "round", "strokeJoin": "round"},
-			StyleArrow:        map[string]any{"fill": t.Edge, "stroke": t.Edge, "strokeWidth": 1.0},
-			StyleArrowOpen:    map[string]any{"fill": t.Background, "stroke": t.Edge, "strokeWidth": 1.25},
+			StyleEdge:         map[string]any{"stroke": t.Edge, "strokeWidth": EdgeWidth, "strokeCap": "round", "strokeJoin": "round"},
+			StyleArrow:        map[string]any{"fill": t.Edge, "stroke": t.Edge, "strokeWidth": 1.0, "strokeJoin": "round"},
+			StyleArrowOpen:    map[string]any{"fill": t.Background, "stroke": t.Edge, "strokeWidth": EdgeWidth, "strokeJoin": "round"},
 			StyleEdgeLabel:    map[string]any{"fill": t.Muted, "fontSize": 11.0},
 			StyleEdgeLabelBox: map[string]any{"fill": t.Background, "fillOpacity": 0.9, "cornerRadius": 3.0},
 			StyleCluster:      map[string]any{"fill": t.Panel, "stroke": t.Axis, "strokeWidth": 1.0, "cornerRadius": 6.0},

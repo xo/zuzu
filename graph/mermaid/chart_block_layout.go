@@ -415,10 +415,10 @@ func (b *blockDiagram) spec() map[string]any {
 	})...)
 	marks = append(marks,
 		map[string]any{"type": "symbol", "name": "arrows", "from": map[string]any{"data": "arrowsFill"}, "style": []any{graph.StyleArrow}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("fill"), "size": value(36),
+			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("fill"), "size": value(graph.ArrowSymbolSize),
 		}}},
 		map[string]any{"type": "symbol", "name": "openArrows", "from": map[string]any{"data": "arrowsOpen"}, "style": []any{graph.StyleArrowOpen}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("open"), "size": value(36),
+			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("open"), "size": value(graph.ArrowSymbolSize),
 		}}},
 		map[string]any{"type": "rect", "name": "edgeLabelBoxes", "from": map[string]any{"data": "edgeLabels"}, "style": []any{graph.StyleEdgeLabelBox}, "encode": map[string]any{"update": map[string]any{
 			"xc": field("x"), "yc": field("y"), "width": field("width"), "height": field("height"),

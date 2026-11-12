@@ -11,6 +11,7 @@ import (
 	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/text"
+	"github.com/xo/zuzu/theme"
 )
 
 // seqConfig holds the settings of a sequence diagram, in the units of the
@@ -873,8 +874,9 @@ func (l *seqLayout) self(e seqEvent, lines []string, lineY float64) float64 {
 	return endY
 }
 
-// headLength and headWidth are the size of an arrowhead.
-const headLength, headWidth = 8.0, 3.2
+// headLength is the length of an arrowhead, and headWidth half its width,
+// as the arrowhead normal of a graph has them (docs/STYLE.md).
+const headLength, headWidth = theme.ArrowLength, 0.4 * theme.ArrowLength
 
 // end draws the mark at an end of a message, with its tip at x, y and
 // pointing in dir, 1 to the right and -1 to the left.
@@ -1095,12 +1097,10 @@ func (l *seqLayout) spec() map[string]any {
 	mark("activations", "rect", "activations", graph.StyleNode, box(map[string]any{
 		"fill": color, "stroke": color, "fillOpacity": value(0.3), "strokeWidth": value(1), "cornerRadius": value(2),
 	}))
-	mark("messages", "path", "messages", graph.StyleEdge, path(map[string]any{"strokeWidth": value(1.5)}))
-	mark("messagesDotted", "path", "messagesDotted", graph.StyleEdge, path(map[string]any{
-		"strokeWidth": value(1.5), "strokeDash": value([]any{4, 3}),
-	}))
+	mark("messages", "path", "messages", graph.StyleEdge, path(map[string]any{}))
+	mark("messagesDotted", "path", "messagesDotted", graph.StyleEdge, path(map[string]any{"strokeDash": value([]any{4, 3})}))
 	mark("heads", "path", "heads", graph.StyleArrow, path(map[string]any{}))
-	mark("openHeads", "path", "openHeads", graph.StyleEdge, path(map[string]any{"strokeWidth": value(1.5)}))
+	mark("openHeads", "path", "openHeads", graph.StyleEdge, path(map[string]any{}))
 	mark("dots", "path", "dots", graph.StyleArrow, path(map[string]any{}))
 	mark("notes", "rect", "notes", cluster, box(map[string]any{"fillOpacity": value(1)}))
 	mark("tabs", "rect", "tabs", cluster, box(map[string]any{"fillOpacity": value(1), "cornerRadius": value(4)}))

@@ -899,7 +899,7 @@ func (a *arch) spec() map[string]any {
 			"x": field("x"), "y": field("y"), "shape": value("circle"), "size": value(40),
 		}}},
 		map[string]any{"type": "symbol", "name": "arrows", "from": from("arrows"), "style": []any{graph.StyleArrow}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("shape"), "size": value(36),
+			"x": field("x"), "y": field("y"), "angle": field("angle"), "shape": field("shape"), "size": value(graph.ArrowSymbolSize),
 		}}},
 	)
 	return map[string]any{

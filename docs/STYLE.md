@@ -28,20 +28,26 @@ scheme works in either mode. Each theme is a Vega config value (D14).
 | `faint` | `#98a2b3` | `#6a7487` | the source line, the title of an axis, a guide line |
 | `grid` | `#eceff3` | `#1e242e` | the grid lines |
 | `axis` | `#cfd5de` | `#333c4a` | a base line, a border, a guide line of a diagram, such as a lifeline |
-| `edge` | `#848e9f` | `#707a8d` | an edge of a diagram, its arrowheads, a message of a sequence diagram and a link of an architecture diagram |
+| `edge` | `#414a5b` | `#bcc4d2` | an edge of a diagram, its arrowheads, a message of a sequence diagram and a link of an architecture diagram |
 | `band` | `#f1f2f3` | `#1d2128` | a band behind a group of rows, such as a section of a gantt |
 
 The dark mode is not the light mode inverted. Its background has a little
 blue in it, its text is not pure white, and its data colors are lighter, so
 that each color keeps its contrast against the background.
 
-A reader follows an edge of a diagram, a line of 1.25, at the size of a
-terminal. So `edge` is darker than `axis` in the light mode and lighter in
-the dark mode (D32). It has a contrast of at least 3:1 with `bg`, the least
-contrast that WCAG 2.1 asks for a graphic that carries meaning. The label of
-an edge is text in `muted`, so `edge` stays lighter than `muted` in the
-light mode and darker in the dark mode, and the label reads apart from its
-line.
+A reader follows an edge of a diagram at the size of a terminal, across
+the nodes of a large diagram. So `edge` is darker than `muted` in the light
+mode and lighter in the dark mode, about halfway between `muted` and `text`,
+as the line of a theme of Mermaid and of Graphviz is dark (D32). The label
+of an edge is text in `muted`, and so it reads apart from its line:
+
+| Mode | `edge` with `bg` | `edge` with `muted` | `edge` with `text` |
+| --- | --- | --- | --- |
+| light | 8.9:1 | 1.65:1 | 1.79:1 |
+| dark | 10.5:1 | 1.41:1 | 1.47:1 |
+
+These are contrast ratios of WCAG 2.1. A graphic that carries meaning needs
+at least 3:1 with `bg`.
 
 `band` is `text` at an opacity of 0.06 over `bg` (D32). zuzu draws a band
 in `text` at that opacity, and not in an opaque color, so that the grid
@@ -207,9 +213,26 @@ background color, drawn under the fill with `paint-order="stroke"`.
 | hierarchy | a group is a tint of its color with its name at the top left. A leaf is the full color. Corners round by 3 to 6 |
 | link of a sankey | the color of its source at 0.32 opacity |
 | node of a graph | a rounded rectangle with a tint of its color and an outline of 1.25 |
-| edge of a graph | a line of 1.25 in `edge`, with round caps and joins, and an arrowhead in `edge` |
+| edge of a graph | a line of `edgeWidth` in `edge`, with round caps and joins, and an arrowhead in `edge`, as "Edges" says |
 | guide line of a diagram | a line of 1.25 in `axis`, with round caps and joins, such as a lifeline of a sequence diagram or an axis of a radar |
 | section of a gantt | a band in `band` behind the rows of every other section, across the chart, with the name of the section at its left |
+
+### Edges
+
+An edge of a diagram, a message of a sequence diagram and a link of an
+architecture diagram take these sizes:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `edgeWidth` | 1.5 | the width of the line of an edge, and of the outline of an open arrowhead |
+| `arrowLength` | 8 | the length of the arrowhead `normal` of DOT. It is 0.8 of this length wide, and the other shapes take the same scale |
+
+A filled arrowhead has an outline of 1 in `edge`. The tip of an arrowhead
+ends on the border of the node at each size. An arrowhead has round joins,
+so its outline reaches at most half its width past the tip, under the
+outline of the node. The `arrowsize` of DOT multiplies the
+length, and a source that sets the color or the width of an edge, such as
+`color` of DOT or `linkStyle` of Mermaid, wins over these tokens.
 
 ## Annotations
 

@@ -33,12 +33,16 @@ const D = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
 // the colors of the data. Any scheme works in either mode.
 const FONT = "'IBM Plex Sans', Inter, 'Helvetica Neue', Arial, sans-serif";
 const MODES = {
-  light: { name: "light", bg: "#ffffff", panel: "#f5f6f8", text: "#1b2230", muted: "#5f6b7d", faint: "#98a2b3", grid: "#eceff3", axis: "#cfd5de", edge: "#848e9f", band: "#f1f2f3", fillOpacity: 0.2 },
-  dark: { name: "dark", bg: "#10141b", panel: "#171c25", text: "#e7ebf2", muted: "#9ba5b7", faint: "#6a7487", grid: "#1e242e", axis: "#333c4a", edge: "#707a8d", band: "#1d2128", fillOpacity: 0.24 },
+  light: { name: "light", bg: "#ffffff", panel: "#f5f6f8", text: "#1b2230", muted: "#5f6b7d", faint: "#98a2b3", grid: "#eceff3", axis: "#cfd5de", edge: "#414a5b", band: "#f1f2f3", fillOpacity: 0.2 },
+  dark: { name: "dark", bg: "#10141b", panel: "#171c25", text: "#e7ebf2", muted: "#9ba5b7", faint: "#6a7487", grid: "#1e242e", axis: "#333c4a", edge: "#bcc4d2", band: "#1d2128", fillOpacity: 0.24 },
 };
 // BAND is the opacity of the text that draws a band behind a group of rows,
 // so that the band of each mode is the text at 0.06 over the background.
 const BAND = 0.06;
+// EDGE_WIDTH is the width of the line of an edge of a diagram, and
+// ARROW_LENGTH the length of its arrowhead, which is 0.8 of its length wide.
+const EDGE_WIDTH = 1.5;
+const ARROW_LENGTH = 8;
 // Each scheme gives ten categorical colors for the light mode, the index of
 // the color for a rise and a fall, and, if it wants, its own colors for the
 // dark mode. Without them, the dark mode lifts each light color.
@@ -1100,10 +1104,12 @@ chart("flowchart", 3, "Flowchart with a layered layout", "the zuzu pipeline", (t
   const kind = Object.fromEntries(N.map(([id, , k]) => [id, k]));
   const fillOf = { in: t.cat[0], data: t.cat[2], step: t.text, out: t.cat[1] };
   const line = d3.line().curve(d3.curveBasis);
-  const defs = el("marker", { id: "arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" },
-    el("path", { d: "M0,1L9,5L0,9Z", fill: t.edge }));
+  // A marker scales by the width of the line, so the arrowhead is
+  // ARROW_LENGTH long and its tip ends on the border of the node.
+  const defs = el("marker", { id: "arrow", viewBox: "0 0 10 10", refX: 10, refY: 5, markerWidth: r2(ARROW_LENGTH / EDGE_WIDTH), markerHeight: r2(ARROW_LENGTH / EDGE_WIDTH), orient: "auto-start-reverse" },
+    el("path", { d: "M0,1L10,5L0,9Z", fill: t.edge }));
   const body = g({ transform: `translate(${ox},${oy}) scale(${r2(s)})` },
-    E.map(([a, b, later]) => el("path", { d: line(gr.edge(a, b).points.map((p) => [p.x, p.y])), fill: "none", stroke: t.edge, "stroke-width": 1.25, "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": later ? "4 4" : null, "marker-end": "url(#arrow)" })),
+    E.map(([a, b, later]) => el("path", { d: line(gr.edge(a, b).points.map((p) => [p.x, p.y])), fill: "none", stroke: t.edge, "stroke-width": EDGE_WIDTH, "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": later ? "4 4" : null, "marker-end": "url(#arrow)" })),
     N.map(([id, label]) => {
       const n = gr.node(id), k = kind[id], c = fillOf[k];
       return g({ transform: `translate(${n.x - n.width / 2},${n.y - n.height / 2})` },
