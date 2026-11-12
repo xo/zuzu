@@ -440,8 +440,8 @@ text there.
 `look: handDrawn` and `layout: elk` are hints of a way to draw (D32). zuzu
 accepts them with no issue in every kind, in the config or at the top of
 the front matter. zuzu draws its own look for `handDrawn`, and its own
-layered layout, `zuzu.layered`, for `elk`. A look by hand, modeled on the
-look of xkcd, and an ELK layout are work for later. The other looks, such
+layered layout, `zuzu.layered`, for `elk`. Two looks drawn by hand, one
+like Excalidraw and one like xkcd, and an ELK layout are work for later. The other looks, such
 as `classic` and `neo`, draw in the look of zuzu too. The other ELK
 layouts of Mermaid 12.3, `elk.stress`, `elk.force`, `elk.mrtree`,
 `elk.sporeOverlap`, `elk.box` and `elk.rectpacking`, and the section `elk`
@@ -1107,9 +1107,9 @@ the bold and the italic words of such a line in bold and in italic.
 
 These parts are issues: a class or a style of a name before the definition
 of the name, the body of a second definition of a name, which Mermaid
-ignores, the settings of the section `requirement` of the config, the
-layout `elk`, the look `handDrawn`, a `theme` that Mermaid does not have,
-the `themeVariables`, and a style that a flowchart does not read. A relation to a
+ignores, the settings of the section `requirement` of the config, a
+`theme` that Mermaid does not have, the `themeVariables`, and a style that
+a flowchart does not read. A relation to a
 name that is not a requirement or an element is an error, as in Mermaid.
 A name that is a requirement and also an element is an error. Mermaid
 draws its two boxes on top of each other.

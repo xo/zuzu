@@ -1109,16 +1109,10 @@ stays true.
 25. Answered on 2026-11-12 by D32: the changes to D31 are accepted.
 26. Answered on 2026-11-12 by D32: an item of the scene carries a link and a
     tooltip, and the SVG writer writes them.
-27. How does a diagram of Mermaid ask for the mode or the scheme that its
-    `theme` maps to (D32 part 4)? Only the options `WithMode` and
-    `WithScheme` of the caller set the theme, and the guides read the theme
-    and not the config of the spec. zuzu can write keys such as
-    `zuzu.mode` and `zuzu.scheme` in the config of the spec, which apply
-    when the caller sets no theme. It can add a method such as
-    `Chart.Theme`, which returns the mode and the scheme that the source
-    asks for, so that the caller passes them on. Or it can keep the issue
-    and name the mode or the scheme in it. `redux-dark-color` is dark, and
-    its name does not end in `-dark`. A scheme of zuzu cannot hold its own
-    neutral colors yet.
+27. Answered on 2026-11-12 by D32: the theme of the source applies by
+    default, and a mode or a scheme that the caller gives wins over it.
 28. Answered on 2026-11-12 by D32: the id of a commit of a gitGraph with
     no id comes from a hash, so that the same source gives the same image.
+29. A maintainer has to review the parameters `lanes` and `laneEdges` of
+    `zuzu.layered`, which an agent added to D31 on 2026-11-12 for the
+    swimlane diagram of Mermaid.

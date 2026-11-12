@@ -72,32 +72,50 @@ numbers before strings.
 ### Do the work of D32
 
 D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
-zuzu did parts 1 to 3 and 5 to 10, and drew the requirement, gitGraph and
-block diagrams of part 11. These are left:
+zuzu did parts 1 to 10, and drew the requirement, gitGraph, block,
+swimlane, use case, agentflow, timeline and C4 diagrams of part 11. These
+are left:
 
-1. The `theme` of Mermaid (4). A spec cannot ask for a mode or a scheme,
-   because only the options `WithMode` and `WithScheme` of the caller set
-   the theme. Open question 27 asks how. It is the issue of 557 files of
-   the corpus of mermaid-go-renderer.
-2. The next kinds of Mermaid in the order of D32 (11): swimlane, usecase,
-   agentflow, timeline and C4, then venn, treeView, railroad,
-   eventmodeling, zenuml, cynefin, ishikawa, kanban, packet and info.
-3. A kind of Mermaid that lays out when it is read, such as a sequence, a
-   pie, a gantt, a journey, a mindmap, a treemap or an architecture
-   diagram, measures an emoji as nothing, because `WithEmoji` is an option
-   of the render. Its labels can be too narrow (6).
-4. The SVG writer measures the `limit` of a text without the font of
+1. The next kinds of Mermaid in the order of D32 (11): venn, treeView,
+   railroad, eventmodeling, zenuml, cynefin, ishikawa, kanban, packet and
+   info. They hold 172 files of the corpus of mermaid-go-renderer.
+2. A kind of Mermaid that lays out when it is read, such as a sequence, a
+   pie, a gantt, a journey, a mindmap, a treemap, an architecture diagram,
+   a gitGraph, a block diagram, a timeline or a C4 diagram, measures an
+   emoji as nothing, because `WithEmoji` is an option of the render. Its
+   labels can be too narrow (6).
+3. The SVG writer measures the `limit` of a text without the font of
    emoji (6).
-5. A weight or a style in `fontFamily` draws only in the graphs and in the
+4. A weight or a style in `fontFamily` draws only in the graphs and in the
    sequence. It is an issue in the other kinds (5).
-6. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
+5. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
    issues, because the package `html` of okage keeps no link (10).
 
-### Draw a look by hand
+### Draw two looks by hand
 
-D32 accepts `look: handDrawn` of Mermaid with no issue. zuzu can draw a
-look of its own by hand later, modeled on the look of xkcd: lines that
-wobble, and a font that looks written by hand.
+zuzu draws its standard look today. D32 adds two more looks, which a
+caller selects for any chart or diagram. zuzu draws each in its own way
+and ports no code of another program. Each look changes the lines, the
+fills and the font, and keeps the layout.
+
+1. A look like Excalidraw. Lines and outlines wobble as if drawn by hand,
+   and fills are hatched, as in Excalidraw. The text draws in Excalifont.
+2. A look like xkcd, like the look that `plt.xkcd()` of matplotlib gives.
+   Lines wobble in long, smooth curves, and the text draws in a font like
+   the handwriting of xkcd.
+
+Before the work starts:
+
+1. Make sure that the license of each font allows zuzu to bundle it, as
+   D16 asks: the Open Font License or a license like it. Check the license
+   of Excalifont, and find a font for the look of xkcd under such a
+   license.
+2. Decide whether a font of a look goes in a package that a caller
+   imports, as the emoji font does (D32 part 6).
+3. Decide how a caller selects a look, and whether `look: handDrawn` of
+   Mermaid selects the look like Excalidraw.
+4. A wobble must be the same on each render, so that the output stays
+   deterministic.
 
 ### Add an ELK layout
 
@@ -120,76 +138,66 @@ and places nodes in another way.
 4. The shape `subroutine` is too narrow for a short label, so the label
    covers its two inner lines.
 
-### Fix the Mermaid bugs that the test files of iv found
-
-The test files of iv are in `testdata/zuzu` of the iv repository. Most of
-them come from the corpus of `github.com/bvolpato/mermaid-go-renderer`.
-
-1. The front matter skips a list of YAML, and the other parts of YAML that
-   it does not read, with no issue.
-2. `gantt foo` ignores `foo` with no issue.
-
 ### Fix what the corpus of mermaid-go-renderer found
 
 The corpus of `github.com/bvolpato/mermaid-go-renderer` at commit 9af8f11
 holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
-zuzu drew 2390 of them, and 1758 with no issue. Of the files that zuzu
-does not draw, 419 are of kinds that it does not draw. Of the files with
-an issue, 557 have the `theme` of Mermaid, which open question 27 is
-about.
+zuzu drew 2637 of them, and 2508 with no issue. 172 of the files that zuzu
+does not draw are of kinds that it does not draw yet.
 
-1. A top-level `direction LR` in a flowchart is dropped with no issue.
-   Mermaid sets the direction of the graph with it.
-2. A gantt does not check the settings at the top level of the config, so
-   a setting such as `fontFamily` there is dropped with no issue.
-3. `%%{wrap}%%` is not read. Mermaid sets `wrap: true` with it.
-4. `nodeSpacing` and `rankSpacing` at the top level of the config are
-   issues. Mermaid 12.3 reads them there too.
-5. `class Z foo` on an id that names no node makes a node `Z` in a
-   flowchart, and `class end badBadEvent` makes a state `end`. mmdc makes
-   no node.
-6. A radar with 2 axes is an error. mmdc draws it.
-7. `state h <<history>>` draws a state and an issue, and Mermaid makes no
-   state. `state "x" as s1:::cls` takes the class, and Mermaid adds an
-   empty description and no class.
+1. A style or a class on the id of a subgraph of a flowchart, such as
+   `style sub fill:#f00`, is dropped with no issue. zuzu makes a node of
+   the id and removes it. Mermaid styles the subgraph.
+2. A flowchart does not read properties after brackets, as
+   `a["A"]@{ shape: cyl }`, and it reads `@{ ... }` over more lines with
+   the commas of one line. The agentflow diagram reads both.
+3. Mermaid moves a node into the innermost subgraph that names it, at the
+   `end` of that subgraph. zuzu keeps the node in the first subgraph that
+   names it.
+4. In a layout LR with subgraphs inside subgraphs, the title of an outer
+   subgraph covers the border of an inner one.
+5. `\n` in the label of a node draws as text. With `htmlLabels: false`,
+   Mermaid starts a new line there.
+6. A `classDef` of a treemap splits at `\,`. Mermaid reads it as a comma of
+   a value, as in a flowchart.
+7. A state or a class diagram reports `flowchart.nodeSpacing`, which
+   Mermaid reads there.
 8. In an ER diagram, a text where only a part is bold or italic, such as
    `*first*Name`, draws plain. A line draws in one font.
-9. `htmlLabels` in a mindmap is an issue. mmdc breaks a long word with it.
-10. `gantt.compact` and `gantt.useWidth` are issues. An outlined label of a
-    sankey stays inside the chart, where Mermaid draws it past the left
-    edge.
-11. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
+9. An outlined label of a sankey stays inside the chart, where Mermaid
+   draws it past the left edge.
+10. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
     reads `0` as a date of 2000 and the end as a time of the day of the
     render. It needs the time of the render (see "Give a chart of Mermaid
     the time of the render").
-12. A value with `\,` in a `classDef` of a flowchart, such as
-    `stroke-dasharray: 9\,5`, splits at the comma.
-13. A part of a style with no colon, such as `fill#969`, is dropped with
-    no issue in a flowchart. The block diagram reports it.
-14. `layout: elk.box`, `layout: elk.rectpacking`, the section `elk` of the
-    config, and `layout: dagre` in a chart are issues.
+11. A swimlane diagram does not do `optimizeRanksByCrossings` with
+    `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
+    lines. Some of its routes share a line, and the titles of its lanes do
+    not turn in a layout LR.
+12. A use case diagram draws a boundary of `type: package` as a panel with
+    no tab, and reports it. `colorScheme: rotate` is an issue. Mermaid
+    drops the last `;` of a `style` line, and zuzu reports an error.
+13. A line of a timeline that ends in `: ` with a space is an error in
+    Mermaid, and zuzu reads the next line as its event.
+14. The C4 diagrams report the directions of `Rel_U`, `Rel_D`, `Rel_L`,
+    `Rel_R`, `Node_L` and `Node_R`, `$tags`, `$sprite` and a shape of a
+    tag, which Mermaid parses and does not draw.
 
 ### Draw more of Mermaid
 
-1. A label wraps at the width of Mermaid in the pixels of zuzu. zuzu draws
-   a label at 11 pixels and Mermaid at 14, so a line of zuzu holds about 30
-   percent more words.
-2. `flowchart.minNodeWidth`, 120 by default in Mermaid 12.3.0, is not read,
+1. `flowchart.minNodeWidth`, 120 by default in Mermaid 12.3.0, is not read,
    so a node with a short label is narrower than in Mermaid.
-3. The title of a subgraph that is wider than its nodes draws past the box
+2. The title of a subgraph that is wider than its nodes draws past the box
    of the subgraph. Mermaid makes the box wider. Only a subgraph that lays
    out on its own, in `graph/nest.go`, reads the width of its title.
-4. A chart of `xyChart` reports `tickLength`, `tickWidth`, `labelPadding`
+3. A chart of `xyChart` reports `tickLength`, `tickWidth`, `labelPadding`
    and `titlePadding` of an axis, the width of the line of an axis of
    numbers, and `plotReservedSpacePercent`. The look of zuzu has no ticks
    and no line on an axis of numbers, and the runtime has no padding of the
    labels or of the title of an axis.
-5. The title of a gantt with sections starts at the names of the tasks, to
+4. The title of a gantt with sections starts at the names of the tasks, to
    the right of the names of the sections, because a title takes the bounds
    of the axes.
-6. zuzu does not draw 18 kinds of Mermaid 12, which hold 862 files of the
-   corpus of mermaid-go-renderer. D32 gives their order, in "Do the work
-   of D32".
 
 ### Draw more of DOT
 

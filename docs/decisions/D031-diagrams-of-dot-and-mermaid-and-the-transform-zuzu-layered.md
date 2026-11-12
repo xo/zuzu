@@ -62,6 +62,8 @@ the output of another.
 | `width`, `height` | none | the fields of the size of a node |
 | `label`, `fontSize`, `padding` | none, 11 and 8 | the field of the label of a node, which the transform measures, when the node has no size |
 | `breakWords` | false | breaks a word that is wider than the width of a wrap between its letters. Otherwise the word stays whole |
+| `lanes` | false | lays the clusters out as lanes side by side across the ranks, with one node of a lane in each rank and edges at right angles, as the swimlane layout of Mermaid. Each top cluster is a lane |
+| `laneEdges` | false | with `lanes`, an edge between two lanes moves its target to the next rank. Otherwise it does not |
 | `as` | see below | the names of the output fields |
 
 A node or an edge of the input can hold the field `wrap`: the width, in

@@ -18,8 +18,11 @@ is in `docs/BACKLOG.md`.
 2. `look: handDrawn` and `layout: elk` are hints. zuzu draws its own look
    and its own layered layout, and reports neither. This is an exception
    to D6, which the maintainers chose because both name a way to draw and
-   not a part of the diagram. A look drawn by hand, modeled on the look of
-   xkcd, and an ELK layout are work for later.
+   not a part of the diagram. An ELK layout is work for later. zuzu will
+   have two looks drawn by hand beside its standard look: a look like
+   Excalidraw, with the font Excalifont, and a look like xkcd, like the
+   look of xkcd in matplotlib. zuzu draws each in its own way, and ports no
+   code of Excalidraw, rough.js or matplotlib.
 3. `animate` and `animation` on a link of Mermaid draw the link dashed, as
    one still frame of Mermaid, with no issue. A still image has no motion
    (open question 24).
