@@ -1,0 +1,18 @@
+usecase-beta
+  accTitle: Shop
+  accDescr {
+    The actors of a shop.
+  }
+  actor Buyer("`*Buyer*`") <<Person>>
+  actor Clerk@{ type: hollow, business: true }
+  actor Robot@{ type: awesome }
+  actor Bell@{ icon: "fa:bell" }
+  Order("Place order")@{ business: true } <<Core>>
+  Pay("Pay #quot;now#quot;")
+  json Cart@{ "items": [{ "name": "Book" }], "tags": ["a", "b"], "total": 29.5, "empty": {} }
+  note for Order "`Needs a **cart**`"
+  Buyer --> Order
+  Clerk --> Order
+  Robot --> Pay
+  Bell --> Pay
+  Order --> Cart

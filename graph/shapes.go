@@ -68,7 +68,7 @@ var shapes = map[string]string{
 	"bolt": "bolt", "com-link": "bolt", "lightning-bolt": "bolt",
 	"cross-circ": "cross-circ", "summary": "cross-circ", "crossed-circle": "cross-circ",
 	"fr-circ": "fr-circ", "stop": "fr-circ", "framed-circle": "fr-circ",
-	collapsedGroup: collapsedGroup,
+	collapsedGroup: collapsedGroup, businessEllipse: businessEllipse,
 }
 
 // ShapeOf returns the shape that draws a name of a shape, and false for a
@@ -188,13 +188,17 @@ func ColumnPath(xs []float64, top, bottom float64) string {
 	return b.String()
 }
 
+// ellipsePath returns the path of an ellipse of the radii rx and ry around
+// 0, 0.
+func ellipsePath(rx, ry float64) string {
+	return "M" + num(rx) + ",0A" + num(rx) + "," + num(ry) + " 0 1,1 " + num(-rx) + ",0A" + num(rx) + "," + num(ry) + " 0 1,1 " + num(rx) + ",0Z"
+}
+
 // shapePath returns the path of a shape.
 func shapePath(kind string, w, h float64) string {
 	x, y := w/2, h/2
 	i := h / 4
-	ellipse := func(rx, ry float64) string {
-		return "M" + num(rx) + ",0A" + num(rx) + "," + num(ry) + " 0 1,1 " + num(-rx) + ",0A" + num(rx) + "," + num(ry) + " 0 1,1 " + num(rx) + ",0Z"
-	}
+	ellipse := ellipsePath
 	switch kind {
 	case "rect":
 		return poly([2]float64{-x, -y}, [2]float64{x, -y}, [2]float64{x, y}, [2]float64{-x, y})

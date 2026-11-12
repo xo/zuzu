@@ -518,10 +518,11 @@ weight 600, and `Times-Italic` draws in italic. These parts name a family:
 
 | Part | What zuzu does |
 | --- | --- |
-| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, an agentflow diagram, a state diagram, a class diagram and an entity relationship diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
+| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, an agentflow diagram, a state diagram, a class diagram, an entity relationship diagram, a requirement diagram and a use case diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
 | `sequence.actorFontFamily`, `sequence.messageFontFamily`, `sequence.noteFontFamily` | gives the weight and the style to the participants, the messages or the notes. Each wins over `fontFamily`, and `actorFontWeight` and the other weights win over each |
 | `font-family` in a style, such as `style A font-family:Times-Bold` | gives the weight and the style to the label. `font-weight` and `font-style` in the same style win over it |
-| another setting whose name ends in `FontFamily`, such as `usecase.actorFontFamily` | nothing |
+| `usecase.actorFontFamily`, `usecase.usecaseFontFamily` | gives the weight and the style to the actors or the use cases of a use case diagram. Each wins over `fontFamily`, and `actorFontWeight` and `usecaseFontWeight` win over each |
+| another setting whose name ends in `FontFamily`, such as `journey.taskFontFamily` | nothing |
 
 A name with no weight and no style, such as `courier` or `Trebuchet MS`,
 is no issue anywhere. A name with a weight or a style in a part that does
@@ -1228,6 +1229,156 @@ which draw in the look of zuzu, the other settings of the sections
 `agentflow` and `flowchart`, a callback of `click` and the target of a
 link, and a style that a flowchart does not read.
 
+### Use case diagram
+
+The keyword is `usecase-beta`. zuzu reads a use case diagram with the
+grammar of Mermaid 12.3.0, so a source that Mermaid reads as an error is
+an error in zuzu too. A statement ends at a new line. The direction is
+`LR` by default, and `direction TB` on a line of its own sets it. The
+direction is `TB`, `TD`, `BT`, `LR` or `RL`, and the last one wins.
+
+| Part | Example |
+| --- | --- |
+| an actor | `actor Customer`, `actor Admin("Main administrator")`, `actor A, B` |
+| a use case | `Checkout`, `Login("Sign in")`, `Report[Generate report]`, `"Reset password"` |
+| a system boundary, with its actors and its use cases, one on each line | `systemBoundary Store`, then `Browse`, then `end` |
+| the title of a system boundary | `systemBoundary sb1["Payment service"]`, `systemBoundary "Payment service"` |
+| a relation | `Customer --> Checkout` |
+| a relation with an id | `Customer opens@--> Checkout` |
+| include and extend | `Checkout ..> : include Payment`, `Coupon ..> : extend Checkout` |
+| a generalization | `Admin --\|> Person` |
+| the label of a relation | `Customer -- "places order" --> Checkout`, `Customer -- places order --> Checkout` |
+| the metadata of a name | `actor Broker@{ type: hollow, business: true }`, `Payment_service@{ type: package }` |
+| the metadata of an edge with an id | `opens@{ animation: fast }`, `opens@{ animate: true }` |
+| a stereotype | `actor SalesAgent <<Employee>>`, `Quote("Prepare quote") <<Core>>` |
+| a note | `note for Login "Requires a session"` |
+| a block of JSON | `json Payload@{ "status": "pending" }` |
+| a class of style | `classDef hot stroke:#c33`, then `class Login,Pay hot` or `Login("Sign in"):::hot` |
+| a style | `style Login fill:#ffe6e6`, `style opens stroke:#06c` |
+| the text for a screen reader | `accTitle: Shop`, `accDescr: The shop`, `accDescr { ... }` |
+
+A label in parentheses draws an ellipse, and a label in brackets draws a
+rectangle. A use case with no label is an ellipse, and so is a name that
+only a relation names. A name in quotes takes an id where each character
+that is not a letter, a digit or an underscore of ASCII is `_`, so
+`"Reset password"` is `Reset_password`. A statement can declare a name
+again with the same label, and it adds its classes.
+
+| Arrow | Draws |
+| --- | --- |
+| `-->` | a solid line with an arrowhead at its end |
+| `<--` | a solid line with an arrowhead at its start |
+| `--` | a solid line with no arrowhead |
+| `--o`, `o--` | a circle at the end, or at the start |
+| `--x`, `x--` | a cross at the end, or at the start |
+| `..> : include`, `..> : extend` | a dashed line with an arrowhead at its end, and `«include»` or `«extend»` in its middle |
+| `--\|>` | a solid line with a hollow triangle at its end |
+
+Each dash more than two in `-->`, `<--` or `--` adds a rank, so `--->`
+spans at least 2 ranks. The words include and extend match in any case.
+
+| Metadata | Of | Values |
+| --- | --- | --- |
+| `type` | an actor | `normal`, `hollow` or `awesome` |
+| `icon` | an actor | the name of an icon, such as `"fa:user"` |
+| `business` | an actor or a use case | `true` or `false` |
+| `type` | a system boundary | `rect` or `package` |
+| `animate`, `animation` | an edge with an id | `true` or `false`, and `fast` or `slow` |
+
+zuzu draws each part in its own look:
+
+| Part | Draws as |
+| --- | --- |
+| an actor | a stick figure over its name, the figure of an actor of a sequence diagram |
+| a hollow actor | the outline of a figure |
+| an awesome actor | a filled figure |
+| an actor with an icon | the icon in a rounded box over its name. A name with no pack, such as `user`, is `fa:user` |
+| a business actor | a line across the head of the figure |
+| a use case | an ellipse, or a rectangle for a label in brackets |
+| a business use case | an ellipse with a line across its right end |
+| a stereotype | a line over the name in guillemets, such as `«Core»` |
+| a system boundary | a panel with its title at the top left |
+| a note | a note, with a dashed line and no arrowhead to its actor or its use case |
+| a block of JSON | a table: its id at the top, then a row for each value, with the path of the value, such as `address.city` or `items[0].name`, and the value |
+| an animated edge | a dashed line, one still frame of Mermaid (D32) |
+
+The actors come first in the layout, then the use cases, the notes and the
+blocks of JSON, as in Mermaid. Each actor and each use case takes the place
+of its first mention in the source.
+
+A block of JSON holds an object. Its rows are in the order of the source. A
+key that comes twice keeps its first place and its last value, as
+`JSON.parse` does. An array of values takes a row for each value, with the
+path in the first row only. An empty array is `[]`, and an empty object is
+`{}`.
+
+A label in quotes or in brackets is plain text, so zuzu draws `**text**`
+with its stars, as Mermaid does. A string of markdown, in "\` and \`",
+draws without its marks. A line of zuzu draws in one font, so zuzu draws
+a label in bold or in italic only when all of it is. An entity, such as
+`#quot;`, reads as its character.
+
+`classDef`, `class`, `:::` and `style` read the styles of a flowchart. The
+class `default` styles each actor, use case, system boundary, block of
+JSON and edge, as in Mermaid. A later `classDef` of a name replaces an
+earlier one. A class or a style of an edge names the id of the edge, such
+as `opens` in `Customer opens@--> Checkout`. An edge takes the stroke of
+its classes and its styles, and not their fill. Mermaid draws the figure
+of an actor in the colors of its theme, over a style of the actor. zuzu
+draws the style.
+
+zuzu reads these settings of `usecase`:
+
+1. `nodeSpacing`, `rankSpacing` and `diagramPadding`, which zuzu reads as
+   those of a flowchart.
+2. `wrappingWidth`, 120 by default, where the label of an actor, a use
+   case or a note wraps.
+3. `minNodeWidth`, 120 by default, the least width of the label of a use
+   case or a note.
+4. `actorFontSize`, `actorFontWeight`, `usecaseFontSize` and
+   `usecaseFontWeight`. A size is in pixels, and the default sizes are
+   those of the look of zuzu, which are smaller than those of Mermaid.
+5. `actorFontFamily` and `usecaseFontFamily`, which give the weight and
+   the style that the name of a family holds.
+6. `colorScheme: role`, the default, which draws in the colors of zuzu.
+
+These parts are issues: `colorScheme: rotate`, which gives each actor and
+each use case a color of a palette of a theme of Mermaid, the type
+`package` of a system boundary, which zuzu draws as a panel with no tab,
+another setting of `usecase`, and the `theme` and the `themeVariables` of
+Mermaid. An icon that does not load draws as a box with a question mark,
+and it is an issue when the diagram renders.
+
+These are errors, as in Mermaid:
+
+1. A source that the grammar does not read, such as a relation or a
+   second system boundary inside a system boundary, a name that is a
+   keyword, such as `end`, a style of two names, or a statement of
+   PlantUML, such as `skinparam`.
+2. A name that is an actor and a use case, or a system boundary, a block
+   of JSON or an id of an edge that another declaration names.
+3. Two labels, two shapes, two stereotypes or two system boundaries of one
+   name, and two titles of one system boundary.
+4. Two declarations of a name in quotes, of a block of JSON, or of an id
+   of an edge.
+5. A relation to a system boundary, include or extend from or to a name
+   that is not a use case, a generalization from an actor to a use case,
+   and a circle or a cross at a block of JSON.
+6. Metadata, a note, a class or a style of a name that the diagram does
+   not declare, a note for a name that is not an actor or a use case, and
+   metadata that a name does not take.
+7. An actor with an icon and a type other than `normal`, a business actor
+   that is `awesome` or has an icon, and a business use case in brackets.
+8. A block of JSON that does not read, or that does not hold an object.
+9. Classes after `:::` on a name that a relation only names.
+
+Mermaid 12.3.0 draws no title of the front matter in a use case diagram,
+and zuzu draws it. Mermaid removes the last semicolon of a line of `style`
+or of `classDef` that holds a color, such as `style A fill:#f00;`, before
+it reads the line. zuzu reads such a semicolon as an error. zuzu reads
+`%%` after a statement as a comment, and Mermaid reads it as an error.
+`accTitle` and `accDescr` join into the description of the Vega spec.
+
 ### Links and tooltips
 
 `click` in a flowchart, an agentflow diagram and a state diagram, and `click`, `link` and
@@ -1258,8 +1409,8 @@ node. "Links" in `docs/API.md` lists the schemes that zuzu writes.
 ### Labels that wrap
 
 Mermaid 12.3.0 wraps a long label of a flowchart, a state diagram, a class
-diagram, an entity relationship diagram, a requirement diagram and an
-agentflow diagram. zuzu
+diagram, an entity relationship diagram, a requirement diagram, an
+agentflow diagram and a use case diagram. zuzu
 wraps the same labels at the widths of Mermaid, scaled by 11/14, as the
 last paragraph of this section says. It measures the words with the
 bundled font, so the lines
@@ -1271,7 +1422,8 @@ are the same on each machine.
 | a node of an agentflow diagram | `agentflow.wrappingWidth`, 120 pixels by default |
 | a state, and a note of a state | `state.wrappingWidth`, 120 pixels by default |
 | the text of a link, a transition, a relation and a relationship | 200 pixels |
-| a subgraph, a flow, a composite state, a state with more than one description, a class, a note of a class, an entity and its attributes, a requirement and an element | no wrap |
+| an actor, a use case, and a note of a use case diagram | `usecase.wrappingWidth`, 120 pixels by default |
+| a subgraph, a flow, a composite state, a state with more than one description, a class, a note of a class, an entity and its attributes, a requirement and an element, a system boundary and a block of JSON | no wrap |
 
 A label wraps at the spaces between its words. A line that is wider than
 the width breaks before the first word that does not fit. Each line of a
@@ -2226,7 +2378,8 @@ element, a boundary or a relationship a link (D32).
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
-relationship diagram, the requirement diagram, the agentflow diagram, and
+relationship diagram, the requirement diagram, the agentflow diagram, the use case
+diagram, and
 the charts above, which hold the sequence diagram, the mindmap, the
 architecture diagram, the git graph, the block diagram, the timeline and
 the five kinds of C4 diagram. The agentflow diagram reads into a graph, as

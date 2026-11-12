@@ -147,7 +147,7 @@ func graphSection(is *graph.Issues, kind, section string, v any, read ...string)
 func isGraph(kind string) bool {
 	switch kind {
 	case "flowchart", "graph", "flowchart-elk", "stateDiagram", "stateDiagram-v2",
-		"classDiagram", "classDiagram-v2", "erDiagram", "requirementDiagram", "agentflow-beta":
+		"classDiagram", "classDiagram-v2", "erDiagram", "requirementDiagram", "agentflow-beta", "usecase-beta":
 		return true
 	}
 	return false

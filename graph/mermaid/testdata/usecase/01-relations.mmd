@@ -1,0 +1,22 @@
+---
+title: Library
+---
+usecase-beta
+  direction LR
+  actor Member("Library member")
+  actor Librarian
+  systemBoundary Desk["Front desk"]
+    Borrow("Borrow a book")
+    Return("Return a book")
+    Renew[Renew a loan]
+  end
+  Member --> Borrow
+  Member ---> Return
+  Return <-- Librarian
+  Member -- "online" --> Renew
+  Borrow ..> : include CheckCard
+  Fine ..> : extend Return
+  Librarian --|> Member
+  Member --o Fine
+  Librarian x-- Fine
+  Member -- Renew

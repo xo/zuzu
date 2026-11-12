@@ -494,9 +494,7 @@ func (r *requirementDiagram) finish() error {
 		}
 		r.g.Edges = append(r.g.Edges, e)
 	}
-	if len(r.acc) > 0 {
-		r.g.Description = strings.Join(r.acc, " ")
-	}
+	r.g.Description = describe(r.d, r.acc...)
 	return nil
 }
 

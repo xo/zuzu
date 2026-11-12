@@ -205,7 +205,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		dir = TB
 	}
 	var nodes, edges, clusters []any
-	media, html := false, false
+	// media says whether a node has an icon, an image or a figure, and
+	// figures whether a node has a figure.
+	media, figures, html := false, false, false
 	// links says whether a node, an edge or a cluster has a link or a
 	// tooltip, so that each mark encodes them (D32).
 	links := false
@@ -262,6 +264,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		if m := n.Media; m != nil {
 			media = true
+			figures = figures || m.Path != ""
 			media2row(r, m)
 		}
 		if labelRow(r, "x", n.XLabel, n.XHTML) {
@@ -553,6 +556,15 @@ func Compile(g *Graph) (*vega.Spec, error) {
 				"x": field("mediaX"), "y": field("mediaY"), "path": field("formPath"),
 			}, nil))
 		}
+		// A figure, such as an actor, draws in the paint of its node.
+		if figures {
+			data = append(data, filter("iconFigure", "layoutNodes", "datum.iconKind === 'figure'"))
+			for _, sig := range paints["node"] {
+				marks = append(marks, mark("path", "iconFigure", "_paint", sig, []string{StyleNode}, map[string]any{
+					"x": field("mediaX"), "y": field("mediaY"), "path": field("iconPath"),
+				}, nil))
+			}
+		}
 		marks = append(marks,
 			map[string]any{"type": "path", "from": map[string]any{"data": "iconFill"}, "style": []string{StyleIcon}, "encode": map[string]any{"update": map[string]any{
 				"x": field("mediaX"), "y": field("mediaY"), "path": field("iconPath"),
@@ -755,10 +767,14 @@ func labelRow(r map[string]any, name, text, src string) bool {
 	return false
 }
 
-// media2row writes the icon or the image of a node into its row, for the
-// transform zuzu.icon and the layout.
+// media2row writes the icon, the image or the figure of a node into its
+// row, for the transform zuzu.icon and the layout.
 func media2row(r map[string]any, m *Media) {
-	if m.Icon != "" {
+	switch {
+	case m.Path != "":
+		// The transform zuzu.icon leaves a figure as it is.
+		r["iconKind"], r["iconPath"], r["mediaWidth"], r["mediaHeight"] = "figure", m.Path, m.Width, m.Height
+	case m.Icon != "":
 		r["icon"] = m.Icon
 		size := m.Height
 		if m.Inline {
@@ -767,7 +783,7 @@ func media2row(r map[string]any, m *Media) {
 		if size > 0 {
 			r["iconSize"] = size
 		}
-	} else {
+	default:
 		r["image"] = m.Image
 		if m.Width > 0 {
 			r["imageWidth"] = m.Width

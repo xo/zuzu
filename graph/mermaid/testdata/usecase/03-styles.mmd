@@ -1,0 +1,26 @@
+---
+config:
+  usecase:
+    nodeSpacing: 60
+    rankSpacing: 70
+    actorFontSize: 13
+    usecaseFontWeight: bold
+---
+usecase-beta
+  direction TB
+  actor User:::outside
+  Login("Sign in"):::hot
+  systemBoundary Account:::box
+    Profile[Edit profile]
+  end
+  json Session@{ "active": true }
+  User go@--> Login
+  Login --> Profile
+  Profile --> Session
+  classDef default stroke:#333333
+  classDef hot,outside stroke-width:3px
+  classDef box fill:#fffbea
+  class Session box
+  style Login fill:#ffe6e6
+  style go stroke:#06c
+  go@{ animation: fast }

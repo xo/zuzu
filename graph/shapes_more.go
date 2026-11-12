@@ -173,9 +173,16 @@ func moreSize(kind string, w, h float64) (float64, float64, bool) {
 		return 14, 14, true
 	case collapsedGroup:
 		return math.Max(w, 80), h + collapsedRow, true
+	case businessEllipse:
+		return w * 1.25, h * 1.3, true
 	}
 	return 0, 0, false
 }
+
+// businessEllipse is the shape of a business use case of Mermaid: an
+// ellipse with a line across its right end, from its bottom edge to a
+// point of its top edge near its tip.
+const businessEllipse = "businessEllipse"
 
 // collapsedGroup is the shape of a collapsed subgraph of Mermaid: a
 // rounded box with its title at the top, and a dashed line and three dots
@@ -312,6 +319,9 @@ func morePath(kind string, w, h float64) (string, bool) {
 		// A ring and a dot. The dot is two small circles that the outline
 		// fills.
 		return circlePath(0, 0, x) + circlePath(0, 0, 0.7) + circlePath(0, 0, 1.9), true
+	case businessEllipse:
+		at := func(px, sign float64) [2]float64 { return [2]float64{px, sign * y * math.Sqrt(1-px*px/(x*x))} }
+		return ellipsePath(x, y) + stroke(at(x*0.6, 1), at(x*0.94, -1)), true
 	case collapsedGroup:
 		// The dashed line is short strokes of 3 with gaps of 3, since
 		// the outline has one dash for the whole path. The dots sit in

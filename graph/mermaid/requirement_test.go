@@ -237,3 +237,14 @@ func TestRequirementBraceLine(t *testing.T) {
 		t.Errorf("expected a statement after an end brace, got %d nodes and %d edges", len(g.Nodes), len(g.Edges))
 	}
 }
+
+// TestRequirementDescription checks that the description of the front
+// matter comes first in the description of the graph, then accTitle, as
+// in the other kinds (D32).
+func TestRequirementDescription(t *testing.T) {
+	t.Parallel()
+	g := classOf(t, "---\ndescription: The front\n---\nrequirementDiagram\naccTitle: The title\nrequirement r {\nid: 1\n}\n")
+	if want := "The front The title"; g.Description != want {
+		t.Errorf("the description %q, not %q", g.Description, want)
+	}
+}

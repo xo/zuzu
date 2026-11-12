@@ -506,10 +506,7 @@ func queuePath(w, h float64) string {
 // iconPath returns the path of the icon of a participant, around its
 // center.
 func iconPath(kind string) string {
-	circle := func(cx, cy, r float64) string {
-		return "M" + pathPoint(cx+r, cy) + "A" + pathNum(r) + "," + pathNum(r) + " 0 1,1 " + pathPoint(cx-r, cy) +
-			"A" + pathNum(r) + "," + pathNum(r) + " 0 1,1 " + pathPoint(cx+r, cy) + "Z"
-	}
+	circle := ringPath
 	switch kind {
 	case "boundary":
 		return circle(4, 0, 10) + "M-6,0H-14M-14,-10V10"
@@ -518,7 +515,22 @@ func iconPath(kind string) string {
 	case "entity":
 		return circle(0, -2, 10) + "M-10,12H10"
 	}
-	return circle(0, -8, 5) + "M0,-3V5M-9,0H9M0,5L-7,14M0,5L7,14"
+	return stickFigure(1)
+}
+
+// ringPath returns the path of a circle at cx, cy, with at most two
+// decimals.
+func ringPath(cx, cy, r float64) string {
+	return "M" + pathPoint(cx+r, cy) + "A" + pathNum(r) + "," + pathNum(r) + " 0 1,1 " + pathPoint(cx-r, cy) +
+		"A" + pathNum(r) + "," + pathNum(r) + " 0 1,1 " + pathPoint(cx+r, cy) + "Z"
+}
+
+// stickFigure returns the path of the stick figure of an actor, around its
+// center, at a scale: 18 pixels wide and 27 high at the scale 1. A
+// sequence diagram and a use case diagram draw it.
+func stickFigure(k float64) string {
+	return ringPath(0, -8*k, 5*k) + "M" + pathPoint(0, -3*k) + "V" + pathNum(5*k) + "M" + pathPoint(-9*k, 0) + "H" + pathNum(9*k) +
+		"M" + pathPoint(0, 5*k) + "L" + pathPoint(-7*k, 14*k) + "M" + pathPoint(0, 5*k) + "L" + pathPoint(7*k, 14*k)
 }
 
 // band returns the x of the side of the head of a participant that faces

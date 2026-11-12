@@ -583,7 +583,7 @@ func clip(n NodePlace, kind string, px, py float64) (float64, float64) {
 	hw, hh := n.Width/2, n.Height/2
 	var t float64
 	switch kind {
-	case "ellipse", "circle", "doublecircle", "oval", "point", "bullseye", mcircle, "fr-circ", "cross-circ", "cloud", "bang":
+	case "ellipse", "circle", "doublecircle", "oval", "point", "bullseye", mcircle, "fr-circ", "cross-circ", "cloud", "bang", businessEllipse:
 		t = 1 / math.Sqrt(dx*dx/(hw*hw)+dy*dy/(hh*hh))
 	case "diamond", "rhombus", mdiamond:
 		t = 1 / (math.Abs(dx)/hw + math.Abs(dy)/hh)

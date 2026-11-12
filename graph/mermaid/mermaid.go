@@ -1,6 +1,7 @@
 // Package mermaid reads diagrams of Mermaid 12.3.0 (D31): the flowchart, the
 // state diagram, the class diagram, the entity relationship diagram, the
-// requirement diagram and the agentflow diagram into a graph, and the
+// requirement diagram, the agentflow diagram and the use case diagram
+// into a graph, and the
 // charts into specs of Vega-Lite and Vega. It reads the subset that
 // docs/DIAGRAMS.md lists, and reports the rest.
 package mermaid
@@ -655,7 +656,8 @@ func str(cfg map[string]any, keys ...string) string {
 }
 
 // Graph reads a flowchart, a state diagram, a class diagram, an entity
-// relationship diagram, a requirement diagram or an agentflow diagram into
+// relationship diagram, a requirement diagram, an agentflow diagram or a
+// use case diagram into
 // a graph. The report
 // names each part that zuzu does not draw, and in the strict mode such a
 // part is an error.
@@ -736,6 +738,8 @@ func readGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 		return requirementGraph(d, strict)
 	case "agentflow-beta":
 		return agentflowGraph(d, strict)
+	case "usecase-beta":
+		return usecaseGraph(d, strict)
 	default:
 		return nil, nil, fmt.Errorf("%s: %w", d.Kind, ErrKind)
 	}

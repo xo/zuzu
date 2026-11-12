@@ -131,6 +131,10 @@ type Node struct {
 type Media struct {
 	// Icon names an icon, as pack:name, and Image the URL of an image.
 	Icon, Image string
+	// Path is a figure that zuzu draws in the place of an icon, such as
+	// an actor of a use case diagram: the path data of SVG around 0, 0,
+	// inside Width and Height. It takes the paint of its node.
+	Path string
 	// Form is the box around an icon: square, circle, rounded, or empty
 	// for none.
 	Form string

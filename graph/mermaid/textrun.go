@@ -47,8 +47,13 @@ var lineBreak = regexp.MustCompile(`(?i)<br\s*/?>`)
 // labelText reads the text of a label of a chart: br as a new line, and
 // the entities, such as `#quot;` and `#35;`. It keeps the marks of markdown.
 func labelText(s string) string {
-	s = lineBreak.ReplaceAllString(s, "\n")
-	s = entities.ReplaceAllStringFunc(s, func(m string) string {
+	return strings.TrimSpace(decodeEntities(lineBreak.ReplaceAllString(s, "\n")))
+}
+
+// decodeEntities reads the entities of a label, such as `#quot;` and
+// `#35;`, as their characters.
+func decodeEntities(s string) string {
+	return entities.ReplaceAllStringFunc(s, func(m string) string {
 		name := m[1 : len(m)-1]
 		switch name {
 		case "quot":
@@ -65,7 +70,6 @@ func labelText(s string) string {
 		}
 		return m
 	})
-	return strings.TrimSpace(s)
 }
 
 // markdownRuns splits a label at the marks of markdown: two stars or two
