@@ -100,8 +100,9 @@ type seqEvent struct {
 	kind string
 	line int
 	text seqText
-	// from and to are the ends of a message, and the participants of a note
-	// or of an activation in from.
+	// from and to are the ends of a message, the participants of a note
+	// or of an activation in from, and the participants that a fragment of
+	// ZenUML starts at and spans.
 	from, to string
 	arrow    seqArrow
 	// activate and deactivate are the shorthands + and - of a message.
@@ -120,6 +121,12 @@ type seqEvent struct {
 	// is on.
 	start, step float64
 	visible     bool
+	// number is the number that ZenUML gives a message or a fragment,
+	// which its badge shows in place of the number of autonumber.
+	number string
+	// comment holds the lines of a comment of ZenUML, which draw over a
+	// message or a fragment.
+	comment []string
 }
 
 // seqBox is a box of participants: its title and its color.

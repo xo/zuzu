@@ -119,6 +119,7 @@ func TestInertSettings(t *testing.T) {
 		"railroad":        "railroad-ebnf-beta\n  a = b ;\n",
 		"treeView":        "treeView-beta\n  a\n",
 		"em":              "eventmodeling\n  tf 01 ui A\n",
+		"zenuml":          "zenuml\n  A->B: hi\n",
 	}
 	sections := map[string]string{
 		"flowchart": "flowchart", "stateDiagram-v2": "state", "classDiagram": "class", "erDiagram": "er",
@@ -133,6 +134,7 @@ func TestInertSettings(t *testing.T) {
 		"railroad": "railroad",
 		"treeView": "treeView",
 		"em":       "eventmodeling",
+		"zenuml":   "zenuml",
 	}
 	for name, body := range bodies {
 		src := "---\nconfig:\n" + inertConfig + "  " + sections[name] + ":\n    useMaxWidth: false\n---\n" + body
@@ -198,6 +200,7 @@ func TestHints(t *testing.T) {
 		"railroad-peg-beta\n  A <- B ;\n",
 		"treeView-beta\n  a\n",
 		"eventmodeling\n  tf 01 ui A\n",
+		"zenuml\n  A->B: hi\n",
 	}
 	// The look handDrawn and the layout elk are hints, in the config or
 	// at the top of the front matter, with a description (D32).
@@ -245,6 +248,7 @@ func TestThemes(t *testing.T) {
 		"gitGraph\n  commit\n",
 		"block-beta\n  a b\n",
 		"treeView-beta\n  a\n",
+		"zenuml\n  A->B: hi\n",
 	}
 	looks := map[string]string{
 		"default": `zuzu.scheme:"mermaid-default"`, "base": `zuzu.scheme:"mermaid-base"`,

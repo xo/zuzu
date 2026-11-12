@@ -1,0 +1,12 @@
+zenuml
+    title Order service
+    Client->OrderService.create(order) {
+      inventory = Stock.reserve(items)
+      Payment.charge(card) {
+        audit()
+        return receipt
+      }
+      OrderService->Mail: send confirmation
+      @return OrderService->Client: created
+    }
+    Mail->Client: confirmation sent

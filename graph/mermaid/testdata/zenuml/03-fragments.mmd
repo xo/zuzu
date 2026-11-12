@@ -1,0 +1,34 @@
+zenuml
+    A.start() {
+      if(ready) {
+        B.go()
+      } else if(waiting) {
+        B.wait()
+      } else {
+        B.stop()
+      }
+      while(more) {
+        B.next()
+      }
+      opt {
+        B.extra()
+      }
+      par {
+        B->C: one
+        B->C: two
+      }
+      critical(lock) {
+        C.write()
+      }
+      section(setup) {
+        C.init()
+      }
+      try {
+        C.risky()
+      } catch(error) {
+        C.recover()
+      } finally {
+        C.close()
+      }
+      ref(Login, B, C)
+    }

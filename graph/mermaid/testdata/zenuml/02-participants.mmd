@@ -1,0 +1,16 @@
+zenuml
+    @Actor Alice
+    @Database DB as "Order store"
+    group Backend {
+      <<service>> API
+      @Boundary Gate
+    }
+    @Control Ctl
+    @Entity Thing
+    @Starter(Alice)
+    API.get() {
+      DB.query()
+      Ctl.check()
+      Thing.load()
+      Gate.open()
+    }

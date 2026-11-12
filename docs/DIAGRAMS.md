@@ -1656,6 +1656,7 @@ the source draws once, with its label.
 | `railroad-beta`, `railroad-ebnf-beta`, `railroad-abnf-beta`, `railroad-peg-beta` | Vega rects, paths and text, laid out in Go with the sizes of Mermaid: a track for each rule |
 | `treeView-beta` | Vega rules, rects, paths, text and icons, laid out in Go: a row for each item, indented by its depth |
 | `eventmodeling` | Vega rects, paths, symbols and text, laid out in Go: the frames along a time axis, each in the swimlane of its kind |
+| `zenuml` | Vega, laid out in Go by the layout of `sequenceDiagram` |
 
 #### pie
 
@@ -3334,6 +3335,88 @@ with an outline and its name in bold in the middle. A swimlane is a panel
 with its label at its top left. An arrow and its arrowhead take the color
 `edge`, `edgeWidth` and `arrowLength`, and draw over the boxes, as in
 Mermaid.
+
+#### zenuml
+
+A ZenUML diagram is a sequence diagram written as code. mmdc draws it with
+the plugin `@mermaid-js/mermaid-zenuml`, which holds `@zenuml/core`
+3.49. zuzu reads the grammar of `@zenuml/core`, and turns each statement
+into the participants, the messages, the activations and the frames of a
+sequence diagram, as "sequenceDiagram" says. The same layout then draws
+it, so the two kinds look the same.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `title Text`, before any other statement | the title |
+| `A`, `"Name with spaces"`, `A as Alice` at the start | a participant. An alias is the label |
+| `@Actor A`, `@Database A`, `@Boundary A`, `@Control A`, `@Entity A` | an actor, a database, a boundary, a control or an entity, as "sequenceDiagram" draws them |
+| `<<service>> A` | a participant with `«service»` over its label |
+| `group Name { A B }` | a panel behind the participants, with its title |
+| `@Starter(A)`, after the participants | A sends each message that names no sender |
+| `A.method(x)`, `A->B.method()`, `A.first().second()` | a message with a filled arrowhead, and an activation of the receiver |
+| `A.method() { ... }` | the same, and the statements of the block inside the activation |
+| `method()` | a message from the sender of the block to itself |
+| `result = A.method()`, `Type result = A.method()` | the message, and a dashed message back with the name `result` |
+| `A->B: text`, `B: text`, `A->B`, `A - B` | a message with an open arrowhead and no activation |
+| `new A(x)`, `a = new A()` | a dashed message to the head of A, which starts there, with `«x»` or `«create»`, and an activation of A. With an assignment, the participant is `a:A`, and a dashed message goes back with the name `a` |
+| `return x`, `@return A->B: text`, `@reply A->B: text`, `A-->B: text` | a dashed message with an open arrowhead. `return` goes back to the sender of the block |
+| `if (x) { } else if (y) { } else { }` | a frame `alt` with a section for each `else` |
+| `while (x) { }`, `for`, `forEach`, `foreach`, `loop` | a frame `loop` |
+| `opt { }`, `par { }`, `critical (x) { }` | a frame `opt`, `par` or `critical` |
+| `section (x) { }`, `frame (x) { }`, `{ }` | a frame `section` with no label, as ZenUML draws it |
+| `try { } catch (e) { } finally { }` | a frame `try` with a section for each `catch` and the `finally` |
+| `ref(Name, A, B)` | a frame `ref` across A and B, with the text of the ref |
+| `==Text==`, at the start of a line | a dashed line across the diagram, with the text in a box |
+| `// Text`, before a statement | the text over the message or the frame |
+
+A participant that no statement declares takes the place where a message
+first names it, as in ZenUML. When a message names no sender and the
+diagram has no `@Starter`, zuzu draws the starter of ZenUML as the first
+participant: an actor with no label. A participant that the head declares
+twice keeps the first value of each part, as in ZenUML.
+
+ZenUML numbers each statement in the order of the source, and a statement
+in a block takes the number of the block before its own, such as `1.2.1`.
+The statements of a frame take the number of the frame, and the sections
+of a frame count on. zuzu draws each number in a small text at the left of
+its message or of its frame, as ZenUML does.
+
+A colon starts the text of a message, which runs to the end of the line,
+as in ZenUML. So `accTitle: Text` and `accDescr: Text` are a message to a
+participant named `accTitle` or `accDescr`, as ZenUML draws them, and not
+the description of the spec. The `description` of the front matter is
+still the description. ZenUML draws its own `title`, and not the `title`
+of the front matter, so zuzu does not draw the front matter title either.
+
+ZenUML reads no setting of the config. Each setting is an issue, as in the
+other charts, and a known `theme` selects the look, as "The theme" says.
+
+Mermaid never reports an error in a ZenUML diagram, because the parser of
+ZenUML skips each token that does not fit its grammar. zuzu reports each
+token that does not fit the grammar as an issue, and each token that the
+grammar wants and that is not there, such as the `}` of a block. It then
+draws the rest.
+
+These are issues, because ZenUML draws them and zuzu does not: the color
+of a participant, such as `A #FF0000`, an emoji of a participant, such as
+`[smile] A`, the icons of the clouds, `@EC2`, `@Lambda`, `@AzureFunction`,
+`@SQS`, `@SNS` and `@IAM`, which draw as participants, a style at the start
+of the last line of a comment, such as `[red]`, `<bold>` or `(blue)`, and
+the Markdown of a comment, `**`, `__` and `` ` ``, which zuzu takes out
+and draws as plain text.
+
+ZenUML reads these parts and draws nothing for them, so zuzu reads them
+with no issue (D32): the width of a participant, such as `A 200`, a group
+with no name, a type that has no icon, such as `@Queue`, the words
+`const`, `readonly`, `static` and `await`, and a comment before a
+participant or before a `}`.
+
+zuzu draws a ZenUML diagram in other ways than mmdc in these places. A
+return of a participant to itself is a dashed loop, and ZenUML draws an
+icon and the text. A frame spans the messages in it, and ZenUML spans
+other lifelines. The heads of the participants draw at the top only, as in
+ZenUML, in the look of zuzu, and the texts are in the sizes of zuzu.
+Labels do not wrap, as in ZenUML.
 
 ### Other kinds
 

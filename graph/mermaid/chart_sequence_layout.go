@@ -57,7 +57,32 @@ func (c *chart) sequenceSettings() (seqConfig, error) {
 	if err := c.unreadSettings(seqRead...); err != nil {
 		return seqConfig{}, err
 	}
-	cfg := c.d.Config
+	s := newSeqConfig(c.d.Config, c.d.Kind)
+	seq, _ := c.d.Config["sequence"].(map[string]any)
+	for _, a := range []struct {
+		key string
+		to  *string
+	}{{"messageAlign", &s.messageAlign}, {"noteAlign", &s.noteAlign}} {
+		v, ok := seq[a.key].(string)
+		if !ok {
+			continue
+		}
+		switch v {
+		case "left", "center", "right":
+			*a.to = v
+		default:
+			if err := c.add("the setting sequence.%s %s", a.key, v); err != nil {
+				return s, err
+			}
+		}
+	}
+	return s, nil
+}
+
+// newSeqConfig returns the settings of a sequence diagram of a kind from
+// its config: each setting that the config gives, and the default of each
+// other one.
+func newSeqConfig(cfg map[string]any, kind string) seqConfig {
 	seq, _ := cfg["sequence"].(map[string]any)
 	num := func(key string, def float64) float64 {
 		if v, ok := configNumber(cfg, "sequence", key); ok && v >= 0 {
@@ -121,31 +146,14 @@ func (c *chart) sequenceSettings() (seqConfig, error) {
 	}
 	width := num("width", 150)
 	s.mermaid = seqMermaid{width: width, actorMargin: num("actorMargin", 50), labelBoxWidth: num("labelBoxWidth", 50)}
-	s.messageWrap = scaleWrap(c.d.Kind, labelMessage, width)
-	s.noteWrap = scaleWrap(c.d.Kind, "", width)
-	s.actorWrap = scaleWrap(c.d.Kind, "", width-2*s.wrapPadding)
+	s.messageWrap = scaleWrap(kind, labelMessage, width)
+	s.noteWrap = scaleWrap(kind, "", width)
+	s.actorWrap = scaleWrap(kind, "", width-2*s.wrapPadding)
 	if w, ok := cfg["wrap"].(bool); ok {
 		s.wrap = w
 	}
 	s.wrap = flag("wrap", s.wrap)
-	for _, a := range []struct {
-		key string
-		to  *string
-	}{{"messageAlign", &s.messageAlign}, {"noteAlign", &s.noteAlign}} {
-		v, ok := seq[a.key].(string)
-		if !ok {
-			continue
-		}
-		switch v {
-		case "left", "center", "right":
-			*a.to = v
-		default:
-			if err := c.add("the setting sequence.%s %s", a.key, v); err != nil {
-				return s, err
-			}
-		}
-	}
-	return s, nil
+	return s
 }
 
 // seqLayout lays out a sequence diagram and writes its rows.
@@ -185,7 +193,9 @@ type seqFrame struct {
 	block, fill string
 	text        seqText
 	// wrap is the width at which its label wraps.
-	wrap       float64
+	wrap float64
+	// number is the number that ZenUML gives the fragment, or empty.
+	number     string
 	y0, x0, x1 float64
 	sections   []seqPart
 }
@@ -631,7 +641,9 @@ func (l *seqLayout) draw() {
 			}
 			l.numbers = e.visible || l.cfg.numbers
 		case "message":
-			y = l.message(k, e, y, start, end)
+			y = l.message(k, e, l.comment(e, y), start, end)
+		case "divider":
+			y = l.divider(e, y)
 		case "note":
 			y = l.note(k, e, y)
 		case "activate":
@@ -643,8 +655,14 @@ func (l *seqLayout) draw() {
 				l.deactivate(e.from, y)
 			}
 		case "start":
-			y += l.gap() * 0.6
-			f := &seqFrame{block: e.block, fill: e.fill, text: e.text, wrap: l.wrapOf(k, 0), y0: y, x0: math.Inf(1), x1: math.Inf(-1)}
+			y = l.comment(e, y) + l.gap()*0.6
+			f := &seqFrame{block: e.block, fill: e.fill, text: e.text, wrap: l.wrapOf(k, 0), number: e.number, y0: y, x0: math.Inf(1), x1: math.Inf(-1)}
+			// A ref of ZenUML spans its participants.
+			if i, ok := l.idx[e.from]; ok && e.to != "" {
+				if j, ok := l.idx[e.to]; ok {
+					f.x0, f.x1 = math.Min(l.cx[i], l.cx[j]), math.Max(l.cx[i], l.cx[j])
+				}
+			}
 			l.frames = append(l.frames, f)
 			if e.block == "rect" {
 				y += 2
@@ -797,9 +815,7 @@ func (l *seqLayout) message(k int, e seqEvent, y float64, start, end []float64) 
 		"kind": "message", "from": e.from, "to": e.to, "text": strings.Join(lines, " "),
 		"x": x0, "y": lineY, "path": "M0,0H" + pathNum(x1-x0),
 	}, math.Min(x0, x1), math.Max(x0, x1), lineY)
-	if l.numbers {
-		l.badge(fx, lineY)
-	}
+	l.messageBadge(e, fx, tx, lineY)
 	lx, align := (fx+tx)/2, "center"
 	switch l.cfg.messageAlign {
 	case "left":
@@ -870,9 +886,7 @@ func (l *seqLayout) self(e seqEvent, lines []string, lineY float64) float64 {
 	if e.centralTo {
 		l.add("dots", map[string]any{"kind": "dot", "x": ex, "y": endY, "path": dotPath()}, ex-4, ex+4, endY+4)
 	}
-	if l.numbers {
-		l.badge(sx, lineY)
-	}
+	l.messageBadge(e, sx, sx, lineY)
 	lx := sx + 4
 	if l.numbers {
 		lx += 10
@@ -923,9 +937,24 @@ func dotPath() string {
 	return "M3.5,0A3.5,3.5 0 1,1 -3.5,0A3.5,3.5 0 1,1 3.5,0Z"
 }
 
-// badge draws the number of a message in a circle at a place.
-func (l *seqLayout) badge(x, y float64) {
-	n := strconv.FormatFloat(l.number, 'f', -1, 64)
+// messageBadge draws the number of a message that goes from fx to tx at a
+// y: the number that ZenUML gives it, as a small text at the left of the
+// line, or the number of autonumber at its start when it is on.
+func (l *seqLayout) messageBadge(e seqEvent, fx, tx, y float64) {
+	switch {
+	case e.number != "":
+		l.textRow("numberLabels", "number", []string{e.number}, numberFont, math.Min(fx, tx)-4, y-2, "right", "bottom")
+	case l.numbers:
+		l.badge(fx, y, strconv.FormatFloat(l.number, 'f', -1, 64))
+	}
+}
+
+// numberFont is the font of a number that ZenUML gives a message or a
+// fragment.
+var numberFont = text.Font{Family: text.Family, Size: 9}
+
+// badge draws a number in a circle at a place.
+func (l *seqLayout) badge(x, y float64, n string) {
 	f := text.Font{Family: text.Family, Size: 9, Weight: 600}
 	w, _ := l.size(f, []string{n})
 	r := math.Max(8, w/2+4)
@@ -966,6 +995,52 @@ func (l *seqLayout) note(k int, e seqEvent, y float64) float64 {
 	}
 	l.textRow("noteLabels", "note", lines, f, tx, top+nh/2-float64(len(lines)-1)*lh(f)/2, l.cfg.noteAlign, "middle")
 	return top + nh
+}
+
+// comment draws the comment of ZenUML over a message or a fragment, at the
+// left of its sender, and returns the y below it, less the gap that the
+// message or the fragment puts above itself.
+func (l *seqLayout) comment(e seqEvent, y float64) float64 {
+	if len(e.comment) == 0 {
+		return y
+	}
+	x := 0.0
+	if len(l.ps) > 0 {
+		x = l.cx[0]
+	}
+	if i, ok := l.idx[e.from]; ok {
+		x = l.cx[i]
+		if j, ok := l.idx[e.to]; ok && e.kind == "message" {
+			x = math.Min(x, l.cx[j])
+		}
+	}
+	f := l.cfg.noteFont
+	top := y + l.gap()*0.6
+	l.textRow("comments", "comment", e.comment, f, x+4, top, "left", "top")
+	_, h := l.size(f, e.comment)
+	return top + h + 4 - l.gap()
+}
+
+// divider draws a divider of ZenUML at a y: a line across the diagram with
+// its label in a box in the middle. It returns the y below it.
+func (l *seqLayout) divider(e seqEvent, y float64) float64 {
+	n := len(l.ps)
+	if n == 0 {
+		return y
+	}
+	f := l.cfg.noteFont
+	tw, th := l.size(f, e.text.lines)
+	h := th + 1.4*l.cfg.noteMargin
+	top := y + l.gap()*0.6
+	x0, x1 := l.cx[0]-l.w[0]/2, l.cx[n-1]+l.w[n-1]/2
+	mid := (x0 + x1) / 2
+	l.add("dividers", map[string]any{"kind": "divider", "x": x0, "x2": x1, "y": top + h/2}, x0, x1, top+h)
+	if len(e.text.lines) > 0 {
+		w := tw + 2*l.cfg.noteMargin
+		l.add("notes", map[string]any{"kind": "divider", "x": mid - w/2, "x2": mid + w/2, "y": top, "y2": top + h}, mid-w/2, mid+w/2, top+h)
+		l.textRow("noteLabels", "divider", e.text.lines, f, mid, top+h/2-float64(len(e.text.lines)-1)*lh(f)/2, "center", "middle")
+	}
+	return top + h
 }
 
 // closeFrame closes the innermost block at a y and draws it.
@@ -1009,6 +1084,9 @@ func (l *seqLayout) closeFrame(y float64) {
 	}
 	x1 = math.Max(x1, x0+need)
 	l.add("frames", map[string]any{"kind": "block", "block": word, "x": x0, "x2": x1, "y": f.y0, "y2": y}, x0, x1, y)
+	if f.number != "" {
+		l.textRow("numberLabels", "number", []string{f.number}, numberFont, x0-4, f.y0+tabH/2, "right", "middle")
+	}
 	l.add("tabs", map[string]any{"kind": "tab", "x": x0, "x2": x0 + tabW, "y": f.y0, "y2": f.y0 + tabH}, x0, x0+tabW, f.y0+tabH)
 	l.textRow("tabLabels", "block", []string{word}, kf, x0+tabW/2, f.y0+tabH/2, "center", "middle")
 	l.textRow("condLabels", "condition", bracket(cond), mf, x0+tabW+10, f.y0+l.cfg.boxTextMargin, "left", "top")
@@ -1132,6 +1210,8 @@ func (l *seqLayout) spec() map[string]any {
 	texts("condLabels", graph.StyleEdgeLabel, l.cfg.messageFont)
 	texts("messageLabels", graph.StyleNodeLabel, l.cfg.messageFont)
 	texts("noteLabels", graph.StyleNodeLabel, l.cfg.noteFont)
+	texts("comments", graph.StyleEdgeLabel, l.cfg.noteFont)
+	texts("numberLabels", graph.StyleEdgeLabel, numberFont)
 	texts("actorLabels", graph.StyleNodeLabel, l.cfg.actorFont)
 	var domain []any
 	for _, p := range l.ps {
