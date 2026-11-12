@@ -192,9 +192,24 @@ func (w *writer) group(it *scene.Item) error {
 		order[i] = i
 	}
 	slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(it.Items[a].ZIndex, it.Items[b].ZIndex) })
+	markClip := ""
 	for _, i := range order {
-		if err := w.mark(&it.Items[i]); err != nil {
+		m := &it.Items[i]
+		clipped := m.Clip && !it.Clip
+		if clipped {
+			// A mark that clips draws inside the box of its group, as
+			// Vega clips it.
+			if markClip == "" {
+				markClip = w.id("clip")
+				fmt.Fprintf(&w.defs, `<clipPath id="%s"><rect width="%s" height="%s"/></clipPath>`, markClip, num(it.Width), num(it.Height))
+			}
+			fmt.Fprintf(w.out, `<g clip-path="url(#%s)">`, markClip)
+		}
+		if err := w.mark(m); err != nil {
 			return err
+		}
+		if clipped {
+			w.out.WriteString("</g>")
 		}
 	}
 	if it.Clip {

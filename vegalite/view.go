@@ -623,6 +623,15 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	default:
 		vs.Range = v.defaultRange(s)
 	}
+	// rangeMin and rangeMax replace the ends of a range of two values.
+	if r := vs.Range.Values; len(r) == 2 {
+		if x, ok := s.props["rangeMin"]; ok {
+			r[0] = lit(x)
+		}
+		if x, ok := s.props["rangeMax"]; ok {
+			r[1] = lit(x)
+		}
+	}
 	// The other properties.
 	positional := s.channel == "x" || s.channel == "y"
 	quant := !s.discrete && s.typ != "time" && s.typ != "utc"
@@ -848,6 +857,11 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 		if s.channel == "yOffset" {
 			return offsetRange(s, "bandwidth('"+v.sn("y")+"')", "height")
 		}
+		if s.discrete {
+			// A discrete y puts its first value at the top, as a step
+			// does.
+			return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: v.sizeName(1)}}}
+		}
 		return vega.ScaleRange{Values: []vega.Value{{Signal: v.sizeName(1)}, lit(0)}}
 	case "color", "fill", "stroke":
 		switch {
@@ -923,7 +937,8 @@ func (v *view) guides(out *vega.Spec) {
 				grids = append(grids, *grid)
 			}
 			mains = append(mains, main)
-		case "xOffset", "yOffset", "theta", "radius":
+		case "xOffset", "yOffset", "theta", "radius", "angle":
+			// These have no guide, as in Vega-Lite.
 		default:
 			field := ""
 			if s.field != nil {

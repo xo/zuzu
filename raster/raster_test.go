@@ -226,3 +226,34 @@ func TestDrawRefusesWhatItCannotDraw(t *testing.T) {
 		}
 	}
 }
+
+// TestDrawMarkClip checks that a mark that clips draws inside the box of
+// its group, as the SVG writer clips it.
+func TestDrawMarkClip(t *testing.T) {
+	t.Parallel()
+	s := &scene.Scene{Width: 40, Height: 20, Root: scene.Mark{Type: scene.Group, Items: []scene.Item{{
+		Width: 20, Height: 20,
+		Items: []scene.Mark{{Type: scene.Rect, Clip: true, Items: []scene.Item{{Width: 40, Height: 20, Fill: scene.Paint{Color: "#000000"}}}}},
+	}}}}
+	img, err := Draw(s, WithRenderer(fonts()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if img.RGBAAt(10, 10).A == 0 {
+		t.Error("the rect draws nothing inside its group")
+	}
+	if img.RGBAAt(30, 10).A != 0 {
+		t.Error("the rect draws outside its group")
+	}
+	var b bytes.Buffer
+	if err := svg.Write(&b, s); err != nil {
+		t.Fatal(err)
+	}
+	want, err := fonts().Render(b.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := differ(img, want); d > 0.01 {
+		t.Errorf("%.2f%% of the pixels differ from okage, more than 1%%", 100*d)
+	}
+}

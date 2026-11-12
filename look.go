@@ -46,6 +46,9 @@ func (s *scope) look(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 	if expr.Truthy(d[theme.Sankey]) {
 		sankeyLook(m, sm)
 	}
+	if !encodes(m, "strokeCap") {
+		dashCaps(sm)
+	}
 	if sm.Type == scene.Line && expr.Truthy(d[theme.EndLabel]) {
 		out = append(out, s.endLabel(m, sm)...)
 	}
@@ -55,6 +58,36 @@ func (s *scope) look(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 		out = append(out, s.reference(m, sm)...)
 	}
 	return out
+}
+
+// dashCaps gives a dashed item a flat cap in place of the round or the
+// square cap of a style, when that cap closes a gap of its pattern. Such a
+// cap reaches half the width of the stroke past each end of each dash, so
+// a gap no longer than the width disappears, as with the default dashes of
+// Vega-Lite on a line of 2. A flat cap draws the dashes as the spec gives
+// them, as the dashes of a reference line are drawn.
+func dashCaps(sm *scene.Mark) {
+	for i := range sm.Items {
+		it := &sm.Items[i]
+		if it.StrokeCap != "round" && it.StrokeCap != "square" {
+			continue
+		}
+		w := 1.0
+		if it.StrokeWidth != nil {
+			w = *it.StrokeWidth
+		}
+		dash := it.StrokeDash
+		if len(dash)%2 == 1 {
+			// An odd pattern repeats, so each of its values is a gap too.
+			dash = append(slices.Clone(dash), dash...)
+		}
+		for j := 1; j < len(dash); j += 2 {
+			if dash[j] > 0 && dash[j] <= w {
+				it.StrokeCap = "butt"
+				break
+			}
+		}
+	}
 }
 
 // encodedField returns the field and the scale of a property that the

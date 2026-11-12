@@ -125,6 +125,10 @@ type config struct {
 	step float64
 	// marks holds the config of each type of mark, such as "bar".
 	marks map[string]map[string]any
+	// facetSpacing and concatSpacing are the default spacing between the
+	// cells of a facet and between the views of a concatenation, or nil
+	// for the default of 20.
+	facetSpacing, concatSpacing any
 }
 
 // readConfig reads the parts of the config that the compiler follows.
@@ -134,9 +138,11 @@ func readConfig(raw []byte) *config {
 		return cfg
 	}
 	var m struct {
-		Mark  map[string]any `json:"mark"`
-		Scale map[string]any `json:"scale"`
-		View  map[string]any `json:"view"`
+		Mark   map[string]any `json:"mark"`
+		Scale  map[string]any `json:"scale"`
+		View   map[string]any `json:"view"`
+		Facet  map[string]any `json:"facet"`
+		Concat map[string]any `json:"concat"`
 	}
 	if json.Unmarshal(raw, &m) != nil {
 		return cfg
@@ -159,7 +165,23 @@ func readConfig(raw []byte) *config {
 	if st, ok := m.View["step"].(float64); ok {
 		cfg.step = st
 	}
+	cfg.facetSpacing = m.Facet["spacing"]
+	cfg.concatSpacing = m.Concat["spacing"]
 	return cfg
+}
+
+// spacing returns the padding of the layout of a facet or a
+// concatenation: the spacing of the spec, else the spacing of the config,
+// else 20. A spacing can be one number or an object with a row and a
+// column, as the padding of a layout of Vega can.
+func spacing(s *Spec, config any) any {
+	if v := valueOf(s.Spacing); v != nil {
+		return v
+	}
+	if config != nil {
+		return config
+	}
+	return 20.0
 }
 
 // passedConfig are the parts of the config of a spec that the Vega config

@@ -103,6 +103,10 @@ func (rt *runtime) render() (*scene.Scene, error) {
 		b := layout.Empty()
 		st := rt.style()
 		for i := range marks {
+			if marks[i].Clip {
+				// A mark that clips stays inside the plot area.
+				continue
+			}
 			m := st.MarkBounds(&marks[i])
 			if !m.IsEmpty() {
 				b.X1, b.Y1 = math.Min(b.X1, m.X1+dx), math.Min(b.Y1, m.Y1+dy)

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/xo/zuzu/format"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -74,6 +75,20 @@ func (f *facetDef) title() string {
 		return titleString(t)
 	}
 	return titleOf(f.def)
+}
+
+// labelText returns the expression of the label of a header, from the
+// reference to the value of the facet. A time unit writes its value in the
+// format of the unit, such as 2012 for a year.
+func (f *facetDef) labelText(ref string) string {
+	if d := f.def; d.units != nil {
+		fn := "timeFormat"
+		if d.utc {
+			fn = "utcFormat"
+		}
+		return fn + "(" + ref + ", " + strconv.Quote(format.TimeUnitSpecifier(d.units, vlSpecifiers)) + ")"
+	}
+	return "isValid(" + ref + ") ? " + ref + " : \"\"+" + ref
 }
 
 // labels reports whether the header draws the values of the facet.
@@ -287,7 +302,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		if wrap != nil || np != "" {
 			return c.issue(path, "a facet of a facet that wraps or has a name")
 		}
-		return c.facetOfFacet(row, column, cell, out, src, path, repeat)
+		return c.facetOfFacet(s, row, column, cell, out, src, path, repeat)
 	}
 	if len(indep) > 0 && len(cell.Layer) > 0 && src != nil {
 		// Each cell copies the datasets of the layers, so the source
@@ -492,9 +507,8 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		height = h
 	}
 	headerTitle := func(f *facetDef, orient string) *vega.Title {
-		ref := "parent[" + strconv.Quote(f.def.out) + "]"
 		t := &vega.Title{
-			Text:   vega.Value{Signal: "isValid(" + ref + ") ? " + ref + " : \"\"+" + ref},
+			Text:   vega.Value{Signal: f.labelText("parent[" + strconv.Quote(f.def.out) + "]")},
 			Style:  vega.Strings{List: []string{"guide-label"}},
 			Frame:  lit("group"),
 			Offset: lit(10),
@@ -672,7 +686,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	case column != nil:
 		cols = map[string]any{"signal": "length(data('" + colDomain + "'))"}
 	}
-	out.Layout = lit(map[string]any{"padding": 20, "columns": cols, "bounds": "full", "align": "all"})
+	out.Layout = lit(map[string]any{"padding": spacing(s, c.cfg.facetSpacing), "columns": cols, "bounds": "full", "align": "all"})
 	if !c.nested {
 		c.mergeAggregates(out)
 	}
@@ -1049,7 +1063,7 @@ func renameData(m *vega.Mark, from, to string) {
 // facet takes the names of a facet named child, and its headers read the
 // rows of the outer cell. The title of a field of each facet in the same
 // direction joins the two, as Origin / Cylinders.
-func (c *compiler) facetOfFacet(row, column *facetDef, cell *Spec, out *vega.Spec, src *dataNode, path string, repeat map[string]string) error {
+func (c *compiler) facetOfFacet(s *Spec, row, column *facetDef, cell *Spec, out *vega.Spec, src *dataNode, path string, repeat map[string]string) error {
 	innerRow, innerCol, err := facetRowColumn(cell, repeat)
 	if err != nil {
 		return err
@@ -1158,9 +1172,8 @@ func (c *compiler) facetOfFacet(row, column *facetDef, cell *Spec, out *vega.Spe
 	c.data = append(c.data, vega.Data{Name: domain, Source: vega.List(c.name(src)), Transform: []vega.Transform{
 		transform("aggregate", map[string]any{"groupby": []any{field}}),
 	}})
-	ref := "parent[" + strconv.Quote(field) + "]"
 	label := &vega.Title{
-		Text:  vega.Value{Signal: "isValid(" + ref + ") ? " + ref + " : \"\"+" + ref},
+		Text:  vega.Value{Signal: outer.labelText("parent[" + strconv.Quote(field) + "]")},
 		Style: vega.Strings{List: []string{"guide-label"}}, Frame: lit("group"), Offset: lit(10),
 	}
 	groupTitle := &vega.Title{Text: lit(title), Style: vega.Strings{List: []string{"guide-title"}}, Offset: lit(10)}
@@ -1199,7 +1212,7 @@ func (c *compiler) facetOfFacet(row, column *facetDef, cell *Spec, out *vega.Spe
 	if column != nil {
 		cols = map[string]any{"signal": "length(data('" + domain + "'))"}
 	}
-	out.Layout = lit(map[string]any{"padding": 20, "columns": cols, "bounds": "full", "align": "all"})
+	out.Layout = lit(map[string]any{"padding": spacing(s, c.cfg.facetSpacing), "columns": cols, "bounds": "full", "align": "all"})
 	if !c.nested {
 		c.mergeAggregates(out)
 	}

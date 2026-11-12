@@ -395,8 +395,11 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	if lg.Size, err = get(l.Size); err != nil {
 		return nil, err
 	}
+	if lg.StrokeDash, err = get(l.StrokeDash); err != nil {
+		return nil, err
+	}
 	main := lg.Fill
-	for _, sc := range []scale.Scale{lg.Stroke, lg.Shape, lg.Size} {
+	for _, sc := range []scale.Scale{lg.Stroke, lg.Shape, lg.Size, lg.StrokeDash} {
 		if main == nil {
 			main = sc
 		}
@@ -880,7 +883,7 @@ func configStr(cfg map[string]any, key, def string) string {
 // namedOnChart reports whether a legend of the stroke alone has each of its
 // values named at the end of a line.
 func (s *scope) namedOnChart(l *vega.Legend, lg *layout.Legend) bool {
-	if lg.Stroke == nil || lg.Fill != nil || lg.Shape != nil || lg.Size != nil || !l.Values.IsZero() {
+	if lg.Stroke == nil || lg.Fill != nil || lg.Shape != nil || lg.Size != nil || lg.StrokeDash != nil || !l.Values.IsZero() {
 		return false
 	}
 	named := s.rt.endLabels[l.Stroke]

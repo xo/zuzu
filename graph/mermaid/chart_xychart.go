@@ -294,11 +294,6 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 	if v, ok := configNumber(cfg, "xyChart", "height"); ok {
 		height = v
 	}
-	var w, h any = width, height
-	if horizontal && xa.cats != nil {
-		// A step places the first category at the top.
-		h = map[string]any{"step": height / float64(max(len(xa.cats), 1))}
-	}
 	config := map[string]any{
 		"style": map[string]any{"xyUnnamed": map[string]any{"zuzu.endLabel": false}},
 	}
@@ -316,8 +311,8 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 		}
 	}
 	spec := map[string]any{
-		"width":    w,
-		"height":   h,
+		"width":    width,
+		"height":   height,
 		"data":     map[string]any{"values": rows},
 		"encoding": encoding,
 		"layer":    layers,

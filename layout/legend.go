@@ -12,10 +12,12 @@ import (
 
 // Legend is a legend, with the settings that the view resolved from the
 // spec. It draws the first of its scales that it has: the fill, the
-// stroke, the shape or the size.
+// stroke, the shape, the size or the dash.
 type Legend struct {
 	Fill, Stroke, Shape, Size scale.Scale
-	Title                     string
+	// StrokeDash is the scale of the dashes, whose entries are short lines.
+	StrokeDash scale.Scale
+	Title      string
 	// Values are the values of the entries, or nil for those of the scale.
 	Values []any
 	// Format writes the label of a value.
@@ -81,7 +83,7 @@ func (s Style) Legend(l *Legend) scene.Mark {
 // legend of smaller circles draws them in a row, so that their labels have
 // room.
 func (l *Legend) nested() bool {
-	if l.Size == nil || l.Fill != nil || l.Stroke != nil || l.Shape != nil || l.Line {
+	if l.Size == nil || l.Fill != nil || l.Stroke != nil || l.Shape != nil || l.StrokeDash != nil || l.Line {
 		return false
 	}
 	rmax := 0.0
@@ -157,7 +159,7 @@ func (l *Legend) values() []any {
 	if l.Values != nil {
 		return l.Values
 	}
-	for _, sc := range []scale.Scale{l.Fill, l.Stroke, l.Shape, l.Size} {
+	for _, sc := range []scale.Scale{l.Fill, l.Stroke, l.Shape, l.Size, l.StrokeDash} {
 		if sc == nil {
 			continue
 		}
@@ -250,6 +252,10 @@ func (s Style) entries(l *Legend, x, y float64, columns int) scene.Mark {
 // short line, a shape, or a circle of the size.
 func (s Style) swatch(l *Legend, v any, i int, x, y float64) scene.Item {
 	color := s.Theme.Category[i%len(s.Theme.Category)]
+	if l.StrokeDash != nil {
+		// The dashes tell the entries apart, in the color of a line.
+		color = s.Theme.Category[0]
+	}
 	if c := l.color(); c != nil {
 		if str, ok := c.Map(v).(string); ok {
 			color = str
@@ -266,11 +272,18 @@ func (s Style) swatch(l *Legend, v any, i int, x, y float64) scene.Item {
 		it.Stroke = scene.Paint{Color: color}
 		it.StrokeWidth = ptr(2)
 	}
-	if l.Line {
+	if l.Line || l.StrokeDash != nil {
 		it.Shape = "stroke"
 		it.Fill = scene.Paint{}
 		it.Stroke = scene.Paint{Color: color}
 		it.StrokeWidth = ptr(2)
+	}
+	if l.StrokeDash != nil {
+		if d, ok := l.StrokeDash.Map(v).([]any); ok {
+			for _, x := range d {
+				it.StrokeDash = append(it.StrokeDash, expr.Number(x))
+			}
+		}
 	}
 	if l.Shape != nil {
 		if sh, ok := l.Shape.Map(v).(string); ok {

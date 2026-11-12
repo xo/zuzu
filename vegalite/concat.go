@@ -1,6 +1,7 @@
 package vegalite
 
 import (
+	"cmp"
 	"encoding/json/v2"
 	"fmt"
 	"maps"
@@ -141,7 +142,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 			out.Legends = append(out.Legends, nested.Legends...)
 			out.Marks = append(out.Marks, vega.Mark{
 				Type: "group", Name: cell.prefix + "group",
-				Layout: nested.Layout, Marks: nested.Marks, Title: nested.Title,
+				Layout: nested.Layout, Marks: nested.Marks, Title: cmp.Or(nested.Title, cell.spec.Title),
 			})
 			continue
 		}
@@ -184,10 +185,7 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 	if len(s.Repeat) > 0 {
 		align = "all"
 	}
-	layout := map[string]any{"padding": 20.0, "columns": columns, "bounds": "full", "align": align}
-	if v := valueOf(s.Spacing); v != nil {
-		layout["padding"] = v
-	}
+	layout := map[string]any{"padding": spacing(s, c.cfg.concatSpacing), "columns": columns, "bounds": "full", "align": align}
 	if v := valueOf(s.Bounds); v != nil {
 		layout["bounds"] = v
 	}

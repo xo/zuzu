@@ -217,7 +217,7 @@ func place(ts okage.Transform, x, y, angle float64) okage.Transform {
 // group draws a group item: its background, then its marks in the order
 // of their zindex. A group that clips draws its marks into a layer, which
 // goes onto the image through the mask of the clip, as okage draws a group
-// with a clip path.
+// with a clip path. A mark that clips draws the same way.
 func (d *drawer) group(it *scene.Item, ts okage.Transform) error {
 	ts = ts.PreTranslate(float32(it.X), float32(it.Y))
 	if !it.Fill.IsZero() || !it.Stroke.IsZero() {
@@ -228,8 +228,15 @@ func (d *drawer) group(it *scene.Item, ts okage.Transform) error {
 	if !it.Clip {
 		return d.marks(it, ts)
 	}
+	return d.clipped(it.Width, it.Height, ts, func(lts okage.Transform) error { return d.marks(it, lts) })
+}
+
+// clipped draws into a layer, which goes onto the image through the mask
+// of the box from the origin of ts to (w, h). draw takes the transform of
+// the layer.
+func (d *drawer) clipped(w, h float64, ts okage.Transform, draw func(okage.Transform) error) error {
 	pb := okage.NewPathBuilder()
-	r, ok := okage.RectFromXYWH(0, 0, float32(it.Width), float32(it.Height))
+	r, ok := okage.RectFromXYWH(0, 0, float32(w), float32(h))
 	if !ok {
 		return nil
 	}
@@ -245,7 +252,7 @@ func (d *drawer) group(it *scene.Item, ts okage.Transform) error {
 	parent := d.pm
 	d.pm = layer
 	lts := ts.PostTranslate(float32(-lx), float32(-ly))
-	err := d.marks(it, lts)
+	err := draw(lts)
 	d.pm = parent
 	if err != nil {
 		return err
@@ -268,7 +275,16 @@ func (d *drawer) marks(it *scene.Item, ts okage.Transform) error {
 	}
 	slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(it.Items[a].ZIndex, it.Items[b].ZIndex) })
 	for _, i := range order {
-		if err := d.mark(&it.Items[i], ts); err != nil {
+		m := &it.Items[i]
+		if m.Clip && !it.Clip {
+			// A mark that clips draws inside the box of its group, as
+			// Vega clips it.
+			if err := d.clipped(it.Width, it.Height, ts, func(lts okage.Transform) error { return d.mark(m, lts) }); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := d.mark(m, ts); err != nil {
 			return err
 		}
 	}

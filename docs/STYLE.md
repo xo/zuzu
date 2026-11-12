@@ -201,7 +201,7 @@ background color, drawn under the fill with `paint-order="stroke"`.
 
 | Mark | Rule |
 | --- | --- |
-| line | 2 wide, round joins and caps, a monotone curve. The last point has a dot of radius 3, and the name of the series follows it in the color of the series |
+| line | 2 wide, round joins and caps, a monotone curve. The last point has a dot of radius 3, and the name of the series follows it in the color of the series. A dashed line whose gaps are no longer than its width has flat caps, because a round cap closes such a gap |
 | area | the line on top, and a gradient of the same color below, from 0.32 opacity to 0.02 |
 | stacked area | full colors at 0.88 opacity, with a line of 1 in the background color between the layers |
 | bar | the end away from zero has round corners of radius 3. A group of bars has a gap of 8 percent of a band between its bars |

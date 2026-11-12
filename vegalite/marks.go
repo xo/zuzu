@@ -47,6 +47,11 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		switch k {
 		case "color", "fill", "stroke", "filled", "orient", "invalid", "type", "style", "tooltip", "point", "line", "clip", "thickness", "binSpacing", "cornerRadiusEnd", "aria", "width", "height", "x", "y", "x2", "y2", "size", "radius", "theta", "theta2", "radius2", "outerRadius", "innerRadius", "xOffset", "yOffset", "x2Offset", "y2Offset":
 			continue
+		case "radiusOffset", "thetaOffset":
+			// polar adds them to the place of a mark that is not an arc.
+			if u.mark != "arc" {
+				continue
+			}
 		}
 		if _, set := e[k]; !set {
 			e.set(k, propRef(v))
@@ -273,7 +278,63 @@ func (u *unit) position(e enc) error {
 	if err := u.axis(e, "x", "width"); err != nil {
 		return err
 	}
-	return u.axis(e, "y", "height")
+	if err := u.axis(e, "y", "height"); err != nil {
+		return err
+	}
+	u.polar(e)
+	return nil
+}
+
+// polar sets the theta and the radius of a mark that is not an arc, such as
+// the label of a slice. They move the mark from its x and y, which are the
+// middle of the view when the spec gives no x and no y. A stack, a bin or a
+// band places the mark at the middle of its interval. The properties
+// thetaOffset and radiusOffset of the mark add to each.
+func (u *unit) polar(e enc) {
+	if r := u.polarRef("theta"); r != nil {
+		e.set("theta", r)
+	}
+	if r := u.polarRef("radius"); r != nil {
+		e.set("radius", r)
+	}
+}
+
+// polarRef returns the reference of the channel theta or radius of a mark
+// that is not an arc, or nil if the mark has neither the channel nor the
+// property.
+func (u *unit) polarRef(ch string) map[string]any {
+	var ref map[string]any
+	switch d := u.ch[ch]; {
+	case d == nil:
+		if v, ok := u.props[ch]; ok {
+			ref = map[string]any{"value": v}
+		}
+	case d.hasValue:
+		ref = map[string]any{"value": d.value}
+	case u.stack == ch:
+		u.v.addScale(u, ch, d, []string{d.stackName("start"), d.stackName("end")})
+		ref = u.midRef(ch, d.stackName("start"), d.stackName("end"))
+	case d.bin != nil:
+		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
+		ref = u.midRef(ch, d.out, d.outEnd)
+	case d.isField():
+		u.v.addScale(u, ch, d, []string{d.out})
+		ref = map[string]any{"scale": u.v.sn(ch), "field": d.out}
+		if u.v.scaleType(ch) == "band" {
+			ref["band"] = 0.5
+		}
+	}
+	if ref == nil {
+		return nil
+	}
+	if off, ok := u.props[ch+"Offset"]; ok {
+		if sig, ok := ref["signal"].(string); ok {
+			ref["signal"] = sig + " + " + expr.String(off)
+		} else {
+			ref["offset"] = off
+		}
+	}
+	return ref
 }
 
 // axis sets the position along one axis: x and x2, or y and y2, with the
@@ -695,6 +756,11 @@ func (u *unit) arc(e enc) {
 		u.v.addScale(u, "theta", t, []string{t.stackName("start"), t.stackName("end")})
 		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.stackName("end")})
 		e.set("endAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.stackName("start")})
+	case t.isField() && t.bin != nil:
+		// A bin spans from its start to its end, as a stack does.
+		u.v.addScale(u, "theta", t, []string{t.out, t.outEnd})
+		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.outEnd})
+		e.set("endAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out})
 	case t.isField():
 		u.v.addScale(u, "theta", t, []string{t.out})
 		e.set("startAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out})
@@ -704,6 +770,12 @@ func (u *unit) arc(e enc) {
 	}
 }
 
+// midRef returns the reference to the middle of an interval through the
+// scale of a channel, such as the middle of a bin or of a stack.
+func (u *unit) midRef(ch, start, end string) map[string]any {
+	return map[string]any{"signal": "scale(" + strconv.Quote(u.v.sn(ch)) + ", 0.5 * " + fieldRef(start) + " + 0.5 * " + fieldRef(end) + ")"}
+}
+
 // others sets the channels that are not positions or colors: size, shape,
 // opacity, text and the like.
 func (u *unit) others(e enc) {
@@ -711,6 +783,11 @@ func (u *unit) others(e enc) {
 		if r := u.channelRef(name); r != nil {
 			e.set(name, r)
 		}
+	}
+	if d := u.ch["angle"]; d != nil && d.isField() && d.bin != nil && len(d.cond) == 0 {
+		// A bin turns a mark by the angle of its middle.
+		u.v.addScale(u, "angle", d, []string{d.out, d.outEnd})
+		e.set("angle", u.midRef("angle", d.out, d.outEnd))
 	}
 	if r := u.channelRef("size"); r != nil {
 		switch u.mark {
@@ -750,6 +827,11 @@ func (u *unit) others(e enc) {
 					spec = str(d.def.Format)
 				}
 				ref = map[string]any{"signal": "format(" + fieldRef(d.out) + ", " + strconv.Quote(spec) + ")"}
+				if d.bin != nil {
+					// A bin writes its range, as its tooltip does.
+					start, end := fieldRef(d.out), fieldRef(d.outEnd)
+					ref = map[string]any{"signal": "!isValid(" + start + ") || !isFinite(+" + start + ") ? \"null\" : format(" + start + ", " + strconv.Quote(spec) + ") + \" – \" + format(" + end + ", " + strconv.Quote(spec) + ")"}
+				}
 			case temporal:
 				spec := "%b %d, %Y"
 				if !d.def.Format.IsZero() {

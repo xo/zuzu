@@ -263,7 +263,7 @@ func pathBounds(b *Bounds, it *scene.Item) {
 }
 
 // textBounds returns the bounds of a text item, from the estimate of its
-// width, its align, its baseline and its angle.
+// width, its align, its baseline, its angle and its radius.
 func (s Style) textBounds(it *scene.Item) Bounds {
 	size := it.FontSize
 	if size == 0 {
@@ -299,9 +299,11 @@ func (s Style) textBounds(it *scene.Item) Bounds {
 	corners := [][2]float64{{x0, y0}, {x0 + w, y0}, {x0, y0 + h}, {x0 + w, y0 + h}}
 	a := it.Angle * math.Pi / 180
 	sin, cos := math.Sin(a), math.Cos(a)
+	// A radius moves the text from its x and y, at the angle theta.
+	x, y := it.X+it.Radius*math.Sin(it.Theta), it.Y-it.Radius*math.Cos(it.Theta)
 	b := Empty()
 	for _, c := range corners {
-		b.add(it.X+c[0]*cos-c[1]*sin, it.Y+c[0]*sin+c[1]*cos)
+		b.add(x+c[0]*cos-c[1]*sin, y+c[0]*sin+c[1]*cos)
 	}
 	return b
 }
