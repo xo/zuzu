@@ -1,0 +1,19 @@
+---
+title: Signed numbers
+description: A list of numbers with a sign.
+config:
+  theme: forest
+  railroad:
+    padding: 6
+    arcRadius: 14
+    horizontalSeparation: 16
+    verticalSeparation: 12
+    markerRadius: 4
+    compactMode: true
+    showMarkers: false
+    useMaxWidth: false
+---
+railroad-beta
+sign = choice(terminal("+"), terminal("-")) ;
+number = sequence(optional(nonterminal("sign")), oneOrMore(nonterminal("digit"))) ;
+list = sequence(terminal("["), optional(sequence(nonterminal("number"), zeroOrMore(sequence(terminal(","), nonterminal("number"))))), terminal("]")) ;

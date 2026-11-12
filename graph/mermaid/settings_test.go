@@ -116,6 +116,7 @@ func TestInertSettings(t *testing.T) {
 		"info":            "info\n",
 		"kanban":          "kanban\n  a[A]\n    b[B]\n",
 		"packet":          "packet\n  0-3: \"a\"\n",
+		"railroad":        "railroad-ebnf-beta\n  a = b ;\n",
 	}
 	sections := map[string]string{
 		"flowchart": "flowchart", "stateDiagram-v2": "state", "classDiagram": "class", "erDiagram": "er",
@@ -125,8 +126,9 @@ func TestInertSettings(t *testing.T) {
 		"c4":       "c4",
 		"ishikawa": "ishikawa",
 		"cynefin":  "cynefin", "info": "info",
-		"kanban": "kanban",
-		"packet": "packet",
+		"kanban":   "kanban",
+		"packet":   "packet",
+		"railroad": "railroad",
 	}
 	for name, body := range bodies {
 		src := "---\nconfig:\n" + inertConfig + "  " + sections[name] + ":\n    useMaxWidth: false\n---\n" + body
@@ -189,6 +191,7 @@ func TestHints(t *testing.T) {
 		"C4Context\n  Person(a, \"A\")\n",
 		"ishikawa-beta\n  P\n  A\n",
 		"cynefin-beta\n  complex \"a\"\n", "info\n",
+		"railroad-peg-beta\n  A <- B ;\n",
 	}
 	// The look handDrawn and the layout elk are hints, in the config or
 	// at the top of the front matter, with a description (D32).

@@ -254,6 +254,12 @@ func configSection(kind string) string {
 		return "stateDiagram"
 	case c4Context, c4Container, c4Component, c4Dynamic, c4Deployment:
 		return "c4"
+	case rrEBNF:
+		return "railroadEbnf"
+	case rrABNF:
+		return "railroadAbnf"
+	case rrPEG:
+		return "railroadPeg"
 	}
 	return strings.TrimSuffix(kind, "-beta")
 }

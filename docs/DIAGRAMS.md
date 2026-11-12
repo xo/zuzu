@@ -436,6 +436,7 @@ takes the name that Mermaid gives to the kind:
 | `stateDiagram`, `stateDiagram-v2` | `stateDiagram` |
 | `C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment` | `c4` |
 | a keyword that ends in `-beta`, such as `xychart-beta` | the keyword without `-beta`, such as `xychart` |
+| `railroad-ebnf-beta`, `railroad-abnf-beta`, `railroad-peg-beta` | `railroadEbnf`, `railroadAbnf`, `railroadPeg` |
 | any other keyword, such as `gantt` | the keyword |
 
 Mermaid reads its class diagram from the section `class` and its state
@@ -1652,6 +1653,7 @@ the source draws once, with its label.
 | `info` | Vega text: the version of Mermaid |
 | `kanban` | Vega rects, rules and text, laid out in Go: the columns side by side, each with its cards |
 | `packet`, `packet-beta` | Vega rects and text, laid out in Go: the fields on rows of bits |
+| `railroad-beta`, `railroad-ebnf-beta`, `railroad-abnf-beta`, `railroad-peg-beta` | Vega rects, paths and text, laid out in Go with the sizes of Mermaid: a track for each rule |
 
 #### pie
 
@@ -2930,6 +2932,169 @@ wider than its field draws past the field, as in Mermaid.
 The look is the look of zuzu. A field is a box with a tint of the first
 color of the scheme and an outline. Its label is in the color `text`, and
 the numbers of its bits are in the color `muted`.
+
+#### railroad-beta
+
+A railroad diagram draws each rule of a grammar as a track. A terminal and
+a nonterminal are boxes on the track, and a choice, an optional part and a
+repeat are tracks that branch and loop. Mermaid 12.3 reads four notations
+of a grammar into the same model, each with its own keyword:
+
+| Keyword | Notation | A rule |
+| --- | --- | --- |
+| `railroad-beta` | calls of functions | `number = oneOrMore(nonterminal("digit")) ;` |
+| `railroad-ebnf-beta` | EBNF | `number = digit+ ;` or `number ::= digit , { digit } ;` |
+| `railroad-abnf-beta` | ABNF | `number = 1*DIGIT ;` |
+| `railroad-peg-beta` | PEG | `Number <- Digit+ ;` |
+
+The keyword comes first, in its own case. Then come `title`, `accTitle`
+and `accDescr`, in any order, and then the rules. Each rule ends with a
+`;`. A new line is a space, so a rule can run over many lines. The title
+is the title of the diagram. A title in quotes, such as `title "JSON"`,
+draws without its quotes, and in each notation but ABNF, a backslash
+escapes the next character, as `\"` or `\n`. `accTitle` and `accDescr` join
+into the description of the Vega spec. A later `title`, `accTitle` or
+`accDescr` wins over an earlier one of its kind, as in Mermaid.
+
+The parts of `railroad-beta`:
+
+| Part | What zuzu draws |
+| --- | --- |
+| `terminal("text")` | a terminal: a box with round corners |
+| `nonterminal("name")` | a nonterminal: a box |
+| `special("text")` | a special: a box with a dashed outline and the text between `?` and `?` |
+| `sequence(a, b, ...)` | the parts in a row on one track |
+| `choice(a, b, ...)` | the parts as alternatives, one under another |
+| `optional(a)` | the part with a bypass over it |
+| `oneOrMore(a)` | the part with a loop under it |
+| `zeroOrMore(a)` | the part with a loop under it and a bypass over it |
+
+A string is in double or single quotes, and a backslash escapes the next
+character. A name of a rule starts with a letter or `_`, and holds
+letters, digits, `_` and `-`. A comment runs from `/*` to `*/`.
+
+The parts of EBNF:
+
+| Part | What zuzu draws |
+| --- | --- |
+| `a = ...`, `a ::= ...` | a rule |
+| `"text"`, `'text'` | a terminal |
+| a name, as `digit` | a nonterminal |
+| `? text ?` | a special |
+| `a b`, `a , b` | a sequence |
+| `a \| b` | a choice |
+| `( ... )` | a group |
+| `[ ... ]`, `a?` | an optional part |
+| `{ ... }`, `a*` | a repeat with a bypass |
+| `a+` | a repeat |
+| `a - b` | a sequence of `a`, a terminal `-` and `b`, as Mermaid draws an exception |
+
+A comment runs from `(*` to `*)`, or from `/*` to `*/`.
+
+The parts of ABNF:
+
+| Part | What zuzu draws |
+| --- | --- |
+| `"text"` | a terminal, with no escapes |
+| `%x41`, `%x41-5A`, `%d13.10` | a terminal with the value as its text |
+| a name, as `ALPHA` or `local-part` | a nonterminal |
+| `a b` | a sequence |
+| `a / b` | a choice |
+| `( ... )` | a group |
+| `[ ... ]`, `*1a` | an optional part |
+| `*a`, `0*5a` | a repeat with a bypass |
+| `1*a`, `2*5a`, `3a` | a repeat |
+
+The parts of PEG:
+
+| Part | What zuzu draws |
+| --- | --- |
+| `A <- ...` | a rule |
+| `"text"`, `'text'` | a terminal |
+| a name, as `Digit` | a nonterminal |
+| `.` | a special with the text `.` |
+| `a b` | a sequence |
+| `a / b` | a choice |
+| `( ... )` | a group |
+| `a?`, `a*`, `a+` | an optional part, a repeat with a bypass, a repeat |
+| `!a`, `&a` | a special with the text `!a` or `&a`. A part that is not a terminal, a nonterminal or a special shows as `(...)`, as `!(...)` |
+
+A comment runs from `#` to the end of the line.
+
+zuzu reads the tokens as the lexer of Mermaid 12.3 reads them. At each
+place, the first kind of token that matches wins: the keywords first, then
+`title`, `accTitle` and `accDescr`, then the names and the strings. This
+has effects that a reader does not expect, and zuzu keeps them:
+
+1. A name that starts with `title`, such as `titled`, reads as `title`
+   and a rule `d`.
+2. A keyword, such as `terminal`, is not a name, but `terminals` is.
+3. In EBNF, `b? c? ;` reads as `b` and a special `c`, because `? c?` is a
+   special sequence.
+4. In ABNF, a `;` with more text after it on its line starts a comment,
+   so `a = b ; c` is a rule with no end.
+
+These are errors, as in Mermaid: a part that the notation does not have,
+such as `[a-z]` in PEG, `=/` in ABNF or `'x'` in ABNF, a rule with no `;`,
+a rule with no definition, a call of `sequence` or `choice` with no part,
+a call of `optional`, `oneOrMore` or `zeroOrMore` with more than one part,
+a `title` after the first rule, two `!` or two `?` in a row in PEG, and a
+keyword with another case, such as `Railroad-beta`.
+
+Mermaid 12.3 reads these parts and draws nothing for them, so zuzu reads
+them with no issue (D32): the counts of a repeat of ABNF, so that `3DIGIT`
+draws as `1*DIGIT` does, and the settings `railroad.compactMode` and
+`railroad.showMarkers`. Mermaid draws the markers either way.
+
+zuzu lays out a railroad diagram in Go with the sizes of Mermaid 12.3,
+scaled by 11/16, because Mermaid draws its text at 16 pixels. The rules
+stack from top to bottom. Each rule has its name at the left, then a start
+marker, its track and an end marker. A box is as wide as its text, with
+the padding at each side. A sequence puts its parts in a row, with a space
+between two parts. A choice puts its alternatives one under another, each
+in the middle of the widest. Its track enters at the middle of the
+choice, and curves to each alternative. An optional part has a bypass
+over it. A repeat has a loop that runs back under it, and a bypass over it
+when it can be empty.
+
+zuzu reads these settings of `railroad`, in the pixels of Mermaid, which
+scale by 11/16:
+
+| Setting | What it sets | Default |
+| --- | --- | --- |
+| `padding` | the space between the text of a box and its outline | 10 |
+| `verticalSeparation` | the space between two alternatives, and between two rules | 8 |
+| `horizontalSeparation` | the space between two parts of a sequence | 10 |
+| `arcRadius` | the radius of the curves of the tracks | 10 |
+| `markerRadius` | the radius of a start or an end marker | 5 |
+
+A value that is not a number of 0 or more is an issue, and the size takes
+the default. The other settings of `railroad`, such as `terminalFill` or
+`fontSize`, are issues, and so are the colors of `themeVariables`. The four
+notations read the section `railroad`. The key `config` of a directive
+sets the section `railroadEbnf`, `railroadAbnf` or `railroadPeg` in the
+other three notations, as "Every kind" says, and Mermaid does not read
+those sections.
+
+zuzu draws some railroad diagrams in another way than Mermaid 12.3.0:
+
+1. Mermaid draws no title. zuzu draws the `title` of the diagram, or else
+   the `title` of the front matter.
+2. Mermaid cleans a text with `<` in it as HTML, and draws `<` as `&lt;`.
+   zuzu draws the text as the source gives it, and reads an entity, such as
+   `#quot;`.
+3. zuzu removes the spaces at the end of a line before it reads the line.
+   So in ABNF, a `;` with only spaces after it ends the rule, and Mermaid
+   reads it as the start of a comment.
+4. zuzu measures the text in the size of zuzu, so the boxes are smaller
+   than in Mermaid.
+
+The look is the look of zuzu. A nonterminal, a terminal and a special take
+the first three colors of the category scheme, as Mermaid colors them by
+kind. Each box has a tint of its color and an outline in its color. A
+terminal has round corners, and a special has a dashed outline. A text
+with only spaces draws an empty box, as in Mermaid. The name of a rule is
+bold. The tracks and the markers take the color `edge`.
 
 ### Other kinds
 

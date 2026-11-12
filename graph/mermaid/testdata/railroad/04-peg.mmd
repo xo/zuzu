@@ -1,0 +1,8 @@
+railroad-peg-beta
+title "Identifiers (keywords excluded)"
+
+# A comment of PEG runs to the end of the line.
+Identifier <- !Keyword Letter (Letter / Digit)* ;
+Keyword <- ("if" / "else" / "while") !Letter ;
+Letter <- "a" / "b" / "_" ;
+Digit <- &"0" . / "1"+ / "2"? ;

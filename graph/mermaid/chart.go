@@ -74,6 +74,8 @@ var charts = map[string]compiler{
 	"kanban":            kanbanChart,
 	"packet":            packetChart,
 	"packet-beta":       packetChart,
+
+	rrIR: railroadChart, rrEBNF: railroadChart, rrABNF: railroadChart, rrPEG: railroadChart,
 }
 
 // IsChart reports whether a kind of diagram is a chart that Chart
