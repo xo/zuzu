@@ -73,8 +73,11 @@ is in `docs/BACKLOG.md`.
    words that it holds in Mermaid. The ratio is 11/14 for most kinds, and
    11/16 for a timeline, whose labels Mermaid draws at 16 pixels. In a kind
    whose labels have more than one size, each label takes the ratio of its
-   own size: a message of a sequence wraps at 11/16, and a use case at
-   11/12.
+   own size, such as 11/12 for a use case. A ratio comes from the font and
+   the size that mmdc measures with, and not only from the sizes that
+   Mermaid names. mmdc measures each label of a sequence diagram at 16
+   pixels in Times New Roman, which is as wide as 14.5 pixels of IBM Plex
+   Sans, so a sequence diagram wraps at 11/14.5.
 
 ## The look
 

@@ -115,10 +115,13 @@ func parseClick(word, rest string, line int) (click, error) {
 }
 
 // applyClicks gives each node that a click names its link and its tooltip.
-// node returns the node of an id, or nil. A callback, a target and a link
-// with a scheme that zuzu does not write are issues. Mermaid binds a click
-// only to a node, so zuzu skips an id that names no node with no issue, and
-// a click that names no node at all draws nothing and is no issue (D32).
+// node returns the node of an id, or nil. A target and a link with a
+// scheme that zuzu does not write are issues. A callback is no issue: the
+// default securityLevel of Mermaid, strict, binds no callback, so Mermaid
+// draws nothing for it, and its tooltip still fills the tooltip (D32).
+// Mermaid binds a click only to a node, so zuzu skips an id that names no
+// node with no issue, and a click that names no node at all draws nothing
+// and is no issue (D32).
 func applyClicks(is *graph.Issues, clicks []click, node func(id string) *graph.Node) error {
 	for _, c := range clicks {
 		var nodes []*graph.Node
@@ -131,11 +134,6 @@ func applyClicks(is *graph.Issues, clicks []click, node func(id string) *graph.N
 			continue
 		}
 		path := fmt.Sprintf("line %d", c.line)
-		if c.callback != "" {
-			if err := is.Add(path, "the callback %s, since no script runs", c.callback); err != nil {
-				return err
-			}
-		}
 		if c.target != "" {
 			if err := is.Add(path, "the target %s of a link", c.target); err != nil {
 				return err

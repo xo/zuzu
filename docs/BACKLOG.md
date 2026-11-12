@@ -191,6 +191,9 @@ example of the documents of Mermaid whose kind is `...`.
     the math, zuzu needs a renderer of math, and that needs a decision.
 15. zuzu reads `text: a, b` in the body of a requirement, and Mermaid gives
     an error of the parse at the comma.
+16. A sequence diagram decodes `#lt;br#gt;` into `<br>` and then starts a
+    new line there. Mermaid draws the text `<br>`.
+
 
 ### Draw more of Mermaid
 

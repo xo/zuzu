@@ -722,7 +722,9 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 		return classStyle(classes, cls, st), nil
 	}
 	w := labelWrap(d.Config, g)
-	wrap := scaleWrap(d.Kind, cfg.wrap)
+	// Mermaid draws an actor and a note at 14 pixels and a use case at
+	// 12, so the label of each wraps at the ratio of its own size (D32).
+	wrap, caseWrap := scaleWrap(d.Kind, "", cfg.wrap), scaleWrap(d.Kind, labelUsecase, cfg.wrap)
 	under := func(st, more map[string]string) {
 		for k, v := range more {
 			if _, ok := st[k]; !ok {
@@ -785,12 +787,12 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 			shape = "businessEllipse"
 		}
 		g.Nodes = append(g.Nodes, &graph.Node{ID: s.id, Label: t, Shape: shape, Cluster: s.parent, Style: st,
-			Wrap: w.width(wrap, s.label.markdown), MinWidth: scaleWrap(d.Kind, cfg.minWidth+2*pad)})
+			Wrap: w.width(caseWrap, s.label.markdown), MinWidth: scaleWrap(d.Kind, labelUsecase, cfg.minWidth+2*pad)})
 	}
 	for i, n := range m.notes {
 		t, font := ucText(n.label)
 		g.Nodes = append(g.Nodes, &graph.Node{ID: "note-" + strconv.Itoa(i), Label: t, Shape: "note", Style: fontStyle(font),
-			Wrap: w.width(wrap, n.label.markdown), MinWidth: scaleWrap(d.Kind, cfg.minWidth+20)})
+			Wrap: w.width(wrap, n.label.markdown), MinWidth: scaleWrap(d.Kind, "", cfg.minWidth+20)})
 	}
 	for _, id := range m.byFirst(slices.Collect(maps.Keys(m.jsons))) {
 		j := m.jsons[id]
@@ -880,7 +882,7 @@ func (m *ucModel) edge(e *ucEdge, classes map[string]map[string]string, addf fun
 		}
 	}
 	if ge.Label != "" {
-		ge.Wrap = scaleWrap("usecase-beta", edgeWrap)
+		ge.Wrap = scaleWrap("usecase-beta", "", edgeWrap)
 	}
 	// Mermaid moves the dash of an animated edge, and zuzu draws one still
 	// frame of it (D32).

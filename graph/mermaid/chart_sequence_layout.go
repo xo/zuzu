@@ -23,10 +23,15 @@ type seqConfig struct {
 	activationWidth, minWidth, minHeight, wrapPadding                float64
 	labelBoxWidth, labelBoxHeight, marginX, marginY                  float64
 
-	// wrapWidth is the width at which a message, a note and the label of
-	// a box wrap, and actorWrap the width at which the label of a
-	// participant wraps, both in the pixels of zuzu.
-	wrapWidth, actorWrap float64
+	// messageWrap is the width at which a message and the label of a
+	// frame wrap, noteWrap the width at which a note wraps, and actorWrap
+	// the width at which the label of a participant wraps, each in the
+	// pixels of zuzu. Mermaid draws a message and a frame at 16 pixels, and
+	// a note and a participant at 14, so each scales by its own size (D32).
+	messageWrap, noteWrap, actorWrap float64
+	// mermaid holds the settings that the model of Mermaid reads, which
+	// gives the width at which each message, note and frame wraps.
+	mermaid seqMermaid
 
 	messageAlign, noteAlign string
 
@@ -115,8 +120,10 @@ func (c *chart) sequenceSettings() (seqConfig, error) {
 		noteFont:        font("note", 11, 400),
 	}
 	width := num("width", 150)
-	s.wrapWidth = scaleWrap(c.d.Kind, width)
-	s.actorWrap = scaleWrap(c.d.Kind, width-2*s.wrapPadding)
+	s.mermaid = seqMermaid{width: width, actorMargin: num("actorMargin", 50), labelBoxWidth: num("labelBoxWidth", 50)}
+	s.messageWrap = scaleWrap(c.d.Kind, labelMessage, width)
+	s.noteWrap = scaleWrap(c.d.Kind, "", width)
+	s.actorWrap = scaleWrap(c.d.Kind, "", width-2*s.wrapPadding)
 	if w, ok := cfg["wrap"].(bool); ok {
 		s.wrap = w
 	}
@@ -163,6 +170,10 @@ type seqLayout struct {
 	acts map[string][]float64
 	// frames are the open blocks.
 	frames []*seqFrame
+	// wrap is the width in the pixels of zuzu at which the label of each
+	// message, note and frame wraps, by the index of its event, from the
+	// model of Mermaid.
+	wrap map[int]float64
 	// numbers reports whether the messages show their number, and number
 	// and step are the next number and its step.
 	numbers      bool
@@ -173,14 +184,16 @@ type seqLayout struct {
 type seqFrame struct {
 	block, fill string
 	text        seqText
-	y0, x0, x1  float64
-	sections    []seqPart
+	// wrap is the width at which its label wraps.
+	wrap       float64
+	y0, x0, x1 float64
+	sections   []seqPart
 }
 
 // seqPart is a section of a block: its y and its text.
 type seqPart struct {
-	y    float64
-	text seqText
+	y, wrap float64
+	text    seqText
 }
 
 // newSeqLayout lays out a sequence diagram.
@@ -201,6 +214,7 @@ func newSeqLayout(s *sequence, cfg seqConfig) *seqLayout {
 		l.w = append(l.w, w)
 		l.hh = math.Max(l.hh, h)
 	}
+	l.wrap = l.seqWraps()
 	l.place()
 	l.draw()
 	return l
@@ -212,32 +226,28 @@ func lh(f text.Font) float64 {
 }
 
 // lines returns the lines of a text, wrapped to a width when the text or
-// the diagram asks for it.
+// the diagram asks for it. A text wraps as wrapLabel of Mermaid wraps it:
+// a word goes on a new line when the width of the line and the width of
+// the word, without the space between them, reach the width. A text with
+// a break in it, such as <br>, does not wrap, as in Mermaid.
 func (l *seqLayout) lines(t seqText, f text.Font, width float64) []string {
-	wrap := l.cfg.wrap
-	if t.wrap != nil {
-		wrap = *t.wrap
-	}
-	if !wrap {
+	if !l.wraps(t) || len(t.lines) != 1 {
 		return t.lines
 	}
 	var out []string
-	for _, line := range t.lines {
-		cur := ""
-		for word := range strings.FieldsSeq(line) {
-			next := word
-			if cur != "" {
-				next = cur + " " + word
-			}
-			if cur != "" && l.m.Width(f, next) > width {
-				out = append(out, cur)
-				next = word
-			}
-			cur = next
+	cur := ""
+	for word := range strings.FieldsSeq(t.lines[0]) {
+		if cur != "" && l.m.Width(f, cur)+l.m.Width(f, word) >= width {
+			out = append(out, cur)
+			cur = word
+			continue
 		}
-		out = append(out, cur)
+		if cur != "" {
+			cur += " "
+		}
+		cur += word
 	}
-	return out
+	return append(out, cur)
 }
 
 // size returns the width and the height of lines of text.
@@ -336,7 +346,7 @@ func (l *seqLayout) place() {
 			if !ok1 || !ok2 {
 				continue
 			}
-			tw, _ := l.size(l.cfg.messageFont, l.lines(e.text, l.cfg.messageFont, l.cfg.wrapWidth))
+			tw, _ := l.size(l.cfg.messageFont, l.lines(e.text, l.cfg.messageFont, l.wrapOf(k, l.cfg.messageWrap)))
 			if i == j {
 				if i+1 < n {
 					needs = append(needs, need{i, i + 1, math.Max(tw+16, 44) + 2*aw})
@@ -363,7 +373,7 @@ func (l *seqLayout) place() {
 			if !ok1 || !ok2 {
 				continue
 			}
-			nw, _ := l.noteSize(e)
+			nw, _ := l.noteSize(k, e)
 			switch {
 			case e.place == "right" && i+1 < n:
 				needs = append(needs, need{i, i + 1, nw + 24 + aw})
@@ -402,9 +412,9 @@ func (l *seqLayout) place() {
 	}
 }
 
-// noteSize returns the size of a note.
-func (l *seqLayout) noteSize(e seqEvent) (float64, float64) {
-	tw, th := l.size(l.cfg.noteFont, l.lines(e.text, l.cfg.noteFont, l.cfg.wrapWidth))
+// noteSize returns the size of the note of event k.
+func (l *seqLayout) noteSize(k int, e seqEvent) (float64, float64) {
+	tw, th := l.size(l.cfg.noteFont, l.lines(e.text, l.cfg.noteFont, l.wrapOf(k, l.cfg.noteWrap)))
 	return math.Max(tw+2*l.cfg.noteMargin, 40), th + 1.4*l.cfg.noteMargin
 }
 
@@ -623,7 +633,7 @@ func (l *seqLayout) draw() {
 		case "message":
 			y = l.message(k, e, y, start, end)
 		case "note":
-			y = l.note(e, y)
+			y = l.note(k, e, y)
 		case "activate":
 			if _, ok := l.idx[e.from]; ok {
 				l.activate(e.from, y)
@@ -634,19 +644,19 @@ func (l *seqLayout) draw() {
 			}
 		case "start":
 			y += l.gap() * 0.6
-			f := &seqFrame{block: e.block, fill: e.fill, text: e.text, y0: y, x0: math.Inf(1), x1: math.Inf(-1)}
+			f := &seqFrame{block: e.block, fill: e.fill, text: e.text, wrap: l.wrapOf(k, 0), y0: y, x0: math.Inf(1), x1: math.Inf(-1)}
 			l.frames = append(l.frames, f)
 			if e.block == "rect" {
 				y += 2
 			} else {
-				_, th := l.size(l.cfg.messageFont, l.lines(e.text, l.cfg.messageFont, l.cfg.wrapWidth))
+				_, th := l.size(l.cfg.messageFont, l.frameLines(e.text, l.cfg.messageFont, f.wrap))
 				y += math.Max(l.cfg.labelBoxHeight, th+2*l.cfg.boxTextMargin)
 			}
 		case "section":
 			y += l.gap() * 0.6
 			f := l.frames[len(l.frames)-1]
-			f.sections = append(f.sections, seqPart{y: y, text: e.text})
-			_, th := l.size(l.cfg.messageFont, l.lines(e.text, l.cfg.messageFont, l.cfg.wrapWidth))
+			f.sections = append(f.sections, seqPart{y: y, wrap: l.wrapOf(k, 0), text: e.text})
+			_, th := l.size(l.cfg.messageFont, l.frameLines(e.text, l.cfg.messageFont, l.wrapOf(k, 0)))
 			y += math.Max(th+2*l.cfg.boxTextMargin, 6)
 		case "end":
 			y += l.gap() * 0.6
@@ -732,7 +742,7 @@ func (l *seqLayout) message(k int, e seqEvent, y float64, start, end []float64) 
 		return y
 	}
 	f := l.cfg.messageFont
-	lines := l.lines(e.text, f, l.cfg.wrapWidth)
+	lines := l.lines(e.text, f, l.wrapOf(k, l.cfg.messageWrap))
 	_, th := l.size(f, lines)
 	lineY := y + l.gap() + th + 4
 	if len(lines) == 0 {
@@ -922,16 +932,16 @@ func (l *seqLayout) badge(x, y float64) {
 	l.add("badges", map[string]any{"kind": "number", "x": x, "y": y, "size": 4 * r * r, "text": n}, x-r, x+r, y+r)
 }
 
-// note draws a note at a y, and returns the y below it.
-func (l *seqLayout) note(e seqEvent, y float64) float64 {
+// note draws the note of event k at a y, and returns the y below it.
+func (l *seqLayout) note(k int, e seqEvent, y float64) float64 {
 	i, ok1 := l.idx[e.from]
 	j, ok2 := l.idx[e.to]
 	if !ok1 || !ok2 {
 		return y
 	}
 	f := l.cfg.noteFont
-	lines := l.lines(e.text, f, l.cfg.wrapWidth)
-	nw, nh := l.noteSize(e)
+	lines := l.lines(e.text, f, l.wrapOf(k, l.cfg.noteWrap))
+	nw, nh := l.noteSize(k, e)
 	top := y + l.gap()*0.6
 	var x0 float64
 	switch {
@@ -990,11 +1000,11 @@ func (l *seqLayout) closeFrame(y float64) {
 	kw, _ := l.size(kf, []string{word})
 	tabW := math.Max(kw+16, l.cfg.labelBoxWidth)
 	tabH := l.cfg.labelBoxHeight
-	cond := l.lines(f.text, mf, l.cfg.wrapWidth)
+	cond := l.frameLines(f.text, mf, f.wrap)
 	cw, _ := l.size(mf, bracket(cond))
 	need := tabW + 12 + cw + 12
 	for _, s := range f.sections {
-		sw, _ := l.size(mf, bracket(l.lines(s.text, mf, l.cfg.wrapWidth)))
+		sw, _ := l.size(mf, bracket(l.frameLines(s.text, mf, s.wrap)))
 		need = math.Max(need, sw+24)
 	}
 	x1 = math.Max(x1, x0+need)
@@ -1004,7 +1014,7 @@ func (l *seqLayout) closeFrame(y float64) {
 	l.textRow("condLabels", "condition", bracket(cond), mf, x0+tabW+10, f.y0+l.cfg.boxTextMargin, "left", "top")
 	for _, s := range f.sections {
 		l.add("dividers", map[string]any{"kind": "divider", "x": x0, "x2": x1, "y": s.y}, x0, x1, s.y)
-		l.textRow("condLabels", "condition", bracket(l.lines(s.text, mf, l.cfg.wrapWidth)), mf, x0+10, s.y+l.cfg.boxTextMargin, "left", "top")
+		l.textRow("condLabels", "condition", bracket(l.frameLines(s.text, mf, s.wrap)), mf, x0+10, s.y+l.cfg.boxTextMargin, "left", "top")
 	}
 }
 

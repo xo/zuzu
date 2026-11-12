@@ -231,22 +231,46 @@ const (
 // wrapSize is the size in pixels at which zuzu draws a label that wraps.
 const wrapSize = 11
 
-// mermaidSizes are the sizes in pixels at which Mermaid 12.3 draws and
-// measures the labels that wrap in a kind of diagram, for each kind where
-// the size is not 14. A timeline and a mindmap draw their labels at 16.
-var mermaidSizes = map[string]float64{
-	"timeline": 16,
-	"mindmap":  16,
+// The labels of a kind of diagram that Mermaid 12.3 draws at a size of
+// their own, for scaleWrap. Each other label of a kind takes the size of
+// the kind.
+const (
+	// labelMessage is the text of a message of a sequence diagram, and
+	// the label of a frame, such as loop or alt, which Mermaid draws in the
+	// font of a message.
+	labelMessage = "message"
+	// labelUsecase is the label of a use case of a use case diagram.
+	labelUsecase = "usecase"
+)
+
+// mermaidSizes are the sizes in pixels, in the measure of IBM Plex Sans,
+// at which mmdc measures the labels that wrap, by kind of diagram and by
+// label, where the size is not 14. The label "" is each label of the kind
+// that the map does not name. A timeline and a mindmap draw their labels
+// at 16. A use case diagram draws a use case at 12, and an actor at 14.
+// mmdc measures every label of a sequence diagram at 16 pixels in Times
+// New Roman, which is as wide as 14.5 pixels of the font of zuzu (D32).
+var mermaidSizes = map[string]map[string]float64{
+	"timeline":        {"": 16},
+	"mindmap":         {"": 16},
+	"sequenceDiagram": {"": 14.5},
+	"usecase-beta":    {labelUsecase: 12},
 }
 
 // scaleWrap returns the width in the pixels of zuzu of a width at which
-// Mermaid wraps a label of a kind of diagram. zuzu draws a label at 11
-// pixels, and Mermaid at 14 in most kinds, so the width scales by 11/14,
-// and a line holds the words that it holds in Mermaid (D32). The width of
-// a kind in mermaidSizes scales by 11 over its size, such as 11/16 for a
-// timeline. Each width of Mermaid that wraps a label goes through it.
-func scaleWrap(kind string, w float64) float64 {
-	size, ok := mermaidSizes[kind]
+// Mermaid wraps a label of a kind of diagram. label names the label, such
+// as labelMessage, or is "" for the labels of the kind. zuzu draws a label
+// at 11 pixels, and Mermaid at 14 in most kinds, so the width scales by
+// 11/14, and a line holds the words that it holds in Mermaid (D32). A
+// label in mermaidSizes scales by 11 over its own size, such as 11/16 for a
+// timeline and 11/14.5 for a sequence diagram. Each width of Mermaid
+// that wraps a label goes through it.
+func scaleWrap(kind, label string, w float64) float64 {
+	sizes := mermaidSizes[kind]
+	size, ok := sizes[label]
+	if !ok {
+		size, ok = sizes[""]
+	}
 	if !ok {
 		size = 14
 	}
@@ -298,7 +322,7 @@ func wrapGraph(d *Diagram, g *graph.Graph, node float64) {
 		n.Wrap = node
 	}
 	for _, e := range g.Edges {
-		e.Wrap = scaleWrap(d.Kind, edgeWrap)
+		e.Wrap = scaleWrap(d.Kind, "", edgeWrap)
 	}
 }
 
@@ -311,14 +335,14 @@ func wrapSetting(is *graph.Issues, d *Diagram, def float64, section, key string)
 	v, ok := configNumber(cfg, section, key)
 	if !ok {
 		if m, _ := cfg[section].(map[string]any); m != nil && m[key] != nil {
-			return scaleWrap(d.Kind, def), is.Add("config", "the setting %s.%s: %v", section, key, m[key])
+			return scaleWrap(d.Kind, "", def), is.Add("config", "the setting %s.%s: %v", section, key, m[key])
 		}
-		return scaleWrap(d.Kind, def), nil
+		return scaleWrap(d.Kind, "", def), nil
 	}
 	if !(v > 0) {
-		return scaleWrap(d.Kind, def), is.Add("config", "the setting %s.%s: %v", section, key, v)
+		return scaleWrap(d.Kind, "", def), is.Add("config", "the setting %s.%s: %v", section, key, v)
 	}
-	return scaleWrap(d.Kind, v), nil
+	return scaleWrap(d.Kind, "", v), nil
 }
 
 // css reads a style of CSS of a class or a node, as fill:#f9f,stroke:#333,

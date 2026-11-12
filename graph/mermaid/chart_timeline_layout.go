@@ -108,7 +108,7 @@ func (l *tlLayout) key(g, n int) string {
 
 // box measures a text that wraps at a width in the pixels of Mermaid.
 func (l *tlLayout) box(s string, f text.Font, wrap float64) tlBox {
-	lines, _ := plainLines(s, f.Size, f.Weight, scaleWrap("timeline", wrap), l.m)
+	lines, _ := plainLines(s, f.Size, f.Weight, scaleWrap("timeline", "", wrap), l.m)
 	return tlBox{lines: lines, h: math.Max(tlMinH, float64(len(lines))*lh(f)+2*tlPadY)}
 }
 
@@ -139,12 +139,12 @@ func (l *tlLayout) horizontal() {
 		yPeriod = hs + tlGap
 	}
 	axisY := yPeriod + hp + tlAxisGap
-	step, w := scaleWrap("timeline", tlStep), scaleWrap("timeline", tlBoxLR)
+	step, w := scaleWrap("timeline", "", tlStep), scaleWrap("timeline", "", tlBoxLR)
 	x, n := 0.0, 0
 	for gi, g := range l.t.groups {
 		if g.header {
 			b := l.box(g.name, tlBoldFont, tlStep*span(g)-50)
-			l.rect("section", "s"+strconv.Itoa(gi), l.key(gi, n), b, x, 0, scaleWrap("timeline", tlStep*span(g)-10), hs)
+			l.rect("section", "s"+strconv.Itoa(gi), l.key(gi, n), b, x, 0, scaleWrap("timeline", "", tlStep*span(g)-10), hs)
 		}
 		for pi, p := range g.periods {
 			id := "p" + strconv.Itoa(n)
@@ -172,9 +172,9 @@ func (l *tlLayout) horizontal() {
 // timeline, then a row for each period, the period left of the axis and
 // its events right of it.
 func (l *tlLayout) vertical() {
-	pw, ew := scaleWrap("timeline", tlPeriodTD), scaleWrap("timeline", tlEventTD)
-	axisX := pw + scaleWrap("timeline", tlLeftGap)
-	ex := axisX + scaleWrap("timeline", tlRightGap)
+	pw, ew := scaleWrap("timeline", "", tlPeriodTD), scaleWrap("timeline", "", tlEventTD)
+	axisX := pw + scaleWrap("timeline", "", tlLeftGap)
+	ex := axisX + scaleWrap("timeline", "", tlRightGap)
 	sw := ex + ew
 	sectionWrap := tlPeriodTD + tlLeftGap + tlRightGap + tlEventTD - 10
 	hs, hp := l.heights(func(*tlGroup) float64 { return sectionWrap }, tlPeriodWrap)

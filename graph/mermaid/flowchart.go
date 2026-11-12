@@ -78,7 +78,7 @@ func newFlowchart(d *Diagram, strict bool) *flowchart {
 		nodes: map[string]*graph.Node{}, classes: map[string]map[string]string{}, nodeClasses: map[string][]string{},
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
-		nodeWrap: scaleWrap(d.Kind, nodeWrap), markdown: map[string]bool{}, edgeClasses: map[string][]string{},
+		nodeWrap: scaleWrap(d.Kind, "", nodeWrap), markdown: map[string]bool{}, edgeClasses: map[string][]string{},
 		collapsed: map[string]int{}, animated: map[*graph.Edge]bool{}, animClasses: map[string]int{},
 	}
 }
@@ -968,6 +968,10 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 			} else {
 				delete(f.collapsed, n.ID)
 			}
+		case "algorithm":
+			// algorithm picks an ELK layout for one subgraph. It is a hint,
+			// as layout: elk is, so zuzu lays the subgraph out in its own
+			// layered layout with no issue (D32).
 		default:
 			if err := f.add("the property %s of a node", k); err != nil {
 				return err
@@ -1076,7 +1080,7 @@ func inlineMap(body string) map[string]string {
 func (f *flowchart) edge(a, b string, l *link, id string) {
 	e := &graph.Edge{
 		Source: a, Target: b, Label: l.text, MinLen: l.minlen, Head: l.head, Tail: l.tail, Style: map[string]string{}, Curve: f.curve,
-		Wrap: f.wrap.width(scaleWrap(f.d.Kind, edgeWrap), l.markdown),
+		Wrap: f.wrap.width(scaleWrap(f.d.Kind, "", edgeWrap), l.markdown),
 	}
 	switch l.kind {
 	case "thick":

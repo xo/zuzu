@@ -64,7 +64,7 @@ func (p *c4Diagram) measure(e *c4Elem) {
 	}
 	limit := 0.0
 	if p.c4wrap {
-		limit = scaleWrap(p.c.d.Kind, max(wrapW, 32))
+		limit = scaleWrap(p.c.d.Kind, "", max(wrapW, 32))
 	}
 	e.texts = nil
 	if e.label != "" {
@@ -184,7 +184,7 @@ func (p *c4Diagram) inside(parent *c4Bounds, list []*c4Boundary) {
 		}
 		limit := 0.0
 		if p.wrap && p.c4wrap {
-			limit = scaleWrap(p.c.d.Kind, cur.limit)
+			limit = scaleWrap(p.c.d.Kind, "", cur.limit)
 		}
 		bd.texts = nil
 		add := func(s string, size float64, weight int, gap float64) {

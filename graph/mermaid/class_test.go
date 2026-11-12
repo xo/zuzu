@@ -217,7 +217,9 @@ func TestClassStyles(t *testing.T) {
 	for _, r := range report {
 		msgs = append(msgs, r.Message)
 	}
-	if got := strings.Join(msgs, ", "); got != "the callback fn, since no script runs" {
+	// Mermaid binds no callback in its default securityLevel, strict, so
+	// a callback is no issue (D32).
+	if got := strings.Join(msgs, ", "); got != "" {
 		t.Errorf("unexpected report %q", got)
 	}
 	for _, id := range []string{"Animal", "Mineral"} {

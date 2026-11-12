@@ -467,7 +467,10 @@ like Excalidraw and one like xkcd, and an ELK layout are work for later. The oth
 as `classic` and `neo`, draw in the look of zuzu too. The other ELK
 layouts of Mermaid 12.3, `elk.stress`, `elk.force`, `elk.mrtree`,
 `elk.sporeOverlap`, `elk.box` and `elk.rectpacking`, and the section `elk`
-of the config, which holds the settings of ELK, are hints too. Every kind
+of the config, which holds the settings of ELK, are hints too. So is the
+property `algorithm` of a node, such as `grp@{ algorithm: elk.box }`, which
+picks an ELK layout for one subgraph. zuzu lays the subgraph out in its own
+layered layout, with no issue, whatever the value. Every kind
 accepts `layout: dagre`, the default layout of Mermaid, with no issue.
 Another layout, such as `elk.layered` or `tidy-tree`, is an issue. A
 swimlane diagram and a flowchart accept `layout: swimlane`, as "Swimlane
@@ -790,9 +793,8 @@ Without `inheritDir`, a subgraph with no direction takes the direction of
 the subgraph that holds it, as the subgraphs above say. With
 `inheritDir: true`, it takes the direction of the flowchart, as in Mermaid.
 
-These parts are issues: a callback of `click` and the target of a link, as
-"Links and tooltips" says, a statement that starts with `callback` or
-`href`, a `theme` that Mermaid does not have and the `themeVariables`,
+These parts are issues: the target of a link, as "Links and tooltips"
+says, a statement that starts with `callback` or `href`, a `theme` that Mermaid does not have and the `themeVariables`,
 which draw in the look of zuzu, the other settings of the section `flowchart`, such as
 `minNodeWidth`, and any other style, such as `animation` on a node.
 
@@ -968,8 +970,9 @@ zuzu draws each part in its own look:
 | a namespace with dots in its name | a cluster for each part of the name, each in the one before it, with its part as its title |
 | a note | a node of the shape note. A note for a class has a dotted line from the note to the class |
 
-The ends of a relation draw at 1.4 times the size of an arrowhead of a
-flowchart, so that the marks of UML read at the size of a label. The
+The ends of a relation draw at 1.05 times the size of an arrowhead of a
+flowchart, so that the marks of UML read at the size of a label. This is
+the size that they had before the arrowheads of zuzu grew (D32). The
 layout puts the class on the left of a relation in the rank before the
 class on the right, as Mermaid does. A class that a `class` statement
 names inside a namespace moves into it. `classDef`, `cssClass`, `:::` and
@@ -986,7 +989,7 @@ with its whole name as its title, as Mermaid does.
 A class takes a link and a tooltip from `click`, `link` and `callback`, as
 "Links and tooltips" says.
 
-These parts are issues: a callback, the settings of
+These parts are issues: the target of a link, the settings of
 the section `class` of the config other than `hideEmptyMembersBox` and
 `hierarchicalNamespaces`, a `theme` that Mermaid does not have, the
 `themeVariables`, and a style that a flowchart does not read.
@@ -1035,8 +1038,9 @@ zuzu draws each part in its own look:
 | a subgraph | a cluster with its title |
 
 Each row of an attribute has a port with the name of the attribute. The
-ends of a relationship draw at 1.4 times the size of an arrowhead of a
-flowchart. The cardinality `u` of Mermaid draws no mark in Mermaid 12, so
+ends of a relationship draw at 1.05 times the size of an arrowhead of a
+flowchart, the size that they had before the arrowheads of zuzu grew
+(D32). The cardinality `u` of Mermaid draws no mark in Mermaid 12, so
 zuzu reads it and draws no mark either. A relationship to the id of a
 subgraph ends at its box. An entity that a subgraph names on a line of
 its own, or with its attributes, moves into the subgraph. `classDef`,
@@ -1113,7 +1117,7 @@ zuzu draws each part in its own look:
 
 Mermaid writes a kind and the type of a relation between `<<` and `>>`.
 zuzu writes them between guillemets, as it does for a class. The ends of a
-relation draw at 1.4 times the size of an arrowhead of a flowchart. Mermaid
+relation draw at 1.05 times the size of an arrowhead of a flowchart. Mermaid
 draws no line between the two parts of a box when its body holds only a
 method of verification or only a reference. zuzu draws the line.
 
@@ -1251,8 +1255,8 @@ for each flow. zuzu draws every kind in the color of the scheme.
 
 These parts are issues: a `theme` that Mermaid does not have, the
 `themeVariables`, which draw in the look of zuzu, the other settings of
-the sections `agentflow` and `flowchart`, a callback of `click` and the target of a
-link, and a style that a flowchart does not read.
+the sections `agentflow` and `flowchart`, the target of a link, and a
+style that a flowchart does not read.
 
 ### Use case diagram
 
@@ -1358,9 +1362,11 @@ zuzu reads these settings of `usecase`:
 1. `nodeSpacing`, `rankSpacing` and `diagramPadding`, which zuzu reads as
    those of a flowchart.
 2. `wrappingWidth`, 120 by default, where the label of an actor, a use
-   case or a note wraps.
+   case or a note wraps. Mermaid draws a use case at 12 pixels, and an
+   actor and a note at 14. So the width scales by 11/12 for a use case,
+   and by 11/14 for an actor and a note, as "Labels that wrap" says (D32).
 3. `minNodeWidth`, 120 by default, the least width of the label of a use
-   case or a note.
+   case or a note. It scales by the same ratio as the label.
 4. `actorFontSize`, `actorFontWeight`, `usecaseFontSize` and
    `usecaseFontWeight`. A size is in pixels, and the default sizes are
    those of the look of zuzu, which are smaller than those of Mermaid.
@@ -1503,7 +1509,7 @@ These parts are issues, as in a flowchart: a `theme` that Mermaid does
 not have, the `themeVariables` and the `themeCSS`, which draw in the look
 of zuzu, the other settings of the section `flowchart`, such as
 `minNodeWidth`, the other settings of the section `swimlane`, such as
-`swimlane.theme`, and a callback of `click`.
+`swimlane.theme`, and the target of a link.
 
 ### Links and tooltips
 
@@ -1526,8 +1532,13 @@ the link, and a tooltip fills the tooltip. The SVG writes the link as an
 `<a href>` around the shape and the label of the node, and the tooltip as a
 `<title>` inside them. The image of `Image` draws neither.
 
-These parts are issues: a callback, because no script runs (D32), a
-target, which the SVG does not write, and a link with a scheme that zuzu
+A callback, such as `click A callback`, `click A call callback(arg)` or
+`callback A "callback"`, is no issue. Mermaid binds no callback in its
+default `securityLevel`, `strict`, so it draws nothing for one, and zuzu
+does the same (D32). The tooltip of such a statement still fills the
+tooltip.
+
+These parts are issues: a target, which the SVG does not write, and a link with a scheme that zuzu
 does not write, such as `javascript:`. Mermaid writes the target in the
 `<a>` of its SVG, so a click on the node opens the link in another window.
 The SVG of zuzu holds the link and not the target, so the link opens in
@@ -1589,7 +1600,17 @@ a sequence diagram, for `journey.maxLabelWidth` and for the texts of a C4
 diagram. Mermaid 12.3 draws the labels of a timeline and of a mindmap at
 16 pixels, so the widths of a timeline and `mindmap.maxNodeWidth` scale
 by 11/16. A width of 200 in a timeline or a mindmap wraps at 137.5 pixels
-in zuzu. The ratio of each kind is in `mermaidSizes`, in
+in zuzu. In a kind whose labels have more than one size in Mermaid, each
+label takes the ratio of its own size (D32). A ratio comes from the font
+and the size that mmdc measures with. mmdc measures each label of a
+sequence diagram at 16 pixels in Times New Roman, because the family of
+fonts of Mermaid ends in a semicolon that makes it invalid. That text is
+as wide as 14.5 pixels of IBM Plex Sans, so each label of a sequence
+diagram wraps at 11/14.5 of its width in Mermaid, as "Sequence diagram"
+says. A use case diagram draws a use case
+at 12 pixels, and an actor and a note at 14. So the label of a use case
+wraps at 11/12 of `usecase.wrappingWidth`, and an actor at 11/14. The
+ratio of each kind and of each such label is in `mermaidSizes`, in
 `graph/mermaid/style.go`. A node of zuzu fits its widest line. Mermaid
 makes the box of a label that wraps as wide as the width. DOT does not
 wrap a label.
@@ -1936,10 +1957,42 @@ Mermaid. A line with an alias gives it a new kind and a new label.
 | `#35;`, `#infin;` | the character of the entity code. `#59;` puts a semicolon in a text |
 
 A semicolon ends a statement. The text of a message, a note or a label can
-start with `wrap:` or `nowrap:`. A text that wraps wraps at
-`sequence.width`, 150 by default, scaled by 11/14, as "Labels that wrap"
-says. The name of a participant wraps at `sequence.width` less
-`sequence.wrapPadding` on each side, scaled in the same way.
+start with `wrap:` or `nowrap:`. A text wraps where Mermaid 12.3 wraps it
+(D32). Mermaid does not wrap each text at `sequence.width`. The width of
+each text comes from where Mermaid puts its participants, and zuzu puts
+them in another place. So zuzu works out the places of the participants
+as Mermaid does, in the pixels of Mermaid, and takes these widths from
+them:
+
+| Text | Width in Mermaid |
+| --- | --- |
+| a message between two participants | the gap between the two lifelines and their activations, less 3 pixels for an arrowhead at each end that has one, plus `sequence.wrapPadding` on each side, and at least `sequence.width` |
+| a message to the same participant | `sequence.width`, 150 by default |
+| a note to the right of a participant | the width of the note, at least `sequence.width`, less `sequence.wrapPadding` on each side: 130 by default |
+| a note to the left of a participant | the width of the text wrapped at `sequence.width`, plus `sequence.noteMargin` on each side, at least `sequence.width`, less `sequence.wrapPadding` on each side |
+| a note over one participant | the width of the participant, at least `sequence.width`, less `sequence.wrapPadding` on each side |
+| a note over two participants | the gap between their lifelines, plus `sequence.actorMargin`, less `sequence.wrapPadding` on each side |
+| the label of a frame, such as `loop`, and of each section, such as `else` | the width of the frame less `sequence.wrapPadding` on each side |
+| the name of a participant | `sequence.width` less `sequence.wrapPadding` on each side |
+
+A participant in Mermaid is `sequence.width` wide, or as wide as its name
+and `sequence.wrapPadding` on each side when the name does not wrap. Two
+participants are `sequence.actorMargin` apart, 50 by default in Mermaid,
+or more, so that the widest message or note between them fits. Mermaid
+works out the width of a frame from the messages and the notes in it,
+and takes `sequence.labelBoxWidth`, 50 by default, from it for each of
+them. The label of a frame always wraps, as in Mermaid, with its
+brackets. Each other text wraps only when it or the diagram asks for it.
+
+A text wraps as Mermaid wraps it. A word goes on a new line when the width
+of the line and the width of the word, without the space between them,
+reach the width. A text with a break in it, such as `<br>`, does not
+wrap. mmdc measures each label at 16 pixels in Times New Roman, as wide
+as 14.5 pixels of IBM Plex Sans, so each width scales by 11/14.5, as
+"Labels that wrap" says. zuzu keeps a
+word that is wider than the width whole. Mermaid breaks it with a hyphen.
+zuzu does not move the participants for a box or for a participant that a
+message creates when it works out the widths.
 
 | Arrow | Line | End |
 | --- | --- | --- |

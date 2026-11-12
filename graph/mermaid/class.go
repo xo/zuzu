@@ -71,8 +71,10 @@ var classArrows = map[string]string{
 
 // relationArrowSize scales the ends of a relation of a class diagram and
 // of an entity relationship diagram, so that the marks of UML and of
-// crow's foot notation read at the size of a label.
-const relationArrowSize = 1.4
+// crow's foot notation read at the size of a label. The marks keep the
+// size that they had before the arrowheads grew to theme.ArrowLength
+// (D32): a shape normal 8.4 pixels long, which is 1.05 times 8.
+const relationArrowSize = 1.05
 
 // classGraph reads a class diagram into a graph.
 func classGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {

@@ -400,7 +400,7 @@ func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, breakWords bool, m te
 	if n.icon != "" {
 		n.isz = math.Round(n.size * 1.6)
 	}
-	limit := scaleWrap("mindmap", maxWidth-2*pad)
+	limit := scaleWrap("mindmap", "", maxWidth-2*pad)
 	if n.isz > 0 {
 		limit -= n.isz + 6
 	}

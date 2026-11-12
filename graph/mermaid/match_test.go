@@ -171,6 +171,16 @@ func TestLayoutHints(t *testing.T) {
 			}
 		}
 	}
+	// The property algorithm of a node picks an ELK layout for one
+	// subgraph. It is a hint too, whatever its value (D32).
+	for _, src := range []string{
+		"---\nconfig:\n  layout: elk\n---\nflowchart TD\n  subgraph grp\n    a\n  end\n  grp@{ algorithm: elk.box }\n",
+		"flowchart TD\n  subgraph grp\n    a\n  end\n  grp@{ algorithm: elk.rectpacking, label: \"G\" }\n  b@{ algorithm: other }\n",
+	} {
+		if err := strictCheck(t, src); err != nil {
+			t.Errorf("%q: %v", src, err)
+		}
+	}
 	// Mermaid 12.3 has no layout elk.layered.
 	src := "---\nconfig:\n  layout: elk.layered\n---\nflowchart LR\n  A --> B\n"
 	if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {

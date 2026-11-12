@@ -199,13 +199,14 @@ func TestClassAndERDiagrams(t *testing.T) {
     string name PK "the name"
     int age
   }`
-	// The circle of the arrowhead crowodot draws at 1.4 times its size: a
-	// radius of 0.4 of theme.ArrowLength, 8, times 1.4.
+	// The circle of the arrowhead crowodot draws at 1.05 times its size: a
+	// radius of 0.4 of theme.ArrowLength, 8, times 1.05, the size that it
+	// had before the arrowheads grew (D32).
 	s, report, err = svgOf(t, er, true)
 	if err != nil {
 		t.Fatalf("%v (%v)", err, report)
 	}
-	for _, want := range []string{">CUSTOMER<", ">string<", ">name<", ">PK<", ">the name<", ">int<", ">age<", ">places<", "A4.48 4.48"} {
+	for _, want := range []string{">CUSTOMER<", ">string<", ">name<", ">PK<", ">the name<", ">int<", ">age<", ">places<", "A3.36 3.36"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("the ER diagram has no %s", want)
 		}

@@ -211,7 +211,7 @@ func TestStateIssues(t *testing.T) {
 	t.Parallel()
 	tests := []struct{ src, exp string }{
 		{"scale 350 width\na", "the scale of a state diagram"},
-		{"click a call cb()\na", "the callback cb(), since no script runs"},
+		{"click a \"https://example.com\" _blank\na", "the target _blank of a link"},
 		{`note "floating" as N1`, "a note that floats, with no state"},
 		{"a\nclassDef x text-decoration:underline", "the style text-decoration"},
 		{"---\nconfig:\n  theme: sepia\n---\nstateDiagram-v2\na", "the theme of Mermaid, drawn in the look of zuzu"},

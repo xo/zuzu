@@ -133,6 +133,16 @@ func TestUsecaseActors(t *testing.T) {
 	if g.Description != "Shop The actors of a shop." {
 		t.Errorf("expected the description, got %q", g.Description)
 	}
+	// Mermaid draws a use case at 12 pixels, and an actor and a note at
+	// 14, so each label wraps at the ratio of its own size (D32).
+	for _, w := range []struct {
+		id   string
+		want float64
+	}{{"Order", 120.0 * 11 / 12}, {"Buyer", 120.0 * 11 / 14}, {"note-0", 120.0 * 11 / 14}} {
+		if n := node(t, g, w.id); n.Wrap != w.want {
+			t.Errorf("%s: expected a wrap of %g, got %g", w.id, w.want, n.Wrap)
+		}
+	}
 }
 
 func TestUsecaseStyles(t *testing.T) {

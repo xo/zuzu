@@ -11,7 +11,8 @@ import (
 
 // TestClickForms reads each form of a click of a flowchart: a URL, href and
 // a URL, a callback, call and a callback, with a tooltip and a target, and
-// a click on an id that names no node.
+// a click on an id that names no node. A callback is no issue, because the
+// default securityLevel of Mermaid, strict, binds none (D32).
 func TestClickForms(t *testing.T) {
 	t.Parallel()
 	src := `flowchart LR
@@ -54,8 +55,6 @@ func TestClickForms(t *testing.T) {
 	}
 	for _, m := range []string{
 		"the target _blank of a link",
-		"the callback callback, since no script runs",
-		`the callback fn(1, "two"), since no script runs`,
 		"the link javascript:alert('x'), whose scheme zuzu does not write",
 	} {
 		if !slices.Contains(msgs, m) {
@@ -64,8 +63,8 @@ func TestClickForms(t *testing.T) {
 	}
 	// Y and Z name no node. Mermaid binds a click only to a node, so a click
 	// on them draws nothing and is no issue (D32).
-	if len(msgs) != 4 {
-		t.Errorf("the report holds %d issues, want 4: %q", len(msgs), msgs)
+	if len(msgs) != 2 {
+		t.Errorf("the report holds %d issues, want 2: %q", len(msgs), msgs)
 	}
 	if _, _, err := Graph(d, true); !errors.Is(err, vega.ErrUnsupported) {
 		t.Errorf("strict: got %v, want %v", err, vega.ErrUnsupported)
@@ -93,15 +92,17 @@ func TestClickSyntax(t *testing.T) {
 }
 
 // TestClassAndStateClicks reads link and callback of a class diagram and a
-// click of a state diagram.
+// click of a state diagram. A callback fills the tooltip and is no issue
+// (D32).
 func TestClassAndStateClicks(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
 		src, id, href, tooltip, issue string
 	}{
 		{"classDiagram\n  class A\n  link A \"https://example.com\" \"a tip\"", "A", "https://example.com", "a tip", ""},
-		{"classDiagram\n  class A\n  callback A \"fn\" \"a tip\"", "A", "", "a tip", "the callback fn, since no script runs"},
-		{"classDiagram\n  class A\n  click A call fn() \"a tip\"", "A", "", "a tip", "the callback fn(), since no script runs"},
+		{"classDiagram\n  class A\n  callback A \"fn\" \"a tip\"", "A", "", "a tip", ""},
+		{"classDiagram\n  class A\n  click A call fn() \"a tip\"", "A", "", "a tip", ""},
+		{"stateDiagram-v2\n  A\n  click A call fn() \"a tip\"", "A", "", "a tip", ""},
 		{"stateDiagram-v2\n  A: Google\n  click A \"https://google.com\" \"Visit Google\"", "A", "https://google.com", "Visit Google", ""},
 	} {
 		d, err := Read(c.src)

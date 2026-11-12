@@ -207,6 +207,7 @@ graph RL
   linkStyle default stroke:#0f0
   linkStyle 1 stroke:#f0f
   click a callback
+  click b href "https://example.com" _blank
 `
 	d, err := Read(src)
 	if err != nil {
