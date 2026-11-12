@@ -208,8 +208,8 @@ func sequenceChart(c *chart) (map[string]any, bool, error) {
 	if s.hasTitle {
 		spec["title"] = map[string]any{"text": s.title, "anchor": "start"}
 	}
-	if len(s.acc) > 0 {
-		spec["description"] = strings.Join(s.acc, " ")
+	if desc := describe(c.d, s.acc...); desc != "" {
+		spec["description"] = desc
 	}
 	return spec, false, nil
 }

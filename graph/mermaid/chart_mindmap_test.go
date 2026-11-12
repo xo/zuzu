@@ -253,7 +253,7 @@ func TestMindmapMarkdown(t *testing.T) {
 		{"bold", 600, false},
 		{"italic", 400, true},
 		{"Regular", 400, false},
-		{"snake_case_names stay plain", 400, false},
+		{"snake_case_names stay", 400, false},
 		{"Root", 600, false},
 	}
 	for _, test := range tests {
@@ -348,9 +348,8 @@ func TestMindmapIssues(t *testing.T) {
 		{body + "    ::icon(book)\n", "names no pack"},
 		{"---\nconfig:\n  mindmap:\n    useWidth: 500\n---\n" + body, "mindmap.useWidth"},
 		{"---\nconfig:\n  mindmap:\n    colorBy: section\n---\n" + body, "mindmap.colorBy section"},
-		{"---\nconfig:\n  layout: elk\n---\n" + body, "layout elk"},
 		{"---\nconfig:\n  theme: dark\n---\n" + body, "the theme of Mermaid"},
-		{"---\nconfig:\n  look: handDrawn\n---\n" + body, "handDrawn"},
+		{"---\nconfig:\n  layout: cose\n---\n" + body, "layout cose"},
 	}
 	for _, test := range tests {
 		report, err := chartOf(test.src, false)

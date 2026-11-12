@@ -661,9 +661,7 @@ func (c *classDiagram) finish() error {
 	for _, n := range c.g.Nodes {
 		n.Style = classStyle(c.styles, c.nodeClasses[n.ID], c.nodeStyles[n.ID], n.Style)
 	}
-	if len(c.acc) > 0 {
-		c.g.Description = strings.Join(c.acc, " ")
-	}
+	c.g.Description = describe(c.d, c.acc...)
 	return nil
 }
 

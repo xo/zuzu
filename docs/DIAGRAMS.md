@@ -322,15 +322,17 @@ version that bundles Mermaid 12.3.0.
 
 | Part | Example |
 | --- | --- |
-| front matter, between two lines of `---` | `title: Orders` and `config:` |
+| front matter, between two lines of `---` | `title: Orders`, `description: The orders of a shop` and `config:` |
 | a directive | `%%{init: {'flowchart': {'curve': 'linear'}}}%%` |
 | a comment, from `%%` to the end of the line | `%% a comment` |
 | the keyword of the kind, on the first line | `flowchart LR` |
 
-The `title` of the front matter is the title of the diagram. Its `config`
-and each directive merge into one config, and a directive wins over the
-front matter. A setting of the config that a kind does not read is an
-issue. The front matter is YAML. zuzu reads maps by their indent, and a
+The `title` of the front matter is the title of the diagram. Its
+`description` goes in the description of the Vega spec, which Mermaid
+ignores (D32). Its `config` and each directive merge into one config, and
+a directive wins over the front matter. Each other key of the front
+matter goes in the config too, and a setting of the config that a kind
+does not read is an issue. The gantt reads `displayMode` there. The front matter is YAML. zuzu reads maps by their indent, and a
 value in quotes or plain. A value can run over more lines, indented under
 its key. A block after `|` keeps its new lines, and a block after `>` joins
 its lines with spaces. A `-` or a `+` after either sets the new lines at
@@ -358,6 +360,30 @@ diagram from the section `state`, and so the key `config` sets nothing in
 them, or in an xychart, whose section is `xyChart`. zuzu reports such a
 setting, as it reports any setting that it does not read.
 
+### The description
+
+The description of the Vega spec is the text for a screen reader. It holds
+these texts, in this order, with a space between two of them:
+
+1. The `description` of the front matter.
+2. The text of each `accTitle` and `accDescr`, in the order of the source.
+
+A text that is empty adds nothing. A kind that does not read `accTitle`
+and `accDescr`, such as the sankey, takes only the `description`. The
+`description` can be a block of YAML. A number or a boolean of YAML is
+text there.
+
+### Hints of the look and the layout
+
+`look: handDrawn` and `layout: elk` are hints of a way to draw (D32). zuzu
+accepts them with no issue in every kind, in the config or at the top of
+the front matter. zuzu draws its own look for `handDrawn`, and its own
+layered layout, `zuzu.layered`, for `elk`. A look by hand, modeled on the
+look of xkcd, and an ELK layout are work for later. The other looks, such
+as `classic` and `neo`, draw in the look of zuzu too. A graph accepts
+`layout: dagre`, and another layout, such as `elk.box` or `tidy-tree`, is
+an issue. A mindmap accepts `cose-bilkent` and `tidy-tree` too.
+
 ### Settings that change nothing
 
 These settings change nothing in a still image. zuzu accepts them in every
@@ -368,7 +394,7 @@ kind, with no issue:
 | `logLevel` | sets what Mermaid writes to the log of the browser |
 | `securityLevel` | sets which scripts, links and tags of HTML a page can run |
 | `useMaxWidth`, at the top or in a section, such as `flowchart.useMaxWidth` | makes the SVG as wide as the page that holds it. zuzu writes an SVG of a fixed size |
-| `handDrawnSeed` | seeds the random lines of the look `handDrawn`, which is an issue of its own |
+| `handDrawnSeed` | seeds the random lines of the look `handDrawn`, which zuzu draws in its own look |
 | `architecture.seed`, `architecture.randomize` | seed and start the layout of forces of an architecture diagram. The layout of zuzu uses no random numbers |
 | `class.htmlLabels` | nothing. Mermaid 12 does not read it |
 | `htmlLabels`, `flowchart.htmlLabels`, in a chart other than a mindmap | nothing. A chart draws its text in SVG |
@@ -546,7 +572,19 @@ goes over it. `curve` sets the curve of the link, as `linkStyle` with
 mmdc 12.3.0 draws every link with round corners and does not read a
 curve, so the curves of zuzu follow the documentation of Mermaid.
 `accTitle` and `accDescr` join into the description of the Vega spec, as
-in a state diagram.
+"The description" says.
+
+`animate: true` and `animation: fast` or `animation: slow` in the
+properties of a link draw the link dashed, as one still frame of Mermaid
+(D32). A still image has no motion. The dash is the dash of Mermaid, lines
+of 9 pixels and gaps of 5, and it wins over the dash of a style, as in
+Mermaid. `animate: false` draws the link solid. Another value of
+`animation` is an issue. The style `animation` in a `classDef` or a
+`linkStyle` of a link adds no issue and no dash, because the motion of a
+style moves a dash that the style gives with `stroke-dasharray`. mmdc
+12.3.0 draws such a link solid when its style gives no dash. The style
+`animation` of a node or a subgraph is an issue, at the line of its
+`classDef`.
 
 `id@{ view: collapsed }` on the id of a subgraph draws the subgraph as one
 node, as Mermaid 12 does. The node is a rounded box with the title of the
@@ -596,12 +634,10 @@ Without `inheritDir`, a subgraph with no direction takes the direction of
 the subgraph that holds it, as the subgraphs above say. With
 `inheritDir: true`, it takes the direction of the flowchart, as in Mermaid.
 
-These parts are issues: `click`, a callback and `href`, the properties
-`animate` and `animation` of a link, the layout `elk`, which draws with
-`zuzu.layered`, the look `handDrawn`, the `theme` and the `themeVariables`
-of Mermaid, which draw in the look of zuzu, the other settings of the
-section `flowchart`, such as `minNodeWidth`, and any other style, such as
-`animation`.
+These parts are issues: `click`, a callback and `href`, the `theme` and
+the `themeVariables` of Mermaid, which draw in the look of zuzu, the other
+settings of the section `flowchart`, such as `minNodeWidth`, and any other
+style, such as `animation` on a node.
 
 ### Icons and images
 
@@ -704,7 +740,7 @@ Mermaid.
 These parts are issues: `scale`, `click`, a floating note with no state,
 such as `note "text" as N1`, a kind of state other than `choice`, `fork`
 and `join`, which draws as a state, the settings of the section `state` of
-the config other than `wrappingWidth`, the layout `elk`, the look `handDrawn`, the `theme` and the
+the config other than `wrappingWidth`, the `theme` and the
 `themeVariables` of Mermaid, and a style that a flowchart does not read.
 
 ### Class diagram
@@ -781,8 +817,7 @@ with its whole name as its title, as Mermaid does.
 
 These parts are issues: `click`, `link` and `callback`, the settings of
 the section `class` of the config other than `hideEmptyMembersBox` and
-`hierarchicalNamespaces`, the
-layout `elk`, the look `handDrawn`, the `theme` and the `themeVariables` of
+`hierarchicalNamespaces`, the `theme` and the `themeVariables` of
 Mermaid, and a style that a flowchart does not read.
 
 ### Entity relationship diagram
@@ -851,17 +886,18 @@ class or a style of an entity with no attributes wins over the font of
 its markdown.
 
 These parts are issues: `click`, the settings of the section `er` of the
-config, the layout `elk`, the look `handDrawn`, the `theme` and the
-`themeVariables` of Mermaid, and a style that a flowchart does not read.
+config, the `theme` and the `themeVariables` of Mermaid, and a style that
+a flowchart does not read.
 
 ### Labels that wrap
 
 Mermaid 12.3.0 wraps a long label of a flowchart, a state diagram, a class
 diagram and an entity relationship diagram. zuzu wraps the same labels at
-the same widths. It measures the words with the bundled font, so the lines
+the widths of Mermaid, scaled by 11/14, as the last paragraph of this
+section says. It measures the words with the bundled font, so the lines
 are the same on each machine.
 
-| Label | Width |
+| Label | Width in Mermaid |
 | --- | --- |
 | a node of a flowchart | `flowchart.wrappingWidth`, 120 pixels by default |
 | a state, and a note of a state | `state.wrappingWidth`, 120 pixels by default |
@@ -889,17 +925,22 @@ is not set, Mermaid 12 reads `flowchart.htmlLabels` in its place in every
 kind of graph, and so does zuzu. Another value of one of these settings, such as a width that is not a
 positive number, is an issue, and the label takes the default.
 
-A width is in the pixels of zuzu, which draws a label at 11 pixels.
-Mermaid draws a label at 14 pixels, so a line of zuzu holds more words. A
-node of zuzu fits its widest line. Mermaid makes the box of a label that
-wraps as wide as the width. DOT does not wrap a label.
+zuzu draws a label at 11 pixels and Mermaid at 14. So zuzu scales each
+width of Mermaid that wraps a label by 11/14, and a line of zuzu holds the
+words that a line of Mermaid holds (D32). A width of 120 in Mermaid wraps
+at about 94 pixels in zuzu, and a width of 200 at about 157. The rule
+holds for each width of the table above, for `sequence.width` in a
+sequence diagram, for `mindmap.maxNodeWidth` and for
+`journey.maxLabelWidth`. A node of zuzu fits its widest line. Mermaid
+makes the box of a label that wraps as wide as the width. DOT does not
+wrap a label.
 
 ### Charts
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
-config that a chart does not read is an issue, and so are the `theme`, the
-`themeCSS` and the look `handDrawn`. Each chart but `sankey` and `mindmap`
-joins `accTitle` and `accDescr` into the description of the spec. Mermaid
+config that a chart does not read is an issue, and so are the `theme` and
+the `themeCSS`. Each chart but `sankey` and `mindmap` joins `accTitle` and
+`accDescr` into the description of the spec, as "The description" says. Mermaid
 does not read them in a sankey or a mindmap either, so there they are
 errors, as in Mermaid. Each chart has about 5 fixtures in
 `graph/mermaid/testdata`, and the gantt has 18. A test draws each fixture
@@ -1104,8 +1145,8 @@ The actors of a step go under its name, on one line that ends with an
 ellipsis when it is too long. Mermaid writes the actors in a legend, and
 wraps the name of each actor at `journey.maxLabelWidth`. zuzu has no
 legend of the actors. With `journey.maxLabelWidth`, the actors under a step
-wrap at that width, or at the width of the column of the step if it is
-less, by the rule of Mermaid. A line takes words while it fits. A word that
+wrap at that width scaled by 11/14, as "Labels that wrap" says, or at the
+width of the column of the step if it is less, by the rule of Mermaid. A line takes words while it fits. A word that
 is wider than the width breaks into parts, and each part but the last ends
 with a hyphen. zuzu measures the text in the bundled font.
 
@@ -1213,7 +1254,10 @@ Mermaid. A line with an alias gives it a new kind and a new label.
 | `#35;`, `#infin;` | the character of the entity code. `#59;` puts a semicolon in a text |
 
 A semicolon ends a statement. The text of a message, a note or a label can
-start with `wrap:` or `nowrap:`.
+start with `wrap:` or `nowrap:`. A text that wraps wraps at
+`sequence.width`, 150 by default, scaled by 11/14, as "Labels that wrap"
+says. The name of a participant wraps at `sequence.width` less
+`sequence.wrapPadding` on each side, scaled in the same way.
 
 | Arrow | Line | End |
 | --- | --- | --- |
@@ -1277,7 +1321,8 @@ label, as in Mermaid, `**bold**` and `__bold__` draw in a bold font, and
 text. Text between two backquotes is code, and it draws as it is written,
 with its backquotes and its marks. `<br>` and a new line in a string of
 markdown start a new line. A label wraps at the spaces to fit
-`mindmap.maxNodeWidth`, 200 by default.
+`mindmap.maxNodeWidth`, 200 by default, less the padding on its two sides,
+scaled by 11/14, as "Labels that wrap" says.
 
 The text in a shape can run over more lines, up to the line that ends the
 shape, as `root(`, then `The root`, then `)`. zuzu drops the spaces at the
@@ -1301,7 +1346,8 @@ zuzu reads no CSS, so each class is an issue.
 
 zuzu reads `mindmap.padding`, `mindmap.maxNodeWidth`, `mindmap.colorBy`,
 which is `branch` or `depth`, and `mindmap.layoutAlgorithm` and `layout`,
-which are `cose-bilkent` or `tidy-tree`. Both draw with the layout of zuzu.
+which are `cose-bilkent` or `tidy-tree`. `layout` can be `elk` too. Each
+draws with the layout of zuzu.
 
 Mermaid lays a mindmap out with cose-bilkent, a layout of forces around
 the root. zuzu uses a tidy tree on two sides instead. The layout is the

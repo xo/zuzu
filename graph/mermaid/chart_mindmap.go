@@ -77,7 +77,7 @@ func mindmapChart(c *chart) (map[string]any, bool, error) {
 	}
 	for _, k := range []string{"layout", "mindmap.layoutAlgorithm"} {
 		v := str(c.d.Config, strings.Split(k, ".")...)
-		if v != "" && v != "cose-bilkent" && v != "tidy-tree" {
+		if v != "" && v != "cose-bilkent" && v != "tidy-tree" && !hint(k, v) {
 			if err := c.add("the setting %s %s", k, v); err != nil {
 				return nil, false, err
 			}
@@ -363,7 +363,7 @@ func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, m text.Measurer) {
 	if n.icon != "" {
 		n.isz = math.Round(n.size * 1.6)
 	}
-	limit := maxWidth - 2*pad
+	limit := scaleWrap(maxWidth - 2*pad)
 	if n.isz > 0 {
 		limit -= n.isz + 6
 	}

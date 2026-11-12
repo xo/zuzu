@@ -26,8 +26,8 @@ type journeyTask struct {
 func journeyChart(c *chart) (map[string]any, bool, error) {
 	// maxLabelWidth is the width at which Mermaid wraps the name of an
 	// actor in its legend. zuzu has no legend of the actors, and wraps the
-	// actors under each task at that width instead. A width that is not a
-	// number stays an issue.
+	// actors under each task at that width, scaled by scaleWrap, instead.
+	// A width that is not a number stays an issue.
 	wrap, wrapped := configNumber(c.d.Config, "journey", "maxLabelWidth")
 	var read []string
 	if wrapped {
@@ -106,6 +106,7 @@ func journeyChart(c *chart) (map[string]any, bool, error) {
 	if !wrapped {
 		wrap = 0
 	}
+	wrap = scaleWrap(wrap)
 	return journeySpec(title, tasks, wrap), true, nil
 }
 

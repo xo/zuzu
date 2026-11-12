@@ -3,6 +3,7 @@ package mermaid
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -10,9 +11,9 @@ import (
 	"github.com/xo/zuzu/vega"
 )
 
-// wrapsOf reads a diagram and writes the width at which each label wraps:
-// the nodes as id=wrap, and the edges as source>target=wrap, in order, and
-// a b when the words break.
+// wrapsOf reads a diagram and writes the width at which each label wraps,
+// in the pixels of Mermaid: the nodes as id=wrap, and the edges as
+// source>target=wrap, in order, and a b when the words break.
 func wrapsOf(t *testing.T, src string) string {
 	t.Helper()
 	d, err := Read(src)
@@ -28,11 +29,13 @@ func wrapsOf(t *testing.T, src string) string {
 
 func wraps(g *graph.Graph) string {
 	var parts []string
+	// zuzu scales each width of Mermaid by 11/14.
+	px := func(w float64) float64 { return math.Round(w*14/11*1e6) / 1e6 }
 	for _, n := range g.Nodes {
-		parts = append(parts, fmt.Sprintf("%s=%g", n.ID, n.Wrap))
+		parts = append(parts, fmt.Sprintf("%s=%g", n.ID, px(n.Wrap)))
 	}
 	for _, e := range g.Edges {
-		parts = append(parts, fmt.Sprintf("%s>%s=%g", e.Source, e.Target, e.Wrap))
+		parts = append(parts, fmt.Sprintf("%s>%s=%g", e.Source, e.Target, px(e.Wrap)))
 	}
 	if g.BreakWords {
 		parts = append(parts, "b")
@@ -68,6 +71,18 @@ func TestWrap(t *testing.T) {
 	}
 }
 
+func TestScaleWrap(t *testing.T) {
+	t.Parallel()
+	g, _, err := Graph(&Diagram{Kind: "flowchart", Header: "LR", Config: map[string]any{}, Lines: []Line{{Text: "A -->|x| B", N: 2}}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A label of zuzu is 11 pixels and one of Mermaid is 14.
+	if n, e := g.Nodes[0].Wrap, g.Edges[0].Wrap; n != 120.0*11/14 || e != 200.0*11/14 {
+		t.Errorf("expected the widths 120 and 200 scaled by 11/14, got %g and %g", n, e)
+	}
+}
+
 func TestWrapIssues(t *testing.T) {
 	t.Parallel()
 	for _, src := range []string{
@@ -88,7 +103,7 @@ func TestWrapIssues(t *testing.T) {
 			t.Errorf("%q: expected 1 line in the report, got %v, %v", src, report, err)
 			continue
 		}
-		if g.Nodes[0].Wrap != nodeWrap {
+		if g.Nodes[0].Wrap != scaleWrap(nodeWrap) {
 			t.Errorf("%q: expected the default width, got %g", src, g.Nodes[0].Wrap)
 		}
 	}

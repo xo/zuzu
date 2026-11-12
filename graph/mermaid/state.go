@@ -577,9 +577,7 @@ func (s *stateDiagram) finish() error {
 	for _, c := range s.g.Clusters {
 		c.Style = classStyle(s.classes, s.nodeClasses[c.ID], s.nodeStyles[c.ID], c.Style)
 	}
-	if len(s.acc) > 0 {
-		s.g.Description = strings.Join(s.acc, " ")
-	}
+	s.g.Description = describe(s.d, s.acc...)
 	return nil
 }
 

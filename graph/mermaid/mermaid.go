@@ -8,6 +8,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
@@ -42,6 +43,9 @@ type Diagram struct {
 	N int
 	// Title is the title of the front matter.
 	Title string
+	// Description is the description of the front matter. Mermaid ignores
+	// it, and zuzu puts it in the description of the spec (D32).
+	Description string
 	// Config is the config of the front matter and of the directives.
 	Config map[string]any
 	// Lines are the lines of the body, without comments.
@@ -82,6 +86,10 @@ func Read(src string) (*Diagram, error) {
 		}
 		if c, ok := fm["config"].(map[string]any); ok {
 			merge(d.Config, c)
+		}
+		if s, ok := yamlText(fm["description"]); ok {
+			d.Description = s
+			delete(fm, "description")
 		}
 		for k, v := range fm {
 			if k != "title" && k != "config" {
@@ -142,6 +150,34 @@ func Read(src string) (*Diagram, error) {
 	}
 	merge(d.Config, inits)
 	return d, nil
+}
+
+// yamlText returns a scalar of YAML as text: a string, or a number or a
+// boolean as YAML writes it. A map is not text.
+func yamlText(v any) (string, bool) {
+	switch v := v.(type) {
+	case string:
+		return v, true
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(v), true
+	}
+	return "", false
+}
+
+// describe returns the description of the spec of a diagram: the
+// description of the front matter first, then the text of each accTitle
+// and accDescr in the order of the source, joined by spaces. An empty text
+// adds nothing.
+func describe(d *Diagram, acc ...string) string {
+	parts := make([]string, 0, len(acc)+1)
+	for _, s := range append([]string{d.Description}, acc...) {
+		if s = strings.TrimSpace(s); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 // configSection returns the key that Mermaid gives to the key config of a

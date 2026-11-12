@@ -454,8 +454,8 @@ func pieScale(domain, colors []any) map[string]any {
 
 // unreadSettings reports each setting of the config that a chart does not
 // read. A setting that the chart reads is a path of keys with dots, such
-// as pie.textPosition. The look handDrawn is an issue, and the other looks
-// draw in the look of zuzu (D12).
+// as pie.textPosition. Every look draws in the look of zuzu, and the
+// layout elk in the layout of zuzu (D12, D32).
 func (c *chart) unreadSettings(read ...string) error {
 	line := c.line
 	c.line = 0
@@ -483,10 +483,9 @@ func (c *chart) unreadIn(m map[string]any, prefix string, read []string) error {
 		}
 		var err error
 		switch {
-		case path == "look":
-			if m[k] == "handDrawn" {
-				err = c.add("the look handDrawn")
-			}
+		case path == "look", prefix == "" && hint(k, m[k]):
+			// Every look draws in the look of zuzu, and the layout elk
+			// in the layout of zuzu (D32).
 		case themed:
 			err = c.add("the %s of Mermaid, drawn in the look of zuzu", path)
 		default:

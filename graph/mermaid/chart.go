@@ -85,8 +85,10 @@ func Chart(d *Diagram, strict bool) ([]byte, bool, vega.Report, error) {
 	} else {
 		spec["$schema"] = "https://vega.github.io/schema/vega/v5.json"
 	}
-	if _, ok := spec["description"]; !ok && len(c.acc) > 0 {
-		spec["description"] = strings.Join(c.acc, " ")
+	if _, ok := spec["description"]; !ok {
+		if desc := describe(d, c.acc...); desc != "" {
+			spec["description"] = desc
+		}
 	}
 	if _, ok := spec["title"]; !ok && d.Title != "" {
 		spec["title"] = map[string]any{"text": d.Title, "anchor": "start"}

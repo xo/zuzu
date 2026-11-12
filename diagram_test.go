@@ -542,23 +542,27 @@ func TestWrap(t *testing.T) {
 			}
 		}
 	}
+	// zuzu wraps at the widths of Mermaid, 120 for a node and 200 for an
+	// edge, scaled by 11/14, the size of a label of zuzu over that of
+	// Mermaid.
+	node, edge := 120.0*11/14, 200.0*11/14
 	rows := layoutRows(t, src)
-	check("A", linesOf(rows["node A"]), 120, 3)
+	check("A", linesOf(rows["node A"]), node, 4)
 	if got := strings.Join(linesOf(rows["node A"]), " "); got != long {
 		t.Errorf("A: expected the words of the label, got %q", got)
 	}
-	check("the edge", linesOf(rows["edge 0"]), 200, 2)
+	check("the edge", linesOf(rows["edge 0"]), edge, 2)
 	// A word wider than the width keeps a line of its own.
 	check("B", linesOf(rows["node B"]), 1000, 1)
 	// The icon in the line takes 18 of the width.
-	check("C", linesOf(rows["node C"]), 120-18, 2)
-	check("D", linesOf(rows["node D"]), 120, 1)
+	check("C", linesOf(rows["node C"]), node-18, 2)
+	check("D", linesOf(rows["node D"]), node, 2)
 	if l, _ := rows["cluster S"]["label"].(string); strings.Contains(l, "\n") {
 		t.Errorf("expected the title of the subgraph on one line, got %q", l)
 	}
 	// SVG labels break the word, and DOT does not wrap.
 	rows = layoutRows(t, "---\nconfig:\n  htmlLabels: false\n---\n"+src)
-	check("B in SVG", linesOf(rows["node B"]), 120, 3)
+	check("B in SVG", linesOf(rows["node B"]), node, 3)
 	rows = layoutRows(t, `digraph { a [label="`+long+`"] }`)
 	check("DOT", linesOf(rows["node a"]), 1000, 1)
 }

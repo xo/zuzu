@@ -1,0 +1,9 @@
+---
+config:
+  flowchart:
+    wrappingWidth: 160
+---
+flowchart TB
+  a[A label of a node that is long enough to wrap in Mermaid] -->|a label of a link that is long enough to wrap as well| b[Short]
+  b --> c[Shared Business Logic]
+  c --> d["`A **markdown** label that is long enough to wrap too`"]

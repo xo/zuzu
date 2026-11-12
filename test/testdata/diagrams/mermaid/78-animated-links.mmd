@@ -1,0 +1,15 @@
+flowchart LR
+  a[Source] e1@--> b[Queue]
+  b e2@==> c[Worker]
+  c e3@-.-> d[Store]
+  d e4@--> e[Report]
+  e e5@--> f[Archive]
+  a --> f
+  e1@{ animate: true }
+  e2@{ animation: slow }
+  e3@{ animation: fast }
+  classDef flow stroke-dasharray: 2 4,animation: dash 25s linear infinite
+  classDef moves animation: dash 25s linear infinite
+  class e4 flow
+  class e5 moves
+  linkStyle 5 stroke:#e53e3e,animation: dash 10s linear infinite

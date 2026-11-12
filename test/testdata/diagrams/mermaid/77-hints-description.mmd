@@ -1,0 +1,16 @@
+---
+title: Hints and a description
+description: >-
+  The orders of a shop, from the cart
+  to the delivery.
+look: handDrawn
+config:
+  layout: elk
+---
+flowchart LR
+  accTitle: Orders
+  accDescr: Each order goes from the cart to the delivery.
+  cart[Cart] --> pay{Paid?}
+  pay -->|yes| ship[Ship]
+  pay -->|no| cart
+  ship --> done([Delivered])

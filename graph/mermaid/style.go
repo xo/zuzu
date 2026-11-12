@@ -13,30 +13,28 @@ import (
 // an entity, and the border of a region of a state.
 const dashed = "4,3"
 
+// animatedDash is the dash of a link that Mermaid animates, with animate
+// or animation, as mmdc 12.3.0 draws it: 9 pixels of line and 5 of gap.
+// zuzu draws one still frame of it (D32). The dash of zuzu, 4,3, is half
+// as long, so the link takes the dash of Mermaid.
+const animatedDash = "9,5"
+
 // lookSetting reports a setting of the top level of the config that every
 // graph reads: the layout, the look and the theme, which a graph draws in
 // its own way, htmlLabels and markdownAutoWrap, which change how a label
 // wraps, and the settings that change nothing in an image. It returns
 // false for any other setting.
 func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
-	if inert(kind, k) {
+	if inert(kind, k) || hint(k, v) {
 		return true, nil
 	}
 	switch k {
 	case "layout":
-		switch v {
-		case "dagre":
+		if v == "dagre" {
 			return true, nil
-		case "elk":
-			// ELK routes edges in its own way, so the layered layout
-			// stands in for it (D31).
-			return true, is.Add("config", "the layout elk, drawn with zuzu.layered")
 		}
 		return true, is.Add("config", "the layout %v", v)
 	case "look":
-		if v == "handDrawn" {
-			return true, is.Add("config", "the look handDrawn")
-		}
 		return true, nil
 	case "theme", "themeVariables", "themeCSS":
 		return true, is.Add("config", "the %s of Mermaid, drawn in the look of zuzu", k)
@@ -48,6 +46,14 @@ func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// hint reports whether a setting of the top level of the config is a hint
+// of a way to draw that zuzu accepts with no issue in every kind (D32):
+// the look handDrawn, which zuzu draws in its own look, and the layout
+// elk, which zuzu draws with zuzu.layered.
+func hint(k string, v any) bool {
+	return k == "look" && v == "handDrawn" || k == "layout" && v == "elk"
 }
 
 // graphSection reports each setting of a section of the config of a graph,
@@ -103,7 +109,7 @@ func inert(kind, path string) bool {
 	case is("logLevel", "securityLevel", "handDrawnSeed", "architecture.seed", "architecture.randomize", "class.htmlLabels"):
 		// logLevel sets what Mermaid logs, and securityLevel the scripts
 		// and the links of a page. handDrawnSeed seeds the look handDrawn,
-		// which is an issue of its own. The layout of an architecture
+		// which zuzu draws in its own look. The layout of an architecture
 		// diagram uses no random numbers. Mermaid 12 does not read
 		// class.htmlLabels.
 		return true
@@ -119,13 +125,22 @@ func inert(kind, path string) bool {
 	return false
 }
 
-// The widths in pixels at which Mermaid 12 wraps a label: the label of a
-// node of a flowchart or of a state by default, and the label of an edge
-// always.
+// The widths in the pixels of Mermaid at which Mermaid 12 wraps a label:
+// the label of a node of a flowchart or of a state by default, and the
+// label of an edge always. scaleWrap turns them into the pixels of zuzu.
 const (
 	nodeWrap = 120
 	edgeWrap = 200
 )
+
+// scaleWrap returns the width in the pixels of zuzu of a width at which
+// Mermaid wraps a label. zuzu draws a label at 11 pixels and Mermaid at
+// 14, so the width scales by 11/14, and a line holds the words that it
+// holds in Mermaid (D32). Each width of Mermaid that wraps a label goes
+// through it.
+func scaleWrap(w float64) float64 {
+	return w * 11 / 14
+}
 
 // wrapping is how the labels of a graph wrap, from the settings of the top
 // level of the config.
@@ -170,38 +185,51 @@ func (w wrapping) width(limit float64, markdown bool) float64 {
 
 // wrapGraph sets the widths at which the labels of a class diagram, a
 // state diagram or an entity relationship diagram wrap: the label of each
-// node at node, or 0 for none, and the label of each edge at edgeWrap.
+// node at node, in the pixels of zuzu, or 0 for none, and the label of
+// each edge at edgeWrap.
 func wrapGraph(cfg map[string]any, g *graph.Graph, node float64) {
 	labelWrap(cfg, g)
 	for _, n := range g.Nodes {
 		n.Wrap = node
 	}
 	for _, e := range g.Edges {
-		e.Wrap = edgeWrap
+		e.Wrap = scaleWrap(edgeWrap)
 	}
 }
 
 // wrapSetting reads the setting of a section of the config that sets the
-// width at which a label wraps, such as flowchart.wrappingWidth, or returns
-// def when the config does not set it. A value that is not a positive
-// number is an issue.
+// width at which a label wraps, such as flowchart.wrappingWidth, or takes
+// def when the config does not set it, and returns it in the pixels of
+// zuzu. A value that is not a positive number is an issue.
 func wrapSetting(is *graph.Issues, cfg map[string]any, def float64, section, key string) (float64, error) {
 	v, ok := configNumber(cfg, section, key)
 	if !ok {
 		if m, _ := cfg[section].(map[string]any); m != nil && m[key] != nil {
-			return def, is.Add("config", "the setting %s.%s: %v", section, key, m[key])
+			return scaleWrap(def), is.Add("config", "the setting %s.%s: %v", section, key, m[key])
 		}
-		return def, nil
+		return scaleWrap(def), nil
 	}
 	if !(v > 0) {
-		return def, is.Add("config", "the setting %s.%s: %v", section, key, v)
+		return scaleWrap(def), is.Add("config", "the setting %s.%s: %v", section, key, v)
 	}
-	return v, nil
+	return scaleWrap(v), nil
 }
 
 // css reads a style of CSS of a class or a node, as fill:#f9f,stroke:#333,
 // into the names of Vega. add records a property that zuzu does not draw.
 func css(s string, add func(format string, args ...any) error) (map[string]string, error) {
+	return readCSS(s, false, add)
+}
+
+// linkCSS reads a style as css does, for a class or a style that can be on
+// a link. It keeps animation as it is, for the caller.
+func linkCSS(s string, add func(format string, args ...any) error) (map[string]string, error) {
+	return readCSS(s, true, add)
+}
+
+// readCSS reads a style of CSS into the names of Vega, and keeps animation
+// when link is true.
+func readCSS(s string, link bool, add func(format string, args ...any) error) (map[string]string, error) {
 	st := map[string]string{}
 	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' }) {
 		k, v, ok := strings.Cut(part, ":")
@@ -210,6 +238,10 @@ func css(s string, add func(format string, args ...any) error) (map[string]strin
 		}
 		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
 		v = strings.TrimSuffix(strings.TrimSpace(strings.TrimSuffix(v, "!important")), "px")
+		if k == "animation" && link {
+			st[k] = v
+			continue
+		}
 		switch k {
 		case "fill":
 			st["fill"], st["fillOpacity"] = v, "1"

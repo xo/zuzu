@@ -214,7 +214,6 @@ func TestWardleyIssues(t *testing.T) {
 		src, issue string
 	}{
 		{"---\nconfig:\n  wardley:\n    width: 900\n---\n" + body, "wardley.width"},
-		{"---\nconfig:\n  look: handDrawn\n---\n" + body, "look handDrawn"},
 	}
 	for _, test := range tests {
 		report, err := chartOf(test.src, false)

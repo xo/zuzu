@@ -51,7 +51,7 @@ func ganttChart(c *chart) (map[string]any, bool, error) {
 	}
 	if len(g.tasks) == 0 {
 		// Mermaid draws a gantt with no task with nothing in it.
-		return emptyChart(g.title, g.desc), false, nil
+		return emptyChart(g.title, describe(c.d, g.desc)), false, nil
 	}
 	spec, err := g.spec()
 	return spec, true, err
@@ -297,8 +297,8 @@ func (g *gantt) spec() (map[string]any, error) {
 	if g.title != "" {
 		spec["title"] = map[string]any{"text": g.title, "anchor": "start"}
 	}
-	if g.desc != "" {
-		spec["description"] = g.desc
+	if desc := describe(g.c.d, g.desc); desc != "" {
+		spec["description"] = desc
 	}
 	return spec, nil
 }

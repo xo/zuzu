@@ -19,8 +19,13 @@ type seqConfig struct {
 	mirror, numbers, hideUnused, rightAngles, wrap bool
 
 	actorMargin, messageMargin, noteMargin, boxMargin, boxTextMargin float64
-	activationWidth, minWidth, minHeight, wrapWidth, wrapPadding     float64
+	activationWidth, minWidth, minHeight, wrapPadding                float64
 	labelBoxWidth, labelBoxHeight, marginX, marginY                  float64
+
+	// wrapWidth is the width at which a message, a note and the label of
+	// a box wrap, and actorWrap the width at which the label of a
+	// participant wraps, both in the pixels of zuzu.
+	wrapWidth, actorWrap float64
 
 	messageAlign, noteAlign string
 
@@ -93,7 +98,9 @@ func (c *chart) sequenceSettings() (seqConfig, error) {
 		messageFont:     font("message", 11, 400),
 		noteFont:        font("note", 11, 400),
 	}
-	s.wrapWidth = num("width", 150)
+	width := num("width", 150)
+	s.wrapWidth = scaleWrap(width)
+	s.actorWrap = scaleWrap(width - 2*s.wrapPadding)
 	if w, ok := cfg["wrap"].(bool); ok {
 		s.wrap = w
 	}
@@ -241,7 +248,7 @@ const iconHeight = 28
 
 // headSize returns the width and the height of the head of a participant.
 func (l *seqLayout) headSize(p *seqParticipant) (float64, float64) {
-	lines := l.lines(p.label, l.cfg.actorFont, l.cfg.wrapWidth-2*l.cfg.wrapPadding)
+	lines := l.lines(p.label, l.cfg.actorFont, l.cfg.actorWrap)
 	tw, th := l.size(l.cfg.actorFont, lines)
 	if icon(p.kind) {
 		return math.Max(tw+8, 40), iconHeight + 4 + th
@@ -434,7 +441,7 @@ func (l *seqLayout) head(i int, top float64, part string) float64 {
 	p := l.ps[i]
 	x, w, hh := l.cx[i], l.w[i], l.hh
 	f := l.cfg.actorFont
-	lines := l.lines(p.label, f, l.cfg.wrapWidth-2*l.cfg.wrapPadding)
+	lines := l.lines(p.label, f, l.cfg.actorWrap)
 	_, th := l.size(f, lines)
 	if icon(p.kind) {
 		h := iconHeight + 4 + th

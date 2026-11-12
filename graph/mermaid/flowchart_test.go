@@ -286,6 +286,79 @@ func TestSubgraphs(t *testing.T) {
 	}
 }
 
+func TestLinkAnimation(t *testing.T) {
+	t.Parallel()
+	src := `flowchart LR
+  A e1@--> B
+  B e2@-.-> C
+  C e3@--> D
+  D e4@--> E
+  E e5@--> F
+  F e6@--> G
+  G --> H
+  e1@{ animate: true }
+  e2@{ animation: slow }
+  e3@{ animation: fast, animate: false }
+  e4@{ animation: spin }
+  classDef anim stroke-dasharray: 2 2,animation: dash 25s linear infinite
+  classDef moves animation: dash 25s linear infinite
+  class e5 anim
+  class e6 moves
+  class e1 anim
+  linkStyle 6 animation: dash 9s linear infinite`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An animated link takes the dash of Mermaid over its own. The style
+	// animation keeps the dash of the style, and adds none.
+	var dashes []string
+	for _, e := range g.Edges {
+		if _, ok := e.Style["animation"]; ok {
+			t.Errorf("the style animation stays on the link %s", e.ID)
+		}
+		dashes = append(dashes, e.Style["strokeDash"])
+	}
+	if s := strings.Join(dashes, "|"); s != "9,5|9,5|9,5||2,2||" {
+		t.Errorf("expected the dashes 9,5|9,5|9,5||2,2||, got %s", s)
+	}
+	var issues []string
+	for _, i := range report {
+		issues = append(issues, i.Path+": "+i.Message)
+	}
+	if s := strings.Join(issues, "|"); s != "line 12: the animation spin of a link" {
+		t.Errorf("unexpected issues %s", s)
+	}
+	// The style animation on a node is an issue, at the line of its
+	// classDef, and the class default is on every node.
+	for _, src := range []string{
+		"flowchart LR\n  A --> B\n  classDef moves animation: dash 25s linear infinite\n  class A moves",
+		"flowchart LR\n  A --> B\n  classDef default animation: dash 25s linear infinite",
+		"flowchart LR\n  A --> B\n  style A animation: dash 25s linear infinite",
+	} {
+		d, err := Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, report, err := Graph(d, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(report) != 1 || report[0].Message != "the style animation" || report[0].Path != "line 3" {
+			t.Errorf("%q: expected the issue of the style animation at line 3, got %v", src, report)
+		}
+		for _, n := range g.Nodes {
+			if _, ok := n.Style["animation"]; ok {
+				t.Errorf("%q: the style animation stays on the node %s", src, n.ID)
+			}
+		}
+	}
+}
+
 func TestLinkProps(t *testing.T) {
 	t.Parallel()
 	src := `flowchart LR
@@ -321,11 +394,15 @@ func TestLinkProps(t *testing.T) {
 	if st := g.Edges[0].Style; st["strokeDash"] != "9,5" || st["strokeDashOffset"] != "4" {
 		t.Errorf("expected the class on the link e1, got %v", st)
 	}
+	// animate draws the link dashed, as one still frame of Mermaid.
+	if st := g.Edges[2].Style; st["strokeDash"] != animatedDash {
+		t.Errorf("expected the link e3 dashed, got %v", st)
+	}
 	var issues []string
 	for _, i := range report {
 		issues = append(issues, i.Message)
 	}
-	if s := strings.Join(issues, "|"); s != "the property animate of a link|the curve bumpY" {
+	if s := strings.Join(issues, "|"); s != "the curve bumpY" {
 		t.Errorf("unexpected issues %s", s)
 	}
 	// The id of a link in a group names the edge from the last node of

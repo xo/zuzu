@@ -196,7 +196,6 @@ func TestPieIssues(t *testing.T) {
 		{"---\nconfig:\n  pie:\n    legendPosition: center\n---\npie\n\"A\" : 1", "legend position center"},
 		{"---\nconfig:\n  theme: forest\n---\npie\n\"A\" : 1", "theme"},
 		{"---\nconfig:\n  themeVariables:\n    pie2: red\n---\npie\n\"A\" : 1", "themeVariables"},
-		{"---\nconfig:\n  look: handDrawn\n---\npie\n\"A\" : 1", "handDrawn"},
 		{"---\nconfig:\n  pie:\n    zuzu.textPlacement: middle\n---\npie\n\"A\" : 1", "text placement middle"},
 		{"---\nconfig:\n  pie:\n    zuzu.textPlacement: circle\n    textPosition: 0.5\n---\npie\n\"A\" : 1", "pie.textPosition"},
 	}

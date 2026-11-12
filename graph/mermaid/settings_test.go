@@ -148,6 +148,46 @@ func TestInertSettings(t *testing.T) {
 	}
 }
 
+func TestHints(t *testing.T) {
+	t.Parallel()
+	bodies := []string{
+		"flowchart LR\n  A --> B\n",
+		"stateDiagram-v2\n  A --> B\n",
+		"classDiagram\n  A --> B\n",
+		"erDiagram\n  A ||--o{ B : has\n",
+		"sequenceDiagram\n  A->>B: hi\n",
+		"pie\n  \"a\" : 1\n",
+		"gantt\n  dateFormat YYYY-MM-DD\n  section S\n  T : 2024-01-01, 1d\n",
+		"sankey\nA,B,1\n",
+		"journey\n  section S\n    T: 5: Me\n",
+		"architecture-beta\n  service a(server)[A]\n",
+		"mindmap\n  root\n",
+		"wardley-beta\ncomponent A [0.5, 0.5]\n",
+		"radar-beta\naxis A, B, C\ncurve c{1, 2, 3}\n",
+		"treemap-beta\n\"A\": 1\n",
+		"quadrantChart\n  A: [0.5, 0.5]\n",
+		"xychart-beta\n  bar [1, 2]\n",
+	}
+	// The look handDrawn and the layout elk are hints, in the config or
+	// at the top of the front matter, with a description (D32).
+	for _, fm := range []string{
+		"config:\n  look: handDrawn\n  layout: elk\n",
+		"look: handDrawn\nlayout: elk\ndescription: A diagram\n",
+	} {
+		for _, body := range bodies {
+			src := "---\n" + fm + "---\n" + body
+			if err := strictCheck(t, src); err != nil {
+				t.Errorf("%q: %v", src, err)
+			}
+		}
+	}
+	// Another layout stays an issue.
+	src := "---\nconfig:\n  layout: tidy\n---\nflowchart LR\n  A --> B\n"
+	if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
+		t.Errorf("%q: expected an unsupported setting, got %v", src, err)
+	}
+}
+
 func TestOldHTMLLabels(t *testing.T) {
 	t.Parallel()
 	for src, exp := range map[string]bool{

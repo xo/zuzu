@@ -39,6 +39,11 @@ type flowchart struct {
 	markdown map[string]bool
 	// edgeClasses are the classes of each edge by its id, in order.
 	edgeClasses map[string][]string
+	// animated holds the edges that animate or animation makes dashed.
+	// animClasses holds the line of the classDef of each class whose
+	// style has animation, which is an issue on a node.
+	animated    map[*graph.Edge]bool
+	animClasses map[string]int
 	// collapsed holds the line of each @{ view: collapsed } by the id that
 	// it names.
 	collapsed map[string]int
@@ -69,8 +74,8 @@ func newFlowchart(d *Diagram, strict bool) *flowchart {
 		nodes: map[string]*graph.Node{}, classes: map[string]map[string]string{}, nodeClasses: map[string][]string{},
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
-		nodeWrap: nodeWrap, markdown: map[string]bool{}, edgeClasses: map[string][]string{},
-		collapsed: map[string]int{},
+		nodeWrap: scaleWrap(nodeWrap), markdown: map[string]bool{}, edgeClasses: map[string][]string{},
+		collapsed: map[string]int{}, animated: map[*graph.Edge]bool{}, animClasses: map[string]int{},
 	}
 }
 
@@ -288,11 +293,18 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 	case "classDef":
 		names, css, _ := strings.Cut(rest, " ")
 		for n := range strings.SplitSeq(names, ",") {
-			st, err := f.css(css)
+			// A class can be on a link, so it keeps animation, until
+			// finish knows where the class is.
+			st, err := linkCSS(css, f.add)
 			if err != nil {
 				return err
 			}
-			f.classes[strings.TrimSpace(n)] = st
+			n = strings.TrimSpace(n)
+			f.classes[n] = st
+			delete(f.animClasses, n)
+			if _, ok := st["animation"]; ok {
+				f.animClasses[n] = f.line
+			}
 		}
 		return nil
 	case "class":
@@ -355,7 +367,8 @@ func (f *flowchart) link(id string) (*graph.Edge, bool) {
 }
 
 // linkProps reads the properties of an edge: its curve, which wins over
-// the curve of the links, or an animation, which is an issue.
+// the curve of the links, and its animation. animate: true and animation
+// fast or slow draw the edge dashed, as one still frame of Mermaid (D32).
 func (f *flowchart) linkProps(e *graph.Edge, body string) error {
 	m := inlineMap(body)
 	for _, k := range slices.Sorted(maps.Keys(m)) {
@@ -370,6 +383,26 @@ func (f *flowchart) linkProps(e *graph.Edge, body string) error {
 				continue
 			}
 			f.linkCurves[slices.Index(f.g.Edges, e)] = c
+		case "animate":
+			switch v {
+			case "true":
+				f.animated[e] = true
+			case "false":
+				delete(f.animated, e)
+			default:
+				if err := f.add("the property animate %s of a link", v); err != nil {
+					return err
+				}
+			}
+		case "animation":
+			switch v {
+			case "fast", "slow":
+				f.animated[e] = true
+			default:
+				if err := f.add("the animation %s of a link", v); err != nil {
+					return err
+				}
+			}
 		default:
 			if err := f.add("the property %s of a link", k); err != nil {
 				return err
@@ -938,7 +971,7 @@ func inlineMap(body string) map[string]string {
 func (f *flowchart) edge(a, b string, l *link, id string) {
 	e := &graph.Edge{
 		Source: a, Target: b, Label: l.text, MinLen: l.minlen, Head: l.head, Tail: l.tail, Style: map[string]string{}, Curve: f.curve,
-		Wrap: f.wrap.width(edgeWrap, l.markdown),
+		Wrap: f.wrap.width(scaleWrap(edgeWrap), l.markdown),
 	}
 	switch l.kind {
 	case "thick":
@@ -985,7 +1018,7 @@ func (f *flowchart) linkStyle(rest string) error {
 		}
 		curve, css = vc, more
 	}
-	st, err := f.css(css)
+	st, err := linkCSS(css, f.add)
 	if err != nil {
 		return err
 	}
@@ -1067,6 +1100,16 @@ func (f *flowchart) finish() error {
 		if c, ok := f.linkCurves[i]; ok {
 			e.Curve = c
 		}
+		// The style animation moves the dash of a link, and a still
+		// frame has no motion. Mermaid draws the dash of an animated
+		// link over its style.
+		delete(e.Style, "animation")
+		if f.animated[e] {
+			e.Style["strokeDash"] = animatedDash
+		}
+	}
+	if err := f.nodeAnimation(); err != nil {
+		return err
 	}
 	if err := f.collapse(); err != nil {
 		return err
@@ -1078,8 +1121,25 @@ func (f *flowchart) finish() error {
 		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)
 		n.Wrap = f.wrap.width(f.nodeWrap, f.markdown[n.ID])
 	}
-	if len(f.acc) > 0 {
-		f.g.Description = strings.Join(f.acc, " ")
+	f.g.Description = describe(f.d, f.acc...)
+	return nil
+}
+
+// nodeAnimation reports the style animation of each class on a node or a
+// subgraph, at the line of its classDef, and takes it out of the class.
+// The class default is on every node.
+func (f *flowchart) nodeAnimation() error {
+	for _, c := range slices.Sorted(maps.Keys(f.animClasses)) {
+		used := c == "default"
+		for _, names := range f.nodeClasses {
+			used = used || slices.Contains(names, c)
+		}
+		if used {
+			if err := f.issues.Add(fmt.Sprintf("line %d", f.animClasses[c]), "the style animation"); err != nil {
+				return err
+			}
+		}
+		delete(f.classes[c], "animation")
 	}
 	return nil
 }

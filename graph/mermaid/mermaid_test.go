@@ -1,6 +1,7 @@
 package mermaid
 
 import (
+	"encoding/json/v2"
 	"errors"
 	"strings"
 	"testing"
@@ -37,19 +38,15 @@ func TestFrontMatter(t *testing.T) {
 				t.Fatal(err)
 			}
 			got := any(d.Title)
-			if test.key != "title" {
-				got = d.Config[test.key]
+			if test.key == "description" {
+				got = d.Description
 			}
 			if got != test.exp {
 				t.Errorf("expected %q, got %q", test.exp, got)
 			}
 			// The config after the block still reads, and the block adds no
 			// key of its own.
-			want := 3
-			if test.key == "title" {
-				want = 2
-			}
-			if len(d.Config) != want || str(d.Config, "theme") != "dark" {
+			if len(d.Config) != 2 || str(d.Config, "theme") != "dark" {
 				t.Errorf("config %v", d.Config)
 			}
 			if v, _ := configNumber(d.Config, "pie", "textPosition"); v != 0.5 {
@@ -61,7 +58,7 @@ func TestFrontMatter(t *testing.T) {
 
 func TestFrontMatterOneIssue(t *testing.T) {
 	t.Parallel()
-	src := "---\ndescription: >-\n  A pie with `x: 1` and\n  more: text\n---\npie\n\"a\": 1\n"
+	src := "---\ndescription: >-\n  A pie with `x: 1` and\n  more: text\nowner: me\n---\npie\n\"a\": 1\n"
 	d, err := Read(src)
 	if err != nil {
 		t.Fatal(err)
@@ -70,8 +67,62 @@ func TestFrontMatterOneIssue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report) != 1 || !strings.Contains(report[0].Message, "the setting description") {
-		t.Errorf("expected one issue of description, got %v", report)
+	if len(report) != 1 || !strings.Contains(report[0].Message, "the setting owner") {
+		t.Errorf("expected one issue of owner, got %v", report)
+	}
+}
+
+func TestDescription(t *testing.T) {
+	t.Parallel()
+	fm := "---\ndescription: From the front\n---\n"
+	acc := "accDescr: the description\naccTitle: the title\n"
+	tests := []struct {
+		name, src, exp string
+	}{
+		{"flowchart", fm + "flowchart LR\n" + acc + "A --> B\n", "From the front the description the title"},
+		{"state", fm + "stateDiagram-v2\n" + acc + "A --> B\n", "From the front the description the title"},
+		{"class", fm + "classDiagram\n" + acc + "A --> B\n", "From the front the description the title"},
+		{"er", fm + "erDiagram\n" + acc + "A ||--o{ B : has\n", "From the front the description the title"},
+		{"front matter only", fm + "flowchart LR\nA --> B\n", "From the front"},
+		{"no front matter", "flowchart LR\n" + acc + "A --> B\n", "the description the title"},
+		{"pie", fm + "pie\n" + acc + "\"a\": 1\n", "From the front the description the title"},
+		{"sequence", fm + "sequenceDiagram\n" + acc + "A->>B: hi\n", "From the front the description the title"},
+		{"gantt", fm + "gantt\n" + acc + "dateFormat YYYY-MM-DD\nT : 2024-01-01, 1d\n", "From the front the description the title"},
+		{"empty gantt", fm + "gantt\n" + acc, "From the front the description the title"},
+		{"sankey", fm + "sankey\nA,B,1\n", "From the front"},
+		{"number", "---\ndescription: 42\n---\npie\n\"a\": 1\n", "42"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			d, err := Read(test.src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got string
+			if IsChart(d.Kind) {
+				b, _, _, err := Chart(d, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var spec struct {
+					Description string `json:"description"`
+				}
+				if err := json.Unmarshal(b, &spec); err != nil {
+					t.Fatal(err)
+				}
+				got = spec.Description
+			} else {
+				g, _, err := Graph(d, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = g.Description
+			}
+			if got != test.exp {
+				t.Errorf("expected %q, got %q", test.exp, got)
+			}
+		})
 	}
 }
 

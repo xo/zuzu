@@ -452,9 +452,7 @@ func (e *erDiagram) finish() error {
 			}
 		}
 	}
-	if len(e.acc) > 0 {
-		e.g.Description = strings.Join(e.acc, " ")
-	}
+	e.g.Description = describe(e.d, e.acc...)
 	return nil
 }
 
