@@ -2,7 +2,10 @@
 //
 // The output is deterministic: the same scene gives the same bytes. It uses
 // only the parts of SVG that okage renders: shapes, paths, text, linear and
-// radial gradients and clip paths, with no CSS (D13).
+// radial gradients and clip paths, with no CSS (D13). It also writes the link
+// of an item as an a element around it, and the tooltip of an item as a
+// title element inside it (D32), which okage does not draw. A link with a
+// scheme that scene.LinkAllowed refuses, such as javascript, is not written.
 package svg
 
 import (
@@ -150,7 +153,9 @@ func (w *writer) mark(m *scene.Mark) error {
 
 // group writes one group item: its background, its clip and its marks.
 func (w *writer) group(it *scene.Item) error {
+	w.open(it)
 	fmt.Fprintf(w.out, `<g transform="translate(%s,%s)">`, num(it.X), num(it.Y))
+	w.title(it)
 	if !it.Fill.IsZero() || !it.Stroke.IsZero() {
 		bg := *it
 		bg.X, bg.Y = 0, 0
@@ -177,6 +182,7 @@ func (w *writer) group(it *scene.Item) error {
 		w.out.WriteString("</g>")
 	}
 	w.out.WriteString("</g>")
+	w.closeLink(it)
 	return nil
 }
 
@@ -186,25 +192,28 @@ func (w *writer) rect(it *scene.Item) {
 	tl, tr, br, bl := shape.Corners(it)
 	if tl == tr && tr == br && br == bl {
 		r := math.Min(tl, math.Min(wd, ht)/2)
+		w.open(it)
 		fmt.Fprintf(w.out, `<rect x="%s" y="%s" width="%s" height="%s"`, num(x), num(y), num(wd), num(ht))
 		if r > 0 {
 			fmt.Fprintf(w.out, ` rx="%s"`, num(r))
 		}
 		w.style(it, "none")
-		w.out.WriteString("/>")
+		w.end(it, "rect")
 		return
 	}
+	w.open(it)
 	fmt.Fprintf(w.out, `<path d="%s"`, shape.RoundRect(x, y, wd, ht, tl, tr, br, bl))
 	w.style(it, "none")
-	w.out.WriteString("/>")
+	w.end(it, "path")
 }
 
 // rule writes a rule item, a line from (x, y) to (x2, y2).
 func (w *writer) rule(it *scene.Item) {
 	x2, y2 := shape.RuleEnd(it)
+	w.open(it)
 	fmt.Fprintf(w.out, `<line x1="%s" y1="%s" x2="%s" y2="%s"`, num(it.X), num(it.Y), num(x2), num(y2))
 	w.style(it, "none")
-	w.out.WriteString("/>")
+	w.end(it, "line")
 }
 
 // line writes a line mark: one path through its items, with the paint and
@@ -214,9 +223,10 @@ func (w *writer) line(items []scene.Item) error {
 	if !ok {
 		return fmt.Errorf("drawing a curve %q: %w", items[0].Interpolate, ErrUnsupportedCurve)
 	}
+	w.open(&items[0])
 	fmt.Fprintf(w.out, `<path d="%s"`, d)
 	w.style(&items[0], "none")
-	w.out.WriteString("/>")
+	w.end(&items[0], "path")
 	return nil
 }
 
@@ -226,17 +236,19 @@ func (w *writer) area(items []scene.Item) error {
 	if !ok {
 		return fmt.Errorf("drawing a curve %q: %w", items[0].Interpolate, ErrUnsupportedCurve)
 	}
+	w.open(&items[0])
 	fmt.Fprintf(w.out, `<path d="%s"`, d)
 	w.style(&items[0], "#000")
-	w.out.WriteString("/>")
+	w.end(&items[0], "path")
 	return nil
 }
 
 // trail writes a trail mark, filled with the paint of the first item.
 func (w *writer) trail(items []scene.Item) {
+	w.open(&items[0])
 	fmt.Fprintf(w.out, `<path d="%s"`, shape.TrailOf(items))
 	w.style(&items[0], "#000")
-	w.out.WriteString("/>")
+	w.end(&items[0], "path")
 }
 
 // symbol writes a symbol item at its position, rotated by its angle.
@@ -245,9 +257,10 @@ func (w *writer) symbol(it *scene.Item) error {
 	if !ok {
 		return fmt.Errorf("drawing a symbol %q: %w", it.Shape, ErrUnsupportedShape)
 	}
+	w.open(it)
 	fmt.Fprintf(w.out, `<path transform="%s" d="%s"`, transform(it.X, it.Y, it.Angle), d)
 	w.style(it, "none")
-	w.out.WriteString("/>")
+	w.end(it, "path")
 	return nil
 }
 
@@ -263,17 +276,19 @@ func transform(x, y, angle float64) string {
 
 // arc writes an arc item, a slice of a ring, at its position.
 func (w *writer) arc(it *scene.Item) {
+	w.open(it)
 	fmt.Fprintf(w.out, `<path transform="translate(%s,%s)" d="%s"`, num(it.X), num(it.Y),
 		shape.ArcOf(it))
 	w.style(it, "none")
-	w.out.WriteString("/>")
+	w.end(it, "path")
 }
 
 // path writes a path item at its position.
 func (w *writer) path(it *scene.Item) {
+	w.open(it)
 	fmt.Fprintf(w.out, `<path transform="%s" d="%s"`, transform(it.X, it.Y, it.Angle), esc(it.Path))
 	w.style(it, "none")
-	w.out.WriteString("/>")
+	w.end(it, "path")
 }
 
 // image writes an image item.
@@ -294,7 +309,10 @@ func (w *writer) image(it *scene.Item) {
 	if it.Smooth != nil && !*it.Smooth {
 		def.WriteString(` image-rendering="optimizeSpeed"`)
 	}
+	w.open(it)
+	tag := "use"
 	if !strings.HasPrefix(it.URL, "data:") {
+		tag = "image"
 		fmt.Fprintf(w.out, `<image x="%s" y="%s" %s`, num(it.X), num(it.Y), def.String())
 	} else {
 		id, ok := w.images[def.String()]
@@ -311,7 +329,7 @@ func (w *writer) image(it *scene.Item) {
 	if it.Opacity != nil {
 		fmt.Fprintf(w.out, ` opacity="%s"`, num(*it.Opacity))
 	}
-	w.out.WriteString("/>")
+	w.end(it, tag)
 }
 
 // text writes a text item. A stroke on text is a halo, which SVG draws under
@@ -321,6 +339,7 @@ func (w *writer) text(it *scene.Item) {
 		return
 	}
 	t := shape.TextOf(it, w.measure)
+	w.open(it)
 	fmt.Fprintf(w.out, `<text transform="%s"`, transform(t.X, t.Y, t.Angle))
 	if t.Anchor != "start" {
 		fmt.Fprintf(w.out, ` text-anchor="%s"`, t.Anchor)
@@ -340,6 +359,7 @@ func (w *writer) text(it *scene.Item) {
 	}
 	w.style(it, "#000")
 	w.out.WriteString(">")
+	w.title(it)
 	if len(t.Lines) == 1 {
 		w.out.WriteString(esc(t.Lines[0]))
 	} else {
@@ -352,6 +372,42 @@ func (w *writer) text(it *scene.Item) {
 		}
 	}
 	w.out.WriteString("</text>")
+	w.closeLink(it)
+}
+
+// open writes the start of the link of an item, if it has a link that
+// scene.LinkAllowed accepts.
+func (w *writer) open(it *scene.Item) {
+	if it.Href != "" && scene.LinkAllowed(it.Href) {
+		fmt.Fprintf(w.out, `<a href="%s">`, esc(it.Href))
+	}
+}
+
+// closeLink writes the end of the link of an item, if open wrote its start.
+func (w *writer) closeLink(it *scene.Item) {
+	if it.Href != "" && scene.LinkAllowed(it.Href) {
+		w.out.WriteString("</a>")
+	}
+}
+
+// title writes the tooltip of an item as a title element, if it has one.
+func (w *writer) title(it *scene.Item) {
+	if it.Tooltip != "" {
+		fmt.Fprintf(w.out, "<title>%s</title>", esc(string(it.Tooltip)))
+	}
+}
+
+// end ends the element tag of an item, with its tooltip as a title inside
+// it, and then its link.
+func (w *writer) end(it *scene.Item, tag string) {
+	if it.Tooltip == "" {
+		w.out.WriteString("/>")
+	} else {
+		w.out.WriteString(">")
+		w.title(it)
+		fmt.Fprintf(w.out, "</%s>", tag)
+	}
+	w.closeLink(it)
 }
 
 // style writes the paint of an item. fill is the fill to write when the item

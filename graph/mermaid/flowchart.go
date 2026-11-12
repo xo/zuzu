@@ -56,6 +56,8 @@ type flowchart struct {
 	// next line.
 	cont    []string
 	pending *pendingLink
+	// clicks are the statements click, which finish applies.
+	clicks []click
 	// acc holds the texts of accTitle and accDescr, which join into the
 	// description of the graph.
 	acc []string
@@ -335,7 +337,14 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 		return nil
 	case "linkStyle":
 		return f.linkStyle(rest)
-	case "click", "callback", "href":
+	case "click":
+		c, err := parseClick(word, rest, f.line)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", f.line, err)
+		}
+		f.clicks = append(f.clicks, c)
+		return nil
+	case "callback", "href":
 		return f.add("the interaction %s", word)
 	}
 	if m := linkPropsRE.FindStringSubmatch(st); m != nil {
@@ -1086,6 +1095,9 @@ func (f *flowchart) subgraphEdges() error {
 
 // finish applies the classes and the styles, and the styles of the links.
 func (f *flowchart) finish() error {
+	if err := applyClicks(f.issues, f.clicks, func(id string) *graph.Node { return f.nodes[id] }); err != nil {
+		return err
+	}
 	for _, i := range slices.Sorted(maps.Keys(f.linkStyles)) {
 		if i >= len(f.g.Edges) {
 			return fmt.Errorf("the linkStyle of the link %d, of %d links: %w", i, len(f.g.Edges), ErrSyntax)

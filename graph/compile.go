@@ -206,6 +206,17 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	var nodes, edges, clusters []any
 	media, html := false, false
+	// links says whether a node, an edge or a cluster has a link or a
+	// tooltip, so that each mark encodes them (D32).
+	links := false
+	link := func(r map[string]any, href, tooltip string) {
+		if href != "" {
+			r["href"], links = href, true
+		}
+		if tooltip != "" {
+			r["tooltip"], links = tooltip, true
+		}
+	}
 	paints := map[string][]string{}
 	add := func(kind, sig string) {
 		if !slices.Contains(paints[kind], sig) {
@@ -256,6 +267,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if labelRow(r, "x", n.XLabel, n.XHTML) {
 			html = true
 		}
+		link(r, n.Href, n.Tooltip)
 		style(r, n.Style)
 		add("node", signature(r, paintKeys, "_paint"))
 		text := signature(r, textKeys, "_text")
@@ -346,6 +358,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			size *= e.ArrowSize * e.ArrowSize
 		}
 		r["arrowSize"] = size
+		link(r, e.Href, e.Tooltip)
 		style(r, e.Style)
 		add("edge", signature(r, []string{"stroke", "strokeWidth", "strokeDash"}, "_paint"))
 		text := signature(r, textKeys, "_text")
@@ -387,6 +400,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			r["html"], r["label"] = c.HTML, ""
 			html = true
 		}
+		link(r, c.Href, c.Tooltip)
 		style(r, c.Style)
 		add("cluster", signature(r, paintKeys, "_paint"))
 		add("clusterText", signature(r, textKeys, "_text"))
@@ -577,6 +591,17 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
 		}, map[string]string{"textColor": "fill"}))
 	}
+	if links {
+		// Each mark draws a part of a node, an edge or a cluster, and each
+		// row of the layout holds the link and the tooltip of its part.
+		for _, m := range marks {
+			mm, _ := m.(map[string]any)
+			sets, _ := mm["encode"].(map[string]any)
+			if enc, ok := sets["update"].(map[string]any); ok {
+				enc["href"], enc["tooltip"] = field("href"), field("tooltip")
+			}
+		}
+	}
 	padding := 8.0
 	if g.Padding != nil {
 		padding = *g.Padding
@@ -597,6 +622,18 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	if g.Description != "" {
 		spec["description"] = g.Description
+	}
+	// The link and the tooltip of the diagram go on the group of the whole
+	// diagram.
+	root := map[string]any{}
+	if g.Href != "" {
+		root["href"] = map[string]any{"value": g.Href}
+	}
+	if g.Tooltip != "" {
+		root["tooltip"] = map[string]any{"value": g.Tooltip}
+	}
+	if len(root) > 0 {
+		spec["encode"] = map[string]any{"update": root}
 	}
 	b, err := json.Marshal(spec, json.Deterministic(true))
 	if err != nil {

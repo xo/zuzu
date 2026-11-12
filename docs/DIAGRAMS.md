@@ -55,6 +55,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `splines` | curved or straight edges. Another value is an issue |
 | the graph | `layout` | `dot`. Another layout is an issue |
 | the graph, a node, an edge, a cluster | `colorscheme` | the color scheme of its colors, as below |
+| the graph, a node, an edge, a cluster | `URL`, `href`, `tooltip` | the link and the tooltip, as "Links and tooltips" says |
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
 | a node | `shape` | the shape, as below |
 | a node | `sides`, `skew`, `distortion`, `orientation`, `regular` | the polygon of the shape `polygon`, as below. Another shape draws without `sides`, `skew` and `distortion`, as in Graphviz. An `orientation` that is not 0, or `regular=true`, on another shape is an issue |
@@ -311,10 +312,28 @@ part of a label of HTML that okage does not read, such as `href` or
 `<img>`, are issues. A label of HTML that is not valid is an
 error with its line and column.
 
-`URL`, `href` and `tooltip` on a node or an edge are issues. Vega has the
-encodings `href` and `tooltip` for them. The scene graph of zuzu holds no
-link and no tooltip, and the SVG writer writes neither, so zuzu has no
-place to put them.
+`target` and the links and tooltips of the parts of an edge, such as
+`headURL`, `labeltooltip` or `edgehref`, are issues.
+
+### Links and tooltips
+
+`URL` or `href` gives a link to the graph, a cluster, a node or an edge,
+and `tooltip` gives it a tooltip (D32). `href` wins over `URL`, as in
+Graphviz. The SVG writes the link as an `<a href>` around each shape of
+the part, and the tooltip as a `<title>` inside it. A node puts them on its
+shape and its labels. An edge puts them on its line, its arrowheads and
+its labels. A cluster puts them on its box and its title. The graph puts
+them on the group that holds the whole diagram. The image of `Image`
+draws neither.
+
+In a link and a tooltip, `\G` is the name of the graph, or of the cluster,
+`\N` is the name of the node, `\E` is the edge, as `a->b`, `\T` and `\H`
+are its tail and its head, and `\L` is the label. In a tooltip, `\n`,
+`\l` and `\r` end a line.
+
+A link with a scheme that zuzu does not write, such as `javascript:`, is an
+issue, and the part has no link. "Links" in `docs/API.md` lists the schemes
+that zuzu writes.
 
 ## Mermaid
 
@@ -638,10 +657,11 @@ Without `inheritDir`, a subgraph with no direction takes the direction of
 the subgraph that holds it, as the subgraphs above say. With
 `inheritDir: true`, it takes the direction of the flowchart, as in Mermaid.
 
-These parts are issues: `click`, a callback and `href`, the `theme` and
-the `themeVariables` of Mermaid, which draw in the look of zuzu, the other
-settings of the section `flowchart`, such as `minNodeWidth`, and any other
-style, such as `animation` on a node.
+These parts are issues: a callback of `click` and the target of a link, as
+"Links and tooltips" says, a statement that starts with `callback` or
+`href`, the `theme` and the `themeVariables` of Mermaid, which draw in the
+look of zuzu, the other settings of the section `flowchart`, such as
+`minNodeWidth`, and any other style, such as `animation` on a node.
 
 ### Icons and images
 
@@ -741,7 +761,10 @@ more`, `more` is a second description, up to the next colon.
 line starts with a brace. A blank line between them is an error, as in
 Mermaid.
 
-These parts are issues: `scale`, `click`, a floating note with no state,
+A state takes a link and a tooltip from `click`, as "Links and tooltips"
+says.
+
+These parts are issues: `scale`, a floating note with no state,
 such as `note "text" as N1`, a kind of state other than `choice`, `fork`
 and `join`, which draws as a state, the settings of the section `state` of
 the config other than `wrappingWidth`, the `theme` and the
@@ -819,7 +842,10 @@ namespace `Company`, goes in the same cluster. The setting
 `class.hierarchicalNamespaces: false` draws each namespace as one cluster
 with its whole name as its title, as Mermaid does.
 
-These parts are issues: `click`, `link` and `callback`, the settings of
+A class takes a link and a tooltip from `click`, `link` and `callback`, as
+"Links and tooltips" says.
+
+These parts are issues: a callback, the settings of
 the section `class` of the config other than `hideEmptyMembersBox` and
 `hierarchicalNamespaces`, the `theme` and the `themeVariables` of
 Mermaid, and a style that a flowchart does not read.
@@ -970,6 +996,33 @@ of Mermaid, and a style that a flowchart does not read. A relation to a
 name that is not a requirement or an element is an error, as in Mermaid.
 A name that is a requirement and also an element is an error. Mermaid
 draws its two boxes on top of each other.
+
+### Links and tooltips
+
+`click` in a flowchart and a state diagram, and `click`, `link` and
+`callback` in a class diagram, give a node a link and a tooltip (D32).
+These are the forms:
+
+```
+click A "https://example.com" "a tooltip"
+click A href "https://example.com" "a tooltip" _blank
+click A callback "a tooltip"
+click A call callback(arg) "a tooltip"
+click A,B "page.html"
+link A "https://example.com" "a tooltip"
+callback A "callback" "a tooltip"
+```
+
+The tooltip and the target, such as `_blank`, are optional. A URL fills
+the link, and a tooltip fills the tooltip. The SVG writes the link as an
+`<a href>` around the shape and the label of the node, and the tooltip as a
+`<title>` inside them. The image of `Image` draws neither.
+
+These parts are issues: a callback, because no script runs, a target,
+which the SVG does not write, a link with a scheme that zuzu does not
+write, such as `javascript:`, and an id that names no node. Mermaid writes
+the link of `javascript:` as `about:blank` and ignores an id that names no
+node. "Links" in `docs/API.md` lists the schemes that zuzu writes.
 
 ### Labels that wrap
 

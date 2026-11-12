@@ -94,6 +94,7 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 	defaults := s.rt.markDefaults(m)
 	_, configStroke := defaults["stroke"]
 	states := make([]*itemState, len(data))
+	badLink := false
 	for i, d := range data {
 		st := newItemState(d)
 		st.facet = i
@@ -101,6 +102,9 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			setProp(st, k, v)
 		}
 		if err := s.encodeItem(m.Encode, st, d, path); err != nil {
+			return nil, err
+		}
+		if err := s.linkIssue(st.it, path, &badLink); err != nil {
 			return nil, err
 		}
 		if m.Type == scene.Symbol && configStroke && st.it.Size != nil && *st.it.Size < minRingSize {

@@ -22,6 +22,8 @@ type stateDiagram struct {
 	// composite state.
 	states     map[string]*state
 	composites map[string]*graph.Cluster
+	// clicks are the statements click, which finish applies.
+	clicks []click
 	// descs holds the descriptions of each state, simple or composite.
 	descs map[string][]string
 	notes []*stateNote
@@ -261,7 +263,12 @@ func (s *stateDiagram) stmt(t string, lines []Line, i int) error {
 	case word == "scale":
 		return s.add("the scale of a state diagram")
 	case word == "click":
-		return s.add("the interaction click")
+		c, err := parseClick(word, rest, s.line)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", s.line, err)
+		}
+		s.clicks = append(s.clicks, c)
+		return nil
 	}
 	if a, b, ok := strings.Cut(t, "-->"); ok {
 		return s.transition(a, b)
@@ -549,6 +556,15 @@ func (s *stateDiagram) note(lines []Line, i int) (int, error) {
 // finish sets the labels from the descriptions, adds the notes, and applies
 // the classes and the styles.
 func (s *stateDiagram) finish() error {
+	err := applyClicks(s.issues, s.clicks, func(id string) *graph.Node {
+		if st, ok := s.states[id]; ok {
+			return st.node
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	for _, n := range s.g.Nodes {
 		d := s.descs[n.ID]
 		switch {

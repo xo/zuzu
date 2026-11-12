@@ -3,7 +3,10 @@ package zuzu
 import (
 	"encoding/json/v2"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
+	"strings"
 
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
@@ -471,9 +474,74 @@ func setProp(st *itemState, name string, v any) {
 		it.Smooth = &b
 	case "clip":
 		it.Clip = expr.Truthy(v)
+	case "href":
+		it.Href = str()
+	case "tooltip":
+		it.Tooltip = scene.Tooltip(tooltipText(v))
 	}
-	// Other properties, such as tooltip, description and cursor, change
-	// nothing that zuzu draws.
+	// Other properties, such as description and cursor, change nothing that
+	// zuzu draws.
+}
+
+// tooltipText writes the value of a tooltip as the text that Vega shows
+// without a plugin: an object as one line "key: value" for each of its
+// fields, in the order of their keys, an array as [a, b], and any other
+// value as its text. A value in an object or an array that is itself an
+// object or an array shows as {…} or […]. null and undefined show nothing.
+func tooltipText(v any) string {
+	if v == nil || expr.IsUndefined(v) {
+		return ""
+	}
+	inner := func(v any) string {
+		switch x := v.(type) {
+		case []any:
+			return "[…]"
+		case map[string]any:
+			return "{…}"
+		case nil:
+			return "null"
+		default:
+			return expr.String(x)
+		}
+	}
+	array := func(l []any) string {
+		parts := make([]string, len(l))
+		for i, e := range l {
+			parts[i] = inner(e)
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
+	}
+	switch x := v.(type) {
+	case []any:
+		return array(x)
+	case map[string]any:
+		lines := make([]string, 0, len(x))
+		for _, k := range slices.Sorted(maps.Keys(x)) {
+			if l, ok := x[k].([]any); ok {
+				lines = append(lines, k+": "+array(l))
+				continue
+			}
+			lines = append(lines, k+": "+inner(x[k]))
+		}
+		return strings.Join(lines, "\n")
+	}
+	return expr.String(v)
+}
+
+// linkIssue clears the link of an item when LinkAllowed refuses it, and
+// returns the issue of the mark for the first such item. reported says
+// whether the mark has its issue already.
+func (s *scope) linkIssue(it *scene.Item, path string, reported *bool) error {
+	if it.Href == "" || scene.LinkAllowed(it.Href) {
+		return nil
+	}
+	href := it.Href
+	it.Href = ""
+	if *reported {
+		return nil
+	}
+	*reported = true
+	return s.rt.issue(vega.ErrUnsupported, path+"/encode", "the link %q, whose scheme zuzu does not write", href)
 }
 
 // zeroNaN returns 0 for NaN.

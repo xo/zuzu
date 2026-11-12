@@ -14,6 +14,8 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 )
 
 // Scene is a scene graph and the canvas that it draws on.
@@ -138,6 +140,14 @@ type Item struct {
 	Clip  bool   `json:"clip,omitzero"`
 	Items []Mark `json:"items,omitzero"`
 
+	// Href is the link of the item, a URL that a click opens, as the
+	// encoding href of Vega gives it. A renderer writes it only when
+	// LinkAllowed reports true for it.
+	Href string `json:"href,omitzero"`
+	// Tooltip is the text that shows when the pointer is over the item, as
+	// the encoding tooltip of Vega gives it.
+	Tooltip Tooltip `json:"tooltip,omitzero"`
+
 	// Datum is the row of data that the item draws, which the runtime keeps
 	// for the comparison with vega.js (D17). It is not written to JSON.
 	Datum any `json:"-"`
@@ -201,6 +211,63 @@ func (l Lines) MarshalJSONTo(enc *jsontext.Encoder) error {
 		return json.MarshalEncode(enc, l[0])
 	}
 	return json.MarshalEncode(enc, []string(l))
+}
+
+// Tooltip is the text of a tooltip. vega.js writes a tooltip as any value,
+// such as an object, and a value that is not a string reads as its JSON.
+type Tooltip string
+
+// UnmarshalJSONFrom reads a string, or any other value as its JSON.
+func (t *Tooltip) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	v, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	if v.Kind() == '"' {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			return err
+		}
+		*t = Tooltip(s)
+		return nil
+	}
+	if v.Kind() == 'n' {
+		*t = ""
+		return nil
+	}
+	if err := v.Compact(); err != nil {
+		return err
+	}
+	*t = Tooltip(v)
+	return nil
+}
+
+// linkSchemes are the schemes of a link that LinkAllowed accepts.
+var linkSchemes = []string{"http", "https", "mailto", "ftp", "tel"}
+
+// LinkAllowed reports whether a renderer can write a link. A link with no
+// scheme, such as page.html, /a/b or #part, is allowed, and so is a link
+// with the scheme http, https, mailto, ftp or tel. Any other scheme, such
+// as javascript or data, can run a script or hide a page, so it is not
+// allowed. The check reads the link as a browser does: it ignores the
+// spaces and the control characters in it and the case of the scheme.
+func LinkAllowed(href string) bool {
+	var b strings.Builder
+	for _, r := range href {
+		if r > ' ' && r != 0x7f {
+			b.WriteRune(r)
+		}
+	}
+	s := b.String()
+	if s == "" {
+		return false
+	}
+	i := strings.IndexAny(s, ":/?#")
+	if i < 0 || s[i] != ':' {
+		// A relative link: no colon comes before the first /, ? or #.
+		return true
+	}
+	return slices.Contains(linkSchemes, strings.ToLower(s[:i]))
 }
 
 // Weight is the weight of a font, such as bold or 600. Vega writes it as a

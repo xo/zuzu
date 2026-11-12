@@ -63,6 +63,9 @@ type Graph struct {
 	// Description is the text of the diagram for a screen reader, or
 	// empty. Compile writes it as the description of the spec.
 	Description string
+	// Href and Tooltip are the link and the tooltip of the whole diagram,
+	// or empty (D32).
+	Href, Tooltip string
 }
 
 // Node is a node of a graph.
@@ -117,6 +120,9 @@ type Node struct {
 	// its spaces into lines that are not wider. The label of a node with
 	// fields or HTML does not wrap.
 	Wrap float64
+	// Href is the link of the node and Tooltip its tooltip, or empty
+	// (D32). Its shape and its labels take them.
+	Href, Tooltip string
 }
 
 // Media is the icon or the image of a node (D31).
@@ -210,6 +216,9 @@ type Edge struct {
 	// Wrap is the width in pixels at which the label wraps, as Node.Wrap,
 	// or 0 for a label that does not wrap.
 	Wrap float64
+	// Href and Tooltip are the link and the tooltip of the edge, or empty
+	// (D32). Its line, its arrowheads and its labels take them.
+	Href, Tooltip string
 }
 
 // Cluster is a cluster of nodes, as a subgraph of DOT or Mermaid.
@@ -224,4 +233,7 @@ type Cluster struct {
 	// graph.
 	Direction string
 	Style     map[string]string
+	// Href and Tooltip are the link and the tooltip of the cluster, or
+	// empty (D32). Its box and its title take them.
+	Href, Tooltip string
 }

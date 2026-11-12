@@ -83,3 +83,61 @@ func TestPaintReadsEachForm(t *testing.T) {
 		t.Errorf("got %+v", items)
 	}
 }
+
+// TestLinkAndTooltipReadEachForm reads a link and a tooltip of each form,
+// and writes them back.
+func TestLinkAndTooltipReadEachForm(t *testing.T) {
+	t.Parallel()
+	in := `{"width":1,"height":1,"root":{"marktype":"rect","items":[` +
+		`{"href":"a.html","tooltip":"text"},{"tooltip":{"a": 1}},{"tooltip":2},{"tooltip":null}]}}`
+	s, err := Decode(bytes.NewReader([]byte(in)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := s.Root.Items
+	for i, want := range []Tooltip{"text", `{"a":1}`, "2", ""} {
+		if items[i].Tooltip != want {
+			t.Errorf("item %d: got the tooltip %q, want %q", i, items[i].Tooltip, want)
+		}
+	}
+	var b bytes.Buffer
+	if err := Encode(&b, s); err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"href":"a.html","tooltip":"text"}`; !bytes.Contains(b.Bytes(), []byte(want)) {
+		t.Errorf("got %s, want it to hold %s", b.String(), want)
+	}
+}
+
+// TestLinkAllowedRefusesEachScriptScheme checks the links that a renderer
+// writes and the ones that it does not.
+func TestLinkAllowedRefusesEachScriptScheme(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		href string
+		want bool
+	}{
+		{"https://example.com/a?b=c", true},
+		{"HTTP://example.com", true},
+		{"mailto:someone@example.com", true},
+		{"ftp://example.com/f", true},
+		{"tel:+15550100", true},
+		{"page.html", true},
+		{"/a/b:c", true},
+		{"?q=a:b", true},
+		{"#part", true},
+		{"", false},
+		{"javascript:alert(1)", false},
+		{"JavaScript:alert(1)", false},
+		{" java\tscript:alert(1)", false},
+		{"java\nscript:alert(1)", false},
+		{"data:text/html,<b>x</b>", false},
+		{"vbscript:x", false},
+		{"notes://do-your-thing/id", false},
+		{"file:///etc/passwd", false},
+	} {
+		if got := LinkAllowed(c.href); got != c.want {
+			t.Errorf("LinkAllowed(%q): got %v, want %v", c.href, got, c.want)
+		}
+	}
+}

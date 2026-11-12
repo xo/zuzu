@@ -1,0 +1,95 @@
+{
+ "width": 240,
+ "height": 120,
+ "background": "#ffffff",
+ "root": {
+  "marktype": "group",
+  "role": "frame",
+  "items": [
+   {
+    "x": 10,
+    "y": 10,
+    "width": 220,
+    "height": 100,
+    "href": "https://example.com/group?a=1&b=2",
+    "tooltip": "the group",
+    "items": [
+     {
+      "marktype": "rect",
+      "items": [
+       {
+        "x": 0,
+        "y": 0,
+        "width": 60,
+        "height": 40,
+        "fill": "#5b6ee1",
+        "href": "#part",
+        "tooltip": "a <rect> & \"quotes\""
+       },
+       {
+        "x": 70,
+        "y": 0,
+        "width": 60,
+        "height": 40,
+        "fill": "#1fa187",
+        "href": "javascript:alert(1)",
+        "tooltip": "a link that is not written"
+       },
+       {
+        "x": 140,
+        "y": 0,
+        "width": 60,
+        "height": 40,
+        "fill": "#f0a830",
+        "tooltip": {"a": 1, "b": "two"}
+       }
+      ]
+     },
+     {
+      "marktype": "symbol",
+      "items": [
+       {
+        "x": 30,
+        "y": 70,
+        "size": 200,
+        "fill": "#5b6ee1",
+        "href": "mailto:someone@example.com"
+       }
+      ]
+     },
+     {
+      "marktype": "text",
+      "items": [
+       {
+        "x": 100,
+        "y": 70,
+        "text": ["two", "lines"],
+        "fontSize": 11,
+        "fill": "#1b2230",
+        "href": "page.html",
+        "tooltip": "first\nsecond"
+       }
+      ]
+     },
+     {
+      "marktype": "line",
+      "items": [
+       {
+        "x": 140,
+        "y": 60,
+        "stroke": "#5b6ee1",
+        "strokeWidth": 2,
+        "href": "https://example.com/line",
+        "tooltip": "the line"
+       },
+       {
+        "x": 200,
+        "y": 90
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

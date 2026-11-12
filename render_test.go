@@ -142,6 +142,66 @@ func TestFeatureMode(t *testing.T) {
 	}
 }
 
+// TestLinksAndTooltips fills the link and the tooltip of each item from the
+// encodings href and tooltip, writes them in the SVG, and reports a link
+// whose scheme zuzu does not write.
+func TestLinksAndTooltips(t *testing.T) {
+	t.Parallel()
+	src := []byte(`{"$schema": "https://vega.github.io/schema/vega/v5.json",
+		"encode": {"update": {"tooltip": {"value": "the chart"}}},
+		"data": [{"name": "d", "values": [
+			{"a": 1, "u": "https://example.com/1", "l": [1, [2]], "o": {"p": 1}},
+			{"a": 2, "u": "javascript:alert(2)"},
+			{"a": 3, "u": "javascript:alert(3)"}]}],
+		"marks": [{"type": "rect", "from": {"data": "d"}, "encode": {"update": {
+			"x": {"field": "a"}, "width": {"value": 1}, "height": {"value": 1},
+			"href": {"field": "u"},
+			"tooltip": {"signal": "datum.a === 1 ? {b: datum.l, a: datum.a, o: datum.o} : datum.a === 2 ? [datum.a, 'x'] : null"}}}}]}`)
+	c, _, err := Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, report, err := c.Render(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 1 || !errors.Is(report[0], vega.ErrUnsupported) || !strings.Contains(report[0].Error(), "javascript:alert(2)") {
+		t.Errorf("report = %v, want one issue for the link javascript:alert(2)", report)
+	}
+	if got := s.Root.Items[0].Tooltip; got != "the chart" {
+		t.Errorf("the tooltip of the root = %q, want %q", got, "the chart")
+	}
+	items := s.Root.Items[0].Items[0].Items
+	for i, want := range []struct {
+		href    string
+		tooltip scene.Tooltip
+	}{
+		{"https://example.com/1", "a: 1\nb: [1, […]]\no: {…}"},
+		{"", "[2, x]"},
+		{"", ""},
+	} {
+		if items[i].Href != want.href || items[i].Tooltip != want.tooltip {
+			t.Errorf("item %d: got %q and %q, want %q and %q", i, items[i].Href, items[i].Tooltip, want.href, want.tooltip)
+		}
+	}
+	var b bytes.Buffer
+	if _, err := c.SVG(t.Context(), &b); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`<a href="https://example.com/1">`, "<title>a: 1\nb: [1, […]]\no: {…}</title>", "<title>the chart</title>"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("the SVG does not hold %s:\n%s", want, b.String())
+		}
+	}
+	strict, _, err := Parse(src, WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := strict.Render(t.Context()); !errors.Is(err, vega.ErrUnsupported) {
+		t.Errorf("strict render = %v, want %v", err, vega.ErrUnsupported)
+	}
+}
+
 func TestData(t *testing.T) {
 	t.Parallel()
 	src := []byte(`{"$schema": "https://vega.github.io/schema/vega/v5.json",

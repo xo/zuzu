@@ -112,6 +112,34 @@ func TestBackground(t *testing.T) {
 	}
 }
 
+// TestDiagramLinks draws the links and the tooltips of a diagram: on the
+// whole diagram, on a node and its label, on an edge and its label, on a
+// cluster and its title, and on a label of HTML.
+func TestDiagramLinks(t *testing.T) {
+	t.Parallel()
+	src := `digraph { URL="https://example.com/g"; tooltip="all"
+	subgraph cluster_x { label="Box"; URL="https://example.com/c"; b }
+	a [label="First" URL="https://example.com/a" tooltip="node a"]
+	h [label=<<b>Bold</b>> href="https://example.com/h"]
+	a -> b [label="goes" tooltip="edge"]
+	b -> h }`
+	s, report, err := svgOf(t, src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{
+		`<a href="https://example.com/g"><g transform`, `<title>all</title>`,
+		`<a href="https://example.com/a"><path`, `<a href="https://example.com/a"><text`, `<title>node a</title>First</text>`,
+		`<title>edge</title>goes</text>`,
+		`<a href="https://example.com/c"><rect`, `<title>edge</title></path>`,
+		`<a href="https://example.com/h"><text`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the SVG has no %s:\n%s", want, s)
+		}
+	}
+}
+
 // svgOf parses a source and renders it as SVG.
 func svgOf(t *testing.T, src string, strict bool, opts ...RenderOption) (string, Report, error) {
 	t.Helper()

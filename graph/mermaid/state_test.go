@@ -209,7 +209,7 @@ func TestStateIssues(t *testing.T) {
 	t.Parallel()
 	tests := []struct{ src, exp string }{
 		{"scale 350 width\na", "the scale of a state diagram"},
-		{"click a call cb()\na", "the interaction click"},
+		{"click a call cb()\na", "the callback cb(), since no script runs"},
 		{`note "floating" as N1`, "a note that floats, with no state"},
 		{"state h <<history>>", "the kind of state history, drawn as a state"},
 		{"a\nclassDef x text-decoration:underline", "the style text-decoration"},

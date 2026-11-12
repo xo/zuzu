@@ -432,7 +432,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			out = append(out, h.rows(r, np.X, np.Y, in.Nodes[i].Shape)...)
 		}
 		if h, ok := xhtmls[i]; ok {
-			out = append(out, h.rows(Row{"key": r["key"], "textColor": r["textColor"]}, np.XLabelX, np.XLabelY, "")...)
+			out = append(out, h.rows(linkRow(Row{"key": r["key"], "textColor": r["textColor"]}, r), np.XLabelX, np.XLabelY, "")...)
 		}
 		if rec, ok := records[i]; ok {
 			var fs []Row
@@ -478,7 +478,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			{"tail", ep.TailLabelX, ep.TailLabelY, end}, {"x", ep.XLabelX, ep.XLabelY, r["textColor"]},
 		} {
 			if h, ok := hs[l.name]; ok {
-				out = append(out, h.rows(Row{"key": r["key"], "stroke": r["stroke"], "textColor": l.color}, l.x, l.y, "")...)
+				out = append(out, h.rows(linkRow(Row{"key": r["key"], "stroke": r["stroke"], "textColor": l.color}, r), l.x, l.y, "")...)
 			}
 		}
 	}
@@ -490,7 +490,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o["depth"], o["titleX"], o["titleY"] = float64(cp.Depth), cp.TitleX, cp.TitleY
 		out = append(out, o)
 		if h, ok := clusterHTMLs[i]; ok && cp.Width > 0 {
-			out = append(out, h.rows(Row{"key": r["key"], "stroke": r["stroke"], "textColor": r["textColor"]}, cp.TitleX+h.lay.Width/2, cp.TitleY+h.lay.Height/2, "")...)
+			out = append(out, h.rows(linkRow(Row{"key": r["key"], "stroke": r["stroke"], "textColor": r["textColor"]}, r), cp.TitleX+h.lay.Width/2, cp.TitleY+h.lay.Height/2, "")...)
 		}
 	}
 	// A title of HTML sits above the layout, at its left.
@@ -619,4 +619,10 @@ func wrapText(s string, limit float64, breakWords bool, width func(string) float
 		}
 	}
 	return out
+}
+
+// linkRow copies the link and the tooltip of src into dst, and returns dst.
+func linkRow(dst, src Row) Row {
+	copyLink(dst, src)
+	return dst
 }

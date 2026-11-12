@@ -1,0 +1,10 @@
+flowchart LR
+  A[Home] --> B[Guide]
+  A --> C[Section]
+  B --> D[Mail]
+  C --> E[Notes]
+  click A "https://example.com/" "the home page"
+  click B href "https://example.com/guide" "read the guide"
+  click C "#section"
+  click D href "mailto:docs@example.com"
+  click E call showNotes() "the notes"

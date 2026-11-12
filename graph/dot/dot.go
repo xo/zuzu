@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/xo/zuzu/graph"
+	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -204,6 +205,8 @@ type parser struct {
 	strict  bool
 	ranks   int
 	edgeOps string
+	// name is the name of the graph, which \G names in a link.
+	name string
 }
 
 func (p *parser) peek() token { return p.toks[p.pos] }
@@ -259,7 +262,7 @@ func Parse(src string, strict bool) (*graph.Graph, vega.Report, error) {
 	}
 	p.next()
 	if p.peek().kind == tID {
-		p.next()
+		p.name = p.next().text
 	}
 	if err := p.expect("{"); err != nil {
 		return nil, nil, err
@@ -463,6 +466,9 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 		if err := p.paint(cl.Style, attrs, true, "line "+strconv.Itoa(p.peek().line)); err != nil {
 			return nil, err
 		}
+		if cl.Href, cl.Tooltip, err = p.link(attrs, "subgraph "+name, map[byte]string{'G': name}); err != nil {
+			return nil, err
+		}
 	}
 	if r := cmp.Or(attrs["rank"], inherited); r != "" {
 		switch r {
@@ -481,6 +487,13 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 	for _, k := range slices.Sorted(maps.Keys(attrs)) {
 		switch k {
 		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "penwidth", "pencolor", "gradientangle", "colorscheme":
+		case urlAttr, "href", "tooltip":
+			if cl == nil {
+				// Graphviz links only the box of a cluster.
+				if err := p.issues.Add("subgraph "+name, "the attribute %s of a subgraph that is not a cluster", k); err != nil {
+					return nil, err
+				}
+			}
 		default:
 			if err := p.issues.Add("subgraph "+name, "the attribute %s of a subgraph", k); err != nil {
 				return nil, err
@@ -638,7 +651,7 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 			e.TargetPort = v
 		case "tailport":
 			e.SourcePort = v
-		case "color", "penwidth", "style", "fontcolor", "fontsize", "colorscheme":
+		case "color", "penwidth", "style", "fontcolor", "fontsize", "colorscheme", urlAttr, "href", "tooltip":
 		default:
 			if err := p.issues.Add(path, "the attribute %s of an edge", k); err != nil {
 				return err
@@ -653,6 +666,16 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 	e.TailLabel, e.TailHTML = labels["taillabel"][0], labels["taillabel"][1]
 	e.XLabel, e.XHTML = labels["xlabel"][0], labels["xlabel"][1]
 	if err := p.paint(e.Style, a, false, path); err != nil {
+		return err
+	}
+	var err error
+	op := "--"
+	if p.g.Directed {
+		op = "->"
+	}
+	if e.Href, e.Tooltip, err = p.link(a, path, map[byte]string{
+		'G': p.name, 'E': e.Source + op + e.Target, 'T': e.Source, 'H': e.Target, 'L': e.Label,
+	}); err != nil {
 		return err
 	}
 	if a["style"] == "invis" {
@@ -701,6 +724,8 @@ func (p *parser) graphAttrs(a map[string]string) error {
 				return err
 			}
 		case "colorscheme":
+		case urlAttr, "href", "tooltip":
+			// They are read after the loop, with the label.
 		case "rankdir":
 			switch strings.ToUpper(v) {
 			case "TB", "BT", "LR", "RL":
@@ -738,7 +763,9 @@ func (p *parser) graphAttrs(a map[string]string) error {
 			}
 		}
 	}
-	return nil
+	var err error
+	p.g.Href, p.g.Tooltip, err = p.link(a, "graph", map[byte]string{'G': p.name, 'L': p.g.Title})
+	return err
 }
 
 // finish sets the label, the shape and the paint of each node from its
@@ -823,6 +850,7 @@ func (p *parser) finish() error {
 		for _, k := range slices.Sorted(maps.Keys(a)) {
 			switch k {
 			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle", "colorscheme":
+			case urlAttr, "href", "tooltip":
 			case "sides", "skew", "distortion":
 				// Only a polygon reads these. Graphviz draws every other
 				// shape without them.
@@ -845,6 +873,10 @@ func (p *parser) finish() error {
 			}
 		}
 		if err := p.paint(n.Style, a, true, path); err != nil {
+			return err
+		}
+		var err error
+		if n.Href, n.Tooltip, err = p.link(a, path, map[byte]string{'G': p.name, 'N': n.ID, 'L': n.Label}); err != nil {
 			return err
 		}
 		// width and height are inches. With fixedsize true or shape, they
@@ -1038,6 +1070,51 @@ func labelStyle(st map[string]string, k, v string) map[string]string {
 	}
 	st[k] = v
 	return st
+}
+
+// urlAttr is the attribute URL, which gives a link as href does.
+const urlAttr = "URL"
+
+// link reads the link and the tooltip of a node, an edge, a cluster or the
+// graph from URL, href and tooltip (D32). href wins over URL, as in
+// Graphviz. An escape such as \N names a part of the object, as names
+// says: \G the graph, \N the node, \E the edge, \T its tail, \H its head
+// and \L the label. In a tooltip, \n, \l and \r end a line. A link with a
+// scheme that zuzu does not write, such as javascript, is an issue.
+func (p *parser) link(a map[string]string, path string, names map[byte]string) (string, string, error) {
+	sub := func(v string, tooltip bool) string {
+		var b strings.Builder
+		for i := 0; i < len(v); i++ {
+			if v[i] != '\\' || i+1 == len(v) {
+				b.WriteByte(v[i])
+				continue
+			}
+			i++
+			c := v[i]
+			if n, ok := names[c]; ok {
+				b.WriteString(n)
+				continue
+			}
+			switch {
+			case tooltip && (c == 'n' || c == 'l' || c == 'r'):
+				b.WriteByte('\n')
+			case c == '\\' || c == '"':
+				b.WriteByte(c)
+			default:
+				b.WriteByte('\\')
+				b.WriteByte(c)
+			}
+		}
+		return b.String()
+	}
+	href := sub(cmp.Or(a["href"], a[urlAttr]), false)
+	if href != "" && !scene.LinkAllowed(href) {
+		if err := p.issues.Add(path, "the link %s, whose scheme zuzu does not write", href); err != nil {
+			return "", "", err
+		}
+		href = ""
+	}
+	return href, strings.TrimRight(sub(a["tooltip"], true), "\n"), nil
 }
 
 // label reads a label of DOT: \n, \l and \r end a line, and \N names the

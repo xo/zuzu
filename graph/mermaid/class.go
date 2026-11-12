@@ -26,6 +26,9 @@ type classDiagram struct {
 	scopes     []string
 	// body is the class whose body the current line is in, or nil.
 	body *class
+	// clicks are the statements click, link and callback, which finish
+	// applies.
+	clicks []click
 	// styles, nodeClasses and nodeStyles are the classes and the styles,
 	// as in a flowchart.
 	styles      map[string]map[string]string
@@ -183,7 +186,12 @@ func (c *classDiagram) stmt(t string) error {
 	case word == "note":
 		return c.note(rest)
 	case word == "click", word == "link", word == "callback":
-		return c.add("the interaction %s", word)
+		cl, err := parseClick(word, rest, c.line)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", c.line, err)
+		}
+		c.clicks = append(c.clicks, cl)
+		return nil
 	case strings.HasPrefix(t, "<<"):
 		end := strings.Index(t, ">>")
 		if end < 0 {
@@ -634,6 +642,15 @@ func (c *classDiagram) note(rest string) error {
 // finish writes the record of each class and applies the classes and the
 // styles.
 func (c *classDiagram) finish() error {
+	err := applyClicks(c.issues, c.clicks, func(id string) *graph.Node {
+		if cl, ok := c.classes[id]; ok {
+			return cl.node
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 	for _, n := range c.g.Nodes {
 		cl, ok := c.classes[n.ID]
 		if !ok {

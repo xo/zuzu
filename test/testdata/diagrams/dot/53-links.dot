@@ -1,0 +1,15 @@
+digraph links {
+	tooltip="a graph with links"
+	subgraph cluster_docs {
+		label="Docs"
+		URL="https://example.com/docs"
+		tooltip="the docs"
+		guide [label="Guide" URL="https://example.com/guide" tooltip="read the guide"]
+		api [label="API" href="https://example.com/\N"]
+	}
+	home [label="Home" shape=box URL="https://example.com/" tooltip="home\nfirst page"]
+	mail [label="Mail" shape=box URL="mailto:docs@example.com"]
+	home -> guide [label="read" URL="https://example.com/\T-\H" tooltip="\E"]
+	home -> api
+	guide -> mail [tooltip="send a mail"]
+}

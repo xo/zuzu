@@ -69,6 +69,10 @@ func (rt *runtime) render() (*scene.Scene, error) {
 		if err := s.encodeItem(s.spec.Encode, st, map[string]any{}, ""); err != nil {
 			return nil, err
 		}
+		badLink := false
+		if err := s.linkIssue(item, "", &badLink); err != nil {
+			return nil, err
+		}
 		item.X, item.Y = pad.left, pad.top
 	}
 	// Every dataset of the top level runs, whether a mark draws it or not,

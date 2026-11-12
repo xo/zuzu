@@ -131,6 +131,24 @@ renderer of okage whose fonts draw the text, with the layout of text of
 okage D37. A program makes one and shares it, because it loads the fonts of
 the system on its first use (okage D36).
 
+### Links
+
+An item of the scene graph carries a link, `Href`, and a tooltip,
+`Tooltip`, which the encodings `href` and `tooltip` of Vega fill on every
+mark (D32). `svg.Write` writes the link as an `<a href>` around the item
+and the tooltip as a `<title>` inside it. `raster.Draw` draws neither.
+
+A tooltip that is not a string shows as Vega shows it without a plugin. An
+object shows one line `key: value` for each field, in the order of the
+keys, and an array shows as `[a, b]`.
+
+`scene.LinkAllowed` says which links a renderer writes. A link with no
+scheme, such as `page.html`, `/a/b` or `#part`, is allowed. A link with
+the scheme `http`, `https`, `mailto`, `ftp` or `tel` is allowed. A link
+with any other scheme, such as `javascript:`, `data:` or `file:`, is not
+written, because it can run a script or open a file. The runtime reports
+such a link as an issue, and the item has no link.
+
 ### Options
 
 An option is a functional option named `With...`, and the caller owns every

@@ -269,6 +269,7 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 					// it is a thin box in the color of the text.
 					th := math.Max(fontSize/14, 1)
 					d := Row{"kind": "fieldDeco", "key": r["key"], "x": x0, "y": y + lh/2 + 0.5*fontSize - th/2, "width": lw, "height": th}
+					copyLink(d, r)
 					if c, ok := r["textColor"]; ok {
 						d["textColor"] = c
 					}

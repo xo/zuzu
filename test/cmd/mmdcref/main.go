@@ -122,8 +122,19 @@ func main() {
 		ref.Nodes = append(ref.Nodes, Node{ID: sub[1], Label: text(s[loc[1] : loc[1]+end]), X: num(sub[2]), Y: num(sub[3])})
 		ids[sub[1]] = true
 	}
-	for _, m := range linkedRE.FindAllStringSubmatch(s, -1) {
-		ref.Nodes = append(ref.Nodes, Node{ID: m[3], Label: m[3], X: num(m[1]), Y: num(m[2])})
+	for _, loc := range linkedRE.FindAllStringSubmatchIndex(s, -1) {
+		m := linkedRE.FindStringSubmatch(s[loc[0]:loc[1]])
+		// The label of a node with a link ends with its group, as the
+		// label of another node does.
+		end := strings.Index(s[loc[1]:], `</g></g>`)
+		if end < 0 {
+			end = len(s) - loc[1]
+		}
+		label := text(s[loc[1] : loc[1]+end])
+		if label == "" {
+			label = m[3]
+		}
+		ref.Nodes = append(ref.Nodes, Node{ID: m[3], Label: label, X: num(m[1]), Y: num(m[2])})
 		ids[m[3]] = true
 	}
 	for _, loc := range clusterRE.FindAllStringSubmatchIndex(s, -1) {

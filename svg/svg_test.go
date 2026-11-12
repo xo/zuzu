@@ -131,3 +131,54 @@ func TestWriteRefusesWhatItCannotDraw(t *testing.T) {
 		}
 	}
 }
+
+// TestLinksAndTooltipsDrawNothing renders the scene with links and tooltips
+// with okage, and again without them, and checks that the images are the
+// same, so that the a and title elements change nothing that draws.
+func TestLinksAndTooltipsDrawNothing(t *testing.T) {
+	t.Parallel()
+	f, err := os.Open(filepath.Join("testdata", "links.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	s, err := scene.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var with, without bytes.Buffer
+	if err := Write(&with, s); err != nil {
+		t.Fatal(err)
+	}
+	var strip func(m *scene.Mark)
+	strip = func(m *scene.Mark) {
+		for i := range m.Items {
+			m.Items[i].Href, m.Items[i].Tooltip = "", ""
+			for j := range m.Items[i].Items {
+				strip(&m.Items[i].Items[j])
+			}
+		}
+	}
+	strip(&s.Root)
+	if err := Write(&without, s); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(with.Bytes(), without.Bytes()) {
+		t.Fatal("the scene wrote no link and no tooltip")
+	}
+	if strings.Contains(with.String(), "javascript") {
+		t.Errorf("the SVG holds a link with the scheme javascript:\n%s", with.String())
+	}
+	r := okagesvg.New(okagesvg.WithBackground(color.White))
+	a, err := r.Render(with.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := r.Render(without.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(a.Pix, b.Pix) {
+		t.Error("the links and the tooltips change the image")
+	}
+}

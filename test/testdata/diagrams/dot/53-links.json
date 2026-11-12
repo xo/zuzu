@@ -1,0 +1,92 @@
+{
+  "name": "links",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,170,220",
+  "label": "",
+  "tooltip": "a graph with links",
+  "_subgraph_cnt": 1,
+  "objects": [
+    {
+      "name": "cluster_docs",
+      "URL": "https:\/\/example.com\/docs",
+      "bb": "8,65,162,141.5",
+      "label": "Docs",
+      "lheight": "0.23",
+      "lp": "85,129.25",
+      "lwidth": "0.39",
+      "tooltip": "the docs",
+      "_gvid": 0,
+      "nodes": [
+        1,2
+      ]
+    },
+    {
+      "_gvid": 1,
+      "name": "guide",
+      "URL": "https:\/\/example.com\/guide",
+      "height": "0.5",
+      "label": "Guide",
+      "pos": "49,91",
+      "tooltip": "read the guide",
+      "width": "0.92884"
+    },
+    {
+      "_gvid": 2,
+      "name": "api",
+      "height": "0.5",
+      "href": "https:\/\/example.com\/\\N",
+      "label": "API",
+      "pos": "127,91",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 3,
+      "name": "home",
+      "URL": "https:\/\/example.com\/",
+      "height": "0.5",
+      "label": "Home",
+      "pos": "88,202",
+      "shape": "box",
+      "tooltip": "home\\nfirst page",
+      "width": "0.75"
+    },
+    {
+      "_gvid": 4,
+      "name": "mail",
+      "URL": "mailto:docs@example.com",
+      "height": "0.5",
+      "label": "Mail",
+      "pos": "49,18",
+      "shape": "box",
+      "width": "0.75"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 1,
+      "tail": 3,
+      "head": 1,
+      "URL": "https:\/\/example.com\/\\T-\\H",
+      "label": "read",
+      "lp": "87.01,157.75",
+      "pos": "e,55.051,108.91 81.906,183.97 75.753,166.77 66.148,139.93 58.9,119.67",
+      "tooltip": "\\E"
+    },
+    {
+      "_gvid": 2,
+      "tail": 3,
+      "head": 2,
+      "label": "",
+      "pos": "e,122,108.9 95.793,183.68 98.212,178.08 100.82,171.82 103,166 108.68,150.89 114.28,133.75 118.65,119.78"
+    },
+    {
+      "_gvid": 0,
+      "tail": 1,
+      "head": 4,
+      "label": "",
+      "pos": "e,49,36.029 49,72.813 49,65.226 49,56.101 49,47.539",
+      "tooltip": "send a mail"
+    }
+  ]
+}

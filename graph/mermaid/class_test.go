@@ -217,8 +217,13 @@ func TestClassStyles(t *testing.T) {
 	for _, r := range report {
 		msgs = append(msgs, r.Message)
 	}
-	if got := strings.Join(msgs, ", "); got != "the interaction click, the interaction link, the interaction callback" {
+	if got := strings.Join(msgs, ", "); got != "the callback fn, since no script runs" {
 		t.Errorf("unexpected report %q", got)
+	}
+	for _, id := range []string{"Animal", "Mineral"} {
+		if n := node(t, g, id); n.Href != "https://example.com" {
+			t.Errorf("%s: the link %q, want https://example.com", id, n.Href)
+		}
 	}
 	d, _ := Read("classDiagram\n  click A href \"x\"")
 	if _, _, err := Graph(d, true); err == nil {

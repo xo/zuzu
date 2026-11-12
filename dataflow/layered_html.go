@@ -251,7 +251,20 @@ func (h *htmlLabel) rows(r Row, x, y float64, kind string) []Row {
 			out = append(out, o)
 		}
 	}
+	for _, o := range out {
+		copyLink(o, r)
+	}
 	return out
+}
+
+// copyLink copies the link and the tooltip of a node, an edge or a cluster
+// into a row that draws a part of it (D32).
+func copyLink(dst, src Row) {
+	for _, k := range []string{"href", "tooltip"} {
+		if v, ok := src[k]; ok && v != nil {
+			dst[k] = v
+		}
+	}
 }
 
 // keepSpaces turns the spaces at the ends of a run, and each space after
