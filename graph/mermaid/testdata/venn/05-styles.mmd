@@ -1,0 +1,16 @@
+---
+config:
+  theme: forest
+---
+venn-beta
+  set A["Alpha"]
+    text A1["Red text"]
+  set B["Beta"]
+  set C["Gamma"]
+  union A,B["Both"]
+  union B,C
+  style A fill:#ff6b6b, fill-opacity:0.3
+  style B stroke:rgb(0, 128, 128), stroke-width:3
+  style A,B fill:"#ffe66d", color:#333
+  style A1 color:red
+  style C color:navy, font-size:20

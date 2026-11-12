@@ -1610,7 +1610,9 @@ as wide as 14.5 pixels of IBM Plex Sans, so each label of a sequence
 diagram wraps at 11/14.5 of its width in Mermaid, as "Sequence diagram"
 says. A use case diagram draws a use case
 at 12 pixels, and an actor and a note at 14. So the label of a use case
-wraps at 11/12 of `usecase.wrappingWidth`, and an actor at 11/14. The
+wraps at 11/12 of `usecase.wrappingWidth`, and an actor at 11/14. A
+venn diagram draws a text at 20 pixels, so a text wraps at 11/20 of the
+width of its cell, as "venn-beta" says. The
 ratio of each kind and of each such label is in `mermaidSizes`, in
 `graph/mermaid/style.go`. A node of zuzu fits its widest line. Mermaid
 makes the box of a label that wraps as wide as the width. DOT does not
@@ -1657,6 +1659,7 @@ the source draws once, with its label.
 | `treeView-beta` | Vega rules, rects, paths, text and icons, laid out in Go: a row for each item, indented by its depth |
 | `eventmodeling` | Vega rects, paths, symbols and text, laid out in Go: the frames along a time axis, each in the swimlane of its kind |
 | `zenuml` | Vega, laid out in Go by the layout of `sequenceDiagram` |
+| `venn-beta` | Vega paths and text, laid out in Go: a circle for each set, placed as Mermaid places it |
 
 #### pie
 
@@ -3417,6 +3420,117 @@ icon and the text. A frame spans the messages in it, and ZenUML spans
 other lifelines. The heads of the participants draw at the top only, as in
 ZenUML, in the look of zuzu, and the texts are in the sizes of zuzu.
 Labels do not wrap, as in ZenUML.
+
+#### venn-beta
+
+The keyword is `venn-beta`. A venn diagram draws each set as a circle,
+and each union of sets as the overlap of their circles.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `set A`, `set "A"`, `set A["Alpha"]`, `set A:20`, `set A["Alpha"]:20` | a set: a circle with the area of its size, 10 by default, and its label, or its id when it has no label |
+| `union A, B`, with a label and a size as a set has them | the overlap of two sets or more, and its label. A union of n sets has the size 10/n² by default |
+| `text "Apple"` or `text T1["Apple"]`, on an indented line under a set or a union | a text in the area of that set or union |
+| `text A,B T1["Apple"]` | a text in the area of the union of A and B |
+| `style A fill:#ff6b6b, stroke:teal` | the colors of a set, of a union or of a text, by its id |
+| `title Text` | the title |
+
+zuzu reads the statements as the lexer of Mermaid 12.3 reads them:
+
+1. The keywords are in any case, as `SET` or `Title`. Statements can
+   follow each other on one line, and on the line of the keyword.
+2. An id is a word of letters, digits, `-` and `_` that starts with a
+   letter or `_`, or a text in double quotes. A text and the id of a
+   text can be a number too.
+3. A text on an indented line belongs to the last set or union, when
+   only texts come between them. Each other statement ends this mode.
+4. The title runs up to a `#`, a `;` or the end of the line.
+5. A label in brackets loses its spaces at each end, and a text in double
+   quotes loses its quotes.
+6. The value of a style is a text in double quotes, or the words,
+   numbers and colors up to the next comma, joined by spaces. So Mermaid
+   reads `2px` as `2 px`.
+
+These are errors, as in Mermaid: a diagram with no set, a union of one
+set, a union of a set that no `set` before it names, a negative size, a
+size that is not a number, a text with no id, a text with no sets before
+its id after a title or a style, a style with no value, a `;` or a `#` in a
+statement, and `accTitle` and `accDescr`, which Mermaid does not read in a
+venn diagram.
+
+zuzu places the circles in the way that Mermaid 12.3 places them with
+venn.js:
+
+1. A circle has the area of the size of its set. A set of size 0 draws
+   nothing, and the unions with it draw nothing either.
+2. Two sets with a union stand at the distance that gives the size of the
+   union. Two sets with no union stand apart. When a union of three sets
+   or more has no union for two of its sets, that union of two takes a
+   quarter of the size of the smaller set.
+3. The circles go in place one at a time, from the set that overlaps the
+   others most. Then the method of the simplex of Nelder and Mead moves
+   them, so that each union comes as near its size as it can.
+4. The largest circle comes first, the second largest at its right, and
+   the third above them. A group of circles apart from the others goes at
+   the right of the largest group, or under it.
+5. The circles fill a box of `venn.width` by `venn.height`, 800 by 450 by
+   default, less the title, with 15 pixels around them.
+6. The label of a set or of a union goes at the point of its area that is
+   farthest inside its circles and outside the other circles. Mermaid
+   12.3 draws these labels on one line, and so does zuzu.
+7. The texts of an area fill a grid in the largest circle around the
+   point of its label, under the label, with as many columns as the
+   square root of their count. A text wraps at the width of its cell.
+   Mermaid places the texts in the same circles fitted with
+   `venn.padding` around them, 8 by default, and so does zuzu.
+
+With four sets or more, Mermaid also lays the circles out from 10 random
+points, and keeps that layout when it fits better. zuzu starts from 10
+points of a fixed sequence, so the same source gives the same image. Its
+layout of four sets or more can differ from the layout of Mermaid.
+
+zuzu draws a venn diagram at 440/`venn.width` of the size of Mermaid.
+Mermaid draws a text at 20 pixels at a width of 800, and zuzu draws it at
+11. The label of a set or a union is bold, at 13.2 pixels. zuzu leaves out
+the empty space around the circles.
+
+Each set takes the next color of the category scheme. Its circle is a tint
+of its color with an outline of 1.5 in its color, and its label is in its
+color. The tints add where the circles overlap, so each union shows
+through. The label of a union and a text take the color `text`. A style
+can change these colors:
+
+| Style | On a set | On a union | On the id of a text |
+| --- | --- | --- | --- |
+| `fill` | the color of the circle, of its outline and of its label | an opaque fill of the overlap, as in Mermaid | nothing |
+| `stroke` | the color of the outline | nothing | nothing |
+| `fill-opacity` | the opacity of the tint | nothing | nothing |
+| `stroke-width` | the width of the outline, in the pixels of Mermaid | nothing | nothing |
+| `color` | the color of the label | the color of the label | the color of the text |
+
+A color that is not a color of CSS is an issue. A `fill-opacity` that is
+not a number draws the tint opaque, and a `stroke-width` that is not a
+number draws an outline 1 pixel of Mermaid wide, as in Mermaid. So
+`stroke-width:2px` is 1 pixel wide, and `stroke-width:"2px"` is 2. Mermaid
+reads the other properties, such as `font-size`, and the style of an id
+that names nothing, and draws nothing for them. zuzu accepts them with no
+issue (D32).
+
+zuzu reads `venn.width`, `venn.height` and `venn.padding`. A width or a
+height that is not a positive number is an issue, and so is a negative
+padding. `venn.useDebugLayout: true`
+draws the grid of the texts, which zuzu does not draw, so it is an issue.
+`venn.look` is a hint, as `look` is. Mermaid 12.3 draws a venn diagram in
+the theme of `venn.theme`, `redux-color` by default. zuzu reads the
+`theme` of the top level only, as "The theme" says. So `venn.theme` is an
+issue, and a venn diagram with no `theme` draws in the scheme of the
+caller, or `zuzu`. The colors `venn1` to `venn8` of `themeVariables` are
+issues, as the other theme variables are.
+
+zuzu draws a venn diagram in other ways than Mermaid in two places.
+Mermaid draws the label of a set in a darker shade of its color, and zuzu
+in its color. Mermaid draws the opaque fill of a union over the circles
+before it in the source, and zuzu draws all the outlines over it.
 
 ### Other kinds
 

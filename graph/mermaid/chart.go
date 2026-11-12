@@ -79,6 +79,7 @@ var charts = map[string]compiler{
 	"treeView-beta": treeViewChart,
 	"eventmodeling": eventModelChart,
 	"zenuml":        zenumlChart,
+	"venn-beta":     vennChart,
 }
 
 // IsChart reports whether a kind of diagram is a chart that Chart

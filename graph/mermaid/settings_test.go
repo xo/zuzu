@@ -120,6 +120,7 @@ func TestInertSettings(t *testing.T) {
 		"treeView":        "treeView-beta\n  a\n",
 		"em":              "eventmodeling\n  tf 01 ui A\n",
 		"zenuml":          "zenuml\n  A->B: hi\n",
+		"venn":            "venn-beta\n  set A\n",
 	}
 	sections := map[string]string{
 		"flowchart": "flowchart", "stateDiagram-v2": "state", "classDiagram": "class", "erDiagram": "er",
@@ -135,6 +136,7 @@ func TestInertSettings(t *testing.T) {
 		"treeView": "treeView",
 		"em":       "eventmodeling",
 		"zenuml":   "zenuml",
+		"venn":     "venn",
 	}
 	for name, body := range bodies {
 		src := "---\nconfig:\n" + inertConfig + "  " + sections[name] + ":\n    useMaxWidth: false\n---\n" + body
@@ -201,6 +203,7 @@ func TestHints(t *testing.T) {
 		"treeView-beta\n  a\n",
 		"eventmodeling\n  tf 01 ui A\n",
 		"zenuml\n  A->B: hi\n",
+		"venn-beta\n  set A\n",
 	}
 	// The look handDrawn and the layout elk are hints, in the config or
 	// at the top of the front matter, with a description (D32).
