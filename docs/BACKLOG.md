@@ -258,25 +258,96 @@ the render. A time that the caller gives fixes both.
 
 The compilers of the charts work around each of these:
 
-1. A bar on a continuous x with no width does not draw. Vega-Lite gives it
-   a size.
-2. A nominal y with a fixed height draws its first category at the bottom.
-   Vega-Lite draws it at the top.
-3. `y2: {datum}` is dropped, and `y2: {field}` beside a datum `y` takes the
+1. `y2: {datum}` is dropped, and `y2: {field}` beside a datum `y` takes the
    value of `y`.
-4. A text mark of an arc does not read `theta` and `radius`.
-5. An axis has no `labelExpr` and no `titlePadding`. They are issues.
-6. An unfilled point draws with a stroke in the color of the background.
-7. A rule of Vega-Lite with one item takes the look of a reference, and its
+2. An axis has no `labelExpr` and no `titlePadding`. They are issues.
+3. An unfilled point draws with a stroke in the color of the background.
+4. A rule of Vega-Lite with one item takes the look of a reference, and its
    label writes a time as a number.
-8. `x2: {"value": "width"}` is dropped with no issue, and the rect does not
+5. `x2: {"value": "width"}` is dropped with no issue, and the rect does not
    draw.
-9. The axis of an encoding reports `zindex`, `labelFontSize`,
+6. The axis of an encoding reports `zindex`, `labelFontSize`,
    `labelPadding`, `titleFontSize`, `titlePadding`, `tickSize`, `tickWidth`
    and `domainWidth`. `config.axisX` and `config.axisY` apply some of them.
-10. The channel `href` is read and dropped with no issue, and a field of
-    the channel `tooltip` only joins the aggregate. Neither becomes an
-    encoding of Vega, though the scene now carries both.
+7. The channel `href` is read and dropped with no issue, and a field of
+   the channel `tooltip` only joins the aggregate. Neither becomes an
+   encoding of Vega, though the scene now carries both.
+
+### Fix what the review page found
+
+`test/cmd/review` draws each source of the corpus and each fixture of the
+diagrams with its original renderer and with zuzu, side by side. On
+2026-11-12 it showed these differences. Each one is what the page shows, and
+its cause is not known yet.
+
+1. Vega-Lite:
+   - A text mark gets no `align`, so it draws from the left. vega-lite.js
+     writes `align: center` on 36 of the 42 text marks of the references,
+     and the labels inside the bars of `waterfall_chart` are cut.
+   - The title of the y axis of `waterfall_chart` names each field, not the
+     title "Amount" of the spec.
+   - `mark.width` and `mark.height` are dropped with no issue on a mark that
+     is not a bar, such as the image of `scatter_image`.
+   - The text layer of `bar_layered_weather` compiles `y` with a scale and
+     no field.
+   - `size: {expr}` of a bar with no y in `bar_bullet_expr_bind` is dropped,
+     and the bar fills the height.
+   - A legend of `opacity` alone, or of `strokeWidth` alone, draws nothing,
+     with no issue.
+   - `rangeMin` and `rangeMax` are dropped with no issue on a range that is
+     not two values, such as a step or a named range.
+   - The text of `arc_radial_histogram` has no `baseline: middle`, which
+     vega-lite.js sets.
+   - `radiusOffset` and `thetaOffset` of an arc go to Vega, which does not
+     have them.
+2. Vega:
+   - `calendar-view` draws its cells in the one-hue ramp of the theme, not
+     in the pink to green of `pinkyellowgreen`. A diverging scheme of Vega
+     takes the sequential ramp of the theme, though D14 gives a scheme a
+     diverging ramp. The encode of `x` of the labels of its axes is in the
+     report, so the months do not move, and the years cover "Jan".
+   - `wind-vectors` loses the hues of `rainbow`. A cyclical scheme takes
+     the sequential ramp of the theme, which starts at the background of
+     the theme, and the spec sets a dark background of its own.
+   - The fit of `autosize` diverges in `flight-passengers`, because the
+     title is wider than the plot. Each pass makes the width smaller by the
+     same overflow, 500, 354, 208 and 62, and the x axis keeps two labels.
+     The loop is in `NewView` in `zuzu.go` and in `render.go`.
+   - `paint` in `encode.go` turns a fill that is an object with no key
+     `gradient` into an empty gradient. vega.js does not draw such a fill
+     as a gradient.
+3. Deneb, both in the Vega-Lite compiler:
+   - `calendar-heatmap` draws a strip 5374 pixels wide, not the grid of
+     seven years. The band scale `child_x` of the facet `cell` reads the
+     dataset of the top level, `data_2`, not the dataset of the cell,
+     `data_0`. The renaming of the datasets in `vegalite/facet.go` or
+     `vegalite/optimize.go` is the likely cause. The compiler also drops
+     the `labelFontSize`, `labelColor`, `labelFont` and `labelPadding` of
+     the header, the `spacing` of the facet and `config.view.stroke`, with
+     no issue. An axis with `format: ""` and a time unit writes a whole
+     date, where vega-lite.js writes the format of the time unit.
+   - `variance-chart` has no bars of Actual and Forecast. Its shared
+     `color` has no field, only a scale with a domain and a range, and a
+     legend with `orient: "top"`. zuzu drops the domain and the orient
+     with no issue, so the bars get no fill. The rule has no
+     `x2: {scale, value: 0}`, so the stems are missing. The bar
+     `height: {band: 0.5}` with a `yOffset` goes to the rect, not to the
+     group. The conditional `opacity` with no default is dropped.
+4. The charts of zuzu on `docs/survey/compare.html`:
+   - `zuzu.endLabel` names a closed line in a facet at one vertex, so the
+     names of the radar pile up. The spec turns it off.
+5. Mermaid, in `usecase/01-relations`:
+   - The ellipse of CheckCard is outside the boundary Front desk, but
+     covers its top border by 3 pixels, and the label «include» touches
+     that border. A node that is not in a cluster, in the rank of the nodes
+     of a cluster, gets no margin from the cluster.
+   - The back edge from Librarian to Member crosses the long edge from
+     Member to Return near Member, because of where the two edges join
+     Member. The layout can avoid it.
+6. The originals: `contour-plot`, `density-heatmaps`,
+   `labeled-scatter-plot` and `word-cloud` need the npm package `canvas`,
+   which `test/oracle/package.json` does not install. vega.js does not know
+   the projection `airy` of `projections`.
 
 ### Fix the bounds of a text and the place of an axis title
 
