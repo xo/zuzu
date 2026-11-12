@@ -245,6 +245,18 @@ rgb('steelblue').g
 '' + hsl(120, 0.5, 0.5)
 hsl('#ff0000').h
 hsl('#808080').s
+'' + hsl(NaN, 0.5, 0.5)
+'' + merge(hsl('#1f77b4'), {l: 0.33})
+'' + merge(rgb('red'), {g: 128})
+'' + merge({l: 0.5}, hsl('red'))
+'' + merge(hsl('red'), rgb('blue'))
+'' + merge(rgb('blue'), hsl('red'))
+merge(hsl('red'), {l: 0.33}).l
+'' + merge(hsl('red'), {l: 'x'})
+'' + merge(lab('red'), {l: 20})
+'' + merge(hcl('red'), {h: 200})
+'' + merge(hsl('red'), {opacity: 0.5})
+merge(hsl('red'), {foo: 1}).foo
 '' + lab(50, 20, -30)
 lab('white').l
 '' + hcl(250, 40, 60)

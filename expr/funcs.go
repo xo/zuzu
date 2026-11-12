@@ -426,10 +426,21 @@ func makeBuiltins() map[string]Func {
 		},
 		"merge": func(_ *Scope, args []any) (any, error) {
 			out := map[string]any{}
+			space := ""
 			for _, a := range args {
-				if m, ok := a.(map[string]any); ok {
-					maps.Copy(out, m)
+				switch x := a.(type) {
+				case map[string]any:
+					maps.Copy(out, x)
+				case *Color:
+					// A color merged into the output makes it a color, in
+					// the space of the last color, as d3 colors do in
+					// vega.js.
+					maps.Copy(out, x.fields)
+					space = x.space
 				}
+			}
+			if space != "" {
+				return newColor(space, out), nil
 			}
 			return out, nil
 		},

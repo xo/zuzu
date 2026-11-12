@@ -92,7 +92,12 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	if ax.Labels, err = s.boolean(a.Labels, true); err != nil {
 		return nil, err
 	}
-	domain, err := s.boolean(a.Domain, true)
+	// The config of the axis can hide the domain, as it can the grid.
+	showDomain, ok := cfg["domain"].(bool)
+	if !ok {
+		showDomain = true
+	}
+	domain, err := s.boolean(a.Domain, showDomain)
 	if err != nil {
 		return nil, err
 	}

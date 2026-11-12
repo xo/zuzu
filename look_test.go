@@ -70,6 +70,25 @@ func TestSpecConfig(t *testing.T) {
 	}
 }
 
+func TestConfigAxisDomain(t *testing.T) {
+	t.Parallel()
+	const bars = `"mark": "bar",
+		"encoding": {"x": {"field": "c", "type": "nominal"}, "y": {"field": "b", "type": "quantitative"}}`
+	if d := marksOf(renderVL(t, bars), "axis-domain"); len(d) == 0 {
+		t.Fatal("the band axis draws no domain")
+	}
+	s := renderVL(t, bars+`, "config": {"axis": {"domain": false}}`)
+	if d := marksOf(s, "axis-domain"); len(d) != 0 {
+		t.Errorf("the config hides the domain, but %d axes draw it", len(d))
+	}
+	s = renderVL(t, `"mark": "bar",
+		"encoding": {"x": {"field": "c", "type": "nominal", "axis": {"domain": true}}, "y": {"field": "b", "type": "quantitative"}},
+		"config": {"axis": {"domain": false}}`)
+	if d := marksOf(s, "axis-domain"); len(d) != 1 {
+		t.Errorf("the axis shows its domain over the config, but %d axes draw it", len(d))
+	}
+}
+
 func TestAreaLook(t *testing.T) {
 	t.Parallel()
 	s := renderVL(t, `"transform": [{"filter": "datum.c == 'p'"}], "mark": "area",
