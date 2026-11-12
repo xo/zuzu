@@ -900,11 +900,9 @@ okage v0.4.0, sides of ports, and `margin`, so that the schemas that dbtpl
 writes draw. The root package gained `Sniff` and `WithBackground` for
 programs that detect and draw a file, such as iv.
 
-On 2026-11-12 zuzu also draws the sequence, state, class, entity
-relationship, requirement, block, swimlane, use case, agentflow, timeline
-and C4 diagrams of Mermaid, its mindmap, its architecture diagram and its
-gitGraph. D32 sets the order of the kinds that are left, and
-`docs/BACKLOG.md` lists them. The swimlane diagram lays out with the
+On 2026-11-12 zuzu draws every kind of Mermaid 12.3, in the order that
+D32 set. Of the 2811 files of the corpus of mermaid-go-renderer, it draws
+2808, and 2732 with no issue. The swimlane diagram lays out with the
 parameters `lanes` and `laneEdges` of `zuzu.layered`, which wait for a
 review (open question 29).
 

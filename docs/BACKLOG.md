@@ -72,29 +72,24 @@ numbers before strings.
 ### Do the work of D32
 
 D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
-zuzu did all of its parts, and drew the requirement, gitGraph, block,
-swimlane, use case, agentflow, timeline and C4 diagrams of part 11. These
-are left:
-
-1. The next kinds of Mermaid in the order of D32 (11): venn, treeView,
-   railroad, eventmodeling, zenuml, cynefin, ishikawa, kanban, packet and
-   info. They hold 171 files of the corpus of mermaid-go-renderer.
-2. A kind of Mermaid that lays out when it is read, such as a sequence, a
+zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
+11 lists. These are left:
+1. A kind of Mermaid that lays out when it is read, such as a sequence, a
    pie, a gantt, a journey, a mindmap, a treemap, an architecture diagram,
    a gitGraph, a block diagram, a timeline or a C4 diagram, measures an
    emoji as nothing, because `WithEmoji` is an option of the render. Its
    labels can be too narrow (6).
-3. The SVG writer measures the `limit` of a text without the font of
+2. The SVG writer measures the `limit` of a text without the font of
    emoji (6).
-4. A weight or a style in `fontFamily` draws only in the graphs and in the
+3. A weight or a style in `fontFamily` draws only in the graphs and in the
    sequence. It is an issue in the other kinds (5).
-5. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
+4. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
    issues, because the package `html` of okage keeps no link (10).
-6. The wrap of a kind with labels of more than one size in Mermaid uses
+5. The wrap of a kind with labels of more than one size in Mermaid uses
    11/14 for all of them (7): a sequence wraps its messages at 16 pixels
    and its actors and notes at 14, and a use case diagram draws its use
    cases at 12 and its actors at 14.
-7. The node property `algorithm`, an ELK layout for one subgraph, is an
+6. The node property `algorithm`, an ELK layout for one subgraph, is an
    issue. D32 part 2 does not say whether it is a hint.
 
 
@@ -149,9 +144,10 @@ and places nodes in another way.
 
 The corpus of `github.com/bvolpato/mermaid-go-renderer` at commit 9af8f11
 holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
-zuzu drew 2637 of them, and 2508 with no issue. 171 of the files that zuzu
-does not draw are of kinds that it does not draw yet. One more is an
-example of the documents of Mermaid whose kind is `...`.
+zuzu drew 2808 of them, and 2732 with no issue. Of the 3 that it does not
+draw, one is an example of the documents of Mermaid whose kind is `...`,
+one ends in a link with no node, which mmdc does not draw either, and one
+is item 10 below.
 
 1. A style or a class on the id of a subgraph of a flowchart, such as
    `style sub fill:#f00`, is dropped with no issue. zuzu makes a node of
@@ -193,6 +189,26 @@ example of the documents of Mermaid whose kind is `...`.
     an error of the parse at the comma.
 16. A sequence diagram decodes `#lt;br#gt;` into `<br>` and then starts a
     new line there. Mermaid draws the text `<br>`.
+17. The reader of every kind cuts a `%%` in the middle of a line, also
+    inside single quotes and after a colon of ZenUML, as in `A->B: 50%%
+    off`. Mermaid cuts only a line that starts with `%%`. A first line such
+    as `eventmodeling%% note` reads the kind as `eventmodeling%%`.
+18. The reader trims the spaces at the end of a line, so an ABNF rule such
+    as `a = "x" ; ` reads, where mmdc gives an error.
+19. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
+    the spaces.
+20. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
+    an issue.
+21. `venn.theme` is an issue. Mermaid applies the theme of a section, and
+    D32 part 4 names only the theme at the top of the config.
+22. Several kinds draw the title of the front matter, which Mermaid does
+    not draw: ishikawa, kanban, railroad, tree view, event model and C4.
+    zuzu draws it in every kind.
+23. The priority line of a kanban card takes the colors of Mermaid, red,
+    orange, blue and light blue, and not tokens of `docs/STYLE.md`.
+24. A setting that Mermaid never reads is accepted in an event model
+    (`eventmodeling.rowHeight`), and reported in C4 (`c4ShapeInRow`). D32
+    part 3 says to accept it.
 
 
 ### Draw more of Mermaid
@@ -263,6 +279,11 @@ The compilers of the charts work around each of these:
     encoding of Vega, though the scene now carries both.
 
 ### Fix the bounds of a text and the place of an axis title
+
+The bounds of a path add the origin of the item, `it.X` and `it.Y`, so a
+path drawn away from its origin makes an autosized view larger than the
+drawing (`itemBounds` in `layout/layout.go`). vega.js does not add the
+origin.
 
 The bounds of a text ignore its `lineHeight`, so a text of more lines with
 a `lineHeight` above its font size is cut at the bottom of a chart. The

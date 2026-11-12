@@ -1622,12 +1622,14 @@ wrap a label.
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
 config that a chart does not read is an issue, and so are a `theme` that
-Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap`, `block` and `ishikawa` joins
+Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap`, `block`, `ishikawa`, `kanban` and `venn-beta` joins
 `accTitle` and `accDescr` into the description of the spec, as "The
-description" says. Mermaid does not read them in a sankey, a mindmap or a
-block diagram either, so there they are errors, as in Mermaid. A C4
-diagram reads `accTitle` as its title, as "C4" says.
-An ishikawa diagram reads them as causes, as "ishikawa" says. Each chart
+description" says. Mermaid does not read them in a sankey, a mindmap, a
+block diagram or a venn diagram either, so there they are errors, as in
+Mermaid. In a kanban, Mermaid reads them as the text of a node, and so
+does zuzu. A C4 diagram reads `accTitle` as its title, as "C4" says.
+An ishikawa diagram reads them as causes, as "ishikawa" says. A ZenUML
+diagram reads them as messages, as "zenuml" says. Each chart
 has 5 to 7 fixtures in `graph/mermaid/testdata`, the sequence diagram has
 10, the gantt has 18, and the git graph has 12. A test draws each fixture and checks that each value of
 the source draws once, with its label.
@@ -3539,7 +3541,10 @@ relationship diagram, the requirement diagram, the agentflow diagram, the use ca
 diagram, and
 the charts above, which hold the sequence diagram, the mindmap, the
 architecture diagram, the git graph, the block diagram, the timeline,
-the five kinds of C4 diagram and the ishikawa diagram. The agentflow diagram reads into a graph, as
+the five kinds of C4 diagram, the ishikawa diagram, the Cynefin diagram,
+the info diagram, the kanban, the packet, the four kinds of railroad
+diagram, the tree view, the event model, the ZenUML diagram and the venn
+diagram. The agentflow diagram reads into a graph, as
 the flowchart does. Every other kind of Mermaid is an error that wraps
 `mermaid.ErrKind`. D32 sets the order of the next kinds.
 

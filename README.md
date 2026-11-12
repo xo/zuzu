@@ -54,10 +54,12 @@ sankeys, chord diagrams, hex bins and trading days. Phase 6 added
 `raster`, which draws a chart with okage directly, without SVG, and
 `Chart.Image`. Phase 7 added the diagrams of DOT and Mermaid: a layered
 layout of graphs, the flowchart and nine charts of Mermaid, and icons, with
-four packs bundled. Since then zuzu also draws the sequence, state, class,
-ER, requirement, block, swimlane, use case, agentflow, timeline and C4
-diagrams of Mermaid, its mindmap, its architecture diagram and its
-gitGraph. The package `text/emoji` draws an emoji in color.
+four packs bundled. Since then zuzu also draws every other kind of
+Mermaid 12.3: the sequence, state, class, ER, requirement, block,
+swimlane, use case, agentflow, timeline, C4, venn, ishikawa, Cynefin,
+event model, ZenUML, kanban, packet and railroad diagrams, the mindmap,
+the architecture diagram, the gitGraph, the tree view and info. The
+package `text/emoji` draws an emoji in color.
 [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what zuzu reads.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.

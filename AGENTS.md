@@ -13,8 +13,8 @@ maintainer accepted `docs/targets/compare.html`. Phase 3 is done: zuzu runs
 static Vega specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is
 done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
 draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
-of DOT and Mermaid of D31, and since then more kinds of Mermaid, in the
-order of D32. Code follows the plan (D3).
+of DOT and Mermaid of D31, and since then every other kind of Mermaid
+12.3, in the order of D32. Code follows the plan (D3).
 Every decision from D1 to D33 is decided. The parameters `lanes` and
 `laneEdges` that an agent added to D31 wait for a review (open question
 29). The open questions are at the end of `docs/PLAN.md`.
