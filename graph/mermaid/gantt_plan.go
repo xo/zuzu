@@ -38,6 +38,8 @@ type gantt struct {
 	compact       bool
 	sectionStyles int
 	rightPadding  *float64
+	// width is the width of the time axis.
+	width float64
 
 	tasks []*ganttTask
 	byID  map[string]*ganttTask
@@ -82,9 +84,14 @@ var ganttTickRe = regexp.MustCompile(`^([1-9][0-9]*)(millisecond|second|minute|h
 
 // readGantt reads the statements of a gantt.
 func readGantt(c *chart, today time.Time, loc *time.Location) (*gantt, error) {
-	g := &gantt{c: c, loc: loc, today: today, dateFormat: "YYYY-MM-DD", weekend: time.Saturday, byID: map[string]*ganttTask{}}
+	g := &gantt{c: c, loc: loc, today: today, dateFormat: "YYYY-MM-DD", weekend: time.Saturday, byID: map[string]*ganttTask{}, width: ganttWidth}
 	if err := g.config(); err != nil {
 		return nil, err
+	}
+	if c.d.Header != "" {
+		// Mermaid does not read a text after the word gantt.
+		c.line = c.d.N
+		return nil, c.errorf("the text %q after %s", c.d.Header, c.d.Kind)
 	}
 	section := ""
 	auto := 0
@@ -169,14 +176,19 @@ func readGantt(c *chart, today time.Time, loc *time.Location) (*gantt, error) {
 }
 
 // config reads the settings of a gantt from the front matter and the
-// directives.
+// directives. A setting of the top level other than displayMode is an
+// issue, unless it changes nothing, as unreadSettings says.
 func (g *gantt) config() error {
+	if err := g.c.unreadSettings("displayMode", "gantt"); err != nil {
+		return err
+	}
 	if m, ok := g.c.d.Config["displayMode"].(string); ok {
 		if err := g.displayMode(m); err != nil {
 			return err
 		}
 	}
 	cfg, _ := g.c.d.Config["gantt"].(map[string]any)
+	useWidth := 0.0
 	for _, k := range slices.Sorted(maps.Keys(cfg)) {
 		v := cfg[k]
 		n, isNumber := configNumber(cfg, k)
@@ -211,6 +223,14 @@ func (g *gantt) config() error {
 				continue
 			}
 			g.rightPadding = &n
+		case "useWidth":
+			if !isNumber || n <= 0 {
+				if err := g.c.add("the setting gantt.useWidth %v, which is not a number above 0", v); err != nil {
+					return err
+				}
+				continue
+			}
+			useWidth = n
 		default:
 			if accepted(g.c.d.Kind, "gantt."+k, v) {
 				continue
@@ -218,6 +238,21 @@ func (g *gantt) config() error {
 			if err := g.c.add("zuzu does not read the setting gantt.%s", k); err != nil {
 				return err
 			}
+		}
+	}
+	if useWidth > 0 {
+		// useWidth is the width of the whole gantt of Mermaid. Its time
+		// axis is narrower by leftPadding, 75, and by rightPadding, 75
+		// by default. The time axis of zuzu is 640 wide by default, near
+		// the 634 of Mermaid on the page of mmdc, 784 wide.
+		right := ganttPadding
+		if g.rightPadding != nil {
+			right = *g.rightPadding
+		}
+		if w := useWidth - ganttPadding - right; w > 0 {
+			g.width = w
+		} else if err := g.c.add("the setting gantt.useWidth %v, which leaves no width for the time axis", useWidth); err != nil {
+			return err
 		}
 	}
 	return nil

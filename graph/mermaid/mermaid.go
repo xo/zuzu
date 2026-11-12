@@ -8,7 +8,9 @@ package mermaid
 import (
 	"encoding/json/v2"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -51,6 +53,17 @@ type Diagram struct {
 	Config map[string]any
 	// Lines are the lines of the body, without comments.
 	Lines []Line
+
+	// unread holds the parts of the front matter that zuzu does not read,
+	// which Graph and Chart report.
+	unread []unread
+}
+
+// unread is a part of the front matter that zuzu does not read: the number
+// of its line in the source, and what it is.
+type unread struct {
+	n    int
+	what string
 }
 
 // Line is a line of a body, with its number in the source and its indent:
@@ -61,8 +74,12 @@ type Line struct {
 	Indent int
 }
 
-// directive matches a directive, %%{init: {...}}%%.
-var directive = regexp.MustCompile(`(?s)%%\{\s*(init|initialize)\s*:\s*(.*?)\}%%`)
+// directive matches a directive, %%{init: {...}}%%, and wrapDirective the
+// directive %%{wrap}%%, which sets wrap.
+var (
+	directive     = regexp.MustCompile(`(?s)%%\{\s*(init|initialize)\s*:\s*(.*?)\}%%`)
+	wrapDirective = regexp.MustCompile(`%%\{\s*wrap\s*\}%%`)
+)
 
 // Read reads a source up to its kind.
 func Read(src string) (*Diagram, error) {
@@ -81,22 +98,42 @@ func Read(src string) (*Diagram, error) {
 		if j >= len(lines) {
 			return nil, fmt.Errorf("front matter with no end: %w", ErrSyntax)
 		}
-		fm := yamlMap(lines[i+1 : j])
-		if t, ok := fm["title"].(string); ok {
-			d.Title = t
-		}
-		if c, ok := fm["config"].(map[string]any); ok {
-			merge(d.Config, c)
-		}
-		if s, ok := yamlText(fm["description"]); ok {
-			d.Description = s
-			delete(fm, "description")
-		}
-		for k, v := range fm {
-			if k != "title" && k != "config" {
+		fm, lineOf, skipped := yamlMap(lines[i+1:j], i+2)
+		d.unread = skipped
+		// Mermaid reads title, displayMode and config, and ignores every
+		// other key of the front matter. zuzu reads description too (D32).
+		for _, k := range slices.Sorted(maps.Keys(fm)) {
+			v := fm[k]
+			switch k {
+			case "title", "description":
+				s, ok := yamlText(v)
+				switch {
+				case !ok:
+					d.unread = append(d.unread, unread{lineOf[k], fmt.Sprintf("the %s of the front matter, which is not a text", k)})
+				case k == "title":
+					d.Title = s
+				default:
+					d.Description = s
+				}
+			case "config":
+				c, ok := v.(map[string]any)
+				if !ok {
+					d.unread = append(d.unread, unread{lineOf[k], "the config of the front matter, which is not a map of YAML"})
+					continue
+				}
+				merge(d.Config, c)
+			case "displayMode":
 				d.Config[k] = v
+			default:
+				if hint(k, v) {
+					// Mermaid ignores look and layout here too, and a
+					// hint is no issue (D32).
+					continue
+				}
+				d.unread = append(d.unread, unread{lineOf[k], fmt.Sprintf("the key %s of the front matter, which Mermaid ignores", k)})
 			}
 		}
+		slices.SortStableFunc(d.unread, func(a, b unread) int { return a.n - b.n })
 		i = j + 1
 	}
 	body := strings.Join(lines[i:], "\n")
@@ -110,6 +147,12 @@ func Read(src string) (*Diagram, error) {
 	body = directive.ReplaceAllStringFunc(body, func(s string) string {
 		return strings.Repeat("\n", strings.Count(s, "\n"))
 	})
+	// %%{wrap}%% sets wrap, over the wrap of an init directive, as in
+	// Mermaid.
+	if wrapDirective.MatchString(body) {
+		inits["wrap"] = true
+		body = wrapDirective.ReplaceAllString(body, "")
+	}
 	n0 := i
 	for k, l := range strings.Split(body, "\n") {
 		t := strings.TrimSpace(l)
@@ -281,39 +324,66 @@ func relaxedJSON(s string) string {
 
 // yamlMap reads the subset of YAML of a front matter: maps by indent, with
 // scalar values. A scalar can be a block, after | or >, or a plain or
-// quoted text that goes on in the lines indented under its key.
-func yamlMap(lines []string) map[string]any {
+// quoted text that goes on in the lines indented under its key. A map in
+// braces, as {a: 1}, reads as JSON does. first is the number of the first
+// line in the source. yamlMap returns the map, the number of the line of
+// each key of the top level, and each part of YAML that it does not read: a
+// list, a list in brackets, a map in braces that does not read, and a line
+// that is not a key.
+func yamlMap(lines []string, first int) (map[string]any, map[string]int, []unread) {
 	type level struct {
 		indent int
+		path   string
 		m      map[string]any
 	}
 	root := map[string]any{}
-	stack := []level{{-1, root}}
+	lineOf := map[string]int{}
+	var skipped []unread
+	stack := []level{{-1, "", root}}
 	for i := 0; i < len(lines); i++ {
 		t := strings.TrimSpace(lines[i])
 		if t == "" || strings.HasPrefix(t, "#") {
 			continue
 		}
 		indent := yamlIndent(lines[i])
-		k, v, ok := yamlKey(t)
-		if !ok {
-			continue
-		}
-		v = yamlComment(v)
 		for len(stack) > 1 && stack[len(stack)-1].indent >= indent {
 			stack = stack[:len(stack)-1]
 		}
-		cur := stack[len(stack)-1].m
+		k, v, ok := yamlKey(t)
+		if !ok {
+			// A line that is not a key: an item of a list with no key,
+			// or a text. The lines under it go with it.
+			what := fmt.Sprintf("the text %q of the front matter, which is not a key of YAML", t)
+			if yamlItem(t) {
+				what = "a list of YAML in the front matter"
+			}
+			skipped = append(skipped, unread{first + i, what})
+			for i+1 < len(lines) && (strings.TrimSpace(lines[i+1]) == "" || yamlIndent(lines[i+1]) > indent) {
+				i++
+			}
+			continue
+		}
+		v = yamlComment(v)
+		top := stack[len(stack)-1]
+		cur, path := top.m, top.path+k
+		if top.path == "" {
+			lineOf[k] = first + i
+		}
 		// The lines under the key, more indented than it, with the blank
-		// lines between them.
+		// lines between them. An item of a list can have the indent of its
+		// key.
 		end := i + 1
-		for end < len(lines) && (strings.TrimSpace(lines[end]) == "" || yamlIndent(lines[end]) > indent) {
+		for end < len(lines) && (strings.TrimSpace(lines[end]) == "" || yamlIndent(lines[end]) > indent ||
+			v == "" && yamlIndent(lines[end]) == indent && yamlItem(strings.TrimSpace(lines[end]))) {
 			end++
 		}
-		under := lines[i+1 : end]
+		under, at := lines[i+1:end], first+i
 		switch {
 		case yamlBlockHeader(v):
 			cur[k] = yamlBlock(v, under)
+			i = end - 1
+		case v == "" && yamlList(under):
+			skipped = append(skipped, unread{at, "the list of YAML under " + path})
 			i = end - 1
 		case v == "" && !yamlNested(under):
 			if s := yamlComment(yamlPlain(under)); s != "" {
@@ -323,20 +393,80 @@ func yamlMap(lines []string) map[string]any {
 			}
 			m := map[string]any{}
 			cur[k] = m
-			stack = append(stack, level{indent, m})
+			stack = append(stack, level{indent, path + ".", m})
 		case v == "":
 			m := map[string]any{}
 			cur[k] = m
-			stack = append(stack, level{indent, m})
+			stack = append(stack, level{indent, path + ".", m})
 		default:
+			if open := yamlOpenQuote(v); open {
+				// A text in quotes goes on up to its closing quote, at
+				// any indent.
+				for end = i + 1; end < len(lines) && open; end++ {
+					open = yamlOpenQuote(v + " " + yamlPlain(lines[i+1:end+1]))
+				}
+				under = lines[i+1 : end]
+			}
 			if more := yamlPlain(under); more != "" {
 				v += " " + more
 				i = end - 1
 			}
-			cur[k] = scalar(yamlComment(v))
+			v = yamlComment(v)
+			switch {
+			case strings.HasPrefix(v, "["):
+				skipped = append(skipped, unread{at, "the list of YAML under " + path})
+			case strings.HasPrefix(v, "{"):
+				var m map[string]any
+				if json.Unmarshal([]byte(relaxedJSON(v)), &m) != nil {
+					skipped = append(skipped, unread{at, "the map of YAML in braces under " + path})
+					continue
+				}
+				cur[k] = m
+			default:
+				cur[k] = scalar(v)
+			}
 		}
 	}
-	return root
+	return root, lineOf, skipped
+}
+
+// yamlOpenQuote reports whether a value of YAML starts with a quote and
+// does not close it.
+func yamlOpenQuote(v string) bool {
+	if v == "" || v[0] != '"' && v[0] != '\'' {
+		return false
+	}
+	q := v[0]
+	for i := 1; i < len(v); i++ {
+		switch {
+		case q == '"' && v[i] == '\\':
+			i++
+		case q == '\'' && v[i] == '\'' && i+1 < len(v) && v[i+1] == '\'':
+			i++
+		case v[i] == q:
+			return false
+		}
+	}
+	return true
+}
+
+// yamlItem reports whether a line of YAML is an item of a list: a hyphen
+// alone, or a hyphen and a space.
+func yamlItem(t string) bool {
+	return t == "-" || strings.HasPrefix(t, "- ")
+}
+
+// yamlList reports whether the first line under a key with no value is an
+// item of a list, so that the key holds a list.
+func yamlList(under []string) bool {
+	for _, l := range under {
+		t := strings.TrimSpace(l)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		return yamlItem(t)
+	}
+	return false
 }
 
 // yamlComment cuts a comment off a value of YAML. A comment starts with a
@@ -530,12 +660,34 @@ func str(cfg map[string]any, keys ...string) string {
 // names each part that zuzu does not draw, and in the strict mode such a
 // part is an error.
 func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
+	is := &graph.Issues{Strict: strict}
+	if err := d.reportUnread(is); err != nil {
+		return nil, is.Report, err
+	}
 	g, report, err := readGraph(d, strict)
+	report = append(is.Report, report...)
+	if err != nil {
+		return g, report, err
+	}
+	sp := &graph.Issues{Strict: strict}
+	err = graphSpacing(d, g, sp)
+	report = append(report, sp.Report...)
 	if err != nil {
 		return g, report, err
 	}
 	familyStyle(g, str(d.Config, "fontFamily"))
 	return g, report, nil
+}
+
+// reportUnread reports each part of the front matter that zuzu does not
+// read, at its line.
+func (d *Diagram) reportUnread(is *graph.Issues) error {
+	for _, u := range d.unread {
+		if err := is.Add(fmt.Sprintf("line %d", u.n), "%s", u.what); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // familyStyle gives each node, edge and cluster of a graph the weight and

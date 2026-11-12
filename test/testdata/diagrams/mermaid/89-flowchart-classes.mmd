@@ -1,0 +1,18 @@
+---
+config:
+  nodeSpacing: 80
+  rankSpacing: 30
+  elk:
+    mergeEdges: true
+---
+%%{wrap}%%
+flowchart LR
+  direction TB
+  classDef dashed fill:#9cf,stroke-dasharray: 9\,5,stroke:#333
+  classDef odd fill#969,stroke:#f00
+  class C dashed
+  A:::odd --> B
+  B --> C
+  A --> D
+  class B dashed
+  class Z dashed

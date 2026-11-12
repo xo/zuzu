@@ -371,22 +371,34 @@ version that bundles Mermaid 12.3.0.
 | Part | Example |
 | --- | --- |
 | front matter, between two lines of `---` | `title: Orders`, `description: The orders of a shop` and `config:` |
-| a directive | `%%{init: {'flowchart': {'curve': 'linear'}}}%%` |
+| a directive | `%%{init: {'flowchart': {'curve': 'linear'}}}%%`, and `%%{wrap}%%`, which sets `wrap: true` |
 | a comment, from `%%` to the end of the line | `%% a comment` |
 | the keyword of the kind, on the first line | `flowchart LR` |
 
 The `title` of the front matter is the title of the diagram. Its
 `description` goes in the description of the Vega spec, which Mermaid
 ignores (D32). Its `config` and each directive merge into one config, and
-a directive wins over the front matter. Each other key of the front
-matter goes in the config too, and a setting of the config that a kind
-does not read is an issue. The gantt reads `displayMode` there. The front matter is YAML. zuzu reads maps by their indent, and a
-value in quotes or plain. A value can run over more lines, indented under
-its key. A block after `|` keeps its new lines, and a block after `>` joins
-its lines with spaces. A `-` or a `+` after either sets the new lines at
-its end, as in YAML. A `#` after a space, outside quotes, starts a comment
-that runs to the end of the line, as in YAML. The other parts of YAML, such
-as lists and anchors, do not read.
+a directive wins over the front matter. A setting of the config that a kind
+does not read is an issue. `displayMode` of the front matter goes in the
+config too, and the gantt reads it there. Mermaid ignores each other key
+of the front matter, such as `gantt:` or `theme:`, and each one is an
+issue, except a hint of the look or the layout.
+
+The front matter is YAML. zuzu reads maps by their indent, a map in
+braces, as `{curve: linear}`, and a value in quotes or plain. A value can
+run over more lines, indented under its key, and a value in quotes runs to
+its closing quote. A block after `|` keeps its new lines, and a block
+after `>` joins its lines with spaces. A `-` or a `+` after either sets
+the new lines at its end, as in YAML. A `#` after a space, outside quotes,
+starts a comment that runs to the end of the line, as in YAML. A `title`
+or a `description` that is a map, a `config` that is not a map, a list, a
+list in brackets, and a line that is not a key are issues, at their line.
+The other parts of YAML, such as anchors, do not read.
+
+`%%{wrap}%%` sets `wrap: true` at the top of the config, over the `wrap`
+of an `init` directive, as in Mermaid. Of the kinds that zuzu draws, only
+the sequence diagram reads `wrap` there, so it changes nothing in the
+other kinds, with no issue.
 
 The key `config` in a directive sets the section of the config of the kind,
 as Mermaid 12 does. In a sequence diagram,
@@ -430,9 +442,22 @@ accepts them with no issue in every kind, in the config or at the top of
 the front matter. zuzu draws its own look for `handDrawn`, and its own
 layered layout, `zuzu.layered`, for `elk`. A look by hand, modeled on the
 look of xkcd, and an ELK layout are work for later. The other looks, such
-as `classic` and `neo`, draw in the look of zuzu too. A graph accepts
-`layout: dagre`, and another layout, such as `elk.box` or `tidy-tree`, is
-an issue. A mindmap accepts `cose-bilkent` and `tidy-tree` too.
+as `classic` and `neo`, draw in the look of zuzu too. The other ELK
+layouts of Mermaid 12.3, `elk.stress`, `elk.force`, `elk.mrtree`,
+`elk.sporeOverlap`, `elk.box` and `elk.rectpacking`, and the section `elk`
+of the config, which holds the settings of ELK, are hints too. Every kind
+accepts `layout: dagre`, the default layout of Mermaid, with no issue.
+Another layout, such as `elk.layered` or `tidy-tree`, is an issue. A
+mindmap accepts `cose-bilkent` and `tidy-tree` too.
+
+`nodeSpacing` and `rankSpacing` at the top of the config set the spaces of
+every graph, as in Mermaid 12.3, over the spaces of the section of the
+kind, such as `flowchart.nodeSpacing`. A space takes the ratio of the
+default of zuzu to the default of Mermaid for the kind: 140 and 80 in an
+entity relationship diagram, and 50 and 50 in the other graphs. So
+`nodeSpacing: 100` is a space of 48 between two nodes of a rank of a
+flowchart. 0 keeps the space of the section, as in Mermaid. A value that
+is not a number of 0 or more is an issue.
 
 ### The theme
 
@@ -471,6 +496,8 @@ kind, with no issue:
 | `architecture.seed`, `architecture.randomize` | seed and start the layout of forces of an architecture diagram. The layout of zuzu uses no random numbers |
 | `class.htmlLabels` | nothing. Mermaid 12 does not read it |
 | `htmlLabels`, `flowchart.htmlLabels`, in a chart other than a mindmap | nothing. A chart draws its text in SVG |
+| `wrap` at the top level, in a kind other than the sequence diagram | nothing. Of the kinds that zuzu draws, only the sequence diagram reads it |
+| `gantt.compact` | nothing. Mermaid 12 has no such setting |
 
 zuzu matches the names of these settings in any case, so `loglevel` is
 `logLevel`. Mermaid matches a name in its own case, and ignores a key such
@@ -479,8 +506,8 @@ these settings with no change to the image, except `useMaxWidth`, which
 changes only the scale of the PNG of `mmdc`.
 
 `htmlLabels` changes the wrap of a label in a graph and in a mindmap. A
-graph reads it, as "Labels that wrap" says. A mindmap does not read it, and
-it is an issue there.
+graph reads it, as "Labels that wrap" says, and a mindmap reads it as
+"mindmap" says.
 
 ### Font names
 
@@ -695,7 +722,17 @@ A style reads `fill`, `stroke`, `stroke-width`, `color`,
 the dash of the line at the offset. If the offset falls in a gap, the dash
 starts at the next dash. Mermaid puts the style of a node on its shape of
 SVG, where `border` and `background` change nothing, so zuzu reads them
-and draws nothing for them.
+and draws nothing for them. A comma or a semicolon ends each part of a
+style. In a `classDef`, a comma after a backslash is a comma of the value,
+as in Mermaid, so `stroke-dasharray: 9\,5` draws dashes of 9 and gaps of 5.
+A part with no colon, such as `fill#969` or the `5` of
+`stroke-dasharray: 9,5`, is an issue. CSS ignores such a part.
+
+`class` gives a class to a node, a link or a subgraph that a line before
+it names. A `class` on an id that names none of them, such as `class Z hot`
+before the node `Z`, makes no node and draws nothing, as in Mermaid. A
+`direction` outside a subgraph changes nothing, as in Mermaid 12.3: the
+graph keeps the direction of its first line.
 
 zuzu reads these settings of the section `flowchart` of the config:
 
@@ -826,7 +863,15 @@ and no description. The state draws only when a transition or another line
 names it. Thus `state Idle: text` draws the name `Idle`, and `Idle : text`
 draws the description `text`. `state fork_state &lt;&lt;fork&gt;&gt;` is
 not a fork, and `fork_state` draws as a state. In `state "Text" as id:
-more`, `more` is a second description, up to the next colon.
+more`, `more` is a second description, up to the next colon. The second
+description can be empty, as in `state "Text" as id:`, and Mermaid reads
+`state "Text" as id:::hot` in the same way, as an empty description with
+no class. Another kind than a choice, a fork or a join, such as
+`state h <<history>>`, is no state, as in Mermaid.
+
+`class` gives a class to a state by its id, before or after the line that
+names the state. A class makes no state of its own, as in Mermaid, so
+`class end hot` draws no state `end`.
 `state "Text" as id`, or `state id`, opens a composite state when the next
 line starts with a brace. A blank line between them is an error, as in
 Mermaid.
@@ -1422,7 +1467,7 @@ marker of today. A gantt with no task draws nothing but
 its title, as in Mermaid.
 
 zuzu reads these settings of `gantt`, and `displayMode` at the top level
-of the front matter too:
+of the front matter and of the config too:
 
 | Setting | What zuzu does |
 | --- | --- |
@@ -1430,6 +1475,13 @@ of the front matter too:
 | `displayMode: compact` | the tasks of each section pack into as few rows as their times allow |
 | `numberSectionStyles` | the sections take that many colors in turn |
 | `rightPadding` | the padding at the right of the chart, in pixels |
+| `useWidth` | the width of the time axis: `useWidth` less 75, the `leftPadding` of Mermaid, and less `rightPadding`, 75 by default. The time axis is 640 wide by default, near the 634 of Mermaid on the page of `mmdc` |
+| `compact` | nothing, with no issue. Mermaid 12 has no such setting and ignores it, and its documents show it next to `displayMode: compact` |
+
+A text after the keyword, as in `gantt foo`, is an error, as in Mermaid. A
+setting at the top level of the config other than `displayMode`, such as
+`themeCSS`, is an issue, unless it changes nothing, as "Settings that
+change nothing" says.
 
 In the mode `compact`, the tasks of a section go in the order of their
 starts, as in Mermaid. Each task takes the first row of its section whose
@@ -1525,7 +1577,9 @@ rule.
 `min`, `max`, `ticks`, `showLegend`, and `graticule` `circle` or
 `polygon`. zuzu reads the sizes and the margins of `radar`,
 `axisScaleFactor`, `axisLabelFactor`, `curveTension`, and the colors
-`cScale0` and on when each curve has one.
+`cScale0` and on when each curve has one. A radar can have any number of
+axes, as in Mermaid. With two axes, a curve is a line, and with one or
+none, it is a point or nothing.
 
 #### treemap
 
@@ -1653,7 +1707,13 @@ text. Text between two backquotes is code, and it draws as it is written,
 with its backquotes and its marks. `<br>` and a new line in a string of
 markdown start a new line. A label wraps at the spaces to fit
 `mindmap.maxNodeWidth`, 200 by default, less the padding on its two sides,
-scaled by 11/14, as "Labels that wrap" says.
+scaled by 11/14, as "Labels that wrap" says. A word that is wider stays
+whole, as in Mermaid. With `htmlLabels: false`, or
+`flowchart.htmlLabels: false` when `htmlLabels` is not set, Mermaid draws
+its labels in SVG, and zuzu breaks such a word into lines as Mermaid does.
+A value of `htmlLabels` other than `true` or `false` is an issue. Mermaid
+also puts the lines of a label in SVG at the left, and zuzu keeps them in
+the middle.
 
 The text in a shape can run over more lines, up to the line that ends the
 shape, as `root(`, then `The root`, then `)`. zuzu drops the spaces at the
@@ -1677,8 +1737,9 @@ zuzu reads no CSS, so each class is an issue.
 
 zuzu reads `mindmap.padding`, `mindmap.maxNodeWidth`, `mindmap.colorBy`,
 which is `branch` or `depth`, and `mindmap.layoutAlgorithm` and `layout`,
-which are `cose-bilkent` or `tidy-tree`. `layout` can be `elk` too. Each
-draws with the layout of zuzu.
+which are `cose-bilkent` or `tidy-tree`. `layout` can be `dagre` or an ELK
+layout too, as "Hints of the look and the layout" says. Each draws with
+the layout of zuzu.
 
 Mermaid lays a mindmap out with cose-bilkent, a layout of forces around
 the root. zuzu uses a tidy tree on two sides instead. The layout is the

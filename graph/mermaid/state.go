@@ -234,9 +234,11 @@ func (s *stateDiagram) stmt(t string, lines []Line, i int) error {
 		if len(f) < 2 {
 			return s.errorf("a class with no name")
 		}
+		// The class goes to the state of each id, by its id, when
+		// another line names the state. As in Mermaid, a class makes no
+		// state of its own, so class end x draws no state end.
 		for id := range strings.SplitSeq(strings.Join(f[:len(f)-1], ""), ",") {
 			if id = strings.TrimSpace(id); id != "" {
-				s.ref(id)
 				s.nodeClasses[id] = append(s.nodeClasses[id], f[len(f)-1])
 			}
 		}
@@ -373,52 +375,47 @@ func (s *stateDiagram) declare(rest string, lines []Line, i int) error {
 			s.descs[id] = append(s.descs[id], label(m[1]))
 			return s.open(id, lines, i)
 		}
-		id, cls, ok := strings.Cut(m[2], ":::")
-		more := ""
-		if !ok {
-			// Mermaid keeps the text up to the second colon.
-			var parts []string
-			if parts = strings.Split(m[2], ":"); len(parts) > 1 {
-				id, more = parts[0], strings.TrimSpace(parts[1])
-			}
-		}
-		id = strings.TrimSpace(id)
+		// A colon after the id starts a second description, up to the
+		// next colon, as in Mermaid. The description can be empty, and
+		// Mermaid reads id:::class here as an empty description, with no
+		// class.
+		parts := strings.Split(m[2], ":")
+		id := strings.TrimSpace(parts[0])
 		if id == "" || strings.ContainsAny(id, " \t\"") {
 			return s.errorf("the state %q", rest)
 		}
 		s.descs[id] = append(s.descs[id], label(m[1]))
-		if more != "" {
-			s.descs[id] = append(s.descs[id], label(more))
+		if len(parts) > 1 {
+			s.descs[id] = append(s.descs[id], label(parts[1]))
 		}
 		s.ref(id)
-		s.class(id, strings.TrimSpace(cls))
 		return nil
 	}
 	if m := stateKind.FindStringSubmatch(rest); m != nil {
 		kind := m[2] + m[3]
+		switch kind {
+		case "choice", "fork", "join":
+		default:
+			// Mermaid reads another kind, such as <<history>>, and makes
+			// no state for it. The state draws when a transition or
+			// another line names it.
+			return nil
+		}
 		st := s.ref(m[1])
 		if st == nil {
 			return s.errorf("the composite state %s as a %s", m[1], kind)
 		}
-		switch kind {
-		case "choice", "fork", "join":
-			// A choice, a fork and a join draw no text.
-			st.node.Label = ""
-		}
-		switch kind {
-		case "choice":
-			st.kind = kind
+		// A choice, a fork and a join draw no text.
+		st.kind, st.node.Label = kind, ""
+		if kind == "choice" {
 			st.node.Shape, st.node.Width, st.node.Height = "diamond", 28, 28
-		case "fork", "join":
-			st.kind = kind
-			st.node.Shape, st.node.Width, st.node.Height = "bar", 70, 10
-			if d := s.dir(); d == graph.LR || d == graph.RL {
-				st.node.Width, st.node.Height = 10, 70
-			}
-			st.node.Style["fillOpacity"] = "1"
-		default:
-			return s.add("the kind of state %s, drawn as a state", kind)
+			return nil
 		}
+		st.node.Shape, st.node.Width, st.node.Height = "bar", 70, 10
+		if d := s.dir(); d == graph.LR || d == graph.RL {
+			st.node.Width, st.node.Height = 10, 70
+		}
+		st.node.Style["fillOpacity"] = "1"
 		return nil
 	}
 	if m := stateOpen.FindStringSubmatch(rest); m != nil {

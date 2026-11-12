@@ -94,11 +94,25 @@ func Look(d *Diagram) vega.Config {
 
 // hint reports whether a setting of the top level of the config is a hint
 // of a way to draw that zuzu accepts with no issue in every kind (D32):
-// the look handDrawn, which zuzu draws in its own look, and the layout
-// elk, which zuzu draws with zuzu.layered.
+// the look handDrawn, which zuzu draws in its own look, an ELK layout and
+// the section elk of its settings, which zuzu draws with zuzu.layered, and
+// the layout dagre, the default of Mermaid.
 func hint(k string, v any) bool {
-	return k == "look" && v == "handDrawn" || k == "layout" && v == "elk"
+	switch k {
+	case "look":
+		return v == "handDrawn"
+	case "layout":
+		s, _ := v.(string)
+		return s == "dagre" || slices.Contains(elkLayouts, s)
+	case "elk":
+		return true
+	}
+	return false
 }
+
+// elkLayouts are the ELK layouts that Mermaid 12.3 has: elk, which is the
+// layered layout of ELK, and the other algorithms of ELK.
+var elkLayouts = []string{"elk", "elk.stress", "elk.force", "elk.mrtree", "elk.sporeOverlap", "elk.box", "elk.rectpacking"}
 
 // graphSection reports each setting of a section of the config of a graph,
 // such as flowchart.curve, except the settings that read names, which the
@@ -140,12 +154,13 @@ func isGraph(kind string) bool {
 }
 
 // accepted reports whether zuzu accepts a setting of the config with no
-// issue: a setting that inert names, a theme that Look reads, or a font
-// family with no weight and no style, such as fontFamily: Arial or
+// issue: a setting that inert names, a theme that Look reads, a hint at
+// the top level of the config, such as layout: elk, or a font family with
+// no weight and no style, such as fontFamily: Arial or
 // sequence.actorFontFamily: courier. zuzu draws in IBM Plex Sans only, so the name of a family
 // changes nothing (D32).
 func accepted(kind, path string, v any) bool {
-	if inert(kind, path) || path == "theme" && knownTheme(v) {
+	if inert(kind, path) || path == "theme" && knownTheme(v) || !strings.Contains(path, ".") && hint(path, v) {
 		return true
 	}
 	key := strings.ToLower(path[strings.LastIndex(path, ".")+1:])
@@ -186,6 +201,14 @@ func inert(kind, path string) bool {
 		// flowchart.htmlLabels in its place when it is not set. A chart
 		// draws the same text either way.
 		return !isGraph(kind) && kind != "mindmap"
+	case is("wrap"):
+		// Of the kinds that zuzu draws, only the sequence diagram reads
+		// wrap at the top level, which %%{wrap}%% sets.
+		return kind != "sequenceDiagram"
+	case is("gantt.compact"):
+		// Mermaid 12 has no setting gantt.compact and ignores it. Its
+		// documents show it next to displayMode: compact.
+		return true
 	}
 	return false
 }
@@ -284,23 +307,42 @@ func wrapSetting(is *graph.Issues, cfg map[string]any, def float64, section, key
 // css reads a style of CSS of a class or a node, as fill:#f9f,stroke:#333,
 // into the names of Vega. add records a property that zuzu does not draw.
 func css(s string, add func(format string, args ...any) error) (map[string]string, error) {
-	return readCSS(s, false, add)
+	return readCSS(s, false, false, add)
 }
 
 // linkCSS reads a style as css does, for a class or a style that can be on
 // a link. It keeps animation as it is, for the caller.
 func linkCSS(s string, add func(format string, args ...any) error) (map[string]string, error) {
-	return readCSS(s, true, add)
+	return readCSS(s, true, false, add)
+}
+
+// classDefCSS reads the style of a classDef of a flowchart as linkCSS does.
+// A comma after a backslash, as in stroke-dasharray: 9\,5, is a comma of
+// the value and does not end the part, as in Mermaid.
+func classDefCSS(s string, add func(format string, args ...any) error) (map[string]string, error) {
+	return readCSS(s, true, true, add)
 }
 
 // readCSS reads a style of CSS into the names of Vega, and keeps animation
-// when link is true.
-func readCSS(s string, link bool, add func(format string, args ...any) error) (map[string]string, error) {
+// when link is true. When escaped is true, a comma after a backslash is a
+// comma of a value. A part with no colon is an issue: CSS ignores it.
+func readCSS(s string, link, escaped bool, add func(format string, args ...any) error) (map[string]string, error) {
 	st := map[string]string{}
 	family := ""
+	// escComma stands for an escaped comma while the style splits.
+	const escComma = "\x00"
+	if escaped {
+		s = strings.ReplaceAll(s, `\,`, escComma)
+	}
 	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' }) {
+		part = strings.ReplaceAll(part, escComma, ",")
 		k, v, ok := strings.Cut(part, ":")
 		if !ok {
+			if p := strings.TrimSpace(part); p != "" {
+				if err := add("the style %q, which has no colon", p); err != nil {
+					return nil, err
+				}
+			}
 			continue
 		}
 		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
@@ -388,6 +430,9 @@ func sectionConfig(d *Diagram, is *graph.Issues, section string, known ...string
 	cfg := d.Config
 	for _, k := range slices.Sorted(maps.Keys(cfg)) {
 		v := cfg[k]
+		if topSpacing(k) {
+			continue
+		}
 		if ok, err := lookSetting(is, d.Kind, k, v); ok || err != nil {
 			if err != nil {
 				return err

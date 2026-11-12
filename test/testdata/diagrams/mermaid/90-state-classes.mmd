@@ -1,0 +1,13 @@
+stateDiagram-v2
+  classDef hot fill:#f96
+  classDef calm fill:#9cf
+  class c, d calm
+  state h <<history>>
+  state "Waiting" as s1:::hot
+  [*] --> a
+  a --> c
+  c --> d
+  a --> s1
+  s1 --> h
+  d --> [*]
+  class end hot

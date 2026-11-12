@@ -85,6 +85,9 @@ func Chart(d *Diagram, strict bool) ([]byte, bool, vega.Report, error) {
 		return nil, false, nil, fmt.Errorf("%s: %w", d.Kind, ErrKind)
 	}
 	c := &chart{d: d, issues: &graph.Issues{Strict: strict}}
+	if err := d.reportUnread(c.issues); err != nil {
+		return nil, false, c.issues.Report, err
+	}
 	spec, lite, err := comp(c)
 	if err != nil {
 		return nil, false, c.issues.Report, err

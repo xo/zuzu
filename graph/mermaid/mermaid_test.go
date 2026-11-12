@@ -67,7 +67,7 @@ func TestFrontMatterOneIssue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report) != 1 || !strings.Contains(report[0].Message, "the setting owner") {
+	if len(report) != 1 || !strings.Contains(report[0].Message, "the key owner of the front matter") {
 		t.Errorf("expected one issue of owner, got %v", report)
 	}
 }

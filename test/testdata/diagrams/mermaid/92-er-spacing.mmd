@@ -1,0 +1,10 @@
+---
+config:
+  nodeSpacing: 40
+  rankSpacing: 160
+---
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  ORDER ||--|{ LINE-ITEM : contains
+  CUSTOMER }|..|{ DELIVERY-ADDRESS : uses
+  PRODUCT ||--o{ LINE-ITEM : "ordered in"

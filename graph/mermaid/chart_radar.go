@@ -125,10 +125,8 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 			return nil, false, c.errorf("the statement %q", l.Text)
 		}
 	}
-	if len(axes) < 3 {
-		c.line = c.d.N
-		return nil, false, c.errorf("a radar with %d axes, and it needs 3 or more", len(axes))
-	}
+	// Mermaid draws a radar with any number of axes. With two, a curve is
+	// a line, and with one or none, it is a point or nothing.
 	byID := map[string]int{}
 	for i, a := range axes {
 		byID[a.id] = i
@@ -180,7 +178,7 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 			}
 		}
 	}
-	if maxV <= minV {
+	if maxV <= minV && len(curves) > 0 {
 		return nil, false, c.errorf("the max %v is not above the min %v", maxV, minV)
 	}
 	w, h := settingNumber(cfg, "width", 400), settingNumber(cfg, "height", 400)
@@ -334,9 +332,12 @@ func (c *chart) radarColors() (map[int]string, error) {
 // closedPath returns the path of a closed curve through points: straight
 // lines with a tension of 0, and else a smooth curve. The control points
 // of the part from one point to the next follow the line between the two
-// points around them, by the tension.
+// points around them, by the tension. No points give an empty path.
 func closedPath(pts [][2]float64, tension float64) string {
 	n := len(pts)
+	if n == 0 {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString("M" + pathPoint(pts[0][0], pts[0][1]))
 	for i := range n {

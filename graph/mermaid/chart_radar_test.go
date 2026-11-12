@@ -116,7 +116,6 @@ func TestRadarFixtures(t *testing.T) {
 func TestRadarErrors(t *testing.T) {
 	t.Parallel()
 	tests := []string{
-		"radar-beta\naxis A, B\ncurve c{1, 2}\n",
 		"radar-beta\naxis A, B, C\ncurve c{1, 2}\n",
 		"radar-beta\naxis A, B, C\ncurve c{A: 1, 2, 3}\n",
 		"radar-beta\naxis A, B, C\ncurve c{A: 1, B: 2, D: 3}\n",

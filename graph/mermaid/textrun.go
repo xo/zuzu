@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/xo/zuzu/text"
 )
@@ -221,6 +222,42 @@ func wrapRuns(runs []textRun, size float64, weight int, limit float64, m text.Me
 		push()
 	}
 	return lines
+}
+
+// breakRuns breaks each word of runs that is wider than limit into parts no
+// wider than limit, with a new line between them, as Mermaid breaks a word
+// of a label that it draws in SVG. A part holds one character at least.
+func breakRuns(runs []textRun, size float64, weight int, limit float64, m text.Measurer) []textRun {
+	var out []textRun
+	for _, r := range runs {
+		if r.text == "\n" {
+			out = append(out, r)
+			continue
+		}
+		font := textFont(size, weight, r)
+		words := strings.Split(r.text, " ")
+		for i, w := range words {
+			if m.Width(font, w) <= limit {
+				continue
+			}
+			var parts []string
+			start := 0
+			for j, c := range w {
+				if j > start && m.Width(font, w[start:j+utf8.RuneLen(c)]) > limit {
+					parts = append(parts, w[start:j])
+					start = j
+				}
+			}
+			words[i] = strings.Join(append(parts, w[start:]), "\n")
+		}
+		for i, l := range strings.Split(strings.Join(words, " "), "\n") {
+			if i > 0 {
+				out = append(out, textRun{text: "\n"})
+			}
+			out = append(out, textRun{text: l, bold: r.bold, italic: r.italic})
+		}
+	}
+	return out
 }
 
 // plainLines lays a label of plain text out in lines no wider than limit,

@@ -33,10 +33,12 @@ const (
 	// ganttLayout writes a time as a date of JavaScript with no zone, which
 	// reads in the time zone of the render (D27).
 	ganttLayout = "2006-01-02T15:04:05.000"
-	// ganttWidth is the width of the time axis, and ganttRow the height of
-	// the row of a task.
-	ganttWidth = 640
-	ganttRow   = 26
+	// ganttWidth is the width of the time axis by default, and ganttRow the
+	// height of the row of a task. ganttPadding is leftPadding of Mermaid,
+	// and rightPadding by default, on each side of its time axis.
+	ganttWidth   = 640
+	ganttRow     = 26
+	ganttPadding = 75.0
 )
 
 // ganttChart compiles a chart of the kind gantt into Vega-Lite: a bar for
@@ -99,7 +101,7 @@ func (g *gantt) spec() (map[string]any, error) {
 	// A bar is never less than ganttMinBar wide. A short bar grows to the
 	// right, or to the left at the end of the axis, so that the axis does
 	// not grow.
-	least := ganttMillis(lo, hi) * ganttMinBar / ganttWidth
+	least := ganttMillis(lo, hi) * ganttMinBar / g.width
 	var normal, done, active, crit, miles, verts, names []any
 	for i, t := range g.tasks {
 		if t.vert {
@@ -124,7 +126,7 @@ func (g *gantt) spec() (map[string]any, error) {
 			row["tone"] = tone(t.section)
 		}
 		if g.compact {
-			names = append(names, ganttName(t, row["key"], lo, hi))
+			names = append(names, ganttName(t, row["key"], lo, hi, g.width))
 		}
 		if t.milestone {
 			row["at"] = t.start.Add(t.render.Sub(t.start) / 2).Format(ganttLayout)
@@ -285,7 +287,7 @@ func (g *gantt) spec() (map[string]any, error) {
 		return nil, g.c.errorf("the gantt has no task")
 	}
 	spec := map[string]any{
-		"width":  ganttWidth,
+		"width":  g.width,
 		"height": map[string]any{"step": ganttRow},
 		"layer":  layers,
 	}
@@ -363,8 +365,8 @@ func (g *gantt) rows(keys []string) ([]int, []ganttLane) {
 // bar, else past the end of the bar, and else before the start of the bar
 // when it does not fit at the right of the time axis. The time axis runs
 // from lo to hi. The name of a milestone is beside its diamond.
-func ganttName(t *ganttTask, key any, lo, hi time.Time) map[string]any {
-	scale := max(ganttMillis(lo, hi), 1) / ganttWidth
+func ganttName(t *ganttTask, key any, lo, hi time.Time, width float64) map[string]any {
+	scale := max(ganttMillis(lo, hi), 1) / width
 	px := func(at time.Time) float64 { return ganttMillis(lo, at) / scale }
 	start, end := t.start, t.render
 	if t.milestone {
@@ -379,7 +381,7 @@ func ganttName(t *ganttTask, key any, lo, hi time.Time) map[string]any {
 	switch {
 	case !t.milestone && w <= x1-x0:
 		out["place"], out["at"] = "inside", ganttAdd(start, ganttMillis(start, end)/2).Format(ganttLayout)
-	case x1+ganttNameGap+w <= ganttWidth:
+	case x1+ganttNameGap+w <= width:
 		out["place"], out["at"] = "right", end.Format(ganttLayout)
 	default:
 		out["place"], out["at"] = "left", start.Format(ganttLayout)
@@ -462,7 +464,7 @@ func (g *gantt) sections(rows []ganttLane, labeled bool) []any {
 			"data": map[string]any{"values": bands},
 			"mark": map[string]any{"type": "rect", "style": graph.StyleBand},
 			"encoding": map[string]any{
-				"x": map[string]any{"value": -left}, "x2": map[string]any{"value": ganttWidth},
+				"x": map[string]any{"value": -left}, "x2": map[string]any{"value": g.width},
 				"y": pixels("y0"), "y2": map[string]any{"field": "y1"},
 			},
 		},

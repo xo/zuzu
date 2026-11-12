@@ -1,0 +1,16 @@
+---
+title: Parts of YAML
+tags:
+  - yaml
+  - list
+config:
+  flowchart:
+    curve: linear
+  themeCSS: "
+    .node rect { stroke-width: 2px; }
+  "
+---
+flowchart TB
+  A[Start] --> B{Check}
+  B -->|yes| C[Done]
+  B -->|no| A

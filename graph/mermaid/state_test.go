@@ -172,6 +172,8 @@ func TestStateStyles(t *testing.T) {
     a:::hot --> b
     class b cold
     class c, d calm
+    b --> c
+    c --> d
     style a stroke:#c00
     state A {
         x
@@ -211,7 +213,6 @@ func TestStateIssues(t *testing.T) {
 		{"scale 350 width\na", "the scale of a state diagram"},
 		{"click a call cb()\na", "the callback cb(), since no script runs"},
 		{`note "floating" as N1`, "a note that floats, with no state"},
-		{"state h <<history>>", "the kind of state history, drawn as a state"},
 		{"a\nclassDef x text-decoration:underline", "the style text-decoration"},
 		{"---\nconfig:\n  theme: sepia\n---\nstateDiagram-v2\na", "the theme of Mermaid, drawn in the look of zuzu"},
 		{"%%{init: {'state': {'nodeSpacing': 10}}}%%\nstateDiagram-v2\na", "the setting state.nodeSpacing"},

@@ -99,6 +99,9 @@ func (f *flowchart) config() error {
 	cfg := f.d.Config
 	for _, k := range slices.Sorted(maps.Keys(cfg)) {
 		v := cfg[k]
+		if topSpacing(k) {
+			continue
+		}
 		if ok, err := lookSetting(f.issues, f.d.Kind, k, v); ok || err != nil {
 			if err != nil {
 				return err
@@ -315,6 +318,9 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 		if err != nil {
 			return fmt.Errorf("line %d: %w", f.line, err)
 		}
+		// Mermaid 12.3 reads a direction outside a subgraph and draws
+		// nothing for it: the graph keeps the direction of its first
+		// line, as mmdc draws it.
 		if len(f.clusters) > 0 {
 			f.clusters[len(f.clusters)-1].Direction = dir
 		}
@@ -324,7 +330,7 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 		for n := range strings.SplitSeq(names, ",") {
 			// A class can be on a link, so it keeps animation, until
 			// finish knows where the class is.
-			st, err := linkCSS(css, f.add)
+			st, err := classDefCSS(css, f.add)
 			if err != nil {
 				return err
 			}
@@ -344,6 +350,12 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 			// edge.
 			if _, ok := f.link(id); ok {
 				f.edgeClasses[id] = append(f.edgeClasses[id], strings.TrimSpace(name))
+				continue
+			}
+			// Mermaid gives the class to a node, an edge or a subgraph
+			// that a line before names, and makes no node for an id that
+			// names none of them.
+			if _, ok := f.nodes[id]; !ok && !f.isCluster(id) {
 				continue
 			}
 			f.node(id)
@@ -489,6 +501,11 @@ func (f *flowchart) subgraph(rest string) error {
 	f.g.Clusters = append(f.g.Clusters, c)
 	f.clusters = append(f.clusters, c)
 	return nil
+}
+
+// isCluster reports whether an id names a subgraph.
+func (f *flowchart) isCluster(id string) bool {
+	return slices.ContainsFunc(f.g.Clusters, func(c *graph.Cluster) bool { return c.ID == id })
 }
 
 // node returns a node, made in the current subgraph when it is new.

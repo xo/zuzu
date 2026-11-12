@@ -134,15 +134,16 @@ func TestInertSettings(t *testing.T) {
 		"---\nconfig:\n  class:\n    htmlLabels: false\n  flowchart:\n    htmlLabels: false\n---\nclassDiagram\n  A --> B\n",
 		"---\nconfig:\n  flowchart:\n    htmlLabels: false\n---\nerDiagram\n  A ||--o{ B : has\n",
 		"---\nconfig:\n  architecture:\n    seed: 7\n    randomize: true\n---\narchitecture-beta\n  service a(server)[A]\n",
+		// A mindmap reads htmlLabels, and flowchart.htmlLabels in its
+		// place.
+		"---\nconfig:\n  htmlLabels: false\n---\nmindmap\n  root\n",
+		"---\nconfig:\n  flowchart:\n    htmlLabels: false\n---\nmindmap\n  root\n",
 	} {
 		if err := strictCheck(t, src); err != nil {
 			t.Errorf("%q: %v", src, err)
 		}
 	}
 	for _, src := range []string{
-		// A mindmap wraps its labels by htmlLabels, and zuzu does not read
-		// it there.
-		"---\nconfig:\n  htmlLabels: false\n---\nmindmap\n  root\n",
 		// A section of another kind holds settings that change the image.
 		"---\nconfig:\n  flowchart:\n    curve: linear\n---\nclassDiagram\n  A --> B\n",
 		"---\nconfig:\n  flowchart:\n    htmlLabels: maybe\n---\nclassDiagram\n  A --> B\n",

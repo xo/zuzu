@@ -72,7 +72,12 @@ const (
 // in Go (D31). The root is in the center, and its branches split to its
 // two sides, each a tidy tree that grows away from the root.
 func mindmapChart(c *chart) (map[string]any, bool, error) {
-	if err := c.unreadSettings("mindmap.padding", "mindmap.maxNodeWidth", "mindmap.colorBy", "mindmap.layoutAlgorithm", "layout"); err != nil {
+	if err := c.unreadSettings("mindmap.padding", "mindmap.maxNodeWidth", "mindmap.colorBy", "mindmap.layoutAlgorithm", "layout",
+		"htmlLabels", "flowchart.htmlLabels"); err != nil {
+		return nil, false, err
+	}
+	breakWords, err := c.mindmapHTML()
+	if err != nil {
 		return nil, false, err
 	}
 	for _, k := range []string{"layout", "mindmap.layoutAlgorithm"} {
@@ -116,7 +121,7 @@ func mindmapChart(c *chart) (map[string]any, bool, error) {
 	}
 	m := text.NewEstimate()
 	for _, n := range nodes {
-		mindmapMeasure(n, pad, maxWidth, m)
+		mindmapMeasure(n, pad, maxWidth, breakWords, m)
 	}
 	mindmapPlace(root)
 	return mindmapSpec(nodes), false, nil
@@ -353,9 +358,33 @@ func mindmapColor(n *mindmapNode, color int, byDepth bool) {
 	}
 }
 
+// mindmapHTML reads htmlLabels, or flowchart.htmlLabels when it is not set,
+// as Mermaid does, and reports whether a long word of a label breaks. With
+// htmlLabels: false, Mermaid draws a label in SVG and breaks a word that is
+// wider than the label. A value that is not true or false is an issue.
+func (c *chart) mindmapHTML() (bool, error) {
+	for _, keys := range [][]string{{"htmlLabels"}, {"flowchart", "htmlLabels"}} {
+		var v any = c.d.Config
+		for _, k := range keys {
+			m, _ := v.(map[string]any)
+			v = m[k]
+		}
+		if v == nil {
+			continue
+		}
+		html, ok := v.(bool)
+		if !ok {
+			return false, c.add("the setting %s: %v", strings.Join(keys, "."), v)
+		}
+		return !html, nil
+	}
+	return false, nil
+}
+
 // mindmapMeasure measures the label and the icon of a node, and sets the
-// size of its shape.
-func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, m text.Measurer) {
+// size of its shape. When breakWords is true, a word that is wider than
+// the label breaks.
+func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, breakWords bool, m text.Measurer) {
 	n.size, n.weight = mindmapFont, 400
 	if n.parent == nil {
 		n.size, n.weight = mindmapRootFont, boldWeight
@@ -375,7 +404,11 @@ func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, m text.Measurer) {
 			label = one
 		}
 	}
-	n.lines = wrapRuns(markdownRuns(label), n.size, int(n.weight), max(limit, 40), m)
+	runs := markdownRuns(label)
+	if breakWords {
+		runs = breakRuns(runs, n.size, int(n.weight), max(limit, 40), m)
+	}
+	n.lines = wrapRuns(runs, n.size, int(n.weight), max(limit, 40), m)
 	for _, l := range n.lines {
 		n.tw = max(n.tw, l.w)
 	}

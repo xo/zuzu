@@ -3,6 +3,8 @@ package mermaid
 import (
 	"maps"
 	"slices"
+
+	"github.com/xo/zuzu/graph"
 )
 
 // flowSettings are the settings of the section flowchart of the config
@@ -149,4 +151,45 @@ func (f *flowchart) inheritDir() {
 			c.Direction = f.g.Direction
 		}
 	}
+}
+
+// topSpacing reports whether a key of the top level of the config is
+// nodeSpacing or rankSpacing, which graphSpacing reads.
+func topSpacing(k string) bool {
+	return k == "nodeSpacing" || k == "rankSpacing"
+}
+
+// graphSpacing reads nodeSpacing and rankSpacing at the top level of the
+// config of a graph. Mermaid 12.3 lays out every graph with them, over the
+// spaces of the section of its kind, such as flowchart.nodeSpacing. A
+// space takes the ratio of the default of zuzu to the default of Mermaid
+// for the kind: 140 and 80 for an entity relationship diagram, and 50 and
+// 50 for the other kinds. As in Mermaid, 0 keeps the space of the section.
+// A value that is not a number of 0 or more is an issue.
+func graphSpacing(d *Diagram, g *graph.Graph, is *graph.Issues) error {
+	node, rank := mermaidNodeSpacing, mermaidRankSpacing
+	if d.Kind == "erDiagram" {
+		node, rank = 140, 80
+	}
+	for _, k := range []string{"nodeSpacing", "rankSpacing"} {
+		v, ok := d.Config[k]
+		if !ok {
+			continue
+		}
+		n, ok := configNumber(d.Config, k)
+		if !ok || n < 0 {
+			if err := is.Add("config", "the setting %s: %v", k, v); err != nil {
+				return err
+			}
+			continue
+		}
+		switch {
+		case n == 0:
+		case k == "nodeSpacing":
+			g.NodeSep = n * zuzuNodeSep / node
+		default:
+			g.RankSep = n * zuzuRankSep / rank
+		}
+	}
+	return nil
 }
