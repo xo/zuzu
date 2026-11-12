@@ -297,7 +297,12 @@ parts of a class. The sequence diagram, the mindmap and the architecture
 diagram are charts: each lays out in Go and compiles to Vega. A mindmap
 puts its root in the center and a tidy tree on each side, and an
 architecture diagram puts its services on a grid by the sides of its
-edges. The order of the rest of the kinds is still open.
+edges. D32 sets the order of the rest of the kinds.
+
+On 2026-11-12 zuzu added the requirement diagram, the first kind in the
+order of D32. It reads into a graph and lays out with `zuzu.layered`. A
+requirement and an element are records whose fields stack: the kind and
+the name, then a line for each part of the body.
 
 ## The look
 

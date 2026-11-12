@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # diagrams.sh draws the references of the fixtures of DOT, and of the
-# flowcharts, the state diagrams, the class diagrams and the entity
-# relationship diagrams of Mermaid (D31). It needs dot of Graphviz 16, and
+# flowcharts, the state diagrams, the class diagrams, the entity
+# relationship diagrams and the requirement diagrams of Mermaid (D31). It needs dot of Graphviz 16, and
 # mmdc of mermaid-cli that bundles Mermaid 12.3.0. Run it from the folder
 # test.
 # If mmdc cannot find its Chrome, give it a config of puppeteer in the

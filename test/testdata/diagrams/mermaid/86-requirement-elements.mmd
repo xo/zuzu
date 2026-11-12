@@ -1,0 +1,34 @@
+requirementDiagram
+    direction BT
+
+    requirement system {
+        id: 1
+        text: "the system
+        works"
+    }
+
+    requirement empty_req {
+    }
+
+    designConstraint budget {
+        risk: low
+    }
+
+    element plan {
+        docRef: plans/v1
+    }
+
+    element design {
+    }
+
+    element test_report {
+        type: report
+        docRef: tests/report
+    }
+
+    system - contains -> empty_req
+    system - contains -> budget
+    plan <- derives - design
+    design - satisfies -> system
+    test_report - verifies -> system
+    test_report - refines -> design

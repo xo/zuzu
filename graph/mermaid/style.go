@@ -89,7 +89,7 @@ func graphSection(is *graph.Issues, kind, section string, v any, read ...string)
 func isGraph(kind string) bool {
 	switch kind {
 	case "flowchart", "graph", "flowchart-elk", "stateDiagram", "stateDiagram-v2",
-		"classDiagram", "classDiagram-v2", "erDiagram":
+		"classDiagram", "classDiagram-v2", "erDiagram", "requirementDiagram":
 		return true
 	}
 	return false
@@ -184,8 +184,9 @@ func (w wrapping) width(limit float64, markdown bool) float64 {
 }
 
 // wrapGraph sets the widths at which the labels of a class diagram, a
-// state diagram or an entity relationship diagram wrap: the label of each
-// node at node, in the pixels of zuzu, or 0 for none, and the label of
+// state diagram, an entity relationship diagram or a requirement diagram
+// wrap: the label of each node at node, in the pixels of zuzu, or 0 for
+// none, and the label of
 // each edge at edgeWrap.
 func wrapGraph(cfg map[string]any, g *graph.Graph, node float64) {
 	labelWrap(cfg, g)

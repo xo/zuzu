@@ -1,0 +1,32 @@
+---
+title: Styles
+---
+requirementDiagram
+    accTitle: Styled requirements
+    accDescr: A requirement and two elements with classes and styles
+    direction LR
+
+    requirement "Login Speed":::fast {
+        id: "REQ-1"
+        text: "**Fast** login, in _two_ seconds"
+        risk: High
+        verifymethod: Test
+    }
+
+    element "*Auth Service*" {
+        type: "**service**"
+        docref: "docs/auth.md"
+    }
+
+    element cache {
+        type: store
+    }
+
+    classDef fast fill:#fde68a,stroke:#b45309
+    classDef bold font-weight:bold
+    class cache bold
+    "*Auth Service*":::fast
+    style cache stroke:#2563eb,stroke-width:2px
+
+    "*Auth Service*" - satisfies -> "Login Speed"
+    cache - traces -> "Login Speed"

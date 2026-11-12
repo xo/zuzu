@@ -198,8 +198,8 @@ type Edge struct {
 	NoConstraint bool
 	// Head and Tail are the arrowheads at the ends: a name of the arrowType
 	// of Graphviz, such as normal, vee, empty, odiamond, crowodot or
-	// teetee, or circle or cross of Mermaid. ArrowOf says which names zuzu
-	// draws.
+	// teetee, or circle, cross or circleplus of Mermaid. ArrowOf says
+	// which names zuzu draws.
 	Head, Tail string
 	// ArrowSize scales the arrowheads, 1 for 0.
 	ArrowSize float64

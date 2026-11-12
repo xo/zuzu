@@ -1,8 +1,8 @@
 // Command mmdcref reads the SVG of a flowchart, a state diagram, a class
-// diagram or an entity relationship diagram that mmdc drew, and writes the
-// nodes, the edges and the clusters that it holds as JSON, the reference
-// of the check of D31. Run test/oracle/diagrams.sh to draw the
-// SVGs and to write the references.
+// diagram, an entity relationship diagram or a requirement diagram that
+// mmdc drew, and writes the nodes, the edges and the clusters that it
+// holds as JSON, the reference of the check of D31. Run
+// test/oracle/diagrams.sh to draw the SVGs and to write the references.
 package main
 
 import (
@@ -97,6 +97,10 @@ func main() {
 	ids := map[string]bool{}
 	if strings.Contains(s, `aria-roledescription="classDiagram"`) || strings.Contains(s, `aria-roledescription="er"`) {
 		write(classRef(s))
+		return
+	}
+	if strings.Contains(s, `aria-roledescription="requirement"`) {
+		write(requirementRef(s))
 		return
 	}
 	ns, marks := nodes(s)

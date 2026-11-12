@@ -12,8 +12,8 @@ var arrowAliases = map[string]string{
 }
 
 // arrowBases are the shapes that the name of an arrowhead joins, as the
-// arrowType of Graphviz names them. Mermaid adds circle and cross, which
-// stand alone.
+// arrowType of Graphviz names them. Mermaid adds circle, cross and
+// circleplus, which stand alone.
 var arrowBases = []string{"normal", "inv", "box", "crow", "vee", "tee", "diamond", "dot", "curve", "icurve", "none"}
 
 // arrowPart is one shape of an arrowhead with its modifiers: open draws it
@@ -36,7 +36,7 @@ func arrowParts(kind string) ([]arrowPart, bool) {
 	if a, ok := arrowAliases[kind]; ok {
 		kind = a
 	}
-	if kind == "circle" || kind == "cross" {
+	if kind == "circle" || kind == "cross" || kind == "circleplus" {
 		return []arrowPart{{base: kind}}, true
 	}
 	var out []arrowPart
@@ -69,8 +69,8 @@ func arrowParts(kind string) ([]arrowPart, bool) {
 }
 
 // ArrowOf reports whether zuzu draws a kind of arrowhead: a name of the
-// arrowType of Graphviz, or circle or cross of Mermaid. An empty kind is
-// normal.
+// arrowType of Graphviz, or circle, cross or circleplus of Mermaid. An
+// empty kind is normal.
 func ArrowOf(kind string) bool {
 	_, ok := arrowParts(kind)
 	return ok
@@ -184,6 +184,10 @@ func (p arrowPart) path(x float64) (string, float64, bool) {
 		return "M0,0A0.6,0.6 0 1,0 " + at(-1.2, 0) + "A0.6,0.6 0 1,0 0,0Z", 1.2, true
 	case "cross":
 		return "M-0.2,-0.8L-1.8,0.8M-0.2,0.8L-1.8,-0.8", 2, true
+	case "circleplus":
+		// The circle of the relation contains of a requirement diagram,
+		// with a cross of two lines in it, one along the edge.
+		return "M0,0A1,1 0 1,0 -2,0A1,1 0 1,0 0,0ZM0,0L-2,0M-1,-1L-1,1", 2, true
 	}
 	lo, hi := half(0.8)
 	return poly(pt(0, 0), pt(-2, lo), pt(-2, hi)), 2, p.open

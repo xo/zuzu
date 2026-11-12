@@ -1,10 +1,11 @@
 // Package diagrams checks the fixtures of DOT, and of the flowcharts, the
-// state diagrams, the class diagrams and the entity relationship diagrams
-// of Mermaid, against the references of dot and of mmdc (D31). zuzu lays out a graph its own way, so the check does not ask for
-// the places of the reference. It asks that every node, edge, cluster and
-// label of the reference exists, that the hard rules of the layout hold,
-// and that the crossings and the span of the edges are no worse than those
-// of the reference, plus 10 percent and 1.
+// state diagrams, the class diagrams, the entity relationship diagrams and
+// the requirement diagrams of Mermaid, against the references of dot and
+// of mmdc (D31). zuzu lays out a graph its own way, so the check does not
+// ask for the places of the reference. It asks that every node, edge,
+// cluster and label of the reference exists, that the hard rules of the
+// layout hold, and that the crossings and the span of the edges are no
+// worse than those of the reference, plus 10 percent and 1.
 //
 // Run oracle/diagrams.sh to write the references again.
 package diagrams

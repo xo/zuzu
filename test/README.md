@@ -142,8 +142,9 @@ of the clock. `oracle/exprs.mjs` reads the expressions from
 ## Check the diagrams and the icons
 
 The test in `diagrams` checks the fixtures of DOT, and of the flowcharts,
-the state diagrams, the class diagrams and the entity relationship
-diagrams of Mermaid, in `testdata/diagrams` against their references
+the state diagrams, the class diagrams, the entity relationship diagrams
+and the requirement diagrams of Mermaid, in `testdata/diagrams` against
+their references
 (D31). It asks that every node, edge, cluster and label of the reference
 exists, with the cardinalities at the ends of a relation, that the hard rules of the layout hold, and that the
 crossings and the span of the edges are no worse than those of the

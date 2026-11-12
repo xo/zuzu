@@ -208,7 +208,10 @@ An entity relationship diagram in crow's foot notation uses `teeodot` for
 zero or one, `teetee` for one, `crowodot` for zero or more, and `crowtee`
 for one or more. A class diagram of UML uses `empty` for a generalization,
 `diamond` and `odiamond` for a composition and an aggregation, and `vee`
-for a dependency.
+for a dependency. A requirement diagram of Mermaid uses `circleplus`, a
+circle with a cross in it, for the relation `contains`, and `vee` for each
+other relation. `circleplus` stands alone, as `circle` and `cross` of
+Mermaid do.
 
 ### Labels at the ends and xlabels
 
@@ -351,6 +354,7 @@ takes the name that Mermaid gives to the kind:
 | `sequenceDiagram` | `sequence` |
 | `erDiagram` | `er` |
 | `classDiagram`, `classDiagram-v2` | `classDiagram` |
+| `requirementDiagram` | `requirement` |
 | `stateDiagram`, `stateDiagram-v2` | `stateDiagram` |
 | a keyword that ends in `-beta`, such as `xychart-beta` | the keyword without `-beta`, such as `xychart` |
 | any other keyword, such as `gantt` | the keyword |
@@ -889,12 +893,91 @@ These parts are issues: `click`, the settings of the section `er` of the
 config, the `theme` and the `themeVariables` of Mermaid, and a style that
 a flowchart does not read.
 
+### Requirement diagram
+
+The keyword is `requirementDiagram`. The direction is `TB` by default, and
+`direction LR` on a line of its own sets it. The direction is `TB`, `BT`,
+`LR` or `RL`. Mermaid does not read `TD` here, and neither does zuzu. A
+statement ends at a new line, or at the end brace of a body.
+
+| Part | Example |
+| --- | --- |
+| a requirement | `requirement test_req {`, then a part of its body on each line, then `}` |
+| a kind of requirement | `requirement`, `functionalRequirement`, `interfaceRequirement`, `performanceRequirement`, `physicalRequirement` or `designConstraint` |
+| the id of a requirement | `id: 1` |
+| the text of a requirement | `text: the test text.` |
+| the risk of a requirement | `risk: low`, `risk: medium` or `risk: high` |
+| the method of verification of a requirement | `verifymethod: analysis`, `demonstration`, `inspection` or `test` |
+| an element | `element test_entity {`, then a part of its body on each line, then `}` |
+| the type of an element | `type: simulation` |
+| the reference of an element | `docRef: reqs/test_entity` |
+| a name or a value in double quotes | `requirement "test req" {`, `type: "test suite"` |
+| a relation | `test_entity - satisfies -> test_req` |
+| a relation that is written the other way | `test_req <- copies - test_entity`, which goes from `test_entity` to `test_req` |
+| the type of a relation | `contains`, `copies`, `derives`, `satisfies`, `verifies`, `refines` or `traces` |
+| a class of style | `classDef hot fill:#f96`, then `class a,b hot`, `a:::hot` or `requirement a:::hot {` |
+| a style of a requirement or an element | `style a fill:#f9f,stroke:#333` |
+| a comment | `%% a comment`, or a line that starts with `#` |
+| the text for a screen reader | `accTitle: Reqs`, `accDescr: The requirements`, `accDescr { ... }` |
+
+The keywords, the risks and the methods of verification match in any
+case, as in Mermaid. A name matches only in its own case. Each part of a
+body is optional, and a part that the body does not set draws no line.
+
+A name or a value without double quotes starts with a letter, a digit or
+an underscore of ASCII. It ends at a colon, a comma, a brace, an angle
+bracket, a dash or an equals sign, and its line must end there. It cannot
+start with a keyword, such as `test` or `high`, and it cannot hold a
+direction, such as `direction LR`. Mermaid reads each of these as an
+error, and so does zuzu. A text in double quotes can hold them, and it can
+run over more lines.
+
+zuzu draws each part in its own look:
+
+| Part | Draws as |
+| --- | --- |
+| a requirement | a box of two parts with a line between them: its kind in guillemets, such as `«Functional Requirement»`, over its name in bold, then a line for each part of its body, from the left |
+| an element | a box of two parts: `«Element»` over its name in bold, then its type and its reference |
+| the lines of a body | `ID: 1`, `Text: the test text.`, `Risk: High`, `Verification: Test`, `Type: simulation` and `Doc Ref: reqs/test_entity`, in this order |
+| a requirement or an element with an empty body | a box of one part, with its kind and its name |
+| the relation `contains` | a solid edge from the requirement that contains to the one that it contains, with the arrowhead `circleplus` at its start: a circle with a cross in it |
+| any other relation | a dashed edge with the arrowhead `vee` at its end |
+| the label of a relation | its type in guillemets, such as `«satisfies»`, in the middle of the edge |
+
+Mermaid writes a kind and the type of a relation between `<<` and `>>`.
+zuzu writes them between guillemets, as it does for a class. The ends of a
+relation draw at 1.4 times the size of an arrowhead of a flowchart. Mermaid
+draws no line between the two parts of a box when its body holds only a
+method of verification or only a reference. zuzu draws the line.
+
+The requirements come first in the layout, then the elements, as in
+Mermaid. `classDef`, `class`, `:::` and `style` read the same styles as a
+flowchart, and `classDef default` styles each requirement and each
+element. `accTitle` and `accDescr` join into the description of the Vega
+spec.
+
+The name and the parts of a body are markdown, as in Mermaid. zuzu draws a
+text without its marks. A line draws in one font, so zuzu draws a name in
+italic only when all of the name is in italic. A line of a body starts
+with a plain word, such as `Text:`, and so it draws plain. Mermaid draws
+the bold and the italic words of such a line in bold and in italic.
+
+These parts are issues: a class or a style of a name before the definition
+of the name, the body of a second definition of a name, which Mermaid
+ignores, the settings of the section `requirement` of the config, the
+layout `elk`, the look `handDrawn`, the `theme` and the `themeVariables`
+of Mermaid, and a style that a flowchart does not read. A relation to a
+name that is not a requirement or an element is an error, as in Mermaid.
+A name that is a requirement and also an element is an error. Mermaid
+draws its two boxes on top of each other.
+
 ### Labels that wrap
 
 Mermaid 12.3.0 wraps a long label of a flowchart, a state diagram, a class
-diagram and an entity relationship diagram. zuzu wraps the same labels at
-the widths of Mermaid, scaled by 11/14, as the last paragraph of this
-section says. It measures the words with the bundled font, so the lines
+diagram, an entity relationship diagram and a requirement diagram. zuzu
+wraps the same labels at the widths of Mermaid, scaled by 11/14, as the
+last paragraph of this section says. It measures the words with the
+bundled font, so the lines
 are the same on each machine.
 
 | Label | Width in Mermaid |
@@ -902,7 +985,7 @@ are the same on each machine.
 | a node of a flowchart | `flowchart.wrappingWidth`, 120 pixels by default |
 | a state, and a note of a state | `state.wrappingWidth`, 120 pixels by default |
 | the text of a link, a transition, a relation and a relationship | 200 pixels |
-| a subgraph, a composite state, a state with more than one description, a class, a note of a class, an entity and its attributes | no wrap |
+| a subgraph, a composite state, a state with more than one description, a class, a note of a class, an entity and its attributes, a requirement and an element | no wrap |
 
 A label wraps at the spaces between its words. A line that is wider than
 the width breaks before the first word that does not fit. Each line of a
@@ -1445,10 +1528,10 @@ The other settings, which tune fcose, such as `numIter`, are issues.
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
-relationship diagram, and the charts above, which hold the sequence
-diagram, the mindmap and the architecture diagram. Every other kind of
-Mermaid is an error that wraps `mermaid.ErrKind`. The order of the next
-kinds is open question 17 of `docs/PLAN.md`.
+relationship diagram, the requirement diagram, and the charts above,
+which hold the sequence diagram, the mindmap and the architecture diagram.
+Every other kind of Mermaid is an error that wraps `mermaid.ErrKind`. D32
+sets the order of the next kinds.
 
 ## The look
 

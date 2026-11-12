@@ -11,13 +11,13 @@ func TestArrowOf(t *testing.T) {
 		"", "normal", "inv", "box", "crow", "vee", "tee", "diamond", "dot", "curve", "icurve", "none",
 		"onormal", "lnormal", "rnormal", "olbox", "odot", "empty", "invempty", "open", "halfopen", "ediamond",
 		"invdot", "invodot", "crowodot", "crowtee", "teeodot", "teetee", "lteeoldiamond", "nonenormal",
-		"circle", "cross", "boxboxboxbox",
+		"circle", "cross", "circleplus", "boxboxboxbox",
 	} {
 		if !ArrowOf(kind) {
 			t.Errorf("%q is not an arrowhead", kind)
 		}
 	}
-	for _, kind := range []string{"nope", "boxboxboxboxbox", "o", "normalx", "circlecircle"} {
+	for _, kind := range []string{"nope", "boxboxboxboxbox", "o", "normalx", "circlecircle", "circleplusnormal"} {
 		if ArrowOf(kind) {
 			t.Errorf("%q is an arrowhead", kind)
 		}
@@ -45,6 +45,7 @@ func TestArrowPaths(t *testing.T) {
 		{"odiamond", "", "M0,0L-1.2,-0.8L-2.4,0L-1.2,0.8Z"},
 		{"vee", "M0,0L-2,-0.9L-1.4,0L-2,0.9Z", ""},
 		{"lvee", "M0,0L-2,-0.9L-1.4,0Z", ""},
+		{"circleplus", "", "M0,0A1,1 0 1,0 -2,0A1,1 0 1,0 0,0ZM0,0L-2,0M-1,-1L-1,1"},
 		// A name that is not an arrowhead draws as normal.
 		{"nope", "M0,0L-2,-0.8L-2,0.8Z", ""},
 	} {

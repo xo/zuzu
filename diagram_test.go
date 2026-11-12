@@ -183,6 +183,32 @@ func TestClassAndERDiagrams(t *testing.T) {
 	}
 }
 
+func TestRequirementDiagram(t *testing.T) {
+	t.Parallel()
+	src := `requirementDiagram
+  requirement test_req {
+    id: 1
+    text: the test text.
+    risk: high
+    verifymethod: test
+  }
+  element test_entity {
+    type: simulation
+  }
+  test_entity - satisfies -> test_req
+  test_req - contains -> test_entity`
+	s, report, err := svgOf(t, src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{">«Requirement»<", ">test_req<", ">ID: 1<", ">Text: the test text.<", ">Risk: High<",
+		">Verification: Test<", ">«Element»<", ">Type: simulation<", ">«satisfies»<", ">«contains»<", `font-weight="600"`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the requirement diagram has no %s", want)
+		}
+	}
+}
+
 func TestHTMLLabels(t *testing.T) {
 	t.Parallel()
 	src := `digraph {
