@@ -1112,8 +1112,8 @@ width of Mermaid that wraps a label by 11/14, and a line of zuzu holds the
 words that a line of Mermaid holds (D32). A width of 120 in Mermaid wraps
 at about 94 pixels in zuzu, and a width of 200 at about 157. The rule
 holds for each width of the table above, for `sequence.width` in a
-sequence diagram, for `mindmap.maxNodeWidth` and for
-`journey.maxLabelWidth`. A node of zuzu fits its widest line. Mermaid
+sequence diagram, for `mindmap.maxNodeWidth`, for
+`journey.maxLabelWidth` and for the widths of a timeline. A node of zuzu fits its widest line. Mermaid
 makes the box of a label that wraps as wide as the width. DOT does not
 wrap a label.
 
@@ -1126,7 +1126,8 @@ the `themeCSS`. Each chart but `sankey`, `mindmap` and `block` joins
 description" says. Mermaid does not read them in a sankey, a mindmap or a
 block diagram either, so there they are errors, as in Mermaid. Each chart
 has about 5 fixtures in `graph/mermaid/testdata`, the gantt has 18, the git
-graph has 12, and the block diagram has 6. A test draws each fixture
+graph has 12, the block diagram has 6, and the timeline has 6. A test
+draws each fixture
 and checks that each value of the source draws once, with its label.
 
 | Keyword | Compiles to |
@@ -1145,6 +1146,7 @@ and checks that each value of the source draws once, with its label.
 | `architecture-beta` | Vega rects, paths, text and icons, laid out in Go on a grid by the sides of the edges |
 | `gitGraph` | Vega rules, paths and text, laid out in Go with the rules of Mermaid: a lane for each branch and a step for each commit |
 | `block`, `block-beta` | Vega rects, paths and text, laid out in Go on a grid of columns |
+| `timeline` | Vega rects, rules, paths and text, laid out in Go: the periods along an axis, each with its events |
 
 #### pie
 
@@ -1804,12 +1806,98 @@ The look is the look of zuzu. A block is a shape with a tint of the first
 color of the scheme and an outline. A composite block is a panel. An edge
 and its arrowheads take the token Edge, as the edges of the graphs do.
 
+#### timeline
+
+The keyword is `timeline`. `LR` or `TD` can follow it, in any case, and
+sets the direction. `LR`, the default, runs from left to right, and `TD`
+runs from top to bottom. Other text after the keyword is a statement, as in
+Mermaid, so `timeline TB` is a period with the text `TB`.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `title Text` | the title |
+| `section Name` | a section: a header over the periods after it |
+| a period, as `2004` or `2004 : Facebook : Google` | a period, with an event for each colon after it |
+| an event on a line of its own, as `: YouTube` | one more event of the last period |
+| `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` | the description of the Vega spec, the texts joined in order |
+
+zuzu reads the statements as the lexer of Mermaid 12.3 reads them:
+
+1. The keywords are in any case, as `Section` or `TITLE`.
+2. A period runs up to a colon or a `#`. A `#` after a period starts a
+   comment, and so do a `#` and a `%` at the start of a line.
+3. An event starts with a colon and a space. It runs up to the next colon
+   with a space after it, or to the end of the line. Another colon is
+   text, as in `https://mermaid.js.org`.
+4. The name of a section runs up to a colon, and events can follow it on
+   its line. An event belongs to the last period of the source, also when
+   that period is in an earlier section.
+5. A colon at the end of a line takes the next line as its event.
+6. `<br>` starts a new line in a text, and an entity, such as `#quot;`,
+   reads as its character.
+
+These are errors, as in Mermaid: an event before the first period, a colon
+with no space after it outside an event, as in `10:30 : x`, an event with
+no text, a colon at the end of the source, a colon in the name of a
+section, and the keyword `timeline` on a later line.
+
+zuzu lays out a timeline in Go with the sizes of Mermaid 12.3, scaled by
+11/14 (D32). In a timeline `LR`, each period is a box of 149 pixels, one
+each 157 pixels, with its events in a stack under it. The header of each
+section is at the top, across its periods. All the periods have one height,
+and all the headers have one height, as in Mermaid. The axis runs between
+the periods and the events, with an arrowhead at its end. Each period has a
+dot on the axis and a dashed line down to its last event. In a timeline
+`TD`, each section is a header across the timeline, and each period is a
+row under it. The period is a box of 165 pixels at the left of the axis.
+Its events are boxes of 244 pixels in a stack at the right of the axis,
+each with a dashed line from the axis.
+
+A text wraps at the width of Mermaid, scaled by 11/14, as "Labels that
+wrap" says:
+
+| Text | Width in Mermaid |
+| --- | --- |
+| a period or an event of a timeline `LR` | 150 pixels |
+| a section of a timeline `LR` | 200 pixels for each period of the section, less 50 |
+| a period of a timeline `TD` | 200 pixels |
+| an event of a timeline `TD` | 300 pixels |
+| a section of a timeline `TD` | 580 pixels |
+
+zuzu draws some timelines in another way than Mermaid 12.3.0:
+
+1. Mermaid draws no period before the first section. zuzu draws these
+   periods first, with no header.
+2. Mermaid draws the periods of two sections with the same name under each
+   of them. zuzu draws each section with its own periods.
+3. In a timeline `TD`, Mermaid gives each row the height of the tallest
+   row, and can draw a section over the events of the row above it. zuzu
+   gives each row its own height.
+4. Mermaid starts a new line only at `<br>`. zuzu also starts one at
+   `<br/>` and `<BR>`.
+5. Mermaid draws the axis of a timeline with no period and no section.
+   zuzu draws only its title.
+
+Each section takes the next color of the category scheme of the theme,
+and its periods and their events take its color. The periods before the
+first section take a color as a section does. With no section, each period
+takes the next color. With `timeline.disableMulticolor: true`, each period
+takes the first color. The eleventh color is the first again. A section is
+a box with a tint of its color and its name in its color. A period has a
+lighter tint, and an event has the lightest. Each box has an outline in its
+color. The axis and its arrowhead take the token Edge.
+
+zuzu reads `timeline.disableMulticolor`, and a value that is not true or
+false is an issue. The other settings of `timeline`, such as `padding` and
+`leftMargin`, are issues, and so are the colors of `themeVariables`, such
+as `cScale0`.
+
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
 relationship diagram, the requirement diagram, and the charts above,
 which hold the sequence diagram, the mindmap, the architecture diagram, the
-git graph and the block diagram. Every other kind of Mermaid is an error that wraps
+git graph, the block diagram and the timeline. Every other kind of Mermaid is an error that wraps
 `mermaid.ErrKind`. D32 sets the order of the next kinds.
 
 ## Emoji and missing characters
