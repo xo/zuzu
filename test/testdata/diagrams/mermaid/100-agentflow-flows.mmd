@@ -1,0 +1,26 @@
+agentflow-beta TB
+  global
+    corpus["Shared corpus"]@{ shape: refdoc }
+  end
+
+  flow team["Coffee Team"]
+    city["city"]@{ shape: input }
+
+    flow researcher["Researcher"]
+      research["research_location"]@{ shape: tool }
+      city --> research
+      research -.- corpus
+    end
+    researcher@{ instruction: "Research the city." }
+
+    flow designer["Designer"]
+      render["generate_html"]@{ shape: tool }
+    end
+
+    researcher --> designer
+  end
+
+  flow
+    review["Review"]
+  end
+  render --> review

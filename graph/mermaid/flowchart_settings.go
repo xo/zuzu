@@ -24,54 +24,46 @@ const (
 	mermaidTitleTop, zuzuTitleOffset = 25.0, 10.0
 )
 
-// spacing reads the settings of the section flowchart of the config that
-// set the spaces of the layout: nodeSpacing, rankSpacing, diagramPadding,
-// titleTopMargin and subGraphTitleMargin. A value that is not a number of 0
-// or more is an issue, and the space keeps its default.
+// section returns the section of the config that holds the spaces of the
+// layout: flowchart, or agentflow in an agentflow diagram.
+func (f *flowchart) section() string {
+	if f.af != nil {
+		return "agentflow"
+	}
+	return "flowchart"
+}
+
+// configNum reads a setting of the config that is a number of 0 or more,
+// at a path such as flowchart.nodeSpacing. It returns false for a setting
+// that is not set, and for a value that is not such a number, which is an
+// issue.
+func (f *flowchart) configNum(path string, v any) (float64, bool, error) {
+	if v == nil {
+		return 0, false, nil
+	}
+	n, ok := configNumber(map[string]any{"v": v}, "v")
+	if !ok || n < 0 {
+		return 0, false, f.issues.Add("config", "the setting %s: %v", path, v)
+	}
+	return n, true, nil
+}
+
+// spacing reads the settings of the config that set the spaces of the
+// layout: nodeSpacing, rankSpacing, diagramPadding and titleTopMargin of
+// the section that section names, and subGraphTitleMargin of the section
+// flowchart. A value that is not a number of 0 or more is an issue, and
+// the space keeps its default.
 func (f *flowchart) spacing() error {
 	cfg := f.d.Config
+	num := f.configNum
+	if sec, _ := cfg[f.section()].(map[string]any); sec != nil {
+		if err := f.spaces(sec); err != nil {
+			return err
+		}
+	}
 	m, _ := cfg["flowchart"].(map[string]any)
 	if m == nil {
 		return nil
-	}
-	num := func(path string, v any) (float64, bool, error) {
-		if v == nil {
-			return 0, false, nil
-		}
-		n, ok := configNumber(map[string]any{"v": v}, "v")
-		if !ok || n < 0 {
-			return 0, false, f.issues.Add("config", "the setting %s: %v", path, v)
-		}
-		return n, true, nil
-	}
-	// Mermaid takes 0 as the default for the spaces between the nodes
-	// and the ranks.
-	n, ok, err := num("flowchart.nodeSpacing", m["nodeSpacing"])
-	if err != nil {
-		return err
-	}
-	if ok {
-		f.g.NodeSep = n * zuzuNodeSep / mermaidNodeSpacing
-	}
-	if n, ok, err = num("flowchart.rankSpacing", m["rankSpacing"]); err != nil {
-		return err
-	}
-	if ok {
-		f.g.RankSep = n * zuzuRankSep / mermaidRankSpacing
-	}
-	if n, ok, err = num("flowchart.diagramPadding", m["diagramPadding"]); err != nil {
-		return err
-	}
-	if ok {
-		pad := n
-		f.g.Padding = &pad
-	}
-	if n, ok, err = num("flowchart.titleTopMargin", m["titleTopMargin"]); err != nil {
-		return err
-	}
-	if ok {
-		off := n * zuzuTitleOffset / mermaidTitleTop
-		f.g.TitleOffset = &off
 	}
 	if v, ok := m["subGraphTitleMargin"]; ok {
 		margin, _ := v.(map[string]any)
@@ -103,6 +95,42 @@ func (f *flowchart) spacing() error {
 		if _, ok := v.(bool); !ok {
 			return f.issues.Add("config", "the setting flowchart.inheritDir: %v", v)
 		}
+	}
+	return nil
+}
+
+// spaces reads nodeSpacing, rankSpacing, diagramPadding and titleTopMargin
+// of the section of the config that section names.
+func (f *flowchart) spaces(m map[string]any) error {
+	sec := f.section()
+	// Mermaid takes 0 as the default for the spaces between the nodes
+	// and the ranks.
+	n, ok, err := f.configNum(sec+".nodeSpacing", m["nodeSpacing"])
+	if err != nil {
+		return err
+	}
+	if ok {
+		f.g.NodeSep = n * zuzuNodeSep / mermaidNodeSpacing
+	}
+	if n, ok, err = f.configNum(sec+".rankSpacing", m["rankSpacing"]); err != nil {
+		return err
+	}
+	if ok {
+		f.g.RankSep = n * zuzuRankSep / mermaidRankSpacing
+	}
+	if n, ok, err = f.configNum(sec+".diagramPadding", m["diagramPadding"]); err != nil {
+		return err
+	}
+	if ok {
+		pad := n
+		f.g.Padding = &pad
+	}
+	if n, ok, err = f.configNum(sec+".titleTopMargin", m["titleTopMargin"]); err != nil {
+		return err
+	}
+	if ok {
+		off := n * zuzuTitleOffset / mermaidTitleTop
+		f.g.TitleOffset = &off
 	}
 	return nil
 }

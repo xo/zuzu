@@ -61,6 +61,8 @@ type flowchart struct {
 	// acc holds the texts of accTitle and accDescr, which join into the
 	// description of the graph.
 	acc []string
+	// af holds what an agentflow diagram reads, or nil in a flowchart.
+	af *agentState
 }
 
 // pendingLink is a link at the end of a line and the group of nodes that
@@ -104,7 +106,12 @@ func (f *flowchart) config() error {
 			continue
 		}
 		var read []string
-		if k == "flowchart" {
+		switch {
+		case f.af != nil && k == "agentflow":
+			read = agentSettings
+		case f.af != nil && k == "flowchart":
+			read = agentFlowSettings
+		case k == "flowchart":
 			read = flowSettings
 		}
 		if err := graphSection(f.issues, f.d.Kind, k, v, read...); err != nil {
@@ -116,8 +123,13 @@ func (f *flowchart) config() error {
 	}
 	f.wrap = labelWrap(cfg, f.g)
 	var err error
-	if f.nodeWrap, err = wrapSetting(f.issues, cfg, nodeWrap, "flowchart", "wrappingWidth"); err != nil {
+	if f.nodeWrap, err = wrapSetting(f.issues, cfg, nodeWrap, f.section(), "wrappingWidth"); err != nil {
 		return err
+	}
+	if f.af != nil {
+		if err := f.agentConfig(); err != nil {
+			return err
+		}
 	}
 	if c := str(cfg, "flowchart", "curve"); c != "" {
 		vc, ok := curves[c]
@@ -193,6 +205,9 @@ func (f *flowchart) parse() error {
 	if len(f.head) > 0 {
 		lines = append([]Line{{Text: strings.Join(f.head, ";"), N: f.d.N}}, lines...)
 	}
+	if f.af != nil {
+		lines = joinProps(lines)
+	}
 	for _, l := range joinOpen(lines, `"`) {
 		f.line = l.N
 		var sts []string
@@ -209,6 +224,9 @@ func (f *flowchart) parse() error {
 	}
 	if f.pending != nil {
 		return fmt.Errorf("line %d: a link with no node after it: %w", f.line, ErrSyntax)
+	}
+	if f.af != nil && len(f.af.blocks) > 0 {
+		return fmt.Errorf("a %s with no end: %w", f.af.blocks[len(f.af.blocks)-1].word(), ErrSyntax)
 	}
 	if len(f.clusters) > 0 {
 		return fmt.Errorf("a subgraph with no end: %w", ErrSyntax)
@@ -261,7 +279,7 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 		if slices.Contains(keywords, word) {
 			return fmt.Errorf("line %d: a link with no node after it: %w", f.line, ErrSyntax)
 		}
-		sc := &scanner{s: st}
+		sc := f.scan(st)
 		next, err := f.group(sc)
 		if err != nil {
 			return err
@@ -269,12 +287,21 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 		f.connect(p.from, next, p.l)
 		return f.links(sc, next, last)
 	}
-	if first && cont != nil && startsLink(st) {
-		return f.links(&scanner{s: st}, cont, last)
+	if first && cont != nil && startsLink(st, f.af != nil) {
+		return f.links(f.scan(st), cont, last)
+	}
+	if f.af != nil {
+		if ok, err := f.agentStmt(word, rest); ok {
+			return err
+		}
 	}
 	switch word {
 	case "subgraph":
-		return f.subgraph(rest)
+		// An agentflow diagram has no subgraph, and reads the word as the
+		// id of a node.
+		if f.af == nil {
+			return f.subgraph(rest)
+		}
 	case "end":
 		if rest == "" {
 			if len(f.clusters) == 0 {
@@ -352,7 +379,7 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 			return f.linkProps(e, m[2])
 		}
 	}
-	sc := &scanner{s: st}
+	sc := f.scan(st)
 	group, err := f.group(sc)
 	if err != nil {
 		return err
@@ -413,6 +440,11 @@ func (f *flowchart) linkProps(e *graph.Edge, body string) error {
 				}
 			}
 		default:
+			// The other properties of a link of an agentflow diagram, such
+			// as instruction, are data that Mermaid does not draw.
+			if f.af != nil {
+				continue
+			}
 			if err := f.add("the property %s of a link", k); err != nil {
 				return err
 			}
@@ -422,12 +454,17 @@ func (f *flowchart) linkProps(e *graph.Edge, body string) error {
 }
 
 // startsLink reports whether a statement starts with a link, with no id
-// of an edge before it.
-func startsLink(st string) bool {
+// of an edge before it. agent reads the links of an agentflow diagram.
+func startsLink(st string, agent bool) bool {
 	if edgeIDRE.MatchString(st) {
 		return false
 	}
-	return (&scanner{s: st}).link() != nil
+	return (&scanner{s: st, agent: agent}).link() != nil
+}
+
+// scan returns a scanner of a statement.
+func (f *flowchart) scan(st string) *scanner {
+	return &scanner{s: st, agent: f.af != nil}
 }
 
 // subgraph opens a subgraph: subgraph id, subgraph id[title], subgraph
@@ -456,15 +493,20 @@ func (f *flowchart) subgraph(rest string) error {
 
 // node returns a node, made in the current subgraph when it is new.
 func (f *flowchart) node(id string) *graph.Node {
+	// A node of an agentflow diagram takes its flow when the flow ends.
+	cluster := f.cluster()
+	if f.af != nil {
+		cluster = ""
+	}
 	if n, ok := f.nodes[id]; ok {
-		if n.Cluster == "" && f.cluster() != "" {
-			n.Cluster = f.cluster()
+		if n.Cluster == "" && cluster != "" {
+			n.Cluster = cluster
 		}
 		return n
 	}
 	// The id of a subgraph that an edge names is a node of its own here,
 	// until subgraphEdges takes it out.
-	n := &graph.Node{ID: id, Label: id, Shape: "rect", Cluster: f.cluster(), Style: map[string]string{}}
+	n := &graph.Node{ID: id, Label: id, Shape: "rect", Cluster: cluster, Style: map[string]string{}}
 	f.nodes[id] = n
 	f.g.Nodes = append(f.g.Nodes, n)
 	return n
@@ -477,10 +519,12 @@ var delims = []struct{ open, close, shape string }{
 	{"{{", "}}", "hexagon"}, {"{", "}", "diamond"}, {">", "]", "odd"}, {"(", ")", "rounded"}, {"[", "]", "rect"},
 }
 
-// scanner reads a statement.
+// scanner reads a statement. agent reads the links of an agentflow
+// diagram.
 type scanner struct {
-	s string
-	i int
+	s     string
+	i     int
+	agent bool
 }
 
 func (sc *scanner) space() {
@@ -558,6 +602,9 @@ func (sc *scanner) link() *link {
 		l.id = m[1]
 		sc.i += len(m[1]) + 1
 		r = sc.s[sc.i:]
+	}
+	if sc.agent {
+		return sc.agentLink(l)
 	}
 	body := func(b string, hasHead bool) {
 		switch {
@@ -725,15 +772,11 @@ func (f *flowchart) nodeRef(sc *scanner) (string, error) {
 		return "", fmt.Errorf("line %d: %q where a node goes: %w", f.line, sc.s[sc.i:], ErrSyntax)
 	}
 	n := f.node(id)
-	if strings.HasPrefix(sc.s[sc.i:], "@{") {
-		end := matching(sc.s, sc.i+1, '{', '}')
-		if end < 0 {
-			return "", fmt.Errorf("line %d: properties with no end: %w", f.line, ErrSyntax)
-		}
-		if err := f.props(n, sc.s[sc.i+2:end]); err != nil {
-			return "", err
-		}
-		sc.i = end + 1
+	if f.af != nil {
+		f.af.ref(id)
+	}
+	if err := f.nodeProps(sc, n); err != nil {
+		return "", err
 	}
 	for _, d := range delims {
 		if !strings.HasPrefix(sc.s[sc.i:], d.open) {
@@ -774,11 +817,21 @@ func (f *flowchart) nodeRef(sc *scanner) (string, error) {
 		n.Label = label(text)
 		f.markdown[id] = isMarkdown(text)
 		n.Shape = d.shape
+		if f.af != nil {
+			n.Shape = agentBracket(d.shape)
+		}
 		sc.i = end + len(d.close)
 		if strings.Contains(text, "fa:fa-") || strings.Contains(text, "fab:fa-") || strings.Contains(text, "fas:fa-") || strings.Contains(text, "far:fa-") {
 			labelIcon(n)
 		}
 		break
+	}
+	// A node of an agentflow diagram can have its properties after its
+	// shape too, as in a["A"]@{ shape: tool }.
+	if f.af != nil {
+		if err := f.nodeProps(sc, n); err != nil {
+			return "", err
+		}
 	}
 	if strings.HasPrefix(sc.s[sc.i:], ":::") {
 		sc.i += 3
@@ -786,6 +839,23 @@ func (f *flowchart) nodeRef(sc *scanner) (string, error) {
 		f.nodeClasses[id] = append(f.nodeClasses[id], c)
 	}
 	return id, nil
+}
+
+// nodeProps reads the properties of a node in @{ and }, when they come
+// next.
+func (f *flowchart) nodeProps(sc *scanner, n *graph.Node) error {
+	if !strings.HasPrefix(sc.s[sc.i:], "@{") {
+		return nil
+	}
+	end := matching(sc.s, sc.i+1, '{', '}')
+	if end < 0 {
+		return fmt.Errorf("line %d: properties with no end: %w", f.line, ErrSyntax)
+	}
+	if err := f.props(n, sc.s[sc.i+2:end]); err != nil {
+		return err
+	}
+	sc.i = end + 1
+	return nil
 }
 
 // labelIcon takes an icon of Font Awesome out of the label of a node, as
@@ -828,6 +898,9 @@ func matching(s string, i int, open, closing byte) int {
 // with an icon, A@{ icon: "fa:user", form: square, pos: t, h: 48 }, or an
 // image, A@{ img: "url", w: 60, h: 60, constraint: on }.
 func (f *flowchart) props(n *graph.Node, body string) error {
+	if f.af != nil {
+		return f.agentProps(n, body)
+	}
 	m := inlineMap(body)
 	media := &graph.Media{}
 	for _, k := range slices.Sorted(maps.Keys(m)) {
@@ -1123,11 +1196,19 @@ func (f *flowchart) finish() error {
 	if err := f.nodeAnimation(); err != nil {
 		return err
 	}
+	if f.af != nil {
+		if err := f.agentMembers(); err != nil {
+			return err
+		}
+	}
 	if err := f.collapse(); err != nil {
 		return err
 	}
 	if err := f.subgraphEdges(); err != nil {
 		return err
+	}
+	if f.af != nil {
+		f.agentShapes()
 	}
 	for _, n := range f.g.Nodes {
 		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)

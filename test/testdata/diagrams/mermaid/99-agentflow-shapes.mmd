@@ -1,0 +1,20 @@
+---
+title: Release notes
+---
+agentflow-beta LR
+  connector github["GitHub API"]
+  github@{ protocol: "http", endpoint: "https://api.github.com" }
+
+  brief["Release brief"]@{ shape: input, value: "v1.2" }
+  draft["Draft the notes"]@{ shape: task }
+  lookup["changelog_search"]@{ shape: tool, connectorRef: "github.search", returns: "String" }
+  guide["Tone of voice"]@{ shape: refdoc }
+  ok["Accurate?"]@{ shape: decision }
+  publish["Publish"]@{ shape: action }
+  retry(Retry)
+
+  brief --> draft --> lookup --> ok
+  draft -.- guide
+  ok -- yes --> publish
+  ok -->|no| retry
+  retry --x draft

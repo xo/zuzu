@@ -490,7 +490,7 @@ weight 600, and `Times-Italic` draws in italic. These parts name a family:
 
 | Part | What zuzu does |
 | --- | --- |
-| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, a state diagram, a class diagram and an entity relationship diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
+| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, an agentflow diagram, a state diagram, a class diagram and an entity relationship diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
 | `sequence.actorFontFamily`, `sequence.messageFontFamily`, `sequence.noteFontFamily` | gives the weight and the style to the participants, the messages or the notes. Each wins over `fontFamily`, and `actorFontWeight` and the other weights win over each |
 | `font-family` in a style, such as `style A font-family:Times-Bold` | gives the weight and the style to the label. `font-weight` and `font-style` in the same style win over it |
 | another setting whose name ends in `FontFamily`, such as `usecase.actorFontFamily` | nothing |
@@ -1066,9 +1066,125 @@ name that is not a requirement or an element is an error, as in Mermaid.
 A name that is a requirement and also an element is an error. Mermaid
 draws its two boxes on top of each other.
 
+### Agentflow diagram
+
+The keyword is `agentflow-beta`. An agentflow diagram draws the agents of a
+program as a flowchart: their tasks, their tools, their inputs and their
+decisions, in flows. A flow is a box around the nodes of one agent, as a
+subgraph is. The direction comes after the keyword. It is `TB`, `TD`,
+`BT`, `LR` or `RL`, and `TB` by default. The statements, the chains, a
+group with `&`, a chain over a line break, `classDef`, `class`, `:::`,
+`style`, `linkStyle`, `click`, `direction` in a flow and the text for a
+screen reader read as in a flowchart. zuzu reads the diagram into a graph
+and lays it out with `zuzu.layered`.
+
+| Part | Example |
+| --- | --- |
+| a node | `a`, `a["Text"]`, `a(Text)` |
+| a shape | `a["Text"]@{ shape: tool }` or `a@{ shape: tool }` |
+| a label | `a@{ label: "Text" }` |
+| a flow | `flow id["Title"]`, then its statements, then `end` |
+| a flow with no title | `flow id`, then its statements, then `end` |
+| a flow with no id | `flow`, then its statements, then `end` |
+| a collapsed flow | `id@{ view: collapsed }` after the `end` of the flow, or `flow id["Title"]@{ view: collapsed }` |
+| a block of nodes outside every flow | `global`, then its statements, then `end` |
+| a connector | `connector id["Title"]` or `connector id` |
+| a link | `a --> b`, or `a ---> b` for a longer one |
+| a link of a failure | `a --x b` |
+| a link to a reference | `a -.- b`, or `a -..- b` for a longer one |
+| the text of a link | `a -- yes --> b`, `a -- no --x b`, `a -->\|yes\| b`, `a -.-\|ref\| b` |
+| an id of a link | `a e1@--> b`, then `e1@{ animate: true }` |
+| properties over more lines | `a@{`, then one key on each line, then `}` |
+
+These are the shapes of a node:
+
+| Shape | Source | Draws as |
+| --- | --- | --- |
+| `task` | `shape: task`, `a[Text]`, `a(Text)`, or a node with no brackets | a rounded rectangle |
+| `tool` | `shape: tool`, `subroutine`, `subprocess`, `subproc` or `framed-rectangle`, or `a[[Text]]` | a subroutine |
+| `input` | `shape: input` or `lean-right`, or `a[/Text/]` | a parallelogram |
+| `decision` | `shape: decision` or `diamond`, or `a{Text}` | a diamond |
+| `refdoc` | `shape: refdoc`, `lin-doc` or `lined-document` | a document with a second line down its left side |
+| `action` | `shape: action`, `hexagon` or `hex`, or `a{{Text}}` | a hexagon |
+
+Mermaid draws every other shape as a rounded rectangle, and so does zuzu.
+This holds for another name of a shape of Mermaid, such as `rect` or
+`cyl`, and for the other brackets, such as `a((Text))` or `a[(Text)]`. A
+name of a shape with a capital letter or an underscore, such as `Task` or
+`lean_right`, is an error, as in Mermaid. A name that Mermaid does not
+have, such as `connector`, is an error too.
+
+Mermaid reads a flow at its `end`, and so does zuzu. A flow holds each
+node and each flow that its statements name, unless a flow that ended
+before it holds them. So a node that a flow names, and that a flow inside
+it names again, goes into the inner flow. A flow does not hold itself, or a
+node of a block `global`. A block `global` draws no box. Its nodes draw
+outside every flow, even when a flow names them. A flow with the id of a
+flow that ended before it adds to that flow. A flow with no id takes the
+id `subGraph` and the number of the flows that ended before it, as in
+Mermaid. A link to the id of a flow goes to the box of the flow. A flow
+does not hold a flow that holds it, as in Mermaid, and such a loop is an
+issue.
+
+`view: collapsed` draws a flow as one node, as a collapsed subgraph of a
+flowchart draws. Mermaid reads it only after the `end` of the flow, and so
+does zuzu. `view: collapsed` on any other id is an issue.
+
+A connector draws as a rounded rectangle with its title, or with its id.
+A flow holds a connector that it declares. The properties of a connector
+draw nothing, and a shape there is no error, as in Mermaid.
+
+The properties `shape` and `label` of a node draw, and `view` collapses a
+flow. Mermaid keeps the other properties of a node, a flow and a
+connector as data for other programs, and draws none of them. Such
+properties are `value`, `params`, `returns`, `connectorRef`,
+`description`, `model`, `instruction`, `protocol`, `endpoint`, `icon` and
+`img`. zuzu draws none of them either, and reports none of them. The
+properties `animate`, `animation` and `curve` of a link draw as in a
+flowchart. The other properties of a link, such as `instruction`, draw
+nothing, with no issue. An empty `@{ }` changes nothing.
+
+Properties on one line are a map in braces, with a comma between two
+keys. Properties over more lines are a block of YAML, with one key on
+each line. There, a comma at the end of a plain value is a part of the
+value, as in Mermaid. So `shape: input,` on a line of its own is an
+error. A comma after a value in quotes is not a part of the value.
+
+Mermaid reads only the links of the table above in an agentflow diagram.
+Another link, such as `---`, `==>`, `-.->`, `~~~`, `--o`, `<-->` or
+`-. text .-`, is an error, as in Mermaid. A statement `subgraph` or
+`title` is an error too. Each dash or dot more makes a link one rank
+longer.
+
+zuzu reads these settings of the section `agentflow` of the config:
+
+| Setting | Default of Mermaid | What zuzu does |
+| --- | --- | --- |
+| `wrappingWidth` | 120 | wraps the label of a node, as "Labels that wrap" says |
+| `minNodeWidth` | 120 | makes a node at least as wide as a label of this width, scaled by 11/14, and its padding. A diamond and a collapsed flow fit their label |
+| `nodeSpacing` | 50 | sets the space between two nodes of a rank to 24/50 of it |
+| `rankSpacing` | 50 | sets the space between two ranks to 40/50 of it |
+| `diagramPadding` | 8 | sets the space around the diagram to it |
+| `titleTopMargin` | 25 | sets the space between the title and the diagram to 10/25 of it |
+
+It reads `curve`, `subGraphTitleMargin`, `inheritDir` and `htmlLabels` of
+the section `flowchart`, as Mermaid 12.3 does, as a flowchart reads them.
+
+zuzu draws an agentflow diagram in its own look. A node is a shape with a
+tint of its color, as in a flowchart, and a flow is a panel with its
+title at the top left. A link and its arrowhead take the token Edge, and
+a link to a reference is dotted. Mermaid draws an agentflow diagram in
+the theme `redux-color` by default, with a color for each kind of node and
+for each flow. zuzu draws every kind in the color of the scheme.
+
+These parts are issues: the `theme` and the `themeVariables` of Mermaid,
+which draw in the look of zuzu, the other settings of the sections
+`agentflow` and `flowchart`, a callback of `click` and the target of a
+link, and a style that a flowchart does not read.
+
 ### Links and tooltips
 
-`click` in a flowchart and a state diagram, and `click`, `link` and
+`click` in a flowchart, an agentflow diagram and a state diagram, and `click`, `link` and
 `callback` in a class diagram, give a node a link and a tooltip (D32).
 These are the forms:
 
@@ -1096,7 +1212,8 @@ node. "Links" in `docs/API.md` lists the schemes that zuzu writes.
 ### Labels that wrap
 
 Mermaid 12.3.0 wraps a long label of a flowchart, a state diagram, a class
-diagram, an entity relationship diagram and a requirement diagram. zuzu
+diagram, an entity relationship diagram, a requirement diagram and an
+agentflow diagram. zuzu
 wraps the same labels at the widths of Mermaid, scaled by 11/14, as the
 last paragraph of this section says. It measures the words with the
 bundled font, so the lines
@@ -1105,9 +1222,10 @@ are the same on each machine.
 | Label | Width in Mermaid |
 | --- | --- |
 | a node of a flowchart | `flowchart.wrappingWidth`, 120 pixels by default |
+| a node of an agentflow diagram | `agentflow.wrappingWidth`, 120 pixels by default |
 | a state, and a note of a state | `state.wrappingWidth`, 120 pixels by default |
 | the text of a link, a transition, a relation and a relationship | 200 pixels |
-| a subgraph, a composite state, a state with more than one description, a class, a note of a class, an entity and its attributes, a requirement and an element | no wrap |
+| a subgraph, a flow, a composite state, a state with more than one description, a class, a note of a class, an entity and its attributes, a requirement and an element | no wrap |
 
 A label wraps at the spaces between its words. A line that is wider than
 the width breaks before the first word that does not fit. Each line of a
@@ -1918,10 +2036,12 @@ as `cScale0`.
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
-relationship diagram, the requirement diagram, and the charts above,
-which hold the sequence diagram, the mindmap, the architecture diagram, the
-git graph, the block diagram and the timeline. Every other kind of Mermaid is an error that wraps
-`mermaid.ErrKind`. D32 sets the order of the next kinds.
+relationship diagram, the requirement diagram, the agentflow diagram, and
+the charts above, which hold the sequence diagram, the mindmap, the
+architecture diagram, the git graph, the block diagram and the timeline.
+The agentflow diagram reads into a graph, as the flowchart does. Every
+other kind of Mermaid is an error that wraps `mermaid.ErrKind`. D32 sets
+the order of the next kinds.
 
 ## Emoji and missing characters
 

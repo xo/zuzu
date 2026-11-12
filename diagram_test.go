@@ -237,6 +237,39 @@ func TestRequirementDiagram(t *testing.T) {
 	}
 }
 
+func TestAgentflowDiagram(t *testing.T) {
+	t.Parallel()
+	src := `agentflow-beta TB
+  connector llm["LLM API"]
+  flow triage["Triage Agent"]
+    ticket["ticket"]@{ shape: input, value: "INC-4417" }
+    classify["classify_intent"]@{ shape: tool, connectorRef: "llm.chat" }
+    severity["Severity?"]@{ shape: decision }
+    ticket --> classify --> severity
+  end
+  flow audit["Audit"]
+    record["record_outcome"]
+  end
+  audit@{ view: "collapsed" }
+  severity -->|"high"| audit
+  severity --x record`
+	if d := sniffDiagram([]byte(src)); d != Mermaid {
+		t.Fatalf("expected Mermaid, got %v", d)
+	}
+	s, report, err := svgOf(t, src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{">LLM API<", ">Triage Agent<", ">ticket<", ">classify_intent<", ">Severity?<", ">Audit<", ">high<"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the agentflow diagram has no %s", want)
+		}
+	}
+	if strings.Contains(s, ">record_outcome<") {
+		t.Error("the collapsed flow draws its node record_outcome")
+	}
+}
+
 func TestHTMLLabels(t *testing.T) {
 	t.Parallel()
 	src := `digraph {

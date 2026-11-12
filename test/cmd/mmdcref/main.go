@@ -1,8 +1,9 @@
 // Command mmdcref reads the SVG of a flowchart, a state diagram, a class
-// diagram, an entity relationship diagram or a requirement diagram that
-// mmdc drew, and writes the nodes, the edges and the clusters that it
-// holds as JSON, the reference of the check of D31. Run
-// test/oracle/diagrams.sh to draw the SVGs and to write the references.
+// diagram, an entity relationship diagram, a requirement diagram or an
+// agentflow diagram that mmdc drew, and writes the nodes, the edges and
+// the clusters that it holds as JSON, the reference of the check of D31.
+// Run test/oracle/diagrams.sh to draw the SVGs and to write the
+// references.
 package main
 
 import (
@@ -10,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"math"
 	"os"
 	"regexp"
 	"slices"
@@ -54,11 +56,12 @@ type Cluster struct {
 }
 
 var (
-	nodeRE = regexp.MustCompile(`<g class="[^"]*" id="my-svg-(?:flowchart|state)-([^"]+?)-\d+"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"`)
+	nodeRE = regexp.MustCompile(`<g class="[^"]*" id="my-svg-(?:flowchart|state|agentflow)-([^"]+?)-\d+"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"`)
 	// A node with a link sits in an a element that holds its place.
 	linkedRE = regexp.MustCompile(`<a [^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"><g class="[^"]*" id="my-svg-flowchart-([^"]+?)-\d+"`)
-	// A collapsed subgraph is a node with the id of the subgraph.
-	collapsedRE = regexp.MustCompile(`<g class="node" id="my-svg-([^"]+)"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"><rect class="basic label-container collapsed-group"`)
+	// A collapsed subgraph or flow is a node with the id of the subgraph
+	// or the flow.
+	collapsedRE = regexp.MustCompile(`<g class="node" id="my-svg-([^"]+)"[^>]*transform="translate\(([-\d.e]+), ([-\d.e]+)\)"><rect class="basic label-container (?:collapsed-group|flow-collapsed)"`)
 	clusterRE   = regexp.MustCompile(`<g class="cluster[^"]*" id="my-svg-([^"]+)"[^>]*><rect[^>]*x="([-\d.e]+)" y="([-\d.e]+)" width="([-\d.e]+)" height="([-\d.e]+)"`)
 	edgeRE      = regexp.MustCompile(`<path [^>]*data-id="(L_[^"]+)"[^>]*data-points="([^"]+)"`)
 	labelRE     = regexp.MustCompile(`<g class="label" data-id="([^"]+)"[^>]*>(.*?)</g>`)
@@ -103,6 +106,7 @@ func main() {
 		write(requirementRef(s))
 		return
 	}
+	agentflow := strings.Contains(s, `aria-roledescription="agentflow"`)
 	ns, marks := nodes(s)
 	if strings.Contains(s, `aria-roledescription="stateDiagram"`) {
 		ref = stateRef(s, ns, marks)
@@ -143,6 +147,11 @@ func main() {
 		if end < 0 {
 			end = len(s) - loc[1]
 		}
+		// A cluster with no title, such as a flow with none, ends at its
+		// empty label.
+		if empty := strings.Index(s[loc[1]:], `<g class="cluster-label"/>`); empty >= 0 && empty < end {
+			end = empty
+		}
 		ref.Clusters = append(ref.Clusters, Cluster{ID: sub[1], Label: text(s[loc[1] : loc[1]+end]),
 			X: num(sub[2]), Y: num(sub[3]), Width: num(sub[4]), Height: num(sub[5])})
 		ids[sub[1]] = true
@@ -177,6 +186,13 @@ func main() {
 				break
 			}
 		}
+		// An edge of an agentflow diagram to a node in a collapsed flow
+		// keeps the id of the node, and ends at the node of the flow: the
+		// node nearest to the end of its route.
+		if e.Source == "" && agentflow && len(e.Points) > 0 {
+			e.Source = nearest(ref.Nodes, e.Points[0])
+			e.Target = nearest(ref.Nodes, e.Points[len(e.Points)-1])
+		}
 		ref.Edges = append(ref.Edges, e)
 	}
 	write(ref)
@@ -202,6 +218,17 @@ func nodes(s string) ([]Node, []string) {
 		marks = append(marks, s[loc[1]:loc[1]+end])
 	}
 	return ns, marks
+}
+
+// nearest returns the id of the node whose center is nearest to a point.
+func nearest(ns []Node, p [2]float64) string {
+	id, best := "", math.Inf(1)
+	for _, n := range ns {
+		if d := math.Hypot(n.X-p[0], n.Y-p[1]); d < best {
+			id, best = n.ID, d
+		}
+	}
+	return id
 }
 
 // write writes a reference as JSON, with its nodes in the order of their
