@@ -18,6 +18,16 @@ type LayoutInput struct {
 	// RankSep, NodeSep and ClusterPadding are the space between the ranks,
 	// between the nodes of a rank, and inside a cluster. 0 is 40, 24 and 12.
 	RankSep, NodeSep, ClusterPadding float64
+	// Lanes lays the graph out in lanes, as the swimlane layout of Mermaid
+	// 12.3 does: each cluster at the top is a lane that runs along all the
+	// ranks, the lanes lie side by side in the order of the input, and the
+	// edges route at right angles. The nodes outside every cluster make a
+	// lane before the others.
+	Lanes bool
+	// LaneEdges makes an edge between two lanes move its target to the
+	// next rank in a layout in lanes, as the setting
+	// swimlane.ignoreCrossLaneEdges false of Mermaid does.
+	LaneEdges bool
 }
 
 // LayoutNode is a node to lay out.

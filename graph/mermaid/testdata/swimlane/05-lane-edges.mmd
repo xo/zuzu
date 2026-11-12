@@ -1,0 +1,18 @@
+---
+config:
+  swimlane:
+    ignoreCrossLaneEdges: false
+    optimizeRanksByCrossings: false
+---
+swimlane-beta LR
+  subgraph One
+    a[Start] --> b[Left]
+    a --> c[Right]
+  end
+  subgraph Two
+    d[Join]
+    e[End]
+  end
+  b --> d
+  c --> d
+  d --> e

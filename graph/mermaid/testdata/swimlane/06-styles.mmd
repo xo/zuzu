@@ -1,0 +1,19 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+swimlane-beta LR
+  subgraph ops [Operations]
+    intake[Receive request]
+    plan["`**Plan** the work`"]
+  end
+  subgraph legal [Legal]
+    review[Review contract]
+  end
+  intake --> plan -.-> review
+  classDef attention fill:#fff2cc,stroke:#d6a500,color:#111
+  class review attention
+  style intake stroke-width:3px
+  linkStyle 0 stroke:#d33
+  click review "https://example.com" "Open the contract"

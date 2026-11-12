@@ -78,6 +78,15 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A layout in lanes, as the swimlane layout of Mermaid.
+	lanes, err := p.boolean("lanes", false)
+	if err != nil {
+		return nil, err
+	}
+	laneEdges, err := p.boolean("laneEdges", false)
+	if err != nil {
+		return nil, err
+	}
 	as, err := p.as("x", "y", "width", "height", "rank", "order")
 	if err != nil {
 		return nil, err
@@ -171,7 +180,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		return 0, 0, nil, nil
 	}
-	in := graph.LayoutInput{Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad}
+	in := graph.LayoutInput{Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad, Lanes: lanes, LaneEdges: laneEdges}
 	text := func(r Row, f *Accessor) string {
 		v := f.Get(r)
 		if v == nil || expr.IsUndefined(v) {

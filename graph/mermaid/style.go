@@ -34,7 +34,8 @@ func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
 	}
 	switch k {
 	case "layout":
-		if v == "dagre" {
+		// A swimlane diagram, and a flowchart, can lay out in lanes.
+		if v == "dagre" || v == "swimlane" && laneKind(kind) {
 			return true, nil
 		}
 		return true, is.Add("config", "the layout %v", v)
@@ -147,7 +148,7 @@ func graphSection(is *graph.Issues, kind, section string, v any, read ...string)
 func isGraph(kind string) bool {
 	switch kind {
 	case "flowchart", "graph", "flowchart-elk", "stateDiagram", "stateDiagram-v2",
-		"classDiagram", "classDiagram-v2", "erDiagram", "requirementDiagram", "agentflow-beta", "usecase-beta":
+		"classDiagram", "classDiagram-v2", "erDiagram", "requirementDiagram", "agentflow-beta", "usecase-beta", "swimlane-beta":
 		return true
 	}
 	return false

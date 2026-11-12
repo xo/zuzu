@@ -448,7 +448,8 @@ layouts of Mermaid 12.3, `elk.stress`, `elk.force`, `elk.mrtree`,
 of the config, which holds the settings of ELK, are hints too. Every kind
 accepts `layout: dagre`, the default layout of Mermaid, with no issue.
 Another layout, such as `elk.layered` or `tidy-tree`, is an issue. A
-mindmap accepts `cose-bilkent` and `tidy-tree` too.
+swimlane diagram and a flowchart accept `layout: swimlane`, as "Swimlane
+diagram" says. A mindmap accepts `cose-bilkent` and `tidy-tree` too.
 
 `nodeSpacing` and `rankSpacing` at the top of the config set the spaces of
 every graph, as in Mermaid 12.3, over the spaces of the section of the
@@ -518,7 +519,7 @@ weight 600, and `Times-Italic` draws in italic. These parts name a family:
 
 | Part | What zuzu does |
 | --- | --- |
-| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, an agentflow diagram, a state diagram, a class diagram, an entity relationship diagram, a requirement diagram and a use case diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
+| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, a swimlane diagram, an agentflow diagram, a state diagram, a class diagram, an entity relationship diagram, a requirement diagram and a use case diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
 | `sequence.actorFontFamily`, `sequence.messageFontFamily`, `sequence.noteFontFamily` | gives the weight and the style to the participants, the messages or the notes. Each wins over `fontFamily`, and `actorFontWeight` and the other weights win over each |
 | `font-family` in a style, such as `style A font-family:Times-Bold` | gives the weight and the style to the label. `font-weight` and `font-style` in the same style win over it |
 | `usecase.actorFontFamily`, `usecase.usecaseFontFamily` | gives the weight and the style to the actors or the use cases of a use case diagram. Each wins over `fontFamily`, and `actorFontWeight` and `usecaseFontWeight` win over each |
@@ -1379,9 +1380,110 @@ it reads the line. zuzu reads such a semicolon as an error. zuzu reads
 `%%` after a statement as a comment, and Mermaid reads it as an error.
 `accTitle` and `accDescr` join into the description of the Vega spec.
 
+### Swimlane diagram
+
+The keyword is `swimlane-beta`. A swimlane diagram is a flowchart in lanes.
+It reads every part of a flowchart, as "Flowchart" says, with the same
+errors, and it draws its nodes, its links, its styles, its icons and its
+links of `click` the same way. Its labels wrap as the labels of a
+flowchart. The direction is `TB`, `TD`, `BT`, `LR` or `RL`, and `TB` by
+default. A flowchart with `layout: swimlane` lays out in lanes too, as in
+Mermaid 12.3.
+
+Each subgraph at the top is a lane. A lane is a band that runs along all
+the ranks. The lanes lie side by side in the order of the source: from the
+left to the right when the ranks run down or up, and from the top to the
+bottom when the ranks run across. A node is in the lane of the subgraph at
+the top that holds it. The nodes outside every subgraph go into a lane of
+their own, with no title, before the other lanes, as in Mermaid. A lane
+that holds no node draws nothing.
+
+A subgraph inside a lane draws as a box around its nodes, with its title.
+Its direction changes nothing, as in Mermaid. Its box can hold a node of
+another subgraph that lies between its nodes, as in Mermaid. An edge to
+the id of a subgraph ends at the box of the subgraph.
+
+zuzu ranks the nodes as the swimlane layout of Mermaid 12.3 ranks them:
+
+1. An edge that closes a cycle turns around. A search starts from the
+   nodes with no edge in, and follows the edges out of a node in the order
+   of the ids of their targets.
+2. The nodes take their ranks in a topological order, with the ids in the
+   order of `localeCompare` of JavaScript. A diagram from the left to the
+   right takes the nodes one generation at a time.
+3. A node takes the greatest rank of its sources, plus 1 for a source in
+   its own lane. So an edge between two lanes does not move its target to
+   the next rank.
+4. A lane holds one node in each rank, so a node takes at least the rank
+   after the last node of its lane.
+
+With `swimlane.ignoreCrossLaneEdges: false`, each edge moves its target to
+the next rank, and then 8 passes move each node toward the mean of the
+ranks of its neighbors. Two nodes of a lane can then share a rank. They lie
+side by side in it, in the order of the medians of their neighbors, as in
+Mermaid. Mermaid ignores the length of a link, such as `--->`, in a
+swimlane diagram, and so does zuzu.
+
+zuzu places the nodes in its own look, on a grid of the lanes and the
+ranks:
+
+1. The nodes of a lane are in the middle of the lane. A lane is as wide as
+   its widest node and its title, with a space of 16 on each side.
+2. The ranks follow one after another. A rank is as long as its longest
+   node. The space between two ranks is that of a flowchart, 40 by default.
+3. The label of an edge in one rank goes beside the target of the edge, on
+   the side of its source. The lane of the target makes room for it on
+   both sides of its nodes, as in Mermaid.
+4. The label of an edge across the ranks goes in the gap in the middle of
+   the ranks of the edge, on its route. The gap grows to hold it.
+5. An edge routes at right angles, around the nodes, with round corners.
+   It crosses the lanes in the rank of its source when it can. It leaves
+   its source and comes into its target on the side that faces the way
+   from the source to the target, when it can. A route costs more where
+   another route or a label already is, so that two routes share a line
+   only when no other way is short.
+6. A link from a node to itself draws as a loop out of the side of the
+   node. Mermaid 12.3 fails to draw such a link, and zuzu draws it.
+
+A curve of a link that is not `basis`, such as `linear`, draws the route
+at right angles with that curve of Vega. `basis`, the default, draws round
+corners, as the curve `rounded` of Mermaid does. Mermaid draws a hop where
+two routes cross, and zuzu draws none.
+
+The look is the look of zuzu. A lane is a panel with its title at the top
+left, and two lanes have a space of 8 between them. Mermaid draws the title
+of a lane in a band at its left, turned, when the ranks run across. zuzu
+draws it at the top left in each direction. A node and an edge draw as in
+a flowchart, and an edge and its arrowheads take the token Edge.
+
+zuzu reads the settings of the section `flowchart`, as a flowchart does,
+and these settings:
+
+| Setting | Default of Mermaid | What zuzu does |
+| --- | --- | --- |
+| `layout`, `swimlane.layout` | `swimlane` | `swimlane` lays out in lanes. `dagre` and `elk` draw the diagram as a flowchart, with its subgraphs as clusters, as in Mermaid. `swimlane.layout` wins over `layout` |
+| `swimlane.ignoreCrossLaneEdges` | true | false makes each edge move its target to the next rank |
+| `swimlane.optimizeRanksByCrossings` | true | nothing, when `ignoreCrossLaneEdges` is true. When it is false, true is an issue, because zuzu does not move the ranks to fewer crossings |
+| `swimlane.automaticLaneOrdering` | false | true is an issue. zuzu keeps the lanes in the order of the source |
+| `swimlane.lineHops` | `arc` | false draws no hop, as zuzu always does. `arc` and `gap` are issues |
+| `swimlane.look`, `swimlane.useMaxWidth` | `neo`, true | nothing, as `look` and `useMaxWidth` |
+
+A swimlane diagram with `layout: dagre` or `layout: elk` reads no other
+setting of the section `swimlane`, and such a setting is an issue. Another
+layout, such as `tidy-tree`, is an issue, and the diagram lays out in
+lanes. The spec of a diagram in lanes draws with the transform
+`zuzu.layered` and its parameter `lanes: true`, and with `laneEdges: true`
+when `ignoreCrossLaneEdges` is false.
+
+These parts are issues, as in a flowchart: the `theme`, the
+`themeVariables` and the `themeCSS` of Mermaid, which draw in the look of
+zuzu, the other settings of the section `flowchart`, such as
+`minNodeWidth`, the other settings of the section `swimlane`, such as
+`swimlane.theme`, and a callback of `click`.
+
 ### Links and tooltips
 
-`click` in a flowchart, an agentflow diagram and a state diagram, and `click`, `link` and
+`click` in a flowchart, a swimlane diagram, an agentflow diagram and a state diagram, and `click`, `link` and
 `callback` in a class diagram, give a node a link and a tooltip (D32).
 These are the forms:
 
@@ -1408,8 +1510,8 @@ node. "Links" in `docs/API.md` lists the schemes that zuzu writes.
 
 ### Labels that wrap
 
-Mermaid 12.3.0 wraps a long label of a flowchart, a state diagram, a class
-diagram, an entity relationship diagram, a requirement diagram, an
+Mermaid 12.3.0 wraps a long label of a flowchart, a swimlane diagram, a state diagram, a
+class diagram, an entity relationship diagram, a requirement diagram, an
 agentflow diagram and a use case diagram. zuzu
 wraps the same labels at the widths of Mermaid, scaled by 11/14, as the
 last paragraph of this section says. It measures the words with the
@@ -1418,7 +1520,7 @@ are the same on each machine.
 
 | Label | Width in Mermaid |
 | --- | --- |
-| a node of a flowchart | `flowchart.wrappingWidth`, 120 pixels by default |
+| a node of a flowchart and of a swimlane diagram | `flowchart.wrappingWidth`, 120 pixels by default |
 | a node of an agentflow diagram | `agentflow.wrappingWidth`, 120 pixels by default |
 | a state, and a note of a state | `state.wrappingWidth`, 120 pixels by default |
 | the text of a link, a transition, a relation and a relationship | 200 pixels |
@@ -2377,7 +2479,7 @@ element, a boundary or a relationship a link (D32).
 
 ### Other kinds
 
-zuzu draws the flowchart, the state diagram, the class diagram, the entity
+zuzu draws the flowchart, the swimlane diagram, the state diagram, the class diagram, the entity
 relationship diagram, the requirement diagram, the agentflow diagram, the use case
 diagram, and
 the charts above, which hold the sequence diagram, the mindmap, the

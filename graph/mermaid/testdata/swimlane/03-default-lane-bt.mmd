@@ -1,0 +1,9 @@
+swimlane-beta BT
+  start[Start] --> a
+  subgraph Owned [Owned lane]
+    a[Owned node]
+    b[Second node]
+  end
+  a --> b
+  b --> done[Done]
+  done --> later[Later]

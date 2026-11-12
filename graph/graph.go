@@ -56,6 +56,10 @@ type Graph struct {
 	// TitleOffset is the space between the title and the diagram, or nil
 	// for the space of the title of a chart.
 	TitleOffset *float64
+	// Lanes lays the graph out in lanes, as LayoutInput.Lanes says, and
+	// LaneEdges makes an edge between two lanes move its target to the next
+	// rank, as LayoutInput.LaneEdges says.
+	Lanes, LaneEdges bool
 	// BreakWords breaks a word that is wider than the wrap width of its
 	// label between two letters, as the SVG labels of Mermaid do. Otherwise
 	// the word stays whole on a line of its own, and the label is wider

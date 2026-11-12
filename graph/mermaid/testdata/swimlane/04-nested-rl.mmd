@@ -1,0 +1,14 @@
+swimlane-beta RL
+  subgraph Ops
+    intake[Receive] --> plan[Plan]
+    subgraph Inner [Inner team]
+      check[Check]
+    end
+    plan --> check
+  end
+  subgraph Legal
+    review[Review]
+    sign[Sign]
+  end
+  check --> review --> sign
+  intake --> Legal

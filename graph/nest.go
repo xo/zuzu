@@ -12,8 +12,11 @@ import (
 // then takes the place of one node, of its size, in the layout that holds
 // it. An edge to any other cluster ends at the box of the cluster: the
 // layout takes it to the first node of the cluster, and the route stops at
-// the box.
+// the box. A layout in lanes lays out as LayoutInput.Lanes says.
 func Lay(in LayoutInput) (*Layout, error) {
+	if in.Lanes {
+		return layLanes(in)
+	}
 	n, err := newNest(&in)
 	if err != nil {
 		return nil, err

@@ -425,6 +425,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	if g.BreakWords {
 		layout["breakWords"] = true
 	}
+	if g.Lanes {
+		layout["lanes"] = true
+	}
+	if g.LaneEdges {
+		layout["laneEdges"] = true
+	}
 	if g.TitleHTML != "" {
 		// The title of HTML takes the size of the title of a chart.
 		layout["titleHTML"], layout["titleFontSize"] = g.TitleHTML, zlayout.TitleSize

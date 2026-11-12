@@ -108,6 +108,12 @@ func (f *flowchart) config() error {
 			}
 			continue
 		}
+		if k == "swimlane" && (f.d.Kind == "swimlane-beta" || lanesOn(f.d)) {
+			if err := f.swimlaneSettings(v); err != nil {
+				return err
+			}
+			continue
+		}
 		var read []string
 		switch {
 		case f.af != nil && k == "agentflow":
