@@ -18,7 +18,9 @@ is in `docs/BACKLOG.md`.
 2. `look: handDrawn` and `layout: elk` are hints. zuzu draws its own look
    and its own layered layout, and reports neither. This is an exception
    to D6, which the maintainers chose because both name a way to draw and
-   not a part of the diagram. An ELK layout is work for later. zuzu will
+   not a part of the diagram. The node property `algorithm`, which picks an
+   ELK layout for one subgraph, is such a hint too. An ELK layout is work
+   for later. zuzu will
    have two looks drawn by hand beside its standard look: a look like
    Excalidraw, with the font Excalifont, and a look like xkcd, like the
    look of xkcd in matplotlib. zuzu draws each in its own way, and ports no
@@ -69,7 +71,10 @@ is in `docs/BACKLOG.md`.
    of the wrap by the ratio of the size of a label of zuzu, 11 pixels, to
    the size of a label of that kind in Mermaid, so that a line holds the
    words that it holds in Mermaid. The ratio is 11/14 for most kinds, and
-   11/16 for a timeline, whose labels Mermaid draws at 16 pixels.
+   11/16 for a timeline, whose labels Mermaid draws at 16 pixels. In a kind
+   whose labels have more than one size, each label takes the ratio of its
+   own size: a message of a sequence wraps at 11/16, and a use case at
+   11/12.
 
 ## The look
 
@@ -78,7 +83,9 @@ is in `docs/BACKLOG.md`.
    mode (open question 18). On 2026-11-12, after iv drew the ER diagrams
    of dbtpl, the maintainers made Edge darker again, the line of an edge a
    little thicker, and the arrowheads larger, so that a long edge reads at
-   the size of a terminal.
+   the size of a terminal. The marks at the ends of a relation of a class
+   or an ER diagram, such as a crow's foot, keep the size that they had
+   before.
 9. A band behind a group of rows, such as a section of a gantt, takes a
    token Band of `docs/STYLE.md`.
 
@@ -88,8 +95,9 @@ is in `docs/BACKLOG.md`.
     encodings `href` and `tooltip` of Vega do. The SVG writer writes them
     as `<a>` and `<title>`, and the PNG ignores them. `URL`, `href` and
     `tooltip` of DOT and `click` and `link` of Mermaid with a URL fill
-    them. A callback of `click` stays an issue, because no script runs
-    (open question 26).
+    them (open question 26). A callback of `click` binds nothing in the
+    default `securityLevel` of Mermaid, `strict`, so it falls under the rule
+    of part 3, and zuzu accepts it with no issue.
 
 ## The order of the kinds of Mermaid
 

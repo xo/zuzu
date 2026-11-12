@@ -1129,4 +1129,6 @@ stays true.
     no id comes from a hash, so that the same source gives the same image.
 29. A maintainer has to review the parameters `lanes` and `laneEdges` of
     `zuzu.layered`, which an agent added to D31 on 2026-11-12 for the
-    swimlane diagram of Mermaid.
+    swimlane diagram of Mermaid, and the fields `titleWidth` and
+    `titleHeight` of a cluster row, which an agent added the same day for
+    the tab of a package of a use case diagram.

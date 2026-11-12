@@ -72,9 +72,9 @@ numbers before strings.
 ### Do the work of D32
 
 D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
-zuzu did parts 1 to 10, except the rule of part 3 and the wrap of a
-timeline in part 7, and drew the requirement, gitGraph, block, swimlane,
-use case, agentflow, timeline and C4 diagrams of part 11. These are left:
+zuzu did all of its parts, and drew the requirement, gitGraph, block,
+swimlane, use case, agentflow, timeline and C4 diagrams of part 11. These
+are left:
 
 1. The next kinds of Mermaid in the order of D32 (11): venn, treeView,
    railroad, eventmodeling, zenuml, cynefin, ishikawa, kanban, packet and
@@ -90,24 +90,12 @@ use case, agentflow, timeline and C4 diagrams of part 11. These are left:
    sequence. It is an issue in the other kinds (5).
 5. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
    issues, because the package `html` of okage keeps no link (10).
-6. A part of a source that Mermaid 12.3 reads and draws nothing for is
-   still an issue in some kinds. The C4 diagrams report the directions of
-   `Rel_U`, `Rel_D`, `Rel_L`, `Rel_R`, `Node_L` and `Node_R`, `$tags`,
-   `$sprite` and a shape of a tag. Find each such issue, and accept the
-   part with no issue (3).
-7. A timeline wraps its labels at 11/14 of the widths of Mermaid, so a
-   line holds more words than in Mermaid. Mermaid draws the labels of a
-   timeline at 16 pixels, so the ratio is 11/16 (7).
-8. An external element of a C4 diagram, such as `Person_Ext`, takes a
-   color of the categories. It takes the neutral Muted of `docs/STYLE.md`,
-   at the tint of the other elements (16).
-9. A boundary of `type: package` of a use case diagram draws as a panel
-   with no tab, and reports it. It draws with a tab at its top left, as a
-   package of UML does (17).
-10. Make the token Edge darker again, the line of an edge a little thicker,
-    and the arrowheads larger (part 8). Change `docs/STYLE.md` first, then
-    the package `theme`, then `docs/targets/gen-targets.mjs`, then the
-    targets.
+6. The wrap of a kind with labels of more than one size in Mermaid uses
+   11/14 for all of them (7): a sequence wraps its messages at 16 pixels
+   and its actors and notes at 14, and a use case diagram draws its use
+   cases at 12 and its actors at 14.
+7. The node property `algorithm`, an ELK layout for one subgraph, is an
+   issue. D32 part 2 does not say whether it is a hint.
 
 
 ### Draw two looks by hand
@@ -198,14 +186,11 @@ example of the documents of Mermaid whose kind is `...`.
     drops the last `;` of a `style` line, and zuzu reports an error.
 13. A line of a timeline that ends in `: ` with a space is an error in
     Mermaid, and zuzu reads the next line as its event.
-14. Math of KaTeX in a label, written as `$$...$$`, draws as its LaTeX
-    source, and zuzu reports nothing. This breaks hard rule 4 of
-    `AGENTS.md`. mmdc draws it as math. The 6 files under
-    `mermaid-e2e/katex/`, and `config-math-01` and `config-math-02` under
-    `mermaid-docs/config/`, count as files with no issue in the strict
-    mode. First, report the math in the loose mode, and make it an error
-    in the strict mode. To draw the math, zuzu needs a renderer of math,
-    and that needs a decision.
+14. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
+    where Mermaid draws it as math, and draws as its LaTeX source. To draw
+    the math, zuzu needs a renderer of math, and that needs a decision.
+15. zuzu reads `text: a, b` in the body of a requirement, and Mermaid gives
+    an error of the parse at the comma.
 
 ### Draw more of Mermaid
 
@@ -239,9 +224,9 @@ The DOT files come from the gallery of Graphviz, in `testdata/zuzu` of iv.
 6. An edge with a list of colors, such as `color="a:b"`, draws only the
    first color, with no issue. Graphviz draws a line in each color.
 7. `bgcolor` of the graph is an issue. Graphviz fills the page with it.
-8. Head labels of edges that end at the same port draw on top of each
-   other, as at `"public.auth_user":id` of the ER diagrams of dbtpl that
-   iv draws. They need to spread apart.
+8. An edge to a cluster, with `lhead` or `ltail`, whose route is cut at the
+   box of the cluster, puts its end labels back at the first place, with no
+   check for overlap (`clipEdge` in `graph/nest.go`).
 
 
 ### Give a chart of Mermaid the time of the render

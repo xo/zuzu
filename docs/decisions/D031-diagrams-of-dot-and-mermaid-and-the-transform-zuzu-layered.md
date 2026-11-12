@@ -74,7 +74,8 @@ A node row holds its fields and `x`, `y`, `width`, `height`, `rank` and
 wraps. An edge row holds its fields and
 `path`, a path of SVG, the place of its label `labelX` and `labelY`, and
 the place and the angle of each arrowhead. A cluster row holds `x`, `y`,
-`width`, `height`, `depth` and the place of its title.
+`width`, `height`, `depth` and the place of its title, and `titleWidth` and
+`titleHeight`, the size of its title.
 
 ## The algorithm
 
