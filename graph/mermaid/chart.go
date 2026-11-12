@@ -67,6 +67,8 @@ var charts = map[string]compiler{
 	c4Component:         c4Chart,
 	c4Dynamic:           c4Chart,
 	c4Deployment:        c4Chart,
+	"ishikawa":          ishikawaChart,
+	"ishikawa-beta":     ishikawaChart,
 }
 
 // IsChart reports whether a kind of diagram is a chart that Chart

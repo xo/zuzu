@@ -68,6 +68,7 @@ func TestMath(t *testing.T) {
 		"gantt\n  dateFormat YYYY-MM-DD\n  $$a$$ : 2024-01-01, 1d\n",
 		"C4Context\n  Person(a, \"$$a$$\")\n",
 		"flowchart LR\n  A[\"$a$ and $5\"] --> B\n",
+		"ishikawa-beta\n  $$a$$\n  $$b$$\n",
 	} {
 		if err := strictCheck(t, src); err != nil {
 			t.Errorf("%q: %v", src, err)

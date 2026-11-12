@@ -1619,11 +1619,12 @@ wrap a label.
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
 config that a chart does not read is an issue, and so are a `theme` that
-Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap` and `block` joins
+Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap`, `block` and `ishikawa` joins
 `accTitle` and `accDescr` into the description of the spec, as "The
 description" says. Mermaid does not read them in a sankey, a mindmap or a
 block diagram either, so there they are errors, as in Mermaid. A C4
-diagram reads `accTitle` as its title, as "C4" says. Each chart
+diagram reads `accTitle` as its title, as "C4" says.
+An ishikawa diagram reads them as causes, as "ishikawa" says. Each chart
 has 5 to 7 fixtures in `graph/mermaid/testdata`, the sequence diagram has
 10, the gantt has 18, and the git graph has 12. A test draws each fixture and checks that each value of
 the source draws once, with its label.
@@ -1646,6 +1647,7 @@ the source draws once, with its label.
 | `block`, `block-beta` | Vega rects, paths and text, laid out in Go on a grid of columns |
 | `timeline` | Vega rects, rules, paths and text, laid out in Go: the periods along an axis, each with its events |
 | `C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment` | Vega rects, paths and text, laid out in Go in the rows of Mermaid |
+| `ishikawa`, `ishikawa-beta` | Vega rules, symbols, paths, rects and text, laid out in Go: the problem at the head of a spine, and the causes as bones |
 
 #### pie
 
@@ -2582,14 +2584,106 @@ its description are at its top left. A relationship and its arrowheads
 take the color `edge`, and `$lineColor` replaces it. A `$link` gives an
 element, a boundary or a relationship a link (D32).
 
+#### ishikawa
+
+The keywords are `ishikawa` and `ishikawa-beta`. An ishikawa diagram, or
+fishbone, draws a problem at the head of a spine. The causes of the
+problem are bones off the spine, and the causes of a cause are smaller
+bones off its bone.
+
+Each line after the keyword is a statement: a text with an indent. A text
+after the keyword, on its line, is the first statement, as in Mermaid.
+zuzu reads the statements as Mermaid 12.3 reads them:
+
+1. The first statement is the problem.
+2. The indent of the second statement is the indent of a cause.
+3. Each other statement belongs to the last statement before it with a
+   smaller indent. A statement with an indent that is not more than the
+   indent of a cause is a cause. So when all the statements have one
+   indent, each statement after the problem is a cause.
+4. `<br>` starts a new line in a text, and an entity, such as `#quot;`,
+   reads as its character.
+5. `accTitle` and `accDescr` are causes, because Mermaid reads them as
+   text in an ishikawa diagram.
+
+A text that starts with the word `ishikawa`, in any case, is an error, as
+in Mermaid. A diagram with no statement draws nothing, as in Mermaid. The
+`description` of the front matter goes in the description of the spec.
+
+zuzu lays out an ishikawa diagram in Go with the rules and the sizes of
+Mermaid 12.3, scaled by 11/16, because Mermaid draws its labels at 16
+pixels (D32). These sizes are in the pixels of Mermaid:
+
+1. The head is at the right end of the spine and holds the problem, in
+   bold.
+2. The causes alternate above and under the spine, the first above. They
+   go from right to left in pairs. Each pair starts left of the labels of
+   the pair before it.
+3. The bone of a cause leans 82 degrees from the spine, toward the left.
+   The label of the cause is in a box at the end of its bone.
+4. The causes of each side share 500 pixels by the number of the causes
+   under them, at 75 pixels at least for a side. A side is at least 2
+   times `fontSize` for each cause under its cause with the most causes.
+   The spine is 250 pixels from the top at least. A cause with no causes
+   has a bone of 0.2 of the length of its side.
+5. The causes of a cause start along its bone at equal spaces. The bone of
+   such a cause runs along the spine, 30 pixels long, or 60 pixels and 5
+   for each of its own causes. The bones of its causes lean as the bone of
+   a cause, and the bones of their causes run along the spine again.
+   Above the spine, each list of causes goes in the other order, as in
+   Mermaid.
+6. The label of a cause of a cause ends at the left end of its bone. On a
+   bone that leans, the label is over the end of the bone above the spine,
+   and under it below the spine.
+7. Each bone has an arrowhead at its start, which points at the spine or
+   at the bone that it starts on.
+
+Mermaid wraps the labels of an ishikawa diagram by the number of their
+characters, and not by their width, so zuzu wraps them at the same
+characters, with no scale. The label of a cause of a cause wraps at 15
+characters, and the label of a cause does not wrap. The problem wraps at
+110 divided by 0.6 times `fontSize`, and at 6 characters at least. This
+is 11 characters by default.
+
+zuzu reads `fontSize`, 16 by default, and `ishikawa.diagramPadding`, 20 by
+default. `fontSize` sets where the problem wraps and the least length of a
+side, as in Mermaid. A `fontSize` that is not a positive number and a
+padding that is not a number of 0 or more are issues. Each other setting
+is an issue, except `ishikawa.useMaxWidth`, which changes nothing.
+
+zuzu draws some ishikawa diagrams in another way than Mermaid 12.3.0:
+
+1. The box of a cause can reach right of the start of its bone. Mermaid
+   then draws it over the box of the cause before it on its side. zuzu
+   moves the pair of the cause left, so that the two boxes do not overlap.
+2. Mermaid reads a `%%` in the middle of a line as text. zuzu reads it as
+   the start of a comment, as in the other kinds.
+3. Mermaid fails on an empty line right after the keyword. zuzu reads it.
+4. Mermaid reads the keyword in any case, such as `ISHIKAWA`. zuzu reads
+   only `ishikawa` and `ishikawa-beta`.
+5. Mermaid counts a tab of an indent as one space, and zuzu as four. The
+   causes are the same, unless a source mixes tabs and spaces.
+6. Mermaid does not draw the `title` of the front matter. zuzu draws it,
+   as in the other charts.
+7. Mermaid draws an `&` of a label as `&amp;`. zuzu draws `&`.
+
+The look is the look of zuzu. The head and the box of each cause take a
+tint of the first color of the category scheme, as Mermaid draws them in
+one color. The spine, the bones and the arrowheads take the color `edge`.
+The spine and the bone of each cause are 2.5 pixels wide, and the smaller
+bones take `edgeWidth`. The arrowhead of the bone of a cause is
+`arrowLength` long, and the arrowhead of a smaller bone is 0.75 of it.
+The padding around the diagram is 8 pixels, scaled by
+`ishikawa.diagramPadding` over 20.
+
 ### Other kinds
 
 zuzu draws the flowchart, the swimlane diagram, the state diagram, the class diagram, the entity
 relationship diagram, the requirement diagram, the agentflow diagram, the use case
 diagram, and
 the charts above, which hold the sequence diagram, the mindmap, the
-architecture diagram, the git graph, the block diagram, the timeline and
-the five kinds of C4 diagram. The agentflow diagram reads into a graph, as
+architecture diagram, the git graph, the block diagram, the timeline,
+the five kinds of C4 diagram and the ishikawa diagram. The agentflow diagram reads into a graph, as
 the flowchart does. Every other kind of Mermaid is an error that wraps
 `mermaid.ErrKind`. D32 sets the order of the next kinds.
 
