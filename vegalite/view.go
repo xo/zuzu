@@ -43,6 +43,9 @@ type shared struct {
 	order  []string
 	width  vega.Value
 	height vega.Value
+	// late holds the changes to the marks that wait until every layer has
+	// set the type of its scales.
+	late []func()
 }
 
 // view is a view or a layer of a view, which names its marks with a
@@ -389,6 +392,10 @@ func scaleTypeOf(ch string, d *channelDef, mark string, props map[string]any) (s
 // finish writes the view into the compiled spec: its marks, scales,
 // guides and size.
 func (v *view) finish(out *vega.Spec) {
+	for _, f := range v.late {
+		f()
+	}
+	v.late = nil
 	out.Style = vega.Strings{List: []string{"cell"}}
 	slices.SortStableFunc(v.order, func(a, b string) int {
 		return slices.Index(channelOrder, a) - slices.Index(channelOrder, b)

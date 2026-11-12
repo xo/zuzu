@@ -62,6 +62,9 @@ type unit struct {
 	geoAs    []string
 	// source is the dataset of the view before its transforms.
 	source *dataNode
+	// late holds the positions on a point scale that move to the middle
+	// of the band if a later layer turns the scale into bands.
+	late []string
 }
 
 // unit compiles a single view.
