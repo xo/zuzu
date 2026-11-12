@@ -114,6 +114,18 @@ func mindmapChart(c *chart) (map[string]any, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	// Mermaid 12.3 draws the math of KaTeX in a label of HTML, and the
+	// source in a label of SVG, as zuzu does.
+	if !breakWords {
+		for _, n := range nodes {
+			if hasMath(n.label) {
+				c.line = n.line
+				if err := c.add(mathIssue, n.label); err != nil {
+					return nil, false, err
+				}
+			}
+		}
+	}
 	c.line = 0
 	root := nodes[0]
 	for i, k := range root.kids {
@@ -140,17 +152,13 @@ func (c *chart) mindmapNodes() ([]*mindmapNode, error) {
 		if len(nodes) > 0 {
 			last = nodes[len(nodes)-1]
 		}
-		if rest, ok := strings.CutPrefix(t, ":::"); ok {
+		if strings.HasPrefix(t, ":::") {
 			if last == nil {
 				return nil, c.errorf("a class before the first node")
 			}
 			// The classes of a mindmap are classes of CSS that the page of
-			// a site gives, and zuzu reads no CSS.
-			for cl := range strings.FieldsSeq(rest) {
-				if err := c.add("the class %s of the node %q, which needs the CSS of a page", cl, last.label); err != nil {
-					return nil, err
-				}
-			}
+			// a site gives. Mermaid draws nothing for them by itself, so
+			// zuzu reads them with no issue (D32).
 			continue
 		}
 		if m := mindmapIcon.FindStringSubmatch(t); m != nil {
@@ -392,7 +400,7 @@ func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, breakWords bool, m te
 	if n.icon != "" {
 		n.isz = math.Round(n.size * 1.6)
 	}
-	limit := scaleWrap(maxWidth - 2*pad)
+	limit := scaleWrap("mindmap", maxWidth-2*pad)
 	if n.isz > 0 {
 		limit -= n.isz + 6
 	}

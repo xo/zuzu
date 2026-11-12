@@ -212,11 +212,7 @@ func (g *gantt) spec() (map[string]any, error) {
 	if secs != nil {
 		layers = append(layers, secs...)
 	}
-	bands, err := g.bands()
-	if err != nil {
-		return nil, err
-	}
-	if len(bands) > 0 {
+	if bands := g.bands(); len(bands) > 0 {
 		layers = append(layers, map[string]any{
 			"data":     ganttData(bands, "start", "end"),
 			"mark":     map[string]any{"type": "rect", "color": ganttExcluded, "opacity": 0.15},
@@ -497,9 +493,10 @@ func (g *gantt) keys() []string {
 
 // axis returns the axis of time of tasks from lo to hi: the format of
 // axisFormat, the ticks of tickInterval, and the top for topAxis. As in
-// Mermaid, a tickInterval that gives more than ganttMaxTicks ticks is an
-// issue, and the axis takes ticks of its own. Mermaid counts a month as 30
-// days.
+// Mermaid, the axis takes ticks of its own for a tickInterval that is not a
+// number and a unit of time, or that gives more than ganttMaxTicks ticks.
+// Mermaid draws nothing for such a tickInterval, so that is no issue
+// (D32). Mermaid counts a month as 30 days.
 func (g *gantt) axis(lo, hi time.Time) (map[string]any, error) {
 	f := g.axisFormat
 	if f == "" {
@@ -514,7 +511,7 @@ func (g *gantt) axis(lo, hi time.Time) (map[string]any, error) {
 	}
 	m := ganttTickRe.FindStringSubmatch(g.tickInterval)
 	if m == nil {
-		return axis, g.c.add("tickInterval %q is not a number and a unit of time", g.tickInterval)
+		return axis, nil
 	}
 	unit := m[2]
 	n, _ := strconv.Atoi(m[1])
@@ -523,8 +520,7 @@ func (g *gantt) axis(lo, hi time.Time) (map[string]any, error) {
 		"day": 24 * time.Hour, "week": 7 * 24 * time.Hour, "month": 30 * 24 * time.Hour,
 	}[unit] * time.Duration(n)
 	if ticks := math.Ceil(ganttMillis(lo, hi) / float64(step.Milliseconds())); ticks > ganttMaxTicks {
-		return axis, g.c.add("tickInterval %s gives %.0f ticks, more than %d, so the axis takes ticks of its own, as in Mermaid",
-			g.tickInterval, ticks, ganttMaxTicks)
+		return axis, nil
 	}
 	if unit == "week" && g.weekday != "" && g.weekday != "sunday" {
 		if err := g.c.add("zuzu starts a week of the ticks on sunday, not on %s", g.weekday); err != nil {
@@ -537,10 +533,11 @@ func (g *gantt) axis(lo, hi time.Time) (map[string]any, error) {
 
 // bands returns the excluded days from the first start to the last end, a
 // row for each run of days. As in Mermaid, a gantt that spans more than
-// ganttBandYears whole years draws no bands, and that is an issue.
-func (g *gantt) bands() ([]any, error) {
+// ganttBandYears whole years draws no bands. Mermaid draws nothing for
+// excludes then, so that is no issue (D32).
+func (g *gantt) bands() []any {
 	if len(g.excludes) == 0 {
-		return nil, nil
+		return nil
 	}
 	var lo, hi time.Time
 	for _, t := range g.tasks {
@@ -558,7 +555,7 @@ func (g *gantt) bands() ([]any, error) {
 		years--
 	}
 	if years > ganttBandYears {
-		return nil, g.c.add("the gantt spans %d years, more than %d, so it draws no excluded days, as in Mermaid", years, ganttBandYears)
+		return nil
 	}
 	y, m, d := lo.Date()
 	day := time.Date(y, m, d, 0, 0, 0, 0, g.loc)
@@ -579,7 +576,7 @@ func (g *gantt) bands() ([]any, error) {
 	if !run.IsZero() {
 		rows = append(rows, ganttBand(run, day))
 	}
-	return rows, nil
+	return rows
 }
 
 // ganttBand returns the row of a run of excluded days.

@@ -722,7 +722,7 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 		return classStyle(classes, cls, st), nil
 	}
 	w := labelWrap(d.Config, g)
-	wrap := scaleWrap(cfg.wrap)
+	wrap := scaleWrap(d.Kind, cfg.wrap)
 	under := func(st, more map[string]string) {
 		for k, v := range more {
 			if _, ok := st[k]; !ok {
@@ -785,12 +785,12 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 			shape = "businessEllipse"
 		}
 		g.Nodes = append(g.Nodes, &graph.Node{ID: s.id, Label: t, Shape: shape, Cluster: s.parent, Style: st,
-			Wrap: w.width(wrap, s.label.markdown), MinWidth: scaleWrap(cfg.minWidth + 2*pad)})
+			Wrap: w.width(wrap, s.label.markdown), MinWidth: scaleWrap(d.Kind, cfg.minWidth+2*pad)})
 	}
 	for i, n := range m.notes {
 		t, font := ucText(n.label)
 		g.Nodes = append(g.Nodes, &graph.Node{ID: "note-" + strconv.Itoa(i), Label: t, Shape: "note", Style: fontStyle(font),
-			Wrap: w.width(wrap, n.label.markdown), MinWidth: scaleWrap(cfg.minWidth + 20)})
+			Wrap: w.width(wrap, n.label.markdown), MinWidth: scaleWrap(d.Kind, cfg.minWidth+20)})
 	}
 	for _, id := range m.byFirst(slices.Collect(maps.Keys(m.jsons))) {
 		j := m.jsons[id]
@@ -812,12 +812,13 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 			return err
 		}
 		under(st, fontStyle(font))
+		c := &graph.Cluster{ID: id, Label: t, Style: st}
 		if b.typ == "package" {
-			if err := is.Add(fmt.Sprintf("line %d", m.p.at(b.off)), "the type package of the system boundary %s, drawn as a panel with no tab", id); err != nil {
-				return err
-			}
+			// A boundary of the type package draws with a tab at its top
+			// left, as a package of UML (D32).
+			c.Shape = graph.ClusterPackage
 		}
-		g.Clusters = append(g.Clusters, &graph.Cluster{ID: id, Label: t, Style: st})
+		g.Clusters = append(g.Clusters, c)
 	}
 	for _, e := range m.edges {
 		ge, err := m.edge(e, classes, addf)
@@ -879,7 +880,7 @@ func (m *ucModel) edge(e *ucEdge, classes map[string]map[string]string, addf fun
 		}
 	}
 	if ge.Label != "" {
-		ge.Wrap = scaleWrap(edgeWrap)
+		ge.Wrap = scaleWrap("usecase-beta", edgeWrap)
 	}
 	// Mermaid moves the dash of an animated edge, and zuzu draws one still
 	// frame of it (D32).

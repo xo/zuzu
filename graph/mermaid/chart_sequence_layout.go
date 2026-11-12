@@ -115,8 +115,8 @@ func (c *chart) sequenceSettings() (seqConfig, error) {
 		noteFont:        font("note", 11, 400),
 	}
 	width := num("width", 150)
-	s.wrapWidth = scaleWrap(width)
-	s.actorWrap = scaleWrap(width - 2*s.wrapPadding)
+	s.wrapWidth = scaleWrap(c.d.Kind, width)
+	s.actorWrap = scaleWrap(c.d.Kind, width-2*s.wrapPadding)
 	if w, ok := cfg["wrap"].(bool); ok {
 		s.wrap = w
 	}

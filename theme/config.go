@@ -59,13 +59,15 @@ const (
 	// corners.
 	Sankey = "zuzu.sankey"
 	// StyleNode and the styles after it are the styles of the marks of a
-	// diagram of DOT or Mermaid (D31): a node,
+	// diagram of DOT or Mermaid (D31): a node, a node in the neutral color
+	// muted, such as an external element of a C4 diagram (D32),
 	// its label, an edge, its arrowheads, filled and open, its label and the
 	// box under the label, a cluster and its title, an icon of one
 	// color, filled and stroked, a guide line, such as a lifeline of a
 	// sequence diagram, and a band behind a group of rows, such as a
 	// section of a gantt.
 	StyleNode         = "zuzu.node"
+	StyleNodeMuted    = "zuzu.node.muted"
 	StyleNodeLabel    = "zuzu.nodeLabel"
 	StyleEdge         = "zuzu.edge"
 	StyleArrow        = "zuzu.arrow"
@@ -138,6 +140,7 @@ func (t Theme) Config() map[string]any {
 			// A node is a tint of its color with an outline of 1.25, and an
 			// edge a line of EdgeWidth in the color of an edge (D31, D32).
 			StyleNode:         map[string]any{"fill": c, "fillOpacity": 0.14, "stroke": c, "strokeWidth": 1.25},
+			StyleNodeMuted:    map[string]any{"fill": t.Muted, "fillOpacity": 0.14, "stroke": t.Muted, "strokeWidth": 1.25},
 			StyleNodeLabel:    map[string]any{"fill": t.Text, "fontSize": 11.0},
 			StyleEdge:         map[string]any{"stroke": t.Edge, "strokeWidth": EdgeWidth, "strokeCap": "round", "strokeJoin": "round"},
 			StyleArrow:        map[string]any{"fill": t.Edge, "stroke": t.Edge, "strokeWidth": 1.0, "strokeJoin": "round"},

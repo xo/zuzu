@@ -10,7 +10,8 @@ import (
 )
 
 // TestClickForms reads each form of a click of a flowchart: a URL, href and
-// a URL, a callback, call and a callback, with a tooltip and a target.
+// a URL, a callback, call and a callback, with a tooltip and a target, and
+// a click on an id that names no node.
 func TestClickForms(t *testing.T) {
 	t.Parallel()
 	src := `flowchart LR
@@ -21,8 +22,9 @@ func TestClickForms(t *testing.T) {
   click D callback "tip of D"
   click E call fn(1, "two") "tip of E"
   click F "javascript:alert('x')" "tip of F"
-  click G,H href "page.html"
-  click Z "https://example.com/z"`
+  click G,H,Z href "page.html"
+  click Z call fn() "tip of Z"
+  click Y "javascript:alert('y')" "tip of Y" _blank`
 	d, err := Read(src)
 	if err != nil {
 		t.Fatal(err)
@@ -55,14 +57,15 @@ func TestClickForms(t *testing.T) {
 		"the callback callback, since no script runs",
 		`the callback fn(1, "two"), since no script runs`,
 		"the link javascript:alert('x'), whose scheme zuzu does not write",
-		"a click on Z, which is not a node",
 	} {
 		if !slices.Contains(msgs, m) {
 			t.Errorf("the report does not hold %q: %q", m, msgs)
 		}
 	}
-	if len(msgs) != 5 {
-		t.Errorf("the report holds %d issues, want 5: %q", len(msgs), msgs)
+	// Y and Z name no node. Mermaid binds a click only to a node, so a click
+	// on them draws nothing and is no issue (D32).
+	if len(msgs) != 4 {
+		t.Errorf("the report holds %d issues, want 4: %q", len(msgs), msgs)
 	}
 	if _, _, err := Graph(d, true); !errors.Is(err, vega.ErrUnsupported) {
 		t.Errorf("strict: got %v, want %v", err, vega.ErrUnsupported)

@@ -143,8 +143,6 @@ func TestXYIssues(t *testing.T) {
 	tests := []struct {
 		src, part string
 	}{
-		{"xychart\nx-axis [a]\nbar [1, 2]", "which have no category"},
-		{"xychart\nbar [1 \"one\"]", `the label "one" of a bar`},
 		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showTick: true\n---\nxychart\nbar [1]", "xyChart.xAxis.showTick"},
 		{"---\nconfig:\n  xyChart:\n    yAxis:\n      showAxisLine: true\n---\nxychart\nbar [1]", "xyChart.yAxis.showAxisLine"},
 		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showAxisLine: true\n---\nxychart\nx-axis 1 --> 5\nbar [1]", "xyChart.xAxis.showAxisLine"},
@@ -170,6 +168,13 @@ func TestXYIssues(t *testing.T) {
 		}
 		if _, err := compileMermaid(t, test.src, true); err == nil {
 			t.Errorf("%q: expected an error in the strict mode", test.src)
+		}
+	}
+	// Mermaid draws no value past the last category and no label of a bar,
+	// so neither is an issue (D32).
+	for _, src := range []string{"xychart\nx-axis [a]\nbar [1, 2]", "xychart\nbar [1 \"one\"]"} {
+		if report, err := compileMermaid(t, src, true); err != nil || len(report) != 0 {
+			t.Errorf("%q: the report %v and the error %v", src, report, err)
 		}
 	}
 }

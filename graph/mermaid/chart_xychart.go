@@ -158,12 +158,8 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 		if p.kind == "bar" {
 			barKeys = append(barKeys, p.key)
 		}
-		if xa.cats != nil && len(p.values) > len(xa.cats) {
-			c.line = 0
-			if err := c.add("%d values of the %s %q, which have no category on the x axis, and which Mermaid also does not draw", len(p.values)-len(xa.cats), p.kind, p.key); err != nil {
-				return nil, false, err
-			}
-		}
+		// A value past the last category of the x axis draws nothing in
+		// Mermaid, so zuzu skips it with no issue (D32).
 		for i, v := range p.values {
 			row := map[string]any{"kind": p.kind, "series": p.key, "name": p.name, "i": i, "y": v, "label": p.labels[i]}
 			switch {
@@ -487,10 +483,9 @@ func (c *chart) xyPlot(kind, s string) (*xyPlot, error) {
 		if err != nil {
 			return nil, c.errorf("the value %q of a %s", item, kind)
 		}
-		if label != "" && kind == "bar" {
-			if err := c.add("the label %q of a bar, which Mermaid also does not draw", label); err != nil {
-				return nil, err
-			}
+		// Mermaid draws no label of a bar, so zuzu drops it with no issue
+		// (D32).
+		if kind == "bar" {
 			label = ""
 		}
 		p.values = append(p.values, v)

@@ -255,10 +255,11 @@ func TestFlowchartClasses(t *testing.T) {
 	if style["C"]["fill"] != "" {
 		t.Errorf("expected no class on C, got %v", style["C"])
 	}
-	// A part of a style with no colon is an issue.
+	// CSS ignores a part of a style with no colon, and Mermaid draws
+	// nothing for it, so it is no issue (D32).
 	src = "flowchart LR\n  classDef odd fill#969,stroke:#f00\n  A:::odd\n"
-	if got := reportOf(t, src); !slices.Contains(got, `line 2: the style "fill#969", which has no colon`) {
-		t.Errorf("expected an issue of fill#969, got %q", got)
+	if got := reportOf(t, src); len(got) != 0 {
+		t.Errorf("expected no issue, got %q", got)
 	}
 }
 

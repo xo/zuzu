@@ -1,0 +1,1 @@
+{"nodes":[{"id":"test_entity","label":"test_entity","x":89,"y":63.5},{"id":"test_req","label":"test_req","x":89,"y":299}],"edges":[{"source":"test_entity","target":"test_req","label":"«satisfies»","points":[[89,115],[89,216]]}],"clusters":[]}

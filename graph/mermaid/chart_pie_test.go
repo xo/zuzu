@@ -191,7 +191,6 @@ func TestPieIssues(t *testing.T) {
 	tests := []struct {
 		src, part string
 	}{
-		{"pie\n\"A\" : 1\n\"A\" : 2", `the second slice "A"`},
 		{"---\nconfig:\n  pie:\n    highlightSlice: hover\n---\npie\n\"A\" : 1", "pie.highlightSlice"},
 		{"---\nconfig:\n  pie:\n    legendPosition: center\n---\npie\n\"A\" : 1", "legend position center"},
 		{"---\nconfig:\n  theme: sepia\n---\npie\n\"A\" : 1", "theme"},
@@ -211,6 +210,10 @@ func TestPieIssues(t *testing.T) {
 		if _, err := compileMermaid(t, test.src, true); err == nil {
 			t.Errorf("%q: expected an error in the strict mode", test.src)
 		}
+	}
+	// Mermaid drops a second slice of a label, so it is no issue (D32).
+	if report, err := compileMermaid(t, "pie\n\"A\" : 1\n\"A\" : 2", true); err != nil || len(report) != 0 {
+		t.Errorf("a second slice: the report %v and the error %v", report, err)
 	}
 }
 

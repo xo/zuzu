@@ -131,8 +131,8 @@ func TestTheSequentialRampRuns(t *testing.T) {
 }
 
 // TestTheEdgesTakeTheColorOfAnEdge checks that the styles of an edge and
-// its arrowheads take the color edge, a guide line the color axis, and a
-// band the text color (D32).
+// its arrowheads take the color edge, a guide line the color axis, a band
+// the text color, and a muted node the color muted (D32).
 func TestTheEdgesTakeTheColorOfAnEdge(t *testing.T) {
 	t.Parallel()
 	for _, m := range []Mode{Light, Dark} {
@@ -147,6 +147,8 @@ func TestTheEdgesTakeTheColorOfAnEdge(t *testing.T) {
 			{StyleArrowOpen, "stroke", th.Edge},
 			{StyleGuide, "stroke", th.Axis},
 			{StyleBand, "fill", th.Text},
+			{StyleNodeMuted, "fill", th.Muted},
+			{StyleNodeMuted, "stroke", th.Muted},
 		} {
 			s, _ := styles[c.style].(map[string]any)
 			if got := s[c.prop]; got != c.want {

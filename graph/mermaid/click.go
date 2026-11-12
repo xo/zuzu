@@ -115,11 +115,21 @@ func parseClick(word, rest string, line int) (click, error) {
 }
 
 // applyClicks gives each node that a click names its link and its tooltip.
-// node returns the node of an id, or nil. A callback, a target, a link with
-// a scheme that zuzu does not write and an id that names no node are
-// issues.
+// node returns the node of an id, or nil. A callback, a target and a link
+// with a scheme that zuzu does not write are issues. Mermaid binds a click
+// only to a node, so zuzu skips an id that names no node with no issue, and
+// a click that names no node at all draws nothing and is no issue (D32).
 func applyClicks(is *graph.Issues, clicks []click, node func(id string) *graph.Node) error {
 	for _, c := range clicks {
+		var nodes []*graph.Node
+		for _, id := range c.ids {
+			if n := node(id); n != nil {
+				nodes = append(nodes, n)
+			}
+		}
+		if len(nodes) == 0 {
+			continue
+		}
 		path := fmt.Sprintf("line %d", c.line)
 		if c.callback != "" {
 			if err := is.Add(path, "the callback %s, since no script runs", c.callback); err != nil {
@@ -138,14 +148,7 @@ func applyClicks(is *graph.Issues, clicks []click, node func(id string) *graph.N
 			}
 			href = ""
 		}
-		for _, id := range c.ids {
-			n := node(id)
-			if n == nil {
-				if err := is.Add(path, "a click on %s, which is not a node", id); err != nil {
-					return err
-				}
-				continue
-			}
+		for _, n := range nodes {
 			if href != "" {
 				n.Href = href
 			}

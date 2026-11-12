@@ -97,7 +97,7 @@ func stateGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	}
 	// Mermaid wraps the label of a state, of a note and of a transition. A
 	// state with more descriptions is a record, and does not wrap.
-	wrapGraph(d.Config, s.g, s.wrap)
+	wrapGraph(d, s.g, s.wrap)
 	return s.g, s.issues.Report, nil
 }
 
@@ -117,7 +117,7 @@ func (s *stateDiagram) config() error {
 		return err
 	}
 	var err error
-	s.wrap, err = wrapSetting(s.issues, s.d.Config, nodeWrap, "state", "wrappingWidth")
+	s.wrap, err = wrapSetting(s.issues, s.d, nodeWrap, "state", "wrappingWidth")
 	return err
 }
 

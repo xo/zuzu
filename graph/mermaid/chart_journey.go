@@ -106,7 +106,7 @@ func journeyChart(c *chart) (map[string]any, bool, error) {
 	if !wrapped {
 		wrap = 0
 	}
-	wrap = scaleWrap(wrap)
+	wrap = scaleWrap(c.d.Kind, wrap)
 	return journeySpec(title, tasks, wrap), true, nil
 }
 

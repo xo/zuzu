@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/xo/zuzu/graph/mermaid"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -287,6 +288,34 @@ func TestC4Layout(t *testing.T) {
 	}
 }
 
+// TestC4External checks that an external element draws in the neutral
+// color muted, at the tint of the other elements, and that each other
+// element takes the color of its kind (D32).
+func TestC4External(t *testing.T) {
+	t.Parallel()
+	src := "C4Container\nPerson_Ext(a, \"A\")\nSystem(b, \"B\")\nSystemDb_Ext(c, \"C\")\nContainer_Ext(d, \"D\")\n" +
+		"Container(e, \"E\")\nUpdateElementStyle(d, $bgColor=\"red\")\n"
+	items, report, err := drawDiagram(t, src, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	th := theme.New(theme.Light, theme.Zuzu)
+	want := map[string]string{"a": th.Muted, "b": th.Category[1], "c": th.Muted, "d": "red", "e": th.Category[2]}
+	got := map[string]string{}
+	for _, it := range drawnPrefix(items, "elements") {
+		id := datumID(it)
+		got[id] = it.item.Fill.Color
+		if id == "a" || id == "c" {
+			if it.item.Stroke.Color != th.Muted || it.item.FillOpacity == nil || *it.item.FillOpacity != 0.14 {
+				t.Errorf("%s: the stroke %s and the opacity %v", id, it.item.Stroke.Color, it.item.FillOpacity)
+			}
+		}
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("the fills %v, want %v", got, want)
+	}
+}
+
 func TestC4Errors(t *testing.T) {
 	t.Parallel()
 	tests := []string{
@@ -338,21 +367,12 @@ func TestC4Issues(t *testing.T) {
 		{"---\nconfig:\n  c4:\n    c4ShapeInRow: 2\n---\n" + body, "c4.c4ShapeInRow"},
 		{"---\nconfig:\n  c4:\n    width: wide\n---\n" + body, "c4.width"},
 		{"---\nconfig:\n  wrap: 1\n---\n" + body, "wrap"},
-		{body + "Rel_U(a, b, \"x\")\n", "the direction of Rel_U"},
 		{body + "Rel(a, \"b\")\n", "with no label"},
-		{body + "Rel(a, b, \"x\", $descr=\"d\")\n", `the descr "d"`},
-		{body + "Person(c, \"C\", $tags=\"v1\")\n", `the tag "v1"`},
-		{body + "Person(c, \"C\", $sprite=\"user\")\n", `the sprite "user"`},
 		{body + "Person(c, \"C\", $foo=\"x\")\n", "the argument $foo"},
-		{body + "Person(c, \"C\", \"d\", \"person\", \"db\", \"l\", \"x\")\n", "after the last"},
 		{body + "Person(c, $label=\"C\")\n", "draws as no label"},
-		{body + "UpdateElementStyle(b, $shape=\"folder\")\n", `the shape "folder"`},
 		{body + "UpdateElementStyle(b, $shadowing=\"true\")\n", "the argument $shadowing"},
-		{body + "UpdateElementStyle(z, $bgColor=\"red\")\n", "UpdateElementStyle of z"},
-		{body + "UpdateRelStyle(a, b, $textColor=\"red\")\n", "UpdateRelStyle of a and b"},
 		{body + "Rel(a, b, \"x\")\nUpdateRelStyle(a, b, $offsetX=\"far\")\n", `the offsetX "far"`},
 		{body + "Person(c, \"C\", $link=\"javascript:alert(1)\")\n", "the link javascript:alert(1)"},
-		{"C4Deployment\nNode_L(n, \"N\") {\nContainer(c, \"C\")\n}\n", "Node_L, which draws as Node"},
 	}
 	for _, test := range tests {
 		report, err := chartOf(test.src, false)
@@ -373,6 +393,15 @@ func TestC4Issues(t *testing.T) {
 		body + "Person(c, \"C\", $tags=\"db, queue\")\nSystem(d, \"D\", $sprite=\"person\")\n",
 		"%%{init: {'config': {'wrap': false}}}%%\n" + body,
 		body + "accDescr {\n  A diagram\n}\nRelIndex(1, a, b, \"x\")\nBiRel(b, a, \"y\")\n",
+		// Mermaid 12.3 reads each of these and draws nothing for it, so
+		// zuzu accepts it with no issue (D32).
+		body + "Rel_U(a, b, \"x\")\nRel_D(a, b, \"x\")\nRel_L(b, a, \"x\")\nRel_R(b, a, \"x\")\n",
+		body + "Rel(a, b, \"x\", $descr=\"d\", $tags=\"t\", $sprite=\"s\")\n",
+		body + "Person(c, \"C\", $tags=\"v1\")\nSystem(d, \"D\", $sprite=\"user\")\n",
+		body + "Person(c, \"C\", \"d\", \"person\", \"db\", \"l\", \"x\")\n",
+		body + "UpdateElementStyle(b, $shape=\"folder\")\nUpdateElementStyle(z, $bgColor=\"red\")\nUpdateRelStyle(a, b, $textColor=\"red\")\n",
+		body + "Boundary(x, \"X\", \"t\", $tags=\"v1\") {\nSystem(e, \"E\")\n}\n",
+		"C4Deployment\nNode_L(n, \"N\", $sprite=\"s\") {\nContainer(c, \"C\")\n}\nNode_R(m, \"M\") {\nContainer(d, \"D\")\n}\n",
 	} {
 		if report, err := chartOf(src, true); err != nil || len(report) != 0 {
 			t.Errorf("%q: the report %v and the error %v", src, report, err)

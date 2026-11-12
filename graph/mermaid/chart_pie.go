@@ -126,11 +126,9 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 		if v < 0 {
 			return nil, false, c.errorf("the value %v of the slice %q is negative", v, label)
 		}
-		// Mermaid keeps the first slice of a label and drops the rest.
+		// Mermaid keeps the first slice of a label and drops the rest, so
+		// a second slice draws nothing and is no issue (D32).
 		if seen[label] {
-			if err := c.add("the second slice %q, which Mermaid also drops", label); err != nil {
-				return nil, false, err
-			}
 			continue
 		}
 		seen[label] = true

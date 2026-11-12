@@ -108,7 +108,7 @@ func agentflowGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) 
 // a least width of its label in the pixels of Mermaid: the width scaled as
 // a wrap is, and the padding of the node on each side.
 func agentWidth(w float64) float64 {
-	return scaleWrap(w) + 2*8
+	return scaleWrap("agentflow-beta", w) + 2*8
 }
 
 // agentConfig reads agentflow.minNodeWidth.

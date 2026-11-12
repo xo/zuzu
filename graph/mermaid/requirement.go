@@ -108,7 +108,7 @@ func requirementGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error
 	}
 	// Mermaid wraps the label of a relation, and not a requirement or an
 	// element.
-	wrapGraph(d.Config, r.g, 0)
+	wrapGraph(d, r.g, 0)
 	return r.g, r.issues.Report, nil
 }
 
@@ -240,7 +240,8 @@ func (r *requirementDiagram) stmt(t string) error {
 			if len(ids) == 0 || len(names) == 0 || rest != "" {
 				return r.errorf("the class %q", t)
 			}
-			return r.setClass(ids, names)
+			r.setClass(ids, names)
+			return nil
 		case "style":
 			ids, def := styleList(rest)
 			if len(ids) == 0 {
@@ -251,9 +252,8 @@ func (r *requirementDiagram) stmt(t string) error {
 				return err
 			}
 			for _, id := range ids {
-				if err := r.known(id, "the style"); err != nil {
-					return err
-				}
+				// Mermaid ignores a style of a name before its
+				// definition, and so does zuzu, with no issue (D32).
 				if r.boxes[id] == nil {
 					continue
 				}
@@ -279,7 +279,8 @@ func (r *requirementDiagram) stmt(t string) error {
 		if strings.TrimSpace(rest) != "" {
 			return r.errorf("the class %q", t)
 		}
-		return r.setClass([]string{src}, names)
+		r.setClass([]string{src}, names)
+		return nil
 	}
 	return r.relation(src, rest, t)
 }
@@ -304,26 +305,15 @@ func (r *requirementDiagram) classDef(rest string) error {
 	return nil
 }
 
-// known reports a statement that names a requirement or an element
-// before its definition. Mermaid ignores such a statement.
-func (r *requirementDiagram) known(id, what string) error {
-	if r.boxes[id] != nil {
-		return nil
-	}
-	return r.add("%s of %s before its definition, which Mermaid ignores", what, id)
-}
-
-// setClass adds classes to requirements and elements.
-func (r *requirementDiagram) setClass(ids, names []string) error {
+// setClass adds classes to requirements and elements. Mermaid ignores a
+// class of a name before its definition, and so does zuzu, with no issue
+// (D32).
+func (r *requirementDiagram) setClass(ids, names []string) {
 	for _, id := range ids {
-		if err := r.known(id, "the class"); err != nil {
-			return err
-		}
 		if r.boxes[id] != nil {
 			r.nodeClasses[id] = append(r.nodeClasses[id], names...)
 		}
 	}
-	return nil
 }
 
 // define reads the rest of the definition of a requirement or of an
@@ -349,10 +339,8 @@ func (r *requirementDiagram) define(typ, rest string) error {
 		if old.element != b.element {
 			return r.errorf("%s is a requirement and an element", name)
 		}
-		// Mermaid keeps the first definition of a name.
-		if err := r.add("the second definition of %s, which Mermaid ignores", name); err != nil {
-			return err
-		}
+		// Mermaid keeps the first definition of a name and ignores the
+		// body of the second, so it is no issue (D32).
 	} else {
 		r.boxes[name] = b
 		r.order = append(r.order, b)

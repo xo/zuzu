@@ -213,6 +213,7 @@ background color, drawn under the fill with `paint-order="stroke"`.
 | hierarchy | a group is a tint of its color with its name at the top left. A leaf is the full color. Corners round by 3 to 6 |
 | link of a sankey | the color of its source at 0.32 opacity |
 | node of a graph | a rounded rectangle with a tint of its color and an outline of 1.25 |
+| external element of a C4 diagram | a node in `muted`, with the tint and the outline of the other nodes, as Mermaid draws it gray (D32) |
 | edge of a graph | a line of `edgeWidth` in `edge`, with round caps and joins, and an arrowhead in `edge`, as "Edges" says |
 | guide line of a diagram | a line of 1.25 in `axis`, with round caps and joins, such as a lifeline of a sequence diagram or an axis of a radar |
 | section of a gantt | a band in `band` behind the rows of every other section, across the chart, with the name of the section at its left |

@@ -673,6 +673,9 @@ func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	}
 	sp := &graph.Issues{Strict: strict}
 	err = graphSpacing(d, g, sp)
+	if err == nil {
+		err = graphMath(d, g, sp)
+	}
 	report = append(report, sp.Report...)
 	if err != nil {
 		return g, report, err

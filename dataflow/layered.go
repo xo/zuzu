@@ -393,6 +393,8 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		in.Edges = append(in.Edges, e)
 	}
 	clusterHTMLs := map[int]*htmlLabel{}
+	// titles are the width and the height of the title of each cluster.
+	titles := make([][2]float64, len(clusters))
 	for i, r := range clusters {
 		c := graph.LayoutCluster{ID: text(r, fields["key"]), Parent: expr.String(r["parent"])}
 		if r["parent"] == nil {
@@ -412,6 +414,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		if tw > 0 {
 			c.TitleWidth, c.TitleHeight, c.TitleTop = tw, th+4+titleTop+titleBottom, titleTop
+			titles[i] = [2]float64{tw, th}
 		}
 		in.Clusters = append(in.Clusters, c)
 	}
@@ -497,6 +500,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o["kind"] = "cluster"
 		o["x"], o["y"], o["width"], o["height"] = cp.X, cp.Y, cp.Width, cp.Height
 		o["depth"], o["titleX"], o["titleY"] = float64(cp.Depth), cp.TitleX, cp.TitleY
+		o["titleWidth"], o["titleHeight"] = titles[i][0], titles[i][1]
 		out = append(out, o)
 		if h, ok := clusterHTMLs[i]; ok && cp.Width > 0 {
 			out = append(out, h.rows(linkRow(Row{"key": r["key"], "stroke": r["stroke"], "textColor": r["textColor"]}, r), cp.TitleX+h.lay.Width/2, cp.TitleY+h.lay.Height/2, "")...)

@@ -64,7 +64,7 @@ func (p *c4Diagram) measure(e *c4Elem) {
 	}
 	limit := 0.0
 	if p.c4wrap {
-		limit = scaleWrap(max(wrapW, 32))
+		limit = scaleWrap(p.c.d.Kind, max(wrapW, 32))
 	}
 	e.texts = nil
 	if e.label != "" {
@@ -184,7 +184,7 @@ func (p *c4Diagram) inside(parent *c4Bounds, list []*c4Boundary) {
 		}
 		limit := 0.0
 		if p.wrap && p.c4wrap {
-			limit = scaleWrap(cur.limit)
+			limit = scaleWrap(p.c.d.Kind, cur.limit)
 		}
 		bd.texts = nil
 		add := func(s string, size float64, weight int, gap float64) {
@@ -303,14 +303,19 @@ func c4PersonPath(w, h float64) string {
 // external for an element outside the system.
 func c4Color(kind string) string {
 	if strings.HasPrefix(kind, "external_") {
-		return "external"
+		return c4External
 	}
 	return strings.TrimSuffix(strings.TrimSuffix(kind, "_db"), "_queue")
 }
 
-// c4Colors are the names of the colors of the elements, in the order of
-// the category scheme.
-var c4Colors = []any{"person", "system", "container", "component", "external"}
+// c4External is the color of an external element. It draws in the neutral
+// color muted at the tint of the other elements, as Mermaid draws it gray
+// (D32).
+const c4External = "external"
+
+// c4Colors are the names of the colors of the elements that take a color
+// of the category scheme, in its order.
+var c4Colors = []any{"person", "system", "container", "component"}
 
 // paint returns the style of an element or a boundary from the colors that
 // UpdateElementStyle and the named arguments give it.
@@ -386,7 +391,7 @@ func (p *c4Diagram) spec() map[string]any {
 			r["href"], links = l, true
 		}
 	}
-	var bounds, bTexts, elems, eTexts, rels, arrows, boxes, rTexts []any
+	var bounds, bTexts, elems, externals, eTexts, rels, arrows, boxes, rTexts []any
 	for _, b := range p.bounds[1:] {
 		x, y := b.x-minX, b.y-minY
 		r := map[string]any{"id": b.alias, "label": b.label, "parent": c4Parent(b.parent), "x": x, "y": y, "width": b.w, "height": b.h}
@@ -430,7 +435,11 @@ func (p *c4Diagram) spec() map[string]any {
 		default:
 			r["path"] = graph.ShapePath(e.shape, e.w, e.h)
 		}
-		elems = append(elems, r)
+		if r["color"] == c4External {
+			externals = append(externals, r)
+		} else {
+			elems = append(elems, r)
+		}
 		top := ty - e.th/2
 		for _, t := range e.texts {
 			for i, s := range t.lines {
@@ -516,6 +525,7 @@ func (p *c4Diagram) spec() map[string]any {
 		map[string]any{"name": "boundaries", "values": orEmpty(bounds)},
 		map[string]any{"name": "boundaryTexts", "values": orEmpty(bTexts)},
 		map[string]any{"name": "elements", "values": orEmpty(elems)},
+		map[string]any{"name": "elementsExternal", "values": orEmpty(externals)},
 		map[string]any{"name": "elementTexts", "values": orEmpty(eTexts)},
 		map[string]any{"name": "rels", "values": orEmpty(rels)},
 		map[string]any{"name": "arrows", "values": orEmpty(arrows)},
@@ -540,6 +550,11 @@ func (p *c4Diagram) spec() map[string]any {
 		color := map[string]any{"scale": "color", "field": "color"}
 		return map[string]any{"type": "path", "style": []any{graph.StyleNode}, "encode": map[string]any{"update": map[string]any{
 			"x": field("x"), "y": field("y"), "path": field("path"), "fill": color, "stroke": color,
+		}}}
+	})...)
+	marks = append(marks, sigMarks(&data, "elementsExternal", externals, graph.PaintKeys(), nil, func() map[string]any {
+		return map[string]any{"type": "path", "style": []any{graph.StyleNodeMuted}, "encode": map[string]any{"update": map[string]any{
+			"x": field("x"), "y": field("y"), "path": field("path"),
 		}}}
 	})...)
 	marks = append(marks, sigMarks(&data, "elementTexts", eTexts, textKeys, textRename, func() map[string]any {

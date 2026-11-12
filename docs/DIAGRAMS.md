@@ -521,6 +521,7 @@ kind, with no issue:
 | `htmlLabels`, `flowchart.htmlLabels`, in a chart other than a mindmap | nothing. A chart draws its text in SVG |
 | `wrap` at the top level, in a kind other than the sequence diagram and the C4 diagrams | nothing. Of the kinds that zuzu draws, only the sequence diagram and the C4 diagrams read it |
 | `gantt.compact` | nothing. Mermaid 12 has no such setting |
+| a section inside a section of the same name, such as `sequence.sequence`, which `%%{init: {'config': {'sequence': {...}}}}%%` makes | nothing. Mermaid has no setting there (D32) |
 
 zuzu matches the names of these settings in any case, so `loglevel` is
 `logLevel`. Mermaid matches a name in its own case, and ignores a key such
@@ -749,8 +750,9 @@ SVG, where `border` and `background` change nothing, so zuzu reads them
 and draws nothing for them. A comma or a semicolon ends each part of a
 style. In a `classDef`, a comma after a backslash is a comma of the value,
 as in Mermaid, so `stroke-dasharray: 9\,5` draws dashes of 9 and gaps of 5.
-A part with no colon, such as `fill#969` or the `5` of
-`stroke-dasharray: 9,5`, is an issue. CSS ignores such a part.
+CSS ignores a part with no colon, such as `fill#969` or the `5` of
+`stroke-dasharray: 9,5`, and Mermaid draws nothing for it. zuzu skips it
+with no issue (D32).
 
 `class` gives a class to a node, a link or a subgraph that a line before
 it names. A `class` on an id that names none of them, such as `class Z hot`
@@ -1127,11 +1129,11 @@ italic only when all of the name is in italic. A line of a body starts
 with a plain word, such as `Text:`, and so it draws plain. Mermaid draws
 the bold and the italic words of such a line in bold and in italic.
 
-These parts are issues: a class or a style of a name before the definition
-of the name, the body of a second definition of a name, which Mermaid
-ignores, the settings of the section `requirement` of the config, a
-`theme` that Mermaid does not have, the `themeVariables`, and a style that
-a flowchart does not read. A relation to a
+Mermaid ignores a class or a style of a name before the definition of the
+name, and the body of a second definition of a name. zuzu ignores them
+too, with no issue (D32). These parts are issues: the settings of the
+section `requirement` of the config, a `theme` that Mermaid does not have,
+the `themeVariables`, and a style that a flowchart does not read. A relation to a
 name that is not a requirement or an element is an error, as in Mermaid.
 A name that is a requirement and also an element is an error. Mermaid
 draws its two boxes on top of each other.
@@ -1321,6 +1323,7 @@ zuzu draws each part in its own look:
 | a business use case | an ellipse with a line across its right end |
 | a stereotype | a line over the name in guillemets, such as `«Core»` |
 | a system boundary | a panel with its title at the top left |
+| a system boundary of the type `package` | a package of UML: a tab at the top left that holds the title, over a panel as wide as the boundary (D32) |
 | a note | a note, with a dashed line and no arrowhead to its actor or its use case |
 | a block of JSON | a table: its id at the top, then a row for each value, with the path of the value, such as `address.city` or `items[0].name`, and the value |
 | an animated edge | a dashed line, one still frame of Mermaid (D32) |
@@ -1366,9 +1369,8 @@ zuzu reads these settings of `usecase`:
 6. `colorScheme: role`, the default, which draws in the colors of zuzu.
 
 These parts are issues: `colorScheme: rotate`, which gives each actor and
-each use case a color of a palette of a theme of Mermaid, the type
-`package` of a system boundary, which zuzu draws as a panel with no tab,
-another setting of `usecase`, a `theme` that Mermaid does not have, and
+each use case a color of a palette of a theme of Mermaid, another setting
+of `usecase`, a `theme` that Mermaid does not have, and
 the `themeVariables`. An icon that does not load draws as a box with a question mark,
 and it is an issue when the diagram renders.
 
@@ -1524,11 +1526,19 @@ the link, and a tooltip fills the tooltip. The SVG writes the link as an
 `<a href>` around the shape and the label of the node, and the tooltip as a
 `<title>` inside them. The image of `Image` draws neither.
 
-These parts are issues: a callback, because no script runs, a target,
-which the SVG does not write, a link with a scheme that zuzu does not
-write, such as `javascript:`, and an id that names no node. Mermaid writes
-the link of `javascript:` as `about:blank` and ignores an id that names no
-node. "Links" in `docs/API.md` lists the schemes that zuzu writes.
+These parts are issues: a callback, because no script runs (D32), a
+target, which the SVG does not write, and a link with a scheme that zuzu
+does not write, such as `javascript:`. Mermaid writes the target in the
+`<a>` of its SVG, so a click on the node opens the link in another window.
+The SVG of zuzu holds the link and not the target, so the link opens in
+another way, and that is why the target stays an issue. Mermaid writes the
+link of `javascript:` as `about:blank`. "Links" in `docs/API.md` lists the
+schemes that zuzu writes.
+
+Mermaid binds a click only to a node, and ignores an id that names no
+node. zuzu skips such an id with no issue (D32). A click that names no
+node at all draws nothing, so its callback, its target and its link are no
+issue either.
 
 ### Labels that wrap
 
@@ -1570,14 +1580,17 @@ is not set, Mermaid 12 reads `flowchart.htmlLabels` in its place in every
 kind of graph, and so does zuzu. Another value of one of these settings, such as a width that is not a
 positive number, is an issue, and the label takes the default.
 
-zuzu draws a label at 11 pixels and Mermaid at 14. So zuzu scales each
-width of Mermaid that wraps a label by 11/14, and a line of zuzu holds the
-words that a line of Mermaid holds (D32). A width of 120 in Mermaid wraps
-at about 94 pixels in zuzu, and a width of 200 at about 157. The rule
-holds for each width of the table above, for `sequence.width` in a
-sequence diagram, for `mindmap.maxNodeWidth`, for
-`journey.maxLabelWidth`, for the widths of a timeline and for the texts
-of a C4 diagram. A node of zuzu fits its widest line. Mermaid
+zuzu draws a label at 11 pixels and Mermaid at 14 in most kinds. So zuzu
+scales each width of Mermaid that wraps a label by 11/14, and a line of
+zuzu holds the words that a line of Mermaid holds (D32). A width of 120 in
+Mermaid wraps at about 94 pixels in zuzu, and a width of 200 at about 157.
+The rule holds for each width of the table above, for `sequence.width` in
+a sequence diagram, for `journey.maxLabelWidth` and for the texts of a C4
+diagram. Mermaid 12.3 draws the labels of a timeline and of a mindmap at
+16 pixels, so the widths of a timeline and `mindmap.maxNodeWidth` scale
+by 11/16. A width of 200 in a timeline or a mindmap wraps at 137.5 pixels
+in zuzu. The ratio of each kind is in `mermaidSizes`, in
+`graph/mermaid/style.go`. A node of zuzu fits its widest line. Mermaid
 makes the box of a label that wraps as wide as the width. DOT does not
 wrap a label.
 
@@ -1618,12 +1631,14 @@ the source draws once, with its label.
 `showData`, and `title` on the first line or on a line of its own. A slice
 is `"label" : value`. With `showData`, the legend shows each value. zuzu
 reads `pie.textPosition`, `pie.donutHole`, `pie.legendPosition` and the
-colors `pie1` and on. A negative value is an error, and a second slice with
-the same label is an issue.
+colors `pie1` and on. A negative value is an error. Mermaid drops a
+second slice with the same label, and so does zuzu, with no issue (D32).
 
 `pie.highlightSlice` names a slice that reaches 5 percent past the rim of
 the pie, as in Mermaid. The value `hover` highlights the slice under the
-pointer. An image has no pointer, so `hover` is an issue.
+pointer. An image has no pointer, so `hover` is an issue. Mermaid writes
+`hover` into its SVG as a style that a browser runs, and the SVG of zuzu
+does not hold it.
 
 The percent of a slice goes on the middle angle of the slice, with the
 center of the text on that point. The setting `pie.zuzu.textPlacement`
@@ -1660,7 +1675,9 @@ box does not fit, the label goes outside the pie:
 `horizontal` or `vertical` after the keyword, `title`, an `x-axis` of
 categories, `[a, b, c]`, or of a range, `"title" 1 --> 10`, a `y-axis` with
 a title and a range, and series of `bar` and `line`, each with a name or
-not. A value of a line can have a label, `[540 "PaLM"]`. zuzu reads the
+not. A value of a line can have a label, `[540 "PaLM"]`. Mermaid draws
+no label of a value of a bar, and zuzu drops it with no issue (D32). zuzu
+reads the
 settings `xyChart.width`, `height`, `chartOrientation`, `showLegend`,
 `showTitle`, `showDataLabel`, `showDataLabelOutsideBar`, and the colors of
 `plotColorPalette`.
@@ -1705,8 +1722,8 @@ outside -90 to 90 degrees is 0. `showTick: true`, and `showAxisLine: true`
 on an axis of numbers, are issues.
 
 A bar or a line with more values than the x axis has categories draws a
-value for each category. The values past the last category are an issue.
-Mermaid does not draw them either.
+value for each category. Mermaid does not draw the values past the last
+category either, so they are no issue (D32).
 
 #### quadrantChart
 
@@ -1772,16 +1789,19 @@ has a halo, so that it reads on a bar and on the grid.
 A long gantt follows two limits of Mermaid. If the tasks span more than 5
 whole years, zuzu draws no bands of the excluded days. If `tickInterval`
 gives more than 10000 ticks, the axis takes ticks of its own. Mermaid
-counts a month as 30 days for this. Each limit is an issue. A bar is at
-least 2 pixels wide, so that a short task in a long gantt still draws.
+counts a month as 30 days for this. A `tickInterval` that is not a number
+and a unit of time also gives the axis ticks of its own. zuzu then draws
+what Mermaid draws, so none of these is an issue (D32). A bar is at least
+2 pixels wide, so that a short task in a long gantt still draws.
 
 As in Mermaid, the value of a statement is all the text after its keyword.
 In `dateFormat :YYYY-MM-DD`, the colon is part of the format, so no date
 of the source reads in it. A start date then reads as the Date of
 JavaScript reads it. An end date that is not a duration does not read, so
-the task has no length, and that is an issue. An item of `excludes` or
+the task has no length, as in Mermaid. An item of `excludes` or
 `includes` that is not a date, a day of the week or `weekends` excludes or
-includes no day. Each statement with such items is one issue.
+includes no day, as in Mermaid. Mermaid draws nothing for either part, so
+neither is an issue (D32).
 
 A section draws as Mermaid draws it. Every other section, from the
 first, has a band behind its rows. The band starts at the left of the
@@ -1984,7 +2004,7 @@ text. Text between two backquotes is code, and it draws as it is written,
 with its backquotes and its marks. `<br>` and a new line in a string of
 markdown start a new line. A label wraps at the spaces to fit
 `mindmap.maxNodeWidth`, 200 by default, less the padding on its two sides,
-scaled by 11/14, as "Labels that wrap" says. A word that is wider stays
+scaled by 11/16, as "Labels that wrap" says. A word that is wider stays
 whole, as in Mermaid. With `htmlLabels: false`, or
 `flowchart.htmlLabels: false` when `htmlLabels` is not set, Mermaid draws
 its labels in SVG, and zuzu breaks such a word into lines as Mermaid does.
@@ -2001,7 +2021,7 @@ starts a new line.
 | Line after a node | What zuzu does |
 | --- | --- |
 | `::icon(fa fa-book)` | the icon of the node, at the left of its label |
-| `:::urgent large` | an issue for each class |
+| `:::urgent large` | nothing, with no issue |
 
 zuzu reads the classes of a font of icons as the name of an icon:
 `fa fa-book` is `fa:book`, `fas fa-book` is `fas:book`, and `mdi mdi-home`
@@ -2010,7 +2030,8 @@ The icon comes from the packs and the icon loader of the render, as in a
 flowchart. An icon that does not load draws as a box with a question mark,
 and the report names it. An icon whose classes name no pack is an issue.
 The classes of a node are classes of CSS that the page of a site gives.
-zuzu reads no CSS, so each class is an issue.
+Mermaid draws nothing for them by itself, so zuzu reads them with no
+issue (D32).
 
 zuzu reads `mindmap.padding`, `mindmap.maxNodeWidth`, `mindmap.colorBy`,
 which is `branch` or `depth`, and `mindmap.layoutAlgorithm` and `layout`,
@@ -2269,8 +2290,9 @@ A class applies to a block in the order of the class statements, and the
 style statement of the block applies last. A block with no class takes the
 classDef `default`. zuzu reads `fill`, `stroke`, `stroke-width`,
 `stroke-dasharray`, `color`, `font-size`, `font-weight` and `font-style`.
-Another property is an issue, and so is a part of a style with no colon,
-such as `fill#969`, which Mermaid ignores. A class that no classDef names is
+Another property is an issue. Mermaid ignores a part of a style with no
+colon, such as `fill#969`, and so does zuzu, with no issue (D32). A class
+that no classDef names is
 an issue, and so is a class of an id that is not a block. zuzu reads
 `block.padding`, the space between two cells and inside a block, 8 by
 default.
@@ -2324,18 +2346,20 @@ no text, a colon at the end of the source, a colon in the name of a
 section, and the keyword `timeline` on a later line.
 
 zuzu lays out a timeline in Go with the sizes of Mermaid 12.3, scaled by
-11/14. In a timeline `LR`, each period is a box of 149 pixels, one
-each 157 pixels, with its events in a stack under it. The header of each
+11/16, because Mermaid draws the labels of a timeline at 16 pixels (D32).
+In a timeline `LR`, each period is a box of about 131 pixels, one each
+137.5 pixels, with its events in a stack under it. The header of each
 section is at the top, across its periods. All the periods have one height,
 and all the headers have one height, as in Mermaid. The axis runs between
 the periods and the events, with an arrowhead at its end. Each period has a
 dot on the axis and a dashed line down to its last event. In a timeline
 `TD`, each section is a header across the timeline, and each period is a
-row under it. The period is a box of 165 pixels at the left of the axis.
-Its events are boxes of 244 pixels in a stack at the right of the axis,
+row under it. The period is a box of about 144 pixels at the left of the
+axis. Its events are boxes of about 213 pixels in a stack at the right of
+the axis,
 each with a dashed line from the axis.
 
-A text wraps at the width of Mermaid, scaled by 11/14, as "Labels that
+A text wraps at the width of Mermaid, scaled by 11/16, as "Labels that
 wrap" says:
 
 | Text | Width in Mermaid |
@@ -2404,8 +2428,9 @@ with commas between them. An argument is a text in double quotes or a text
 with no quotes. A text with no quotes runs to the next comma, as in
 Mermaid. So `Person(a)` takes the `)` and the lines after it, up to the
 next comma, and it is an error when no comma comes. Two commas, or `""`,
-give an empty argument. Each argument has a place, as the table shows,
-and Mermaid ignores an argument after the last place. zuzu reports it.
+give an empty argument. Each argument has a place, as the table shows.
+Mermaid ignores an argument after the last place, and so does zuzu, with
+no issue (D32).
 
 A named argument, such as `$tags="v1"`, sets the part of its name from any
 place. An element reads `$label`, `$descr`, `$techn`, `$sprite`, `$tags`,
@@ -2474,13 +2499,15 @@ place of an alias, a boundary inside itself, and a boundary with the alias
 
 These are issues: a relationship with no label, which Mermaid does not
 draw, a named argument in the place of a label, which Mermaid draws as no
-label, the direction of `Rel_U` and the other directions, and the side of
-`Node_L` and `Node_R`, which Mermaid does not use either. A `$sprite`, a
-tag or a `$shape` that names no shape, the `$descr` of a relationship, a
-sprite of a boundary, and `$shadowing`, `$legendText` and `$techn` of
-`UpdateElementStyle` are issues too, and Mermaid does not draw them either.
-An update of an element or of a relationship that does not exist yet does
-nothing in Mermaid, and it is an issue.
+label, and `$shadowing`, `$legendText` and `$techn` of
+`UpdateElementStyle`.
+
+Mermaid 12.3 reads these parts and draws nothing for them, so zuzu reads
+them with no issue (D32): the direction of `Rel_U` and the other
+directions, the side of `Node_L` and `Node_R`, a `$sprite`, a tag or a
+`$shape` that names no shape, the `$descr`, the `$sprite` and the tags of
+a relationship, the sprite and the tags of a boundary, and an update of
+an element or of a relationship that does not exist yet.
 
 zuzu draws a C4 diagram in other ways than Mermaid in four places. A
 comment after a statement on its line is a comment, and Mermaid reads it
@@ -2491,8 +2518,10 @@ of zuzu, so the boxes are smaller than in Mermaid.
 
 The look is the look of zuzu. An element is a shape with a tint of its
 color. A person, a system, a container and a component take the first
-four colors of the category scheme, and each external element takes the
-fifth, as Mermaid colors the elements by kind. A color of
+four colors of the category scheme, as Mermaid colors the elements by
+kind. Each external element, such as `Person_Ext` or `System_Ext`, takes
+the neutral color `muted` of `docs/STYLE.md` at the same tint, as Mermaid
+draws it gray (D32). Its style is `zuzu.node.muted`. A color of
 `UpdateElementStyle` replaces the color of the scheme, and its `bgColor`
 draws opaque. A boundary is a panel with a dashed outline, and a
 deployment node is a panel with a solid outline. Its title, its type and
@@ -2510,6 +2539,28 @@ architecture diagram, the git graph, the block diagram, the timeline and
 the five kinds of C4 diagram. The agentflow diagram reads into a graph, as
 the flowchart does. Every other kind of Mermaid is an error that wraps
 `mermaid.ErrKind`. D32 sets the order of the next kinds.
+
+## Math of KaTeX
+
+Mermaid 12.3 draws a text between two `$$` in a label, such as
+`$$x^2$$`, as math with KaTeX. zuzu draws no math. It draws the label as
+its source, with the `$$` and the LaTeX, and reports it. Each label with
+math is one issue in the loose mode, and an error in the strict mode.
+Labels with the same text give one issue, as the report names each text
+once.
+
+Mermaid draws math in these kinds, and zuzu reports it in them:
+
+| Kind | Labels | When |
+| --- | --- | --- |
+| flowchart, swimlane, state, class, entity relationship, requirement, agentflow and use case diagram | the label of a node, its fields, such as an attribute or a member, the label of an edge, and the title of a cluster | in a label of HTML: `htmlLabels`, or `flowchart.htmlLabels` when it is not set, is true, the default |
+| mindmap and block diagram | the label of a node or a block, and the label of an edge of a block diagram | in a label of HTML, as above |
+| sequence diagram | a participant, a message, a note, and a block and its sections, such as `loop` and `else`. The title of a `box` draws as text in Mermaid | always |
+
+With `htmlLabels: false`, Mermaid draws the source of the math as text in a
+graph, a mindmap and a block diagram. zuzu draws the same, so that is no
+issue. The other kinds, such as a gantt, a timeline, a pie or a C4
+diagram, draw the source in Mermaid too, and that is no issue either.
 
 ## Emoji and missing characters
 
@@ -2548,7 +2599,11 @@ a sequence diagram, the links of an architecture diagram and their
 arrowheads take the same tokens. A guide line, such as a lifeline or a
 divider of a sequence diagram, or a ring of a radar, takes the lighter
 color `axis`. A label
-is 11 pixels. A cluster is a panel with its title at the top left. A color
+is 11 pixels. A cluster is a panel with its title at the top left. A
+cluster of the shape `package`, such as a system boundary of the type
+`package` of a use case diagram, is a tab that holds its title over a
+panel, as a package of UML (D32). The layout gives each cluster row the
+size of its title, `titleWidth` and `titleHeight`, for the tab. A color
 that the source gives replaces the color of the theme. A node with an
 opaque fill from the source and no color of text takes the text color of
 the light theme or of the dark theme, whichever reads on the fill. The styles are in

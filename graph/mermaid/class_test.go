@@ -225,9 +225,11 @@ func TestClassStyles(t *testing.T) {
 			t.Errorf("%s: the link %q, want https://example.com", id, n.Href)
 		}
 	}
-	d, _ := Read("classDiagram\n  click A href \"x\"")
-	if _, _, err := Graph(d, true); err == nil {
-		t.Error("expected an error in the strict mode")
+	// A click on a name that is not a class draws nothing in Mermaid, so
+	// it is no issue (D32).
+	d, _ := Read("classDiagram\n  class B\n  click A href \"x\"")
+	if g, report, err := Graph(d, true); err != nil || len(report) != 0 || len(g.Nodes) != 1 {
+		t.Errorf("a click on no class: the error %v, the report %v and %d nodes", err, report, len(g.Nodes))
 	}
 }
 

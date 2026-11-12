@@ -361,7 +361,6 @@ func TestBlockIssues(t *testing.T) {
 	}{
 		{"---\nconfig:\n  block:\n    spacing: 4\n---\n" + body, "block.spacing"},
 		{"---\nconfig:\n  block:\n    padding: wide\n---\n" + body, "block.padding"},
-		{body + "  style a fill#969;\n", `the style "fill#969"`},
 		{body + "  style a fill:#969,filter:blur(2px)\n", "the style filter"},
 		{body + "  class a blue\n", "the class blue"},
 		{body + "  classDef blue fill:#00f\n  class z blue\n", "the class of z"},
@@ -385,6 +384,8 @@ func TestBlockIssues(t *testing.T) {
 		"---\nconfig:\n  block:\n    padding: 4\n    useMaxWidth: false\n---\n" + body,
 		body + "  classDef default fill:#eee\n  classDef blue fill:#00f;\n  class a blue\n  style b fill:#f00;\n",
 		"block\n  columns auto\n  a:2 space:2 b\n",
+		// Mermaid draws nothing for a part of a style with no colon (D32).
+		body + "  style a fill#969;\n",
 	} {
 		if report, err := chartOf(src, true); err != nil || len(report) != 0 {
 			t.Errorf("%q: the report %v and the error %v", src, report, err)

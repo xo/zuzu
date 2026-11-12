@@ -1,0 +1,8 @@
+flowchart LR
+  A[Start] --> B[Check]
+  B --> C[Done]
+  classDef odd fill#969,stroke:#c00
+  class B odd
+  click A "https://example.com/" "the start"
+  click Z "https://example.com/z" "no such node"
+  click Y callback "no such node either"

@@ -18,6 +18,7 @@ import (
 // (D14, D31).
 const (
 	StyleNode         = theme.StyleNode
+	StyleNodeMuted    = theme.StyleNodeMuted
 	StyleNodeLabel    = theme.StyleNodeLabel
 	StyleEdge         = theme.StyleEdge
 	StyleArrow        = theme.StyleArrow
@@ -397,8 +398,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		edges = append(edges, r)
 	}
+	packages := false
 	for _, c := range g.Clusters {
 		r := map[string]any{"key": c.ID, "label": c.Label, "parent": nil}
+		if c.Shape == ClusterPackage {
+			r["shape"], packages = ClusterPackage, true
+		}
 		if c.Parent != "" {
 			r["parent"] = c.Parent
 		}
@@ -483,10 +488,34 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		encodeKeys(enc, sig, rename)
 		return map[string]any{"type": typ, "from": map[string]any{"data": src}, "style": styles, "encode": map[string]any{"update": enc}}
 	}
+	// A package draws as a tab that holds the title and a panel under it,
+	// as a package of UML (D32). The panel draws over the foot of the tab,
+	// so the tab has round corners only at its top.
+	panels := "layoutClusters"
+	if packages {
+		panels = "layoutPanels"
+		data = append(data,
+			filter(panels, "layoutClusters", "datum.shape !== 'package'"),
+			filter("layoutPackages", "layoutClusters", "datum.shape === 'package'"))
+	}
 	for _, sig := range paints["cluster"] {
-		marks = append(marks, mark("rect", "layoutClusters", "_paint", sig, []string{StyleCluster}, map[string]any{
+		marks = append(marks, mark("rect", panels, "_paint", sig, []string{StyleCluster}, map[string]any{
 			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
 		}, nil))
+	}
+	if packages {
+		const tab = "(datum.titleY - datum.y + datum.titleHeight + 4)"
+		signal := func(s string) map[string]any { return map[string]any{"signal": s} }
+		for _, sig := range paints["cluster"] {
+			marks = append(marks, mark("rect", "layoutPackages", "_paint", sig, []string{StyleCluster}, map[string]any{
+				"x": field("x"), "y": field("y"), "width": signal("datum.titleWidth + 2 * (datum.titleX - datum.x)"),
+				"height": signal(tab + " + 6"),
+			}, nil))
+			marks = append(marks, mark("rect", "layoutPackages", "_paint", sig, []string{StyleCluster}, map[string]any{
+				"x": field("x"), "y": signal("datum.y + " + tab), "width": field("width"),
+				"height": signal("datum.height - " + tab),
+			}, nil))
+		}
 	}
 	for _, sig := range paints["clusterText"] {
 		marks = append(marks, mark("text", "layoutClusters", "_text", sig, []string{StyleClusterTitle}, map[string]any{

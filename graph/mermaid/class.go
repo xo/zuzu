@@ -100,7 +100,7 @@ func classGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 		return nil, c.issues.Report, err
 	}
 	// Mermaid wraps the label of a relation, and not a class or a note.
-	wrapGraph(d.Config, c.g, 0)
+	wrapGraph(d, c.g, 0)
 	return c.g, c.issues.Report, nil
 }
 

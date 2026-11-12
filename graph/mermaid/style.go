@@ -210,6 +210,12 @@ func inert(kind, path string) bool {
 		// Mermaid 12 has no setting gantt.compact and ignores it. Its
 		// documents show it next to displayMode: compact.
 		return true
+	case len(keys) >= 2 && strings.EqualFold(keys[0], keys[1]):
+		// A directive with the key config gives the section of the kind,
+		// so %%{init: {'config': {'sequence': {...}}}}%% makes the map
+		// sequence.sequence. Mermaid has no setting there and draws
+		// nothing for it (D32).
+		return true
 	}
 	return false
 }
@@ -222,13 +228,29 @@ const (
 	edgeWrap = 200
 )
 
+// wrapSize is the size in pixels at which zuzu draws a label that wraps.
+const wrapSize = 11
+
+// mermaidSizes are the sizes in pixels at which Mermaid 12.3 draws and
+// measures the labels that wrap in a kind of diagram, for each kind where
+// the size is not 14. A timeline and a mindmap draw their labels at 16.
+var mermaidSizes = map[string]float64{
+	"timeline": 16,
+	"mindmap":  16,
+}
+
 // scaleWrap returns the width in the pixels of zuzu of a width at which
-// Mermaid wraps a label. zuzu draws a label at 11 pixels and Mermaid at
-// 14, so the width scales by 11/14, and a line holds the words that it
-// holds in Mermaid (D32). Each width of Mermaid that wraps a label goes
-// through it.
-func scaleWrap(w float64) float64 {
-	return w * 11 / 14
+// Mermaid wraps a label of a kind of diagram. zuzu draws a label at 11
+// pixels, and Mermaid at 14 in most kinds, so the width scales by 11/14,
+// and a line holds the words that it holds in Mermaid (D32). The width of
+// a kind in mermaidSizes scales by 11 over its size, such as 11/16 for a
+// timeline. Each width of Mermaid that wraps a label goes through it.
+func scaleWrap(kind string, w float64) float64 {
+	size, ok := mermaidSizes[kind]
+	if !ok {
+		size = 14
+	}
+	return w * wrapSize / size
 }
 
 // wrapping is how the labels of a graph wrap, from the settings of the top
@@ -246,16 +268,9 @@ type wrapping struct {
 // labelWrap reads the settings of the top level of a config that change
 // how a label wraps, and sets them on a graph.
 func labelWrap(cfg map[string]any, g *graph.Graph) wrapping {
-	w := wrapping{html: true, markdown: true}
-	if v, ok := cfg["htmlLabels"].(bool); ok {
-		w.html = v
-	} else if fc, _ := cfg["flowchart"].(map[string]any); fc != nil {
-		// flowchart.htmlLabels is the old form of htmlLabels, and Mermaid
-		// reads it in every kind of graph when htmlLabels is not set.
-		if v, ok := fc["htmlLabels"].(bool); ok {
-			w.html = v
-		}
-	}
+	// flowchart.htmlLabels is the old form of htmlLabels, and Mermaid
+	// reads it in every kind of graph when htmlLabels is not set.
+	w := wrapping{html: htmlLabels(cfg), markdown: true}
 	if v, ok := cfg["markdownAutoWrap"].(bool); ok {
 		w.markdown = v
 	}
@@ -277,13 +292,13 @@ func (w wrapping) width(limit float64, markdown bool) float64 {
 // wrap: the label of each node at node, in the pixels of zuzu, or 0 for
 // none, and the label of
 // each edge at edgeWrap.
-func wrapGraph(cfg map[string]any, g *graph.Graph, node float64) {
-	labelWrap(cfg, g)
+func wrapGraph(d *Diagram, g *graph.Graph, node float64) {
+	labelWrap(d.Config, g)
 	for _, n := range g.Nodes {
 		n.Wrap = node
 	}
 	for _, e := range g.Edges {
-		e.Wrap = scaleWrap(edgeWrap)
+		e.Wrap = scaleWrap(d.Kind, edgeWrap)
 	}
 }
 
@@ -291,18 +306,19 @@ func wrapGraph(cfg map[string]any, g *graph.Graph, node float64) {
 // width at which a label wraps, such as flowchart.wrappingWidth, or takes
 // def when the config does not set it, and returns it in the pixels of
 // zuzu. A value that is not a positive number is an issue.
-func wrapSetting(is *graph.Issues, cfg map[string]any, def float64, section, key string) (float64, error) {
+func wrapSetting(is *graph.Issues, d *Diagram, def float64, section, key string) (float64, error) {
+	cfg := d.Config
 	v, ok := configNumber(cfg, section, key)
 	if !ok {
 		if m, _ := cfg[section].(map[string]any); m != nil && m[key] != nil {
-			return scaleWrap(def), is.Add("config", "the setting %s.%s: %v", section, key, m[key])
+			return scaleWrap(d.Kind, def), is.Add("config", "the setting %s.%s: %v", section, key, m[key])
 		}
-		return scaleWrap(def), nil
+		return scaleWrap(d.Kind, def), nil
 	}
 	if !(v > 0) {
-		return scaleWrap(def), is.Add("config", "the setting %s.%s: %v", section, key, v)
+		return scaleWrap(d.Kind, def), is.Add("config", "the setting %s.%s: %v", section, key, v)
 	}
-	return scaleWrap(v), nil
+	return scaleWrap(d.Kind, v), nil
 }
 
 // css reads a style of CSS of a class or a node, as fill:#f9f,stroke:#333,
@@ -326,7 +342,8 @@ func classDefCSS(s string, add func(format string, args ...any) error) (map[stri
 
 // readCSS reads a style of CSS into the names of Vega, and keeps animation
 // when link is true. When escaped is true, a comma after a backslash is a
-// comma of a value. A part with no colon is an issue: CSS ignores it.
+// comma of a value. CSS ignores a part with no colon, and Mermaid draws
+// nothing for it, so zuzu skips it with no issue (D32).
 func readCSS(s string, link, escaped bool, add func(format string, args ...any) error) (map[string]string, error) {
 	st := map[string]string{}
 	family := ""
@@ -339,11 +356,6 @@ func readCSS(s string, link, escaped bool, add func(format string, args ...any) 
 		part = strings.ReplaceAll(part, escComma, ",")
 		k, v, ok := strings.Cut(part, ":")
 		if !ok {
-			if p := strings.TrimSpace(part); p != "" {
-				if err := add("the style %q, which has no colon", p); err != nil {
-					return nil, err
-				}
-			}
 			continue
 		}
 		k, v = strings.TrimSpace(k), strings.TrimSpace(v)

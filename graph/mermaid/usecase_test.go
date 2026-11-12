@@ -287,20 +287,30 @@ end`)
 		msgs = append(msgs, r.Error())
 	}
 	text := strings.Join(msgs, "\n")
-	for _, want := range []string{"usecase.colorScheme: rotate", "usecase.curve", "the type package of the system boundary S"} {
+	for _, want := range []string{"usecase.colorScheme: rotate", "usecase.curve"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("expected an issue about %s, got\n%s", want, text)
 		}
 	}
-	if len(report) != 3 {
-		t.Errorf("expected 3 issues, got\n%s", text)
+	if len(report) != 2 {
+		t.Errorf("expected 2 issues, got\n%s", text)
 	}
 	if len(g.Clusters) != 1 || g.Nodes[0].Cluster != "S" {
 		t.Errorf("expected the boundary S to hold A, got %v %v", g.Clusters, g.Nodes)
 	}
-	d, _ := Read("usecase-beta\nsystemBoundary S@{ type: package }\nA\nend\n")
-	if _, _, err := Graph(d, true); err == nil {
-		t.Error("expected an error in the strict mode")
+	// A boundary of the type package draws with a tab, with no issue, and
+	// a boundary of the type rect as a panel (D32).
+	d, _ := Read("usecase-beta\nsystemBoundary S@{ type: package }\nA\nend\nsystemBoundary R@{ type: rect }\nB\nend\n")
+	g, report, err := Graph(d, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the error %v and the report %v", err, report)
+	}
+	shapes := map[string]string{}
+	for _, c := range g.Clusters {
+		shapes[c.ID] = c.Shape
+	}
+	if shapes["S"] != graph.ClusterPackage || shapes["R"] != "" {
+		t.Errorf("the shapes of the boundaries %v", shapes)
 	}
 }
 

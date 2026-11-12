@@ -95,16 +95,15 @@ func TestGanttLong(t *testing.T) {
 	t.Parallel()
 	src := "gantt\ndateFormat YYYY-MM-DD\ntickInterval 1day\nexcludes weekends\n" +
 		"section Early\nStart : 2022-10-20, 12d\nsection Late\nFinish : 9999-10-01, 30d\n"
-	report, err := compileMermaid(t, src, false)
+	report, err := compileMermaid(t, src, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Past 5 years, Mermaid draws no excluded days, and past 10000 ticks
-	// its axis takes ticks of its own. Both are issues.
-	for _, part := range []string{"so it draws no excluded days", "so the axis takes ticks of its own"} {
-		if !reportHolds(report, part) {
-			t.Errorf("expected an issue of %q, got %v", part, report)
-		}
+	// its axis takes ticks of its own. zuzu does the same, with no issue
+	// (D32).
+	if len(report) != 0 {
+		t.Errorf("expected no issue, got %v", report)
 	}
 	// Each bar draws at least 2 pixels wide, though its time is less than
 	// a pixel of the axis.

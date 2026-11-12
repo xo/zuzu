@@ -1,0 +1,18 @@
+requirementDiagram
+  style test_req fill:#f9f
+  class test_req hot
+  requirement test_req {
+    id: 1
+    text: the test text.
+    risk: high
+    verifymethod: test
+  }
+  requirement test_req {
+    id: 2
+    text: a second definition that Mermaid ignores.
+  }
+  element test_entity {
+    type: simulation
+  }
+  classDef hot fill:#f96
+  test_entity - satisfies -> test_req

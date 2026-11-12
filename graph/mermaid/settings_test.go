@@ -138,6 +138,10 @@ func TestInertSettings(t *testing.T) {
 		// place.
 		"---\nconfig:\n  htmlLabels: false\n---\nmindmap\n  root\n",
 		"---\nconfig:\n  flowchart:\n    htmlLabels: false\n---\nmindmap\n  root\n",
+		// The key config of a directive that holds the section of the
+		// kind makes sequence.sequence, where Mermaid has no setting.
+		"%%{init: {'config': {'sequence': {'hideUnusedParticipants': true}}}}%%\nsequenceDiagram\n  participant a\n",
+		"%%{init: {'config': {'flowchart': {'curve': 'linear'}}}}%%\nflowchart LR\n  A --> B\n",
 	} {
 		if err := strictCheck(t, src); err != nil {
 			t.Errorf("%q: %v", src, err)

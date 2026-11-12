@@ -758,16 +758,9 @@ func (b *blockDiagram) composite(parent *blockNode, t blockToken) error {
 }
 
 // css reads a style of a classDef or of a style statement. A property that
-// zuzu does not draw, and a part with no colon, which Mermaid ignores, are
-// issues.
+// zuzu does not draw is an issue. Mermaid ignores a part with no colon, and
+// so does zuzu, with no issue (D32).
 func (b *blockDiagram) css(s string) (map[string]string, error) {
-	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' }) {
-		if p := strings.TrimSpace(part); p != "" && !strings.Contains(p, ":") {
-			if err := b.c.add("the style %q, which has no colon", p); err != nil {
-				return nil, err
-			}
-		}
-	}
 	return css(s, b.c.add)
 }
 
@@ -812,6 +805,43 @@ func (b *blockDiagram) check() error {
 		c.line = e.line
 		if e.a == e.b {
 			if err := c.add("the edge from %s to itself", e.a); err != nil {
+				return err
+			}
+		}
+	}
+	return b.checkMath()
+}
+
+// checkMath reports each label with math of KaTeX: the labels of the
+// blocks in the order of the source, then the labels of the edges. Mermaid
+// 12.3 draws the math in a label of HTML, and the source in a label of SVG,
+// as zuzu does.
+func (b *blockDiagram) checkMath() error {
+	if !htmlLabels(b.c.d.Config) {
+		return nil
+	}
+	var walk func(n *blockNode) error
+	walk = func(n *blockNode) error {
+		for _, k := range n.kids {
+			if hasMath(k.label) {
+				b.c.line = k.line
+				if err := b.c.add(mathIssue, k.label); err != nil {
+					return err
+				}
+			}
+			if err := walk(k); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := walk(b.root); err != nil {
+		return err
+	}
+	for _, e := range b.edges {
+		if hasMath(e.label) {
+			b.c.line = e.line
+			if err := b.c.add(mathIssue, e.label); err != nil {
 				return err
 			}
 		}

@@ -160,19 +160,33 @@ requirementDiagram
 			t.Errorf("%s: unexpected style %v", c.id, st)
 		}
 	}
-	if len(report) != 1 {
-		t.Errorf("expected one issue for the style of zz, got %v", report)
+	// Mermaid ignores the style of zz, which names nothing, so it is no
+	// issue (D32).
+	if len(report) != 0 {
+		t.Errorf("expected no issue for the style of zz, got %v", report)
 	}
 }
 
 func TestRequirementIssues(t *testing.T) {
 	t.Parallel()
+	// Mermaid ignores a class or a style before the definition, and the
+	// body of a second definition, so none of them is an issue (D32).
 	for _, src := range []string{
-		// Mermaid ignores a class or a style before the definition, and
-		// the body of a second definition.
 		"requirementDiagram\n  class a hot\n  requirement a {\n  }",
 		"requirementDiagram\n  a:::hot\n  requirement a {\n  }",
+		"requirementDiagram\n  style a fill:#f00\n  requirement a {\n  }",
 		"requirementDiagram\n  requirement a {\n  }\n  requirement a {\n  id: 2\n  }",
+	} {
+		d, err := Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, report, err := Graph(d, true)
+		if err != nil || len(report) != 0 || len(g.Nodes) != 1 {
+			t.Errorf("%q: expected one node and no issue, got %v and %v", src, report, err)
+		}
+	}
+	for _, src := range []string{
 		"---\nconfig:\n  requirement:\n    rect_fill: red\n---\nrequirementDiagram\n  requirement a {\n  }",
 	} {
 		d, err := Read(src)

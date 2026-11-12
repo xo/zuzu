@@ -81,6 +81,17 @@ func TestScaleWrap(t *testing.T) {
 	if n, e := g.Nodes[0].Wrap, g.Edges[0].Wrap; n != 120.0*11/14 || e != 200.0*11/14 {
 		t.Errorf("expected the widths 120 and 200 scaled by 11/14, got %g and %g", n, e)
 	}
+	// Mermaid draws the labels of a timeline and of a mindmap at 16
+	// pixels, so their widths scale by 11/16. Each other kind scales by
+	// 11/14 (D32).
+	for kind, want := range map[string]float64{
+		"timeline": 110, "mindmap": 110, "flowchart": 160.0 * 11 / 14, "sequenceDiagram": 160.0 * 11 / 14,
+		"C4Context": 160.0 * 11 / 14, "journey": 160.0 * 11 / 14, "usecase-beta": 160.0 * 11 / 14,
+	} {
+		if got := scaleWrap(kind, 160); got != want {
+			t.Errorf("%s: scaleWrap(160) is %g, want %g", kind, got, want)
+		}
+	}
 }
 
 func TestWrapIssues(t *testing.T) {
@@ -103,7 +114,7 @@ func TestWrapIssues(t *testing.T) {
 			t.Errorf("%q: expected 1 line in the report, got %v, %v", src, report, err)
 			continue
 		}
-		if g.Nodes[0].Wrap != scaleWrap(nodeWrap) {
+		if g.Nodes[0].Wrap != scaleWrap(d.Kind, nodeWrap) {
 			t.Errorf("%q: expected the default width, got %g", src, g.Nodes[0].Wrap)
 		}
 	}

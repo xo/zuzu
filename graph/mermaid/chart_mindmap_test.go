@@ -344,7 +344,6 @@ func TestMindmapIssues(t *testing.T) {
 	tests := []struct {
 		src, issue string
 	}{
-		{body + "    :::urgent\n", "the class urgent"},
 		{body + "    ::icon(book)\n", "names no pack"},
 		{"---\nconfig:\n  mindmap:\n    useWidth: 500\n---\n" + body, "mindmap.useWidth"},
 		{"---\nconfig:\n  mindmap:\n    colorBy: section\n---\n" + body, "mindmap.colorBy section"},
@@ -365,6 +364,9 @@ func TestMindmapIssues(t *testing.T) {
 	}
 	for _, src := range []string{
 		"---\nconfig:\n  layout: tidy-tree\n  mindmap:\n    layoutAlgorithm: cose-bilkent\n    padding: 4\n    maxNodeWidth: 90\n---\n" + body,
+		// A class is CSS of the page, and Mermaid draws nothing for it by
+		// itself (D32).
+		body + "    :::urgent large\n",
 	} {
 		if report, err := chartOf(src, true); err != nil || len(report) != 0 {
 			t.Errorf("%q: the report %v and the error %v", src, report, err)

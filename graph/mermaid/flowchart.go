@@ -78,7 +78,7 @@ func newFlowchart(d *Diagram, strict bool) *flowchart {
 		nodes: map[string]*graph.Node{}, classes: map[string]map[string]string{}, nodeClasses: map[string][]string{},
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
-		nodeWrap: scaleWrap(nodeWrap), markdown: map[string]bool{}, edgeClasses: map[string][]string{},
+		nodeWrap: scaleWrap(d.Kind, nodeWrap), markdown: map[string]bool{}, edgeClasses: map[string][]string{},
 		collapsed: map[string]int{}, animated: map[*graph.Edge]bool{}, animClasses: map[string]int{},
 	}
 }
@@ -132,7 +132,7 @@ func (f *flowchart) config() error {
 	}
 	f.wrap = labelWrap(cfg, f.g)
 	var err error
-	if f.nodeWrap, err = wrapSetting(f.issues, cfg, nodeWrap, f.section(), "wrappingWidth"); err != nil {
+	if f.nodeWrap, err = wrapSetting(f.issues, f.d, nodeWrap, f.section(), "wrappingWidth"); err != nil {
 		return err
 	}
 	if f.af != nil {
@@ -1076,7 +1076,7 @@ func inlineMap(body string) map[string]string {
 func (f *flowchart) edge(a, b string, l *link, id string) {
 	e := &graph.Edge{
 		Source: a, Target: b, Label: l.text, MinLen: l.minlen, Head: l.head, Tail: l.tail, Style: map[string]string{}, Curve: f.curve,
-		Wrap: f.wrap.width(scaleWrap(edgeWrap), l.markdown),
+		Wrap: f.wrap.width(scaleWrap(f.d.Kind, edgeWrap), l.markdown),
 	}
 	switch l.kind {
 	case "thick":

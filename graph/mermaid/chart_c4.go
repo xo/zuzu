@@ -649,7 +649,8 @@ var (
 // assign sets the fields of the places of a statement after its alias and
 // its label, as Mermaid 12.3 does: a value at a place sets the field of
 // that place, and a named argument at any place sets the field of its
-// name. A named argument that zuzu does not draw is an issue.
+// name. A named argument that zuzu does not draw is an issue. Mermaid
+// ignores the arguments after the last place, and so does zuzu (D32).
 func (p *c4Diagram) assign(fields map[string]string, attrs []c4Attr, from int, names, known []string, word string) error {
 	for i, name := range names {
 		a, ok := slot(attrs, from+i)
@@ -672,7 +673,7 @@ func (p *c4Diagram) assign(fields map[string]string, attrs []c4Attr, from int, n
 		}
 		fields[a.key] = a.value
 	}
-	return p.extra(len(attrs)-from-len(names), word)
+	return nil
 }
 
 // name reads the alias of a statement, which must be a value and not a
@@ -770,11 +771,6 @@ func (p *c4Diagram) boundary(t c4Token) error {
 		names = []string{"type", "descr", "sprite", "tags", "link"}
 		def = "node"
 		b.node = true
-		if t.word == "Node_L" || t.word == "Node_R" {
-			if err := p.c.add("%s, which draws as Node, as in Mermaid", t.word); err != nil {
-				return err
-			}
-		}
 	}
 	if _, ok := slot(attrs, 2); !ok {
 		b.fields["type"] = def
@@ -808,10 +804,6 @@ func (p *c4Diagram) rel(t c4Token) error {
 		kind = c4BiRel
 	case "Rel_Back":
 		kind = c4RelBack
-	case "Rel_Up", "Rel_U", "Rel_Down", "Rel_D", "Rel_Left", "Rel_L", "Rel_Right", "Rel_R":
-		if err := p.c.add("the direction of %s, which zuzu does not use in the layout, as Mermaid does not", t.word); err != nil {
-			return err
-		}
 	}
 	tt := t
 	tt.attrs = attrs
@@ -852,8 +844,8 @@ func (p *c4Diagram) rel(t c4Token) error {
 }
 
 // update reads UpdateElementStyle, UpdateRelStyle or UpdateLayoutConfig.
-// An update of an element or a relationship that does not exist yet does
-// nothing in Mermaid, and is an issue.
+// An update of an element or a relationship that does not exist yet draws
+// nothing in Mermaid, so zuzu skips it with no issue (D32).
 func (p *c4Diagram) update(t c4Token) error {
 	switch t.word {
 	case "UpdateLayoutConfig":
@@ -870,7 +862,7 @@ func (p *c4Diagram) update(t c4Token) error {
 		}
 		set(0, &p.shapeInRow)
 		set(1, &p.boundaryInRow)
-		return p.extra(len(t.attrs)-2, t.word)
+		return nil
 	case updateRelStyle:
 		from, _, err := p.name(t, 0)
 		if err != nil {
@@ -887,7 +879,7 @@ func (p *c4Diagram) update(t c4Token) error {
 			}
 		}
 		if r == nil {
-			return p.c.add("%s of %s and %s, which have no relationship before it", t.word, from, to)
+			return nil
 		}
 		return p.updateFields(r.fields, t, []string{"textColor", "lineColor", "offsetX", "offsetY"}, []string{"textColor", "lineColor", "offsetX", "offsetY"})
 	}
@@ -902,13 +894,14 @@ func (p *c4Diagram) update(t c4Token) error {
 	if b, ok := p.boundBy[alias]; ok && alias != c4Global {
 		return p.updateFields(b.fields, t, names, []string{"bgColor", "fontColor", "borderColor"})
 	}
-	return p.c.add("%s of %s, which is not an element or a boundary before it", t.word, alias)
+	return nil
 }
 
 // updateFields sets the fields of an update from its places after the
 // first, as Mermaid does: a value sets the field of its place, and a named
 // argument the field of its name. A field that zuzu does not draw is an
-// issue.
+// issue. Mermaid ignores the arguments after the last place, and so does
+// zuzu.
 func (p *c4Diagram) updateFields(fields map[string]string, t c4Token, names, drawn []string) error {
 	from := 1
 	if t.word == updateRelStyle {
@@ -930,18 +923,6 @@ func (p *c4Diagram) updateFields(fields map[string]string, t c4Token, names, dra
 			continue
 		}
 		fields[key] = a.value
-	}
-	return p.extra(len(t.attrs)-from-len(names), t.word)
-}
-
-// extra reports the arguments of a statement after the last that Mermaid
-// reads, which Mermaid ignores.
-func (p *c4Diagram) extra(n int, word string) error {
-	switch {
-	case n == 1:
-		return p.c.add("an argument of %s after the last that Mermaid reads", word)
-	case n > 1:
-		return p.c.add("%d arguments of %s after the last that Mermaid reads", n, word)
 	}
 	return nil
 }
@@ -973,41 +954,23 @@ var c4ShapeWords = map[string]string{
 	"db": "cylinder", "queue": "h-cyl", "pipe": "h-cyl", "component": "subroutine",
 }
 
-// check resolves the shape of each element, reports the parts that zuzu
-// does not draw, and checks that each relationship joins two parts of
-// the diagram.
+// check resolves the shape of each element, reports the links that zuzu
+// does not write, and checks that each relationship joins two parts of the
+// diagram. A shape, a sprite or a tag that names no shape, the sprite and
+// the tags of a boundary, and the description, the sprite and the tags of
+// a relationship draw nothing in Mermaid 12.3, so zuzu reads them with no
+// issue (D32).
 func (p *c4Diagram) check() error {
 	c := p.c
 	for _, e := range p.elems {
 		c.line = e.line
 		e.shape = c4Shape(e)
-		if s := e.fields["shape"]; s != "" && c4ShapeWords[strings.ToLower(s)] == "" {
-			if err := c.add("the shape %q of %s, which Mermaid does not draw either", s, e.alias); err != nil {
-				return err
-			}
-		}
-		if s := e.fields["sprite"]; s != "" && c4ShapeWords[strings.ToLower(s)] == "" {
-			if err := c.add("the sprite %q of %s, which Mermaid does not draw either", s, e.alias); err != nil {
-				return err
-			}
-		}
-		if err := p.checkTags(e.fields["tags"], e.alias, true); err != nil {
-			return err
-		}
 		if err := p.checkLink(e.fields, e.alias); err != nil {
 			return err
 		}
 	}
 	for _, b := range p.bounds[1:] {
 		c.line = b.line
-		if s := b.fields["sprite"]; s != "" {
-			if err := c.add("the sprite %q of %s, which Mermaid does not draw either", s, b.alias); err != nil {
-				return err
-			}
-		}
-		if err := p.checkTags(b.fields["tags"], b.alias, false); err != nil {
-			return err
-		}
 		if err := p.checkLink(b.fields, b.alias); err != nil {
 			return err
 		}
@@ -1024,16 +987,6 @@ func (p *c4Diagram) check() error {
 			return c.errorf("a relationship from %s to %s: %s is not an element or a boundary", r.from, r.to, end)
 		}
 		name := r.from + " to " + r.to
-		for _, k := range []string{"descr", "sprite"} {
-			if s := r.fields[k]; s != "" {
-				if err := c.add("the %s %q of the relationship from %s, which Mermaid does not draw either", k, s, name); err != nil {
-					return err
-				}
-			}
-		}
-		if err := p.checkTags(r.fields["tags"], "the relationship from "+name, false); err != nil {
-			return err
-		}
 		if err := p.checkLink(r.fields, "the relationship from "+name); err != nil {
 			return err
 		}
@@ -1046,24 +999,6 @@ func (p *c4Diagram) check() error {
 					delete(r.fields, k)
 				}
 			}
-		}
-	}
-	return nil
-}
-
-// checkTags reports each tag that names no shape. Mermaid draws a tag
-// only as the shape of an element.
-func (p *c4Diagram) checkTags(tags, of string, shapes bool) error {
-	if tags == "" {
-		return nil
-	}
-	for tag := range strings.SplitSeq(tags, ",") {
-		tag = strings.TrimSpace(tag)
-		if shapes && c4ShapeWords[strings.ToLower(tag)] != "" {
-			continue
-		}
-		if err := p.c.add("the tag %q of %s, which Mermaid does not draw either", tag, of); err != nil {
-			return err
 		}
 	}
 	return nil

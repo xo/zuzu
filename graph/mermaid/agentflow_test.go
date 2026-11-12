@@ -246,8 +246,8 @@ agentflow-beta
 	if g.NodeSep != 48 || g.RankSep != 20 {
 		t.Errorf("expected the spaces 48 and 20, got %v and %v", g.NodeSep, g.RankSep)
 	}
-	if n := node(t, g, "a"); n.MinWidth != 0 || n.Wrap != scaleWrap(140) {
-		t.Errorf("expected no least width and a wrap of %v, got %v and %v", scaleWrap(140), n.MinWidth, n.Wrap)
+	if n := node(t, g, "a"); n.MinWidth != 0 || n.Wrap != scaleWrap("agentflow-beta", 140) {
+		t.Errorf("expected no least width and a wrap of %v, got %v and %v", scaleWrap("agentflow-beta", 140), n.MinWidth, n.Wrap)
 	}
 	if g.Edges[0].Curve != "linear" {
 		t.Errorf("expected a linear curve, got %q", g.Edges[0].Curve)

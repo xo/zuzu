@@ -152,6 +152,9 @@ type sequence struct {
 	active map[string]int
 	// blocks is the stack of the keywords of the open blocks.
 	blocks []string
+	// math holds each text with math of KaTeX and its line, for the
+	// report. Mermaid draws the math, and zuzu draws the source.
+	math []Line
 }
 
 var (
@@ -246,6 +249,14 @@ func (s *sequence) parse() error {
 	case len(s.participants) == 0:
 		return s.c.errorf("a sequence diagram with no participant")
 	}
+	// Mermaid 12.3 draws the math of KaTeX in each text of a sequence
+	// diagram, whatever htmlLabels is.
+	for _, m := range s.math {
+		s.c.line = m.N
+		if err := s.c.add(mathIssue, m.Text); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -297,6 +308,9 @@ func (s *sequence) text(t string) seqText {
 		}
 	}
 	t = s.decode(t)
+	if hasMath(t) {
+		s.math = append(s.math, Line{Text: t, N: s.c.line})
+	}
 	for _, l := range seqBreak.Split(t, -1) {
 		out.lines = append(out.lines, strings.TrimSpace(l))
 	}
@@ -427,7 +441,11 @@ func (s *sequence) box(arg string, lines []Line, i *int) error {
 		fill = ""
 	}
 	b.fill = fill
+	// Mermaid draws the title of a box as text, with no math, as zuzu
+	// does, so its math is no issue.
+	kept := len(s.math)
 	b.title = s.text(title)
+	s.math = s.math[:kept]
 	s.boxes = append(s.boxes, b)
 	n := len(s.boxes) - 1
 	for *i++; *i < len(lines); *i++ {

@@ -1,0 +1,10 @@
+classDiagram
+  class Animal {
+    +String name
+    +eat()
+  }
+  class Dog
+  Animal <|-- Dog
+  link Animal "https://example.com/animal" "an animal"
+  link Cat "https://example.com/cat" "no such class"
+  click Bird call fly() "no such class either"

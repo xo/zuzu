@@ -184,12 +184,9 @@ func TestGanttIssues(t *testing.T) {
 		src, exp string
 	}{
 		{"gantt\ndateFormat YYYY-MM-DD\na : a1, 2024-01-01, 1d\nclick a1 href \"https://example.com\"", "click"},
-		{"gantt\ndateFormat YYYY-MM-DD\na : 2024-01-01, 3dX", `not a date of the format "YYYY-MM-DD" or a duration`},
 		{"gantt\ndateFormat YYYY-MM-DD\na : after zz, 1d", "after names no task"},
 		{"gantt\ndateFormat YYYY-MM-DD\na : 2024-01-01, until zz", "until names no task"},
 		{"gantt\ntodayMarker stroke-width:5px\na : 2024-01-01, 1d", "todayMarker"},
-		{"gantt\nexcludes weekdays\na : 2024-01-01, 1d", "excludes \"weekdays\""},
-		{"gantt\nincludes monday\na : 2024-01-01, 1d", "includes \"monday\""},
 		{"---\ndisplayMode: wide\n---\ngantt\na : 2024-01-01, 1d", "display mode wide"},
 		{"---\nconfig:\n  gantt:\n    numberSectionStyles: 0\n---\ngantt\na : 2024-01-01, 1d", "gantt.numberSectionStyles 0"},
 		{"---\nconfig:\n  gantt:\n    rightPadding: -4\n---\ngantt\na : 2024-01-01, 1d", "gantt.rightPadding -4"},
@@ -211,20 +208,31 @@ func TestGanttIssues(t *testing.T) {
 			t.Errorf("%q: expected an error in the strict mode", test.src)
 		}
 	}
-	// A tickInterval that does not read is an issue of the spec.
-	g, c, err := ganttOf(t, "gantt\ntickInterval 1decade\na : 2024-01-01, 1d", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := g.spec(); err != nil || !hasIssue(c.issues.Report, "tickInterval") {
-		t.Errorf("expected an issue of tickInterval, got %v and %v", err, c.issues.Report)
+	// Mermaid reads each of these and draws nothing for it, so zuzu
+	// accepts it with no issue (D32): an end that is not a date or a
+	// duration gives the task no length, an item of excludes or includes
+	// that is not a date or a day excludes nothing, and the axis takes ticks
+	// of its own for a tickInterval that does not read.
+	for _, src := range []string{
+		"gantt\ndateFormat YYYY-MM-DD\na : 2024-01-01, 3dX",
+		"gantt\nexcludes weekdays\na : 2024-01-01, 1d",
+		"gantt\nincludes monday\na : 2024-01-01, 1d",
+		"gantt\ntickInterval 1decade\na : 2024-01-01, 1d",
+	} {
+		g, c, err := ganttOf(t, src, true)
+		if err != nil {
+			t.Fatalf("%q: %v", src, err)
+		}
+		if _, err := g.spec(); err != nil || len(c.issues.Report) != 0 {
+			t.Errorf("%q: the error %v and the report %v", src, err, c.issues.Report)
+		}
 	}
 }
 
 // TestGanttColonFormat follows Mermaid 12.3.0 and mmdc: the value of
 // dateFormat is all the text after the keyword, so the colon is part of the
 // format. A start date reads as the Date of JavaScript reads it, and an end
-// date does not read, so its task has no length.
+// date does not read, so its task has no length, with no issue.
 func TestGanttColonFormat(t *testing.T) {
 	t.Parallel()
 	src := "gantt\n dateFormat                :YYYY-MM-DD\n" +
@@ -246,16 +254,10 @@ func TestGanttColonFormat(t *testing.T) {
 			t.Errorf("task %q: expected %s, got %s", task.name, exp[i], got)
 		}
 	}
-	if len(c.issues.Report) != 2 {
-		t.Fatalf("expected 2 issues, got %v", c.issues.Report)
-	}
-	for i, want := range []string{
-		`line 3: excludes ":excludes the named days" holds no dates, days of the week or weekends`,
-		`line 4: the end "2014-01-08" of the task "Completed task" is not a date of the format ":YYYY-MM-DD"`,
-	} {
-		if got := c.issues.Report[i].Error(); !strings.Contains(got, want) {
-			t.Errorf("issue %d: expected %q, got %q", i, want, got)
-		}
+	// Mermaid excludes no day and gives the first task no length, and
+	// draws nothing for either, so neither is an issue (D32).
+	if len(c.issues.Report) != 0 {
+		t.Fatalf("expected no issue, got %v", c.issues.Report)
 	}
 }
 
@@ -263,20 +265,25 @@ func TestGanttListIssues(t *testing.T) {
 	t.Parallel()
 	src := "gantt\ndateFormat YYYY-MM-DD\nexcludes weekends, sunday, 2024-01-03, nope, never\n" +
 		"excludes saturday\nincludes 2024-01-06 friday\na : 2024-01-01, 1d"
-	_, c, err := ganttOf(t, src, false)
+	g, c, err := ganttOf(t, src, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{
-		`line 3: the items "nope", "never" of excludes are not dates, days of the week or weekends`,
-		`line 5: the items "friday" of includes are not dates`,
+	// Mermaid ignores an item that is not a date of the format, a day of
+	// the week or weekends, so it is no issue (D32).
+	if len(c.issues.Report) != 0 {
+		t.Fatalf("expected no issue, got %v", c.issues.Report)
 	}
-	if len(c.issues.Report) != 2 {
-		t.Fatalf("expected 2 issues, got %v", c.issues.Report)
+	day := func(s string) time.Time {
+		d, err := time.ParseInLocation(time.DateOnly, s, g.loc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
 	}
-	for i, w := range want {
-		if got := c.issues.Report[i].Error(); !strings.Contains(got, w) {
-			t.Errorf("issue %d: expected %q, got %q", i, w, got)
+	for s, want := range map[string]bool{"2024-01-03": true, "2024-01-06": false, "2024-01-07": true, "2024-01-05": false} {
+		if got := g.excluded(day(s)); got != want {
+			t.Errorf("%s: excluded %v, want %v", s, got, want)
 		}
 	}
 }

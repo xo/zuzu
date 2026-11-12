@@ -1,0 +1,1 @@
+{"nodes":[{"id":"Animal","label":"Animal","x":80.75,"y":79.5},{"id":"Dog","label":"Dog","x":80.75,"y":227.5}],"edges":[{"source":"Animal","target":"Dog","points":[[80.75,147],[80.75,187]]}],"clusters":[]}

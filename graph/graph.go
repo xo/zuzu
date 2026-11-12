@@ -246,4 +246,11 @@ type Cluster struct {
 	// Href and Tooltip are the link and the tooltip of the cluster, or
 	// empty (D32). Its box and its title take them.
 	Href, Tooltip string
+	// Shape is the shape of the cluster: empty for a panel, or
+	// ClusterPackage.
+	Shape string
 }
+
+// ClusterPackage is the shape of a cluster that draws as a package of UML:
+// a panel with a tab at its top left that holds the title (D32).
+const ClusterPackage = "package"

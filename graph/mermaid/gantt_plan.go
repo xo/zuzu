@@ -6,7 +6,6 @@ import (
 	"math"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -26,9 +25,10 @@ type gantt struct {
 	tickInterval       string
 	weekday            string
 	topAxis, inclusive bool
+	// excludes and includes are the items of the statements excludes and
+	// includes. Mermaid ignores an item that is not a date of the format,
+	// a day of the week or weekends, and so does zuzu, with no issue (D32).
 	excludes, includes []string
-	// lists are the statements excludes and includes, for the report.
-	lists []ganttListStmt
 	// weekend is the first day of the weekend: Saturday, or Friday.
 	weekend time.Weekday
 	// compact packs the tasks of each section into as few rows as their
@@ -115,10 +115,8 @@ func readGantt(c *chart, today time.Time, loc *time.Location) (*gantt, error) {
 			g.topAxis = true
 		case "excludes":
 			g.excludes = append(g.excludes, ganttList(rest)...)
-			g.lists = append(g.lists, ganttListStmt{key: key, text: rest, line: l.N})
 		case "includes":
 			g.includes = append(g.includes, ganttList(rest)...)
-			g.lists = append(g.lists, ganttListStmt{key: key, text: rest, line: l.N})
 		case "todaymarker":
 			if !strings.EqualFold(rest, "off") {
 				err = c.add("todayMarker needs the time of the render, so zuzu draws no marker")
@@ -320,13 +318,6 @@ func ganttAccText(lines []Line, i int) (string, int, bool) {
 	}
 }
 
-// ganttListStmt is a statement excludes or includes: its keyword, its list
-// as the source gives it, and its line.
-type ganttListStmt struct {
-	key, text string
-	line      int
-}
-
 // ganttList splits the list of excludes or includes at commas and spaces.
 func ganttList(s string) []string {
 	return strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' || r == '\t' })
@@ -388,9 +379,6 @@ func (g *gantt) task(name, data, section string, auto *int) (*ganttTask, error) 
 // plan places each task: its start, its end, and the end that it draws.
 func (g *gantt) plan() error {
 	g.toks = ganttFormat(g.dateFormat)
-	if err := g.checkLists(); err != nil {
-		return err
-	}
 	for _, t := range g.tasks {
 		if err := g.place(t); err != nil {
 			return err
@@ -497,8 +485,9 @@ func (g *gantt) endOf(t *ganttTask) (time.Time, bool, error) {
 	if d, ok := ganttParseDuration(t.endText); ok {
 		return d.add(t.start), false, nil
 	}
-	g.c.line = t.line
-	return t.start, false, g.c.add("the end %q of the task %q is not a date of the format %q or a duration, so the task has no length", t.endText, t.name, g.dateFormat)
+	// Mermaid gives a task whose end is not a date of the format or a
+	// duration no length, and so does zuzu, with no issue (D32).
+	return t.start, false, nil
 }
 
 // day returns the start of the day of today.
@@ -564,55 +553,4 @@ func (g *gantt) excluded(t time.Time) bool {
 		}
 	}
 	return false
-}
-
-// checkLists reports the items of each statement excludes and includes that
-// zuzu does not read, in one issue for the statement: an item that is not a
-// date of the format, a day of the week or weekends. Mermaid ignores such an
-// item.
-func (g *gantt) checkLists() error {
-	read := func(s string, days bool) bool {
-		if days && strings.EqualFold(s, "weekends") {
-			return true
-		}
-		for _, n := range ganttDays {
-			if days && strings.EqualFold(s, n) {
-				return true
-			}
-		}
-		if _, ok := ganttParse(s, g.toks, g.today, g.loc); ok {
-			return true
-		}
-		_, ok := ganttParse(s, ganttFormat("YYYY-MM-DD"), g.today, g.loc)
-		return ok
-	}
-	defer func() { g.c.line = 0 }()
-	for _, st := range g.lists {
-		days := st.key == "excludes"
-		items := ganttList(st.text)
-		var unread []string
-		for _, s := range items {
-			if !read(s, days) {
-				unread = append(unread, strconv.Quote(s))
-			}
-		}
-		if len(unread) == 0 {
-			continue
-		}
-		g.c.line = st.line
-		what, verb := "dates", "include"
-		if days {
-			what, verb = "dates, days of the week or weekends", "exclude"
-		}
-		var err error
-		if len(unread) == len(items) {
-			err = g.c.add("%s %q holds no %s, so it does not %s a day", st.key, st.text, what, verb)
-		} else {
-			err = g.c.add("the items %s of %s are not %s, so they do not %s a day", strings.Join(unread, ", "), st.key, what, verb)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
