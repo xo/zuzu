@@ -59,6 +59,8 @@ var charts = map[string]compiler{
 	"architecture-beta": architectureChart,
 	"sequenceDiagram":   sequenceChart,
 	"gitGraph":          gitGraphChart,
+	"block":             blockChart,
+	"block-beta":        blockChart,
 }
 
 // IsChart reports whether a kind of diagram is a chart that Chart

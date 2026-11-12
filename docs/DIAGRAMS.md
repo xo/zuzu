@@ -1075,11 +1075,12 @@ wrap a label.
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
 config that a chart does not read is an issue, and so are the `theme` and
-the `themeCSS`. Each chart but `sankey` and `mindmap` joins `accTitle` and
-`accDescr` into the description of the spec, as "The description" says. Mermaid
-does not read them in a sankey or a mindmap either, so there they are
-errors, as in Mermaid. Each chart has about 5 fixtures in
-`graph/mermaid/testdata`, the gantt has 18, and the git graph has 12. A test draws each fixture
+the `themeCSS`. Each chart but `sankey`, `mindmap` and `block` joins
+`accTitle` and `accDescr` into the description of the spec, as "The
+description" says. Mermaid does not read them in a sankey, a mindmap or a
+block diagram either, so there they are errors, as in Mermaid. Each chart
+has about 5 fixtures in `graph/mermaid/testdata`, the gantt has 18, the git
+graph has 12, and the block diagram has 6. A test draws each fixture
 and checks that each value of the source draws once, with its label.
 
 | Keyword | Compiles to |
@@ -1097,6 +1098,7 @@ and checks that each value of the source draws once, with its label.
 | `mindmap` | Vega paths and text, laid out in Go: the root in the center and a tidy tree on each side |
 | `architecture-beta` | Vega rects, paths, text and icons, laid out in Go on a grid by the sides of the edges |
 | `gitGraph` | Vega rules, paths and text, laid out in Go with the rules of Mermaid: a lane for each branch and a step for each commit |
+| `block`, `block-beta` | Vega rects, paths and text, laid out in Go on a grid of columns |
 
 #### pie
 
@@ -1672,12 +1674,96 @@ settings of `gitGraph` are issues, and so are the colors of
 `themeVariables`, such as `git0` and `gitBranchLabel0`. A value of the
 wrong type, such as `showBranches: 1`, is an issue too.
 
+#### block-beta
+
+The keyword is `block` or `block-beta`. White space and new lines only part
+the statements, as in Mermaid. A line can hold more than one statement,
+and a statement can go on over lines. A text after the keyword on the first
+line is a statement too, so `block-beta bogus` is a block named `bogus`.
+
+| Statement | Example |
+| --- | --- |
+| a block, with an id and a label in double quotes | `a`, `a["A label"]` |
+| a block with a shape | `a("Rounded")`, `a(("Circle"))`, `a{"Diamond"}` |
+| a width in columns | `a:3`, `a["A label"]:2` |
+| the number of columns of a grid | `columns 3`, `columns auto` |
+| one cell of space, or more | `space`, `space:3` |
+| a composite block with an id, a label and a width | `block:group1["Group"]:2 ... end` |
+| a composite block with no id | `block ... end` |
+| a block arrow, with its directions | `arrow<["Label"]>(right)`, `arrow<["Label"]>(x, down)` |
+| an edge, with or without a label | `a --> b`, `a -- "label" --> b` |
+| a class of style, its use, and a style of a block | `classDef blue fill:#66f`, `class a,b blue`, `style a fill:#f9f` |
+
+The shapes are those of the flowchart: `["…"]` a rectangle, `("…")` round
+corners, `(("…"))` a circle, `((("…")))` a double circle, `{"…"}` a
+diamond, `{{"…"}}` a hexagon, `(["…"])` a stadium, `[["…"]]` a subroutine,
+`[("…")]` a cylinder, `>"…"]` an odd shape, `[/"…"/]` and `[\"…"\]` lean
+right and left, and `[/"…"\]` and `[\"…"/]` a trapezoid and an inverted
+trapezoid. Another pair of delimiters draws a rectangle, as in Mermaid. A
+block arrow points `right`, `left`, `up` or `down`, `x` is right and left,
+and `y` is up and down. A link is `---`, `-->`, `<-->`, `--o` or `--x`,
+thick with `=` in place of `-`, and dotted as `-.-` or `-.->`. A label is
+plain text. `<br>` breaks it, and an entity of HTML, such as `&lt;`, reads
+as its character.
+
+zuzu places the blocks as Mermaid 12.3.0 does:
+
+1. A grid fills its cells row by row. With `columns auto`, the default,
+   all the blocks of a grid are in one row.
+2. A block with no label shows its id. A block that a link names and no
+   statement declares joins the grid where the link is.
+3. A second statement of a block sets its shape and its label, and the
+   block stays in its first cell. Its width does not change.
+4. The width of a block with a link after it, as in `a:2 --> b`, does not
+   count, as in Mermaid.
+5. A block that is wider than the columns left in its row takes the rest
+   of the row, and draws past the edge of the grid.
+6. The cells of a grid all have one size: the width of the widest block,
+   with the width of a wide block shared by its columns, and the height of
+   the tallest block. A composite block that is larger than its grid grows
+   its cells to fill it.
+7. A circle, a double circle, a diamond, a stadium and a block arrow keep
+   their own size in the middle of their cells. A block arrow that spans
+   more than one column takes the width of its cells. The other shapes
+   fill their cells.
+8. An edge is a straight line from the middle of one block toward the
+   middle of the other, from the edge of one shape to the edge of the
+   other. Its label sits on its middle.
+
+Mermaid 12.3.0 reads one link in a statement, and draws a chain such as
+`a --> b --> c` wrong. zuzu draws each link of a chain. Mermaid draws the
+label of a composite block in its middle, under its blocks. zuzu draws it
+as the title of a panel, at its top left, and the grid starts under it.
+
+A class applies to a block in the order of the class statements, and the
+style statement of the block applies last. A block with no class takes the
+classDef `default`. zuzu reads `fill`, `stroke`, `stroke-width`,
+`stroke-dasharray`, `color`, `font-size`, `font-weight` and `font-style`.
+Another property is an issue, and so is a part of a style with no colon,
+such as `fill#969`, which Mermaid ignores. A class that no classDef names is
+an issue, and so is a class of an id that is not a block. zuzu reads
+`block.padding`, the space between two cells and inside a block, 8 by
+default.
+
+These are errors, as in Mermaid: a diagram with no statement, a label that
+is not in double quotes, an empty label, a label of markdown, a block arrow
+with no direction, `accTitle`, `accDescr` and `linkStyle`, a composite
+block with no statement or no `end`, an `end` with no block, a second
+composite block with an id that is taken, a style of more than one block,
+as `style a,b fill:#f00`, and a style of an id that is not a block. A shape
+on a composite block is an issue, and so is an edge from a block to
+itself.
+
+The look is the look of zuzu. A block is a shape with a tint of the first
+color of the scheme and an outline. A composite block is a panel. An edge
+and its arrowheads take the token Edge, as the edges of the graphs do.
+
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
 relationship diagram, the requirement diagram, and the charts above,
-which hold the sequence diagram, the mindmap, the architecture diagram and
-the git graph. Every other kind of Mermaid is an error that wraps
+which hold the sequence diagram, the mindmap, the architecture diagram, the
+git graph and the block diagram. Every other kind of Mermaid is an error that wraps
 `mermaid.ErrKind`. D32 sets the order of the next kinds.
 
 ## The look

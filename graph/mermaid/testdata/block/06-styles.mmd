@@ -1,0 +1,16 @@
+---
+config:
+  block:
+    padding: 12
+---
+block
+  columns 3
+  a["Default"] b["Blue"] c["Styled"]
+  block:box
+    d["Boxed"]
+  end
+  classDef default fill:#eee,stroke:#999;
+  classDef blue fill:#66f,stroke:#333,stroke-width:2px,color:#ff6;
+  class b blue
+  style c fill:#f9f,stroke:#333,stroke-width:4px,stroke-dasharray: 5 5
+  style box fill:#efe
