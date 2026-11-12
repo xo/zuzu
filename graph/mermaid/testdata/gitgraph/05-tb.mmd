@@ -1,0 +1,14 @@
+gitGraph TB:
+  commit id: "init" tag: "v0.1"
+  branch develop
+  commit id: "d1"
+  commit id: "d2" type: HIGHLIGHT
+  checkout main
+  commit id: "m1"
+  merge develop id: "m2" tag: "v1.0" tag: "stable"
+  branch feature
+  commit id: "f1"
+  checkout develop
+  commit id: "d3"
+  checkout main
+  merge feature

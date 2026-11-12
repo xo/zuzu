@@ -1,0 +1,11 @@
+gitGraph
+  commit id: "Normal" tag: "v1.0.0"
+  commit
+  commit id: "Reverse" type: REVERSE tag: "RC_1"
+  commit
+  commit id: "Highlight" type: HIGHLIGHT tag: "8.8.4"
+  commit "a message, which draws nothing"
+  branch hotfix
+  commit id: "fix"
+  checkout main
+  merge hotfix id: "release" tag: "v1.1.0" tag: "latest" type: HIGHLIGHT

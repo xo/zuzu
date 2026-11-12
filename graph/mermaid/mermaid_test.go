@@ -142,6 +142,7 @@ func TestHeaderLine(t *testing.T) {
 		fm + "wardley-beta bogus\ncomponent a [0.5, 0.5]",
 		fm + "architecture-beta bogus\nservice a(server)[A]",
 		fm + "sequenceDiagram bogus\nA->>B: hi",
+		fm + "gitGraph bogus\ncommit",
 	}
 	for _, src := range tests {
 		d, err := Read(src)

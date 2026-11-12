@@ -108,11 +108,12 @@ func TestInertSettings(t *testing.T) {
 		"sankey":          "sankey\nA,B,1\n",
 		"journey":         "journey\n  section S\n    T: 5: Me\n",
 		"architecture":    "architecture-beta\n  service a(server)[A]\n",
+		"gitGraph":        "gitGraph\n  commit\n",
 	}
 	sections := map[string]string{
 		"flowchart": "flowchart", "stateDiagram-v2": "state", "classDiagram": "class", "erDiagram": "er",
 		"sequence": "sequence", "pie": "pie", "gantt": "gantt", "sankey": "sankey", "journey": "journey",
-		"architecture": "architecture",
+		"architecture": "architecture", "gitGraph": "gitGraph",
 	}
 	for name, body := range bodies {
 		src := "---\nconfig:\n" + inertConfig + "  " + sections[name] + ":\n    useMaxWidth: false\n---\n" + body

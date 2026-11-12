@@ -1,0 +1,26 @@
+gitGraph
+  commit id: "A"
+  branch develop
+  commit id: "B"
+  checkout main
+  commit id: "C"
+  checkout develop
+  commit id: "D"
+  checkout main
+  commit id: "E"
+  branch feature
+  commit id: "F"
+  checkout develop
+  merge feature id: "G"
+  checkout main
+  commit id: "H"
+  merge develop id: "I"
+  checkout feature
+  commit id: "J"
+  checkout main
+  commit id: "K"
+  checkout feature
+  commit id: "L"
+  merge main id: "M"
+  checkout develop
+  merge feature id: "N"

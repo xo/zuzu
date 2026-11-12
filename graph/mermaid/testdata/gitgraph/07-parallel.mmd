@@ -1,0 +1,21 @@
+---
+config:
+  gitGraph:
+    parallelCommits: true
+---
+gitGraph
+  commit id: "1"
+  commit id: "2"
+  branch develop
+  commit id: "3"
+  commit id: "4"
+  checkout main
+  branch feature
+  commit id: "5"
+  commit id: "6"
+  checkout main
+  commit id: "7"
+  checkout develop
+  merge feature id: "8"
+  checkout main
+  merge develop id: "9"

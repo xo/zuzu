@@ -107,7 +107,7 @@ func isDirection(w string) bool {
 var mermaidKinds = map[string]bool{
 	"flowchart": true, "flowchart-elk": true, "sequenceDiagram": true, "classDiagram": true, "classDiagram-v2": true, "stateDiagram": true,
 	"stateDiagram-v2": true, "erDiagram": true, "journey": true, "gantt": true, "pie": true, "quadrantChart": true,
-	"requirementDiagram": true, "gitGraph": true, "mindmap": true, "timeline": true, "sankey": true, "sankey-beta": true,
+	"requirementDiagram": true, "gitGraph": true, "gitGraph:": true, "mindmap": true, "timeline": true, "sankey": true, "sankey-beta": true,
 	"xychart": true, "xychart-beta": true, "block": true, "block-beta": true, "packet": true, "packet-beta": true,
 	"kanban": true, "architecture-beta": true, "radar-beta": true, "treemap": true, "treemap-beta": true,
 	"C4Context": true, "C4Container": true, "C4Component": true, "C4Dynamic": true, "C4Deployment": true,

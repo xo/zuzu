@@ -119,6 +119,10 @@ func Read(src string) (*Diagram, error) {
 			f := strings.Fields(t)
 			d.Kind = strings.TrimSuffix(f[0], ";")
 			d.Header = strings.TrimSpace(strings.TrimPrefix(t, f[0]))
+			// A git graph can start with gitGraph and a colon.
+			if d.Kind == "gitGraph:" {
+				d.Kind, d.Header = "gitGraph", strings.TrimSpace(":"+d.Header)
+			}
 			d.N = n0 + k + 1
 			continue
 		}

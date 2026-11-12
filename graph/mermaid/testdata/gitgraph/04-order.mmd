@@ -1,0 +1,19 @@
+---
+config:
+  gitGraph:
+    mainBranchName: trunk
+    mainBranchOrder: 2
+---
+gitGraph
+  commit id: "1"
+  branch test1 order: 3
+  branch test2
+  branch test3 order: 1
+  checkout test1
+  commit id: "2"
+  checkout test2
+  commit id: "3"
+  checkout test3
+  commit id: "4"
+  checkout trunk
+  merge test2 id: "5"

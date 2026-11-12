@@ -1079,7 +1079,7 @@ the `themeCSS`. Each chart but `sankey` and `mindmap` joins `accTitle` and
 `accDescr` into the description of the spec, as "The description" says. Mermaid
 does not read them in a sankey or a mindmap either, so there they are
 errors, as in Mermaid. Each chart has about 5 fixtures in
-`graph/mermaid/testdata`, and the gantt has 18. A test draws each fixture
+`graph/mermaid/testdata`, the gantt has 18, and the git graph has 12. A test draws each fixture
 and checks that each value of the source draws once, with its label.
 
 | Keyword | Compiles to |
@@ -1096,6 +1096,7 @@ and checks that each value of the source draws once, with its label.
 | `sequenceDiagram` | Vega, with the layout worked out in Go: rects, rules, paths, symbols and text |
 | `mindmap` | Vega paths and text, laid out in Go: the root in the center and a tidy tree on each side |
 | `architecture-beta` | Vega rects, paths, text and icons, laid out in Go on a grid by the sides of the edges |
+| `gitGraph` | Vega rules, paths and text, laid out in Go with the rules of Mermaid: a lane for each branch and a step for each commit |
 
 #### pie
 
@@ -1578,13 +1579,106 @@ random numbers, so it is the same on each run. zuzu accepts
 `architecture.randomize` and `architecture.seed`, and they change nothing.
 The other settings, which tune fcose, such as `numIter`, are issues.
 
+#### gitGraph
+
+The keyword is `gitGraph` or `gitGraph:`. A direction and a colon can
+follow it, as in `gitGraph TB:`. The direction is `LR`, `TB` or `BT`, and
+`LR` by default. A direction with no colon after it is an error, as in
+Mermaid. A statement can follow the keyword on its line, as in
+`gitGraph: commit`.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `commit`, with `id: "a"`, `msg: "text"` or `"text"`, `tag: "v1"`, and `type: NORMAL`, `REVERSE` or `HIGHLIGHT` | a commit on the current branch |
+| `branch name`, with `order: 2` | a branch from the current commit. The new branch is the current branch |
+| `checkout name`, `switch name` | nothing. The branch is the current branch |
+| `merge name`, with `id:`, `tag:` and `type:` | a merge of the branch into the current branch. `type:` sets how the merge draws |
+| `cherry-pick id: "a"`, with `parent: "b"` and `tag:` | a copy of the commit on the current branch |
+| `title Text` | the title |
+| `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` | the description of the Vega spec, the texts joined in order |
+
+The values of `id:`, `msg:`, `tag:` and `parent:` are strings in double or
+single quotes. A backslash escapes the next character, and a string can
+hold a new line. A statement can have more than one `tag:`, and the last
+`id:` wins. The name of a branch is a string, or a word of letters,
+digits, `_`, `-`, `.` and `/`. The word does not start with a digit, it
+ends in a letter, a digit, `_` or `-`, and it is not a keyword. A new line,
+the two characters `\n` and `<br>` in a name start a new line of its
+label. `order:` is a whole number. Each statement is on a line of its own,
+and the keywords are in the case of the table. Any other text is an error,
+as in Mermaid 12.3. The message of a commit draws nothing, as in Mermaid.
+
+zuzu checks the statements as Mermaid does. These are errors:
+
+1. A branch with the name of a branch that exists.
+2. A checkout of a branch that does not exist.
+3. A merge of a branch into itself, of a branch that does not exist or has
+   no commits, into a branch with no commits, of a branch with the same
+   head as the current branch, or with the id of a commit that exists.
+4. A cherry-pick of a commit that does not exist or that is on the current
+   branch, into a branch with no commits, of a merge with no `parent:`, or
+   with a `parent:` that is not a parent of the commit.
+
+A commit with the id of an earlier commit takes its place, as in Mermaid.
+A commit with no id gets an id in the form of Mermaid: its number, a dash
+and seven hexadecimal digits, such as `0-3f2a9c1`. Mermaid picks the
+digits at random. zuzu takes them from a hash of the number, the branch
+and the message, so that the same source gives the same image.
+
+zuzu lays out a git graph in Go with the rules of Mermaid 12.3. The
+branches take their lanes in the order of `order:`, and branches of the
+same order keep the order of the source. The main branch has the order
+`gitGraph.mainBranchOrder`, 0 by default, and a branch with no `order:` has
+the order 0. Two lanes are 90 pixels apart, or 50 when `rotateCommitLabel`
+is false. In a graph `TB` or `BT`, the space also grows by half of the
+width of the name of the branch. Each commit takes the next step of 50
+pixels along the graph, in the order of the source. With `parallelCommits`,
+a commit takes the step after its closest parent, so that the commits of
+two branches can share a step. In a graph `BT`, the first commit is at the
+bottom.
+
+A link goes from each parent of a commit to the commit. A link between two
+lanes runs along one lane and turns into the other with an arc of 20. A
+link to a merge from the branch that it merges runs along that branch, and
+every other link runs along the lane of its commit. When a commit of the
+source lies between the two ends, on the lane that the link runs along,
+the link goes around it. The link then runs in a lane of its own between
+the two lanes, with arcs of 10, at least 10 pixels away from each other
+line, as in Mermaid.
+
+Each branch takes the next color of the category scheme of the theme, and
+the eleventh branch takes the first color again. A branch has a lane, a
+dashed line in its color, and its name in a label with a tint of its color
+at the start of the lane. A link is in the color of the branch of its
+commit. A link to a merge from the branch that it merges, and a link that
+goes around from a later lane to an earlier one, are in the color of the
+branch of the parent. A commit is a dot in the color of its branch, with a ring of the
+background around it. A merge has a hole, a reverse commit has a cross, a
+highlight is a square with a hole, and a cherry-pick has two cherries. The
+id of a commit is under it, or at its left in a graph `TB` or `BT`. With
+`rotateCommitLabel`, true by default, the id turns 45 degrees. A merge with
+no `id:` and a cherry-pick have no label, as in Mermaid. A cherry-pick with
+no `tag:` gets the tag `cherry-pick:` and the id of its commit, and an
+empty `tag: ""` draws no tag. The tags of a commit are labels with a point
+and a hole. They stack above the commit, the first tag of the source at
+the top, or at its right in a graph `TB` or `BT`.
+
+zuzu reads `gitGraph.showBranches`, `gitGraph.showCommitLabel`,
+`gitGraph.rotateCommitLabel`, `gitGraph.parallelCommits`,
+`gitGraph.mainBranchName`, `gitGraph.mainBranchOrder` and
+`gitGraph.diagramPadding`, the space around the graph, 8 by default. With
+`showBranches` false, zuzu draws no lane and no name of a branch. The other
+settings of `gitGraph` are issues, and so are the colors of
+`themeVariables`, such as `git0` and `gitBranchLabel0`. A value of the
+wrong type, such as `showBranches: 1`, is an issue too.
+
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
 relationship diagram, the requirement diagram, and the charts above,
-which hold the sequence diagram, the mindmap and the architecture diagram.
-Every other kind of Mermaid is an error that wraps `mermaid.ErrKind`. D32
-sets the order of the next kinds.
+which hold the sequence diagram, the mindmap, the architecture diagram and
+the git graph. Every other kind of Mermaid is an error that wraps
+`mermaid.ErrKind`. D32 sets the order of the next kinds.
 
 ## The look
 
