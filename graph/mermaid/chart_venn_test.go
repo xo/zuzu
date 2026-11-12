@@ -229,3 +229,32 @@ func TestVennDescription(t *testing.T) {
 		t.Errorf("the title of the source does not draw: %v", err)
 	}
 }
+
+// TestVennWideTexts checks that the texts of an area with a word that is
+// wider than its cell stack in one column, under the label of the area,
+// and do not draw over each other. Mermaid draws REST and GraphQL here on
+// top of each other.
+func TestVennWideTexts(t *testing.T) {
+	t.Parallel()
+	src := "venn-beta\n  set A\n  set B\n  union A, B[\"Fullstack\"]\n    text \"REST\"\n    text \"GraphQL\"\n"
+	items, report, err := drawDiagram(t, src, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	at := func(name, text string) *drawnItem {
+		for _, it := range drawnOf(items, name) {
+			if it.text == text {
+				return &it
+			}
+		}
+		t.Fatalf("no %s %q", name, text)
+		return nil
+	}
+	label, rest, gql := at("overlapLabels", "Fullstack"), at("texts", "REST"), at("texts", "GraphQL")
+	if rest.item.Y <= label.item.Y {
+		t.Errorf("REST at y %g is not under the label at y %g", rest.item.Y, label.item.Y)
+	}
+	if d := gql.item.Y - rest.item.Y; d < 10 {
+		t.Errorf("GraphQL is %g under REST, so the two texts overlap", d)
+	}
+}

@@ -3484,7 +3484,11 @@ venn.js:
    point of its label, under the label, with as many columns as the
    square root of their count. A text wraps at the width of its cell.
    Mermaid places the texts in the same circles fitted with
-   `venn.padding` around them, 8 by default, and so does zuzu.
+   `venn.padding` around them, 8 by default, and so does zuzu. A word
+   that is wider than its cell does not wrap, and Mermaid draws it over
+   the text beside it. zuzu then stacks the texts of that area in one
+   column, the first where the first row of the grid is, so that no two
+   texts overlap.
 
 With four sets or more, Mermaid also lays the circles out from 10 random
 points, and keeps that layout when it fits better. zuzu starts from 10

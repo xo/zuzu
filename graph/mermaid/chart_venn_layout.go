@@ -375,14 +375,31 @@ func (l *vennLayout) texts(data []*vennArea, s *vennSolution, centers map[string
 		}
 		nodes := groups[key]
 		x0, y0, cw, ch, cols := vennGrid(a, len(nodes), c, s, scale)
+		label := func(t *vennText) string {
+			if t.hasLabel {
+				return t.label
+			}
+			return t.id
+		}
+		// A word wider than its cell does not wrap, and Mermaid then draws it
+		// over the text beside it. zuzu stacks the texts of such an area in
+		// one column, as wide as the grid: the first text stays where the
+		// first row of the grid is, under the label, and each next text goes
+		// one line under it, so that no two texts overlap.
+		if cols > 1 {
+			for _, t := range nodes {
+				if _, lw := plainLines(label(t), vennTextFont.Size, vennTextFont.Weight, cw*0.9*l.k, l.m); lw > cw*0.9*l.k {
+					step := lh(vennTextFont) * 1.3 / l.k
+					y0 += ch/2 - step/2
+					cw, ch, cols = cw*float64(cols), step, 1
+					break
+				}
+			}
+		}
 		for i, t := range nodes {
 			x := (x0 + cw*(float64(i%cols)+0.5)) * l.k
 			y := (y0 + ch*(float64(i/cols)+0.5)) * l.k
-			label := t.id
-			if t.hasLabel {
-				label = t.label
-			}
-			lines, lw := plainLines(label, vennTextFont.Size, vennTextFont.Weight, cw*0.9*l.k, l.m)
+			lines, lw := plainLines(label(t), vennTextFont.Size, vennTextFont.Weight, cw*0.9*l.k, l.m)
 			row := map[string]any{"x": x, "y": y, "lines": anyStrings(lines)}
 			if col, ok, err := l.color(t.id, "color"); err != nil {
 				return err
