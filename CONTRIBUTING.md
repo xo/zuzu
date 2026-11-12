@@ -20,9 +20,12 @@ for the maintainers.
 Run the checks that CI runs:
 
 ```bash
-gofmt -l . && go vet ./... && go build ./... && go test -race -count=2 ./...
-golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go test ./...)
+gofmt -l . && go vet ./... && go build ./... && CGO_ENABLED=0 go build ./... && go test -race -count=2 ./...
+golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go build ./... && go test -race -count=1 ./...)
 ```
+
+CI pins golangci-lint at v2.15.0 and installs it with `go install`, as
+`.github/workflows/test.yml` says. Use the same version.
 
 The tests of the root module read the documents too: the links, the decision
 numbers, the index of the decisions and the rules of `simple-english`.
@@ -32,8 +35,9 @@ numbers, the index of the decisions and the rules of `simple-english`.
 [`docs/STYLE.md`](docs/STYLE.md) holds the rules and the tokens of the look.
 [`docs/targets/`](docs/targets/README.md) shows them in 33 target charts, in
 both modes and in each color scheme. If you change a token, change it in
-`STYLE.md` first, then in `docs/targets/gen-targets.mjs`, then draw the
-targets again and review them in the gallery:
+`STYLE.md` first, then in the package `theme`, then in
+`docs/targets/gen-targets.mjs`, then draw the targets again and review them
+in the gallery:
 
 ```bash
 cd docs/targets && npm install && node gen-targets.mjs
@@ -46,7 +50,7 @@ python3 -m http.server 8767 --bind 127.0.0.1 --directory docs/targets
 ## The survey
 
 [`docs/survey/compare.html`](docs/survey/compare.html) draws the same real
-data with 13 other libraries. Serve the folder and open the page:
+data with 14 other libraries. Serve the folder and open the page:
 
 ```bash
 python3 -m http.server 8766 --bind 127.0.0.1 --directory docs/survey

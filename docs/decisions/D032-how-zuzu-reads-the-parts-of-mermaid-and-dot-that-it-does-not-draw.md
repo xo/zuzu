@@ -2,8 +2,8 @@
 
 Status: Decided. Amends D6, D12, D16, D17 and D31.
 
-On 2026-11-12 the maintainers answered open questions 14 and 17 to 26 of
-the plan, and three more questions about Mermaid and the look. The files
+On 2026-11-12 the maintainers answered open questions 14 and 17 to 28 of
+the plan, and more questions about Mermaid and the look. The files
 of iv and the corpus of `github.com/bvolpato/mermaid-go-renderer` raised
 them. This decision records each answer. The work that each answer needs
 is in `docs/BACKLOG.md`.
@@ -22,16 +22,30 @@ is in `docs/BACKLOG.md`.
    have two looks drawn by hand beside its standard look: a look like
    Excalidraw, with the font Excalifont, and a look like xkcd, like the
    look of xkcd in matplotlib. zuzu draws each in its own way, and ports no
-   code of Excalidraw, rough.js or matplotlib.
+   code of Excalidraw, rough.js or matplotlib. `look: handDrawn` of Mermaid
+   selects the look like Excalidraw, once zuzu has it. The font of a look
+   is opt-in: a caller can give another font, as `fontFamily` does in
+   Mermaid. By default, each look draws with the font that zuzu tests it
+   with, such as Excalifont for the look like Excalidraw.
 3. `animate` and `animation` on a link of Mermaid draw the link dashed, as
    one still frame of Mermaid, with no issue. A still image has no motion
    (open question 24).
+
+   A part of a source that Mermaid 12.3 reads and draws nothing for, zuzu
+   accepts with no issue, because zuzu then draws what Mermaid draws. The
+   directions of `Rel_U`, `Rel_D`, `Rel_L`, `Rel_R`, `Node_L` and `Node_R`
+   of C4, `$tags` and `$sprite` of C4, and the data of a node of an
+   agentflow diagram, such as `model` or `endpoint`, are such parts. A part
+   that changes what Mermaid draws, and that zuzu does not draw, stays an
+   issue.
 4. The `theme` of Mermaid selects a look of zuzu. Each theme with `dark`
    in its name, such as `dark`, `redux-dark` or `redux-dark-color`, selects
    the dark mode. Each other theme, such as `forest` or `neutral`, selects
    a color scheme of zuzu that has the colors of that theme. A scheme that
    zuzu does not have yet comes first in `docs/STYLE.md`, as D14 and D15
-   say. `themeVariables` and `themeCSS` stay issues (open question 21).
+   say. `themeVariables` and `themeCSS` stay issues (open question 21),
+   except the theme variables that a chart reads, such as `pie1` to
+   `pie12` of a pie and `xyChart.plotColorPalette` of an xyChart.
    The theme of the source applies by default. A mode or a scheme that the
    caller gives with `WithMode` or `WithScheme` wins over it, so a program
    that sets its own look keeps it (open question 27). The compiled spec
@@ -52,15 +66,19 @@ is in `docs/BACKLOG.md`.
    nothing for its size. A character that no font of the render has draws
    nothing, and the report names it (open question 20).
 7. A label of Mermaid wraps where Mermaid wraps it. zuzu scales the width
-   of the wrap by 11/14, the ratio of the size of a label of zuzu to the
-   size of a label of Mermaid, so that a line holds the words that it holds
-   in Mermaid.
+   of the wrap by the ratio of the size of a label of zuzu, 11 pixels, to
+   the size of a label of that kind in Mermaid, so that a line holds the
+   words that it holds in Mermaid. The ratio is 11/14 for most kinds, and
+   11/16 for a timeline, whose labels Mermaid draws at 16 pixels.
 
 ## The look
 
 8. The edges, the arrowheads and the messages of a diagram take a token
    Edge of `docs/STYLE.md`, darker than Axis, in the light and the dark
-   mode (open question 18).
+   mode (open question 18). On 2026-11-12, after iv drew the ER diagrams
+   of dbtpl, the maintainers made Edge darker again, the line of an edge a
+   little thicker, and the arrowheads larger, so that a long edge reads at
+   the size of a terminal.
 9. A band behind a group of rows, such as a section of a gantt, takes a
    token Band of `docs/STYLE.md`.
 
@@ -103,5 +121,16 @@ is in `docs/BACKLOG.md`.
 
 15. The maintainers accepted the changes to D30 of 2026-11-11 and
     2026-11-12, the transform `zuzu.sankeylabels` and its parameter `side`
-    (open question 23), and the changes to D31 of 2026-11-12 (open
-    question 25).
+    (open question 23), and the changes to D31 of 2026-11-12 that open
+    question 25 names: how the layout breaks a cycle, orders a rank and
+    places the nodes, and `wrap` and `breakWords`. The parameters `lanes`
+    and `laneEdges`, which came later, wait for open question 29.
+
+## The C4 and the use case diagrams
+
+16. An external element of a C4 diagram, such as `Person_Ext` or
+    `System_Ext`, takes the neutral Muted of `docs/STYLE.md`, at the tint
+    of the other elements, as Mermaid draws it gray. It needs no token of
+    its own.
+17. A boundary of `type: package` of a use case diagram draws with a tab
+    at its top left, as a package of UML does.

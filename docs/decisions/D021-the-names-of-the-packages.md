@@ -30,4 +30,4 @@ each:
 The other names stay as `docs/PLAN.md` lists them: `zuzu`, `expr`,
 `dataflow`, `scale`, `geo`, `layout`, `scene`, `text`, `theme`, `raster`,
 `graph` with `graph/dot` and `graph/mermaid`, and `web`. An exported name does
-not repeat its package: `svg.NewWriter`, not `svg.NewSVGWriter`.
+not repeat its package: `svg.Write`, not `svg.WriteSVG`.

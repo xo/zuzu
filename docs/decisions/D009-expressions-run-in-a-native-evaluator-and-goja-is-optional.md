@@ -1,6 +1,6 @@
 # D9. Expressions run in a native evaluator, and goja is optional
 
-Status: Decided.
+Status: Decided. Amended by D33.
 
 Vega has an expression language, a subset of JavaScript expressions. The
 maintainers chose on 2026-11-10 choice C of `docs/EXPRESSIONS.md`, which also

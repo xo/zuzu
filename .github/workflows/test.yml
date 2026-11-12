@@ -6,7 +6,7 @@
 #
 # The conformance job runs vega.js and vega-lite.js over the corpus to write
 # the references of D17, then checks that zuzu still matches them at the
-# share that the plan states for phase 3. It also checks that the direct
+# shares that the plan states for phases 3 and 4. It also checks that the direct
 # renderer draws the corpus as okage draws its SVG (D11).
 #
 # The tinygo job builds the packages of zuzu with TinyGo for WebAssembly, which

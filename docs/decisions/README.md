@@ -22,13 +22,13 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D6](D006-the-spec-follows-the-documented-behavior-of-vega-and-vega.md) | The spec follows the documented behavior of Vega and Vega-Lite, and zuzu is not a port | Decided. Amended by D32 |
 | [D7](D007-the-first-release-supports-static-vega-and-the-vega-lite.md) | The first release supports static Vega and the Vega-Lite that compiles to it | Decided |
 | [D8](D008-the-scene-graph-is-the-boundary-between-the-layout-and-every.md) | The scene graph is the boundary between the layout and every renderer | Decided |
-| [D9](D009-expressions-run-in-a-native-evaluator-and-goja-is-optional.md) | Expressions run in a native evaluator, and goja is optional | Decided |
+| [D9](D009-expressions-run-in-a-native-evaluator-and-goja-is-optional.md) | Expressions run in a native evaluator, and goja is optional | Decided. Amended by D33 |
 | [D10](D010-svg-is-the-first-output-and-okage-rasterizes-it.md) | SVG is the first output, and okage rasterizes it | Decided |
 | [D11](D011-a-direct-okage-renderer-with-text-through-an-api-that-okage.md) | A direct okage renderer, with text through an API that okage exposes | Decided |
 | [D12](D012-zuzu-draws-its-own-design-and-does-not-reproduce-the-look-of.md) | zuzu draws its own design and does not reproduce the look of Vega | Decided. Amended by D32 |
 | [D13](D013-target-svgs-set-the-look-before-any-code.md) | Target SVGs set the look before any code | Decided |
 | [D14](D014-a-theme-is-a-mode-and-a-color-scheme-as-one-vega-config.md) | A theme is a mode and a color scheme, as one Vega config | Decided |
-| [D15](D015-color-schemes-come-from-the-upstream-themes-that-transit.md) | Color schemes come from the upstream themes that transit draws from | Decided |
+| [D15](D015-color-schemes-come-from-the-upstream-themes-that-transit.md) | Color schemes come from the upstream themes that transit draws from | Decided. Amended by D33 |
 | [D16](D016-zuzu-bundles-ibm-plex-sans.md) | zuzu bundles IBM Plex Sans | Decided. Amended by D32 |
 | [D17](D017-conformance-with-vega-js-measures-meaning-not-look.md) | Conformance with vega.js measures meaning, not look | Decided. Amended by D32 |
 | [D18](D018-dot-and-mermaid-compile-into-the-same-spec.md) | DOT and Mermaid compile into the same spec | Decided |
@@ -46,3 +46,4 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D30](D030-the-transforms-and-the-scale-that-zuzu-adds-for-tiers-1-and-2.md) | The transforms and the scale that zuzu adds for tiers 1 and 2 | Decided |
 | [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Decided. Amended by D32 |
 | [D32](D032-how-zuzu-reads-the-parts-of-mermaid-and-dot-that-it-does-not-draw.md) | How zuzu reads the parts of Mermaid and DOT that it does not draw | Decided. Amends D6, D12, D16, D17 and D31 |
+| [D33](D033-vegajs-is-the-oracle-of-expressions-and-schemes-are-go-values.md) | vega.js is the oracle of expressions, and schemes are Go values | Decided. Amends D9 and D15 |

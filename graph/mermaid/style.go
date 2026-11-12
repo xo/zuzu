@@ -203,9 +203,9 @@ func inert(kind, path string) bool {
 		// draws the same text either way.
 		return !isGraph(kind) && kind != "mindmap"
 	case is("wrap"):
-		// Of the kinds that zuzu draws, only the sequence diagram reads
-		// wrap at the top level, which %%{wrap}%% sets.
-		return kind != "sequenceDiagram"
+		// Of the kinds that zuzu draws, only the sequence diagram and the
+		// C4 diagrams read wrap at the top level, which %%{wrap}%% sets.
+		return kind != "sequenceDiagram" && !strings.HasPrefix(kind, "C4")
 	case is("gantt.compact"):
 		// Mermaid 12 has no setting gantt.compact and ignores it. Its
 		// documents show it next to displayMode: compact.

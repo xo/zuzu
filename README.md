@@ -41,8 +41,8 @@ browser, and draws the results of a query for [`usql`][usql].
 
 # Status
 
-zuzu is in its first phases. Phase 0, the repository, the tests of the
-documents, CI, the corpus and the oracle, is done. The scene graph, the
+Phases 0 to 7 of the plan are done. Phase 0, the repository, the tests of
+the documents, CI, the corpus and the oracle, is done. The scene graph, the
 themes, the SVG writer and the measurement of text with the bundled IBM Plex
 Sans exist (phases 1 and 2). zuzu reads a Vega spec and draws it (phase 3).
 On the 540 specs of the first target, its datasets, scales and marks match
@@ -54,8 +54,10 @@ sankeys, chord diagrams, hex bins and trading days. Phase 6 added
 `raster`, which draws a chart with okage directly, without SVG, and
 `Chart.Image`. Phase 7 added the diagrams of DOT and Mermaid: a layered
 layout of graphs, the flowchart and nine charts of Mermaid, and icons, with
-four packs bundled. Since then zuzu also draws the sequence, state, class
-and ER diagrams, the mindmap and the architecture diagram of Mermaid.
+four packs bundled. Since then zuzu also draws the sequence, state, class,
+ER, requirement, block, swimlane, use case, agentflow, timeline and C4
+diagrams of Mermaid, its mindmap, its architecture diagram and its
+gitGraph. The package `text/emoji` draws an emoji in color.
 [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what zuzu reads.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.
@@ -70,14 +72,14 @@ report, err := chart.SVG(ctx, w, zuzu.WithLoader(zuzu.FSLoader(os.DirFS("data"))
 
 The first step was a survey of what other libraries do. Open
 [`docs/survey/compare.html`](docs/survey/compare.html) to see the same real
-data drawn by 13 chart and diagram libraries, side by side, in a light and a
+data drawn by 14 chart and diagram libraries, side by side, in a light and a
 dark theme. [`docs/survey/README.md`](docs/survey/README.md) says how to open
 it.
 
 The second step was the look. Open
 [`docs/targets/index.html`](docs/targets/index.html) to see 33 target charts,
-from a line to a flowchart, in the light and the dark mode and in six color
-schemes. They came before any code. The script in `docs/targets/` draws them,
+from a line to a flowchart, in the light and the dark mode and in thirteen
+color schemes. They came before any code. The script in `docs/targets/` draws them,
 and [`docs/targets/README.md`](docs/targets/README.md) says how to draw and
 open them.
 
@@ -86,8 +88,8 @@ open them.
 zuzu has four stages, and each stage hands the next one a value that can be
 written as JSON:
 
-1. A front end reads Vega, Vega-Lite, and later DOT or Mermaid, and produces
-   a spec in the shape of a Vega spec.
+1. A front end reads Vega, Vega-Lite, DOT or Mermaid, and produces a spec
+   in the shape of a Vega spec.
 2. The runtime loads the data, runs the transforms and the expressions,
    builds the scales and lays out the axes and the legends.
 3. The result is a scene graph: a tree of shapes with their final positions,

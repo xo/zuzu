@@ -1,7 +1,7 @@
 # API
 
 This document holds the public API of zuzu (D24). The maintainers accepted it
-on 2026-11-10, before any code exists, and it can change as the code shows
+on 2026-11-10, before any code existed, and it can change as the code shows
 what it needs. It shows the signatures and the types, and not the code behind
 them. D25 to D29 hold the decisions that it builds on.
 
@@ -104,17 +104,23 @@ func (v *View) Signal(name string) (any, error)
 func (v *View) Scale(name string) (scale.Scale, error)
 ```
 
-On 2026-11-10 the code of phase 3 has all of the above but these:
+On 2026-11-12 the code has all of this document but these:
 
 1. `WithFonts`. Since phase 6, `Image` draws with the bundled IBM Plex
    Sans and no font of the system (BACKLOG).
 2. `WithEvaluator`, which comes with the package `script` (D9).
-3. `Update`, which comes with live data in phase 8.
-4. The whole of Vega-Lite. Since phase 4 started, `Parse` and
+3. `Update` and `Change`, which come with live data in phase 8.
+4. The whole of Vega-Lite. Since phase 4, `Parse` and
    `FromVegaLite` compile a single view, a layer, a facet, a repeat and a
    concatenation, with the composite marks. A part that the compiler does
-   not handle, such as the config of a spec, is an issue that wraps
+   not handle, such as a selection, is an issue that wraps
    `vega.ErrUnsupported`, or is left out where the backlog says so.
+5. The types of the columns of a result set, in item 3 of "Result sets".
+   zuzu does not read `ColumnTypes`, and a field with no type does not
+   get the type of its column.
+6. The check of an unknown property, in item 3 of "Fields with more than
+   one form". An unknown property goes in `Extra`, with no issue and no
+   error, and no code returns `ErrUnknownProperty`.
 
 `SVG` and `Image` are short forms. A program that wants the scene graph calls
 `Render` and gives the result to a renderer, because every renderer reads the
@@ -122,7 +128,7 @@ scene graph and only the scene graph (D8):
 
 ```go
 s, report, err := chart.Render(ctx)
-err = svg.Write(w, s, svg.WithIndent("  "))
+err = svg.Write(w, s)
 pix, err := raster.Draw(s, raster.WithRenderer(fonts)) // phase 6 (D11)
 ```
 
@@ -162,7 +168,7 @@ the wrong place does not compile.
 | `WithDialect(Dialect)` | from `$schema`, or the first word of a diagram | `Vega`, `VegaLite`, `DOT` or `Mermaid` |
 | `WithStrict(bool)` | loose | the feature mode (D26) |
 | `WithFunction(name string, fn expr.Func)` | none | a Go function that an expression can call |
-| `WithEvaluator(expr.Evaluator)` | the native evaluator | the evaluator of expressions, such as the goja one (D9) |
+| `WithEvaluator(expr.Evaluator)` | the native evaluator | the evaluator of expressions, such as the goja one (D9). Not built yet |
 | `WithLogger(*slog.Logger)` | none | where zuzu logs |
 
 `RenderOption` applies when a chart renders:
@@ -177,7 +183,7 @@ the wrong place does not compile.
 | `WithLocation(*time.Location)` | `time.Local` | the time zone of time scales and formats (D27) |
 | `WithLocale(format.Locale)` | `format.EnUS` | the locale of numbers and dates (D27) |
 | `WithRandom(func() rand.Source)` | a source seeded from the system | the random numbers of a render (D28) |
-| `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with |
+| `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with. Not built yet |
 | `WithSize(width, height float64)` | from the spec | the size of the chart |
 | `WithBackground(color.Color)` | the theme, then the spec | the background over the theme and the spec. An alpha of 0 draws none, and nil keeps the default |
 | `WithScale(float64)` | 1 | the ratio of device pixels to the pixels of the chart in the image of `Image`, such as 2 for a screen of high density. The layout does not change, and the SVG does not change |
@@ -305,13 +311,13 @@ report, err := chart.SVG(ctx, w, zuzu.WithResultSet("sales", rows))
 1. zuzu reads each row once, during the render, until `Next` returns false,
    and then checks `Err`. The caller closes the result set. zuzu does not.
 2. Each row becomes a `map[string]any`, keyed by the names that `Columns`
-   gives. A column scans into an `any`, so a NULL is `nil` and a `[]byte`
-   becomes a `string`.
+   gives. A column scans into an `any`, so a NULL is `nil`, a `[]byte`
+   becomes a `string` and an integer becomes a `float64`.
 3. If the result set also has `ColumnTypes`, as `*sql.Rows` has, zuzu reads
    the type of each column from it. Otherwise, it reads the type from the Go
    values: a `time.Time` is temporal, a number is quantitative and a string
    is nominal. A Vega-Lite spec that names no type for a field then gets the
-   type of its column.
+   type of its column. This item is not built yet.
 4. A result set can be read once, so `WithResultSet` gives the data of one
    render. A `View` takes new rows through `Update`.
 
@@ -331,7 +337,7 @@ type Report []Issue
 
 type Issue struct {
 	Err     error  // a sentinel error, such as ErrUnsupportedTransform
-	Path    string // a JSON pointer into the spec, such as "/transform/2"
+	Path    string // a JSON pointer into a spec, such as "/transform/2", or a place in a diagram, such as "line 12"
 	Message string // the detail, such as the name of the transform
 }
 
@@ -381,9 +387,15 @@ package zuzu
 const (
 	ErrUnknownDialect Error = "unknown spec dialect"
 	ErrNoLoader       Error = "no loader for url data"
+	ErrCycle          Error = "cycle in the spec"
+	ErrUnknownName    Error = "unknown name"
 	ErrNoGlyph        Error = "no font has the character"
 )
 ```
+
+`ErrCycle` is the error of a signal, a dataset or a scale that depends on
+itself. `ErrUnknownName` is the error of a reference to a signal, a dataset
+or a scale that the spec does not have.
 
 `ErrNoGlyph` is the error of a character of a text that no font of the
 render has, such as a character of Chinese, or an emoji without
@@ -399,6 +411,7 @@ unsupported mark, transform or function unwraps to its own sentinel and to
 
 A `View` takes changes to its data, in the manner of the changesets of Vega.
 This is for live data (D19), and its form can change before phase 8.
+`Change` and `View.Update` are not built yet.
 
 ```go
 // Change is one change to one dataset.
@@ -423,26 +436,38 @@ package vega
 func Parse(src []byte) (*Spec, error)
 
 type Spec struct {
-	Schema      string      `json:"$schema,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Width       NumberValue `json:"width,omitempty"`
-	Height      NumberValue `json:"height,omitempty"`
-	Padding     Padding     `json:"padding,omitempty"`
-	Autosize    Autosize    `json:"autosize,omitempty"`
-	Config      Config      `json:"config,omitempty"`
-	Signals     []Signal    `json:"signals,omitempty"`
-	Data        []Data      `json:"data,omitempty"`
-	Scales      []Scale     `json:"scales,omitempty"`
-	Projections []Projection `json:"projections,omitempty"`
-	Axes        []Axis      `json:"axes,omitempty"`
-	Legends     []Legend    `json:"legends,omitempty"`
-	Title       *Title      `json:"title,omitempty"`
-	Marks       []Mark      `json:"marks,omitempty"`
+	Scope
 
-	// Extra holds the properties that zuzu does not know, so that the
-	// report can name them and a spec can be written back whole.
-	Extra map[string]jsontext.Value `json:",embed"`
+	Schema      string      `json:"$schema,omitzero"`
+	Description string      `json:"description,omitzero"`
+	Width       NumberValue `json:"width,omitzero"`
+	Height      NumberValue `json:"height,omitzero"`
+	Padding     Value       `json:"padding,omitzero"`
+	Autosize    Value       `json:"autosize,omitzero"`
+	Background  Value       `json:"background,omitzero"`
+	Style       Strings     `json:"style,omitzero"`
+	Config      Config      `json:"config,omitzero"`
+
+	Extra Extra `json:",embed"`
 }
+
+// Scope holds what a spec and a group mark both hold.
+type Scope struct {
+	Signals     []Signal     `json:"signals,omitzero"`
+	Data        []Data       `json:"data,omitzero"`
+	Scales      []Scale      `json:"scales,omitzero"`
+	Projections []Projection `json:"projections,omitzero"`
+	Axes        []Axis       `json:"axes,omitzero"`
+	Legends     []Legend     `json:"legends,omitzero"`
+	Title       *Title       `json:"title,omitzero"`
+	Marks       []Mark       `json:"marks,omitzero"`
+	Layout      Value        `json:"layout,omitzero"`
+	Encode      Encode       `json:"encode,omitzero"`
+}
+
+// Extra holds the properties that zuzu does not know, so that the report
+// can name them and a spec can be written back whole.
+type Extra = map[string]jsontext.Value
 ```
 
 ```go
@@ -477,7 +502,7 @@ tagged union, and never as `map[string]any`:
 ```go
 // NumberValue is a number or a reference to a signal.
 type NumberValue struct {
-	Kind   RefKind // Absent, Literal or Signal
+	Kind   RefKind // Absent, Literal or SignalRef
 	Number float64
 	Signal string
 }
@@ -501,7 +526,7 @@ its own, and no registry of types exists.
    the properties that zuzu does not know. In the loose mode, each one is an
    issue that wraps `ErrUnknownProperty`. In the strict mode, zuzu decodes
    with `json.RejectUnknownMembers(true)`, and an unknown property is an
-   error.
+   error. The issue and the error are not built yet.
 4. zuzu writes JSON with `json.Deterministic(true)`, so that a map writes its
    keys in the same order each time, and the same spec gives the same bytes.
 
@@ -516,15 +541,18 @@ small constructors for the unions:
 
 ```go
 spec := &vegalite.Spec{
-	Data: vegalite.Values(rows),
-	Mark: vegalite.Mark{Type: vegalite.Line},
+	Data: &vegalite.Data{Values: vega.Lit(rows)},
+	Mark: &vegalite.Mark{Type: "line"},
 	Encoding: vegalite.Encoding{
-		X: vegalite.Field("date", vegalite.Temporal),
-		Y: vegalite.Field("price", vegalite.Quantitative),
+		"x": {Defs: []vegalite.FieldDef{{Field: vega.Lit("date"), Type: "temporal"}}},
+		"y": {Defs: []vegalite.FieldDef{{Field: vega.Lit("price"), Type: "quantitative"}}},
 	},
 }
 chart, report, err := zuzu.FromVegaLite(spec)
 ```
+
+The constructors are `vega.Lit` for a `Value`, `vega.Num` for a
+`NumberValue` and `vega.List` for a list of strings.
 
 A constructor is added when code repeats a pattern, not before. `usql` builds
 its charts this way, much later (D20).
@@ -557,8 +585,13 @@ const (
 	ConfigScheme = "zuzu.scheme"
 )
 
-// Config returns the Vega config that a mode and a scheme make (D14).
-func Config(m Mode, s Scheme) vega.Config
+// Theme is a mode and a scheme together: every color that a chart uses.
+type Theme struct{ /* the neutrals and the colors */ }
+
+func New(m Mode, s Scheme) Theme
+
+// Config returns the Vega config that the mode and the scheme make (D14).
+func (t Theme) Config() map[string]any
 ```
 
 ```go

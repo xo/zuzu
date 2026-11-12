@@ -7,9 +7,9 @@ nothing else.
 
 The targets in [`targets/`](targets/README.md) follow these rules, and
 [`targets/gen-targets.mjs`](targets/gen-targets.mjs) holds the same tokens as
-code. If you change a token, change it here first, then in the script, then
-draw the targets again. The targets and this document can change before the
-code exists, and a change after that is a decision.
+code, and so does the package `theme`. If you change a token, change it here
+first, then in the script and in the package `theme`, then draw the targets
+again. The code exists, so a change to this document is a decision.
 
 ## Themes
 
@@ -208,6 +208,7 @@ background color, drawn under the fill with `paint-order="stroke"`.
 | link of a sankey | the color of its source at 0.32 opacity |
 | node of a graph | a rounded rectangle with a tint of its color and an outline of 1.25 |
 | edge of a graph | a line of 1.25 in `edge`, with round caps and joins, and an arrowhead in `edge` |
+| guide line of a diagram | a line of 1.25 in `axis`, with round caps and joins, such as a lifeline of a sequence diagram or an axis of a radar |
 | section of a gantt | a band in `band` behind the rows of every other section, across the chart, with the name of the section at its left |
 
 ## Annotations

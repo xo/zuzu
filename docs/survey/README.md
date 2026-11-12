@@ -7,7 +7,7 @@ person who reviews what other libraries do.
 | File | What it is |
 | --- | --- |
 | `libraries.html` | the survey of 20 chart libraries and four diagram tools, with the stars, the downloads, the chart types and the views of three other models, as measured on 2026-11-09. It is a record and is not updated |
-| `compare.html` | the same real data drawn by 13 libraries, side by side, in a light and a dark theme |
+| `compare.html` | the same real data drawn by 14 libraries, side by side, in a light and a dark theme |
 | `compare.js` | the adapters of `compare.html`, one block for each kind of chart |
 | `data.js` | the data of `compare.html`. `gen-data.mjs` generates it |
 | `gen-data.mjs` | writes `data.js` from the files of vega-datasets |

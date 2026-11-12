@@ -57,8 +57,8 @@ A transform of Vega, such as `formula` or `stack`, changes the rows in
 place, and the datasets that derive from the same source share those rows.
 So a dataset of vega.js can hold fields that a transform of another dataset
 added, and `facet_bullet` and `pancake-spider-chart` differ for this reason.
-zuzu copies a row before a transform changes it. D32 says that zuzu follows
-vega.js here.
+zuzu copies a row before a transform changes it. D32 part 14 says that zuzu
+follows vega.js here.
 
 ### Make the order of mixed values the same as vega.js
 
@@ -72,13 +72,13 @@ numbers before strings.
 ### Do the work of D32
 
 D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
-zuzu did parts 1 to 10, and drew the requirement, gitGraph, block,
-swimlane, use case, agentflow, timeline and C4 diagrams of part 11. These
-are left:
+zuzu did parts 1 to 10, except the rule of part 3 and the wrap of a
+timeline in part 7, and drew the requirement, gitGraph, block, swimlane,
+use case, agentflow, timeline and C4 diagrams of part 11. These are left:
 
 1. The next kinds of Mermaid in the order of D32 (11): venn, treeView,
    railroad, eventmodeling, zenuml, cynefin, ishikawa, kanban, packet and
-   info. They hold 172 files of the corpus of mermaid-go-renderer.
+   info. They hold 171 files of the corpus of mermaid-go-renderer.
 2. A kind of Mermaid that lays out when it is read, such as a sequence, a
    pie, a gantt, a journey, a mindmap, a treemap, an architecture diagram,
    a gitGraph, a block diagram, a timeline or a C4 diagram, measures an
@@ -90,6 +90,25 @@ are left:
    sequence. It is an issue in the other kinds (5).
 5. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
    issues, because the package `html` of okage keeps no link (10).
+6. A part of a source that Mermaid 12.3 reads and draws nothing for is
+   still an issue in some kinds. The C4 diagrams report the directions of
+   `Rel_U`, `Rel_D`, `Rel_L`, `Rel_R`, `Node_L` and `Node_R`, `$tags`,
+   `$sprite` and a shape of a tag. Find each such issue, and accept the
+   part with no issue (3).
+7. A timeline wraps its labels at 11/14 of the widths of Mermaid, so a
+   line holds more words than in Mermaid. Mermaid draws the labels of a
+   timeline at 16 pixels, so the ratio is 11/16 (7).
+8. An external element of a C4 diagram, such as `Person_Ext`, takes a
+   color of the categories. It takes the neutral Muted of `docs/STYLE.md`,
+   at the tint of the other elements (16).
+9. A boundary of `type: package` of a use case diagram draws as a panel
+   with no tab, and reports it. It draws with a tab at its top left, as a
+   package of UML does (17).
+10. Make the token Edge darker again, the line of an edge a little thicker,
+    and the arrowheads larger (part 8). Change `docs/STYLE.md` first, then
+    the package `theme`, then `docs/targets/gen-targets.mjs`, then the
+    targets.
+
 
 ### Draw two looks by hand
 
@@ -110,10 +129,10 @@ Before the work starts:
    D16 asks: the Open Font License or a license like it. Check the license
    of Excalifont, and find a font for the look of xkcd under such a
    license.
-2. Decide whether a font of a look goes in a package that a caller
-   imports, as the emoji font does (D32 part 6).
-3. Decide how a caller selects a look, and whether `look: handDrawn` of
-   Mermaid selects the look like Excalidraw.
+2. Design the option that selects a look. `look: handDrawn` of Mermaid
+   selects the look like Excalidraw (D32 part 2).
+3. Make the font of a look opt-in: a caller can give another font, and by
+   default a look draws with the font that zuzu tests it with (D32 part 2).
 4. A wobble must be the same on each render, so that the output stays
    deterministic.
 
@@ -142,8 +161,9 @@ and places nodes in another way.
 
 The corpus of `github.com/bvolpato/mermaid-go-renderer` at commit 9af8f11
 holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
-zuzu drew 2637 of them, and 2508 with no issue. 172 of the files that zuzu
-does not draw are of kinds that it does not draw yet.
+zuzu drew 2637 of them, and 2508 with no issue. 171 of the files that zuzu
+does not draw are of kinds that it does not draw yet. One more is an
+example of the documents of Mermaid whose kind is `...`.
 
 1. A style or a class on the id of a subgraph of a flowchart, such as
    `style sub fill:#f00`, is dropped with no issue. zuzu makes a node of
@@ -174,14 +194,18 @@ does not draw are of kinds that it does not draw yet.
     `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
     lines. Some of its routes share a line, and the titles of its lanes do
     not turn in a layout LR.
-12. A use case diagram draws a boundary of `type: package` as a panel with
-    no tab, and reports it. `colorScheme: rotate` is an issue. Mermaid
+12. In a use case diagram, `colorScheme: rotate` is an issue. Mermaid
     drops the last `;` of a `style` line, and zuzu reports an error.
 13. A line of a timeline that ends in `: ` with a space is an error in
     Mermaid, and zuzu reads the next line as its event.
-14. The C4 diagrams report the directions of `Rel_U`, `Rel_D`, `Rel_L`,
-    `Rel_R`, `Node_L` and `Node_R`, `$tags`, `$sprite` and a shape of a
-    tag, which Mermaid parses and does not draw.
+14. Math of KaTeX in a label, written as `$$...$$`, draws as its LaTeX
+    source, and zuzu reports nothing. This breaks hard rule 4 of
+    `AGENTS.md`. mmdc draws it as math. The 6 files under
+    `mermaid-e2e/katex/`, and `config-math-01` and `config-math-02` under
+    `mermaid-docs/config/`, count as files with no issue in the strict
+    mode. First, report the math in the loose mode, and make it an error
+    in the strict mode. To draw the math, zuzu needs a renderer of math,
+    and that needs a decision.
 
 ### Draw more of Mermaid
 
@@ -215,6 +239,10 @@ The DOT files come from the gallery of Graphviz, in `testdata/zuzu` of iv.
 6. An edge with a list of colors, such as `color="a:b"`, draws only the
    first color, with no issue. Graphviz draws a line in each color.
 7. `bgcolor` of the graph is an issue. Graphviz fills the page with it.
+8. Head labels of edges that end at the same port draw on top of each
+   other, as at `"public.auth_user":id` of the ER diagrams of dbtpl that
+   iv draws. They need to spread apart.
+
 
 ### Give a chart of Mermaid the time of the render
 
@@ -273,7 +301,10 @@ color is cleaner.
 ### Write the tool that converts upstream themes into schemes
 
 D15 calls for a tool that reads the upstream palette of each theme at a pinned
-commit and writes one JSON scheme for each, with its license file. The first
+commit and writes a scheme for each, with its license file. D33 says that a
+scheme is a Go value in `theme/theme.go`, so the tool writes Go values. The
+schemes `catppuccin` and `solarized`, which exist only in
+`docs/targets/gen-targets.mjs`, move into the package `theme` too. The first
 sources are the styles of chroma and the editor themes that transit D98
 lists. Each theme with a license that MIT does not allow stays out. The two
 prototypes in the targets, `catppuccin` and `solarized`, show the mapping
@@ -282,7 +313,8 @@ from a palette to the tokens of a scheme.
 ### Choose a font for each scheme from an editor theme
 
 Open question 12. A scheme can name a font that suits its theme. zuzu
-bundles only IBM Plex Sans (D16).
+bundles IBM Plex Sans for text (D16), and Noto Color Emoji for an emoji
+(D32).
 
 ### Pass the bundled fonts to okage
 
@@ -290,7 +322,8 @@ D16. The package `text` embeds IBM Plex Sans, and `text.Fonts` returns the
 files. Since phase 6, `Chart.Image` loads them into a renderer of okage
 with no font of the system, and sets the family as the sans serif family,
 so that an image draws the same font that the layout measured. A character
-that IBM Plex Sans lacks draws nothing. The option `WithFonts` of API.md,
+that IBM Plex Sans and the font of `WithEmoji` lack draws nothing, and the
+report names it (D32). The option `WithFonts` of API.md,
 which gives other fonts, and a fallback to the fonts of the system, are not
 done.
 

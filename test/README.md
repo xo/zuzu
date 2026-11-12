@@ -20,13 +20,18 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `cmd/conform/` | the tool that compares zuzu with the references (D17) |
 | `cmd/gallery/` | the tool that draws the specs of the corpus with zuzu, on a page |
 | `cmd/compile/` | the tool that prints the Vega spec that zuzu compiles from a Vega-Lite spec |
+| `cmd/mmdcref/` | the tool that reads an SVG that `mmdc` drew and writes the reference of a fixture of Mermaid (D31) |
 | `conform/` | the comparison of datasets, scales and marks that `cmd/conform` runs |
-| `oracle/` | the oracles, which run vega.js, vega-lite.js and d3 in Node.js |
+| `testdata/diagrams/` | the fixtures of DOT and of Mermaid, each with its reference |
+| `diagrams/` | the test that checks the fixtures against their references (D31) |
+| `testdata/icons/` | the digests of the bundled icons, and a small pack of turns and flips |
+| `icons/` | the test that checks the package `icon` against `@iconify/utils` (D31) |
+| `oracle/` | the oracles, which run vega.js, vega-lite.js, d3, mermaid.js and `@iconify/utils` in Node.js, and the script that draws the references of the diagrams |
 
 ## The corpus
 
-The specs came from the testdata of `github.com/xo/vegagoja`: 580 specs of
-the examples of Vega-Lite, 88 of Vega, and 11 of Deneb. Each folder holds the
+The specs came from the testdata of `github.com/xo/vegagoja`: 579 specs of
+the examples of Vega-Lite, 87 of Vega, and 13 of Deneb. Each folder holds the
 license of its source. The data folder holds the 53 files that the specs
 read, except three large files that only specs that bind events read.
 `testdata/corpus/data/LICENSE-data.txt` says which.
@@ -168,6 +173,18 @@ pack of turns and flips in `testdata/icons`. Run this in this folder after
 ```bash
 node oracle/icons.mjs
 ```
+
+The tests of the package `graph/mermaid` ask zuzu for the same start and
+end of each task of a gantt as mermaid.js. `oracle/gantt.mjs` writes them
+with the mermaid.js that mermaid-cli bundles, with the clock fixed at
+2024-03-15T10:20:30.400Z. Run this in the folder `oracle`:
+
+```bash
+TZ=UTC node gantt.mjs ../../graph/mermaid/testdata/gantt > ../../graph/mermaid/testdata/gantt/oracle.json
+```
+
+If mermaid-cli is not in `~/.local/lib/node_modules`, set `MERMAID` to the
+folder of its package `mermaid`.
 
 ## Write the meshes of TopoJSON
 

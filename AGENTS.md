@@ -8,13 +8,16 @@ zuzu draws its own look, at the quality of nivo and visx, and does not
 reproduce the look of Vega (D12). A theme is a mode, light or dark, and a
 color scheme that swaps apart from it (D14).
 
-On 2026-11-11 phases 0, 1 and 2 are done: a maintainer accepted
-`docs/targets/compare.html`. Phase 3 is done: zuzu runs static Vega
-specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is done: zuzu
-draws the charts of tiers 1 and 2. Phase 6 is done: `raster` draws a scene
-with okage directly. Phase 7 is done: zuzu draws the diagrams of DOT
-and Mermaid of D31. Code follows the plan (D3).
-Every decision from D1 to D32 is decided. The open questions are at the end of `docs/PLAN.md`.
+On 2026-11-12 phases 0 to 7 are done. Phases 0, 1 and 2 ended when a
+maintainer accepted `docs/targets/compare.html`. Phase 3 is done: zuzu runs
+static Vega specs. Phase 4 is done: zuzu compiles Vega-Lite. Phase 5 is
+done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
+draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
+of DOT and Mermaid of D31, and since then more kinds of Mermaid, in the
+order of D32. Code follows the plan (D3).
+Every decision from D1 to D33 is decided. The parameters `lanes` and
+`laneEdges` that an agent added to D31 wait for a review (open question
+29). The open questions are at the end of `docs/PLAN.md`.
 
 ## Standing rules
 
@@ -40,17 +43,17 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | designing or changing the public API | [docs/API.md](docs/API.md), then D24 |
 | loading data, the feature mode, time zones, locales or random numbers | D25, D26, D27 and D28, then [docs/API.md](docs/API.md) |
 | building for WebAssembly | D29 |
-| working on expressions, formats or scripting | [docs/EXPRESSIONS.md](docs/EXPRESSIONS.md), then D9 |
+| working on expressions, formats or scripting | [docs/EXPRESSIONS.md](docs/EXPRESSIONS.md), then D9 and D33 |
 | working on the scene graph or a renderer | "Architecture" and "Rendering" in [docs/PLAN.md](docs/PLAN.md), then D10, D11 and D8 |
-| working on text, fonts or the measurement of a label | "Text" in [docs/PLAN.md](docs/PLAN.md), then D11 |
+| working on text, fonts or the measurement of a label | "Text" in [docs/PLAN.md](docs/PLAN.md), then D11, D16 and D32 |
 | working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12 and D14 |
 | changing or adding a target SVG | [docs/targets/README.md](docs/targets/README.md), then D13 |
-| adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15 |
-| choosing or adding a font | D16 |
+| adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15 and D33 |
+| choosing or adding a font | D16, then D32 |
 | naming a package | D21 |
 | deciding whether zuzu supports a feature of Vega | "The Vega subset" in [docs/PLAN.md](docs/PLAN.md), then D6 and D7 |
-| testing against vega.js or the corpus | "Conformance" in [docs/PLAN.md](docs/PLAN.md), then D17 |
-| working on DOT, Mermaid, icons or a graph layout | [docs/DIAGRAMS.md](docs/DIAGRAMS.md), then "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18 and D31 |
+| testing against vega.js or the corpus | "Conformance" in [docs/PLAN.md](docs/PLAN.md), then D17 and D32 |
+| working on DOT, Mermaid, icons or a graph layout | [docs/DIAGRAMS.md](docs/DIAGRAMS.md), then "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18, D31 and D32 |
 | working on the browser component | "The browser" in [docs/PLAN.md](docs/PLAN.md), then D19 |
 | working on charts for `usql` | "usql" in [docs/PLAN.md](docs/PLAN.md), then D20 |
 | adding an outside package | D5, then the table of dependencies in [docs/PLAN.md](docs/PLAN.md) |
@@ -115,7 +118,8 @@ the end of `docs/PLAN.md` until the maintainers answer it.
    that a user imports never does (D9, D17).
 12. The documents name no person. Write "the maintainers" (D22).
 13. The look follows `docs/STYLE.md`. Change a token there first, then in
-    `docs/targets/gen-targets.mjs`, then draw the targets again (D12, D13).
+    the package `theme`, then in `docs/targets/gen-targets.mjs`, then draw
+    the targets again (D12, D13).
     A target uses only the parts of SVG that okage renders.
 14. Ask at least two of Gemini, DeepSeek and Astra before you propose a
     decision that changes the architecture, and write what each one said in
@@ -141,7 +145,7 @@ and `dbmeta`. List them with `ListAgents`, and send a message with
 
 ## Layout
 
-On 2026-11-10 the repository holds these files:
+On 2026-11-12 the repository holds these files:
 
 | Path | What it holds |
 | --- | --- |
@@ -178,6 +182,7 @@ On 2026-11-10 the repository holds these files:
 | `icon/` | the reader of icons of Iconify and of SVG, and the cleaning of an SVG (D31) |
 | `icons/` | the bundled packs of icons, one package each, each with its license (D31) |
 | `text/` | the measurement of text and the bundled IBM Plex Sans, in `text/fonts` with its license (D11, D16) |
+| `text/emoji/` | the bundled Noto Color Emoji with its license, in a package that a caller imports (D32) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
 | `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |
 
@@ -188,8 +193,8 @@ The packages go where "Packages" in `docs/PLAN.md` says.
 Run these, as CI does:
 
 ```bash
-gofmt -l . && go vet ./... && go build ./... && go test -race -count=2 ./...
-golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go test ./...)
+gofmt -l . && go vet ./... && go build ./... && CGO_ENABLED=0 go build ./... && go test -race -count=2 ./...
+golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go build ./... && go test -race -count=1 ./...)
 ```
 
 `gofmt -l .` must print nothing. The tests of the root module read the

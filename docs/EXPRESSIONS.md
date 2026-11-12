@@ -101,6 +101,12 @@ goja has two uses behind that interface:
 
 The maintainers chose C on 2026-11-10 (D9).
 
+On 2026-11-12 D33 changed the first use. The oracle of the package `expr`
+is vega.js in Node.js, not goja: `test/oracle/exprs.mjs` evaluates the
+expressions of `expr/testdata/exprs.txt`, and a test compares A with the
+result. The second use stays, and is not built yet: no package runs
+scripts in goja.
+
 ## Extension from Go
 
 A Go program can add a function to the library, such as a function that
@@ -120,6 +126,6 @@ are exact, so the tests compare the output with d3 on the same inputs.
 ## Errors
 
 A parse error names the expression, the position and what the parser
-expected. An error during evaluation names the expression and the row. An
+expected. An error during evaluation names the expression. An
 expression that calls a function that zuzu does not have is an error at
 parse time, and never a value of `undefined` at run time.

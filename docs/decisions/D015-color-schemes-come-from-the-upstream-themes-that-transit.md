@@ -1,6 +1,6 @@
 # D15. Color schemes come from the upstream themes that transit draws from
 
-Status: Decided.
+Status: Decided. Amended by D33.
 
 The maintainers asked on 2026-11-10 whether zuzu can build color schemes
 from the same sources as the package `styles` of transit, which colors source

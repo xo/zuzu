@@ -68,7 +68,7 @@ said the features, the license and the fit with the rest of a project decide
 it, and that a good look is a minimum that every winner meets.
 
 [`survey/compare.html`](survey/compare.html) draws the same real data with
-13 libraries, side by side, in a light and a dark theme. Open it to see what
+14 libraries, side by side, in a light and a dark theme. Open it to see what
 each library draws without help, what needs a plugin, and what the caller must
 prepare first. [`survey/README.md`](survey/README.md) says how to open it.
 
@@ -76,8 +76,8 @@ prepare first. [`survey/README.md`](survey/README.md) says how to open it.
 
 [`targets/index.html`](targets/index.html), which the script in `targets/`
 writes, shows the look that zuzu aims for, in 33 charts from tier 0 to tier 3,
-each in the light and the dark mode, and four of them in each of the six color
-schemes. The targets came before any code (D13), from the same real data as
+each in the light and the dark mode, and four of them in each of the thirteen
+color schemes. The targets came before any code (D13), from the same real data as
 the survey, and they render in okage with no error. [`STYLE.md`](STYLE.md)
 holds the rules they follow. They can change, and once code exists, a change
 to them is a decision.
@@ -100,7 +100,7 @@ network.
    Go value in the shape of a Vega spec: data, transforms, scales,
    projections, axes, legends, marks and signals. A Vega spec is read as it
    is. A Vega-Lite spec is compiled to it, as the JavaScript compiler of
-   Vega-Lite does. DOT and Mermaid come later (D18).
+   Vega-Lite does. DOT and Mermaid compile to it too (D18).
 2. The runtime runs the spec. It loads the data, runs the transforms,
    evaluates the expressions, builds the scales, measures the text and
    lays out the axes, the legends and the groups.
@@ -137,11 +137,14 @@ short word, and an exported name does not repeat its package.
 | `layout` | the axes, the legends, the titles, the size of a view and the grid of a facet |
 | `scene` | the scene graph and its JSON form (D8) |
 | `text` | the measurement of text, behind an interface (D11) |
+| `text/emoji` | Noto Color Emoji, which a caller imports and passes with `WithEmoji` (D32) |
 | `theme` | the modes and the color schemes, and the Vega config they make (D14, D15) |
 | `svg` | the SVG writer |
 | `raster` | the direct okage renderer (D11) |
 | `internal/shape` | the geometry of the items as path data, which `svg` writes and `raster` parses, so that both draw the same shapes |
-| `graph` | the graph model and the layered layout, with `dot` and `mermaid` below it (D18) |
+| `graph` | the graph model and the layered layout, with `dot` and `mermaid` below it (D18, D31) |
+| `icon` | the reader of icons of Iconify and of SVG, and the cleaning of an SVG (D31) |
+| `icons` | the bundled packs of icons, one package each below it, each with its license (D31) |
 | `web` | the browser component, which embeds its JavaScript (D19) |
 | `test/` | a separate module with the corpus, the vega.js oracle and the comparisons (D17) |
 
@@ -163,7 +166,7 @@ the reason (D5). A package that only the test module uses is not listed.
 
 | Package | Pure Go | Why |
 | --- | --- | --- |
-| `github.com/xo/okage` | yes | rasterizes SVG (D10), and draws the direct renderer and measures text (D11). It brings `github.com/go-text/typesetting` and `golang.org/x/image` |
+| `github.com/xo/okage` | yes | rasterizes SVG (D10), and draws the direct renderer and measures text (D11). Its package `html` reads the labels of HTML of DOT (D31). zuzu requires v0.5.0, which draws the glyphs in color of an emoji (D32). It brings `github.com/go-text/typesetting` and `golang.org/x/image` |
 | `github.com/go-text/typesetting` | yes | reads the advance widths of the bundled font for the estimate of `text` (D11). okage uses it too, so it adds no module |
 
 The module also embeds files that are not Go packages:
@@ -193,7 +196,9 @@ Vega-Lite spec without either is in the first target.
 
 zuzu never drops a feature that it does not support without a word (D26).
 In the strict mode, an unsupported feature is an error. In the loose mode,
-zuzu draws the rest and returns a report of what it skipped.
+zuzu draws the rest and returns a report of what it skipped. D32 makes two
+exceptions for Mermaid: a hint of how to draw, such as `look: handDrawn`,
+and a part that Mermaid reads and draws nothing for.
 
 ## Expressions and scripting
 
@@ -273,7 +278,9 @@ holds each result.
 
 The fonts decide the output. A test that must give the same bytes on every
 machine uses fonts that the test brings, and never the fonts of the system.
-zuzu bundles IBM Plex Sans (D16), which the targets use.
+zuzu bundles IBM Plex Sans (D16), which the targets use. The package
+`text/emoji` bundles Noto Color Emoji, which a caller passes with
+`WithEmoji` (D32).
 
 ### The browser
 
@@ -296,7 +303,9 @@ A theme is a mode and a color scheme (D14). The mode, light or dark, sets the
 neutral colors: the background, the text, the grid and the axes. The scheme
 sets the colors of the data: ten categorical colors, the ramps, and a color
 for a rise and for a fall. A caller swaps either one, and any scheme works
-in either mode. [`STYLE.md`](STYLE.md) holds the tokens of both.
+in either mode. [`STYLE.md`](STYLE.md) holds the tokens of both. The
+`theme` of a source of Mermaid selects the dark mode or a scheme with the
+colors of that theme, unless the caller gives a mode or a scheme (D32).
 
 Many more schemes come from the same upstream themes that the package
 `styles` of transit draws from: the styles of chroma and the popular editor
@@ -413,16 +422,16 @@ the rules that Vega leaves to its renderer (D12):
 - `WithSize` replaces the size of the spec, even one that a signal works
   out from a step, as Vega-Lite does for a discrete x.
 
-The survey shows why a theme matters. Of the 13 libraries in
-`compare.html`, Vega, ECharts, ApexCharts, Mermaid, Highcharts and Matplotlib
+The survey shows why a theme matters. Of the 14 libraries in
+`compare.html`, Vega-Lite, Vega, ECharts, ApexCharts, Mermaid, Highcharts and Matplotlib
 switch to dark with one setting, and Observable Plot takes the text color of
 the page. Chart.js, Plotly, Recharts, uPlot, Lightweight Charts and Graphviz
 need each color set by hand.
 
 ## Diagrams
 
-DOT and Mermaid come later (D18). Each one compiles to the same spec, so
-that a diagram uses the same themes, text and renderers as a chart.
+DOT and Mermaid compile to the same spec as a chart (D18), so that a
+diagram uses the same themes, text and renderers as a chart.
 
 Vega has no layered graph layout, which a flowchart needs. A layered layout
 puts the nodes of a directed graph in ranks and keeps the edges short and
@@ -431,10 +440,10 @@ of its own, with a name that cannot collide with a transform of Vega, such
 as `zuzu.layered`. zuzu writes its own layout from the documented algorithm and
 does not port dagre, the layout that Mermaid uses (D6).
 
-The parsers come first for the subset that a flowchart needs: nodes, edges,
-labels, subgraphs and the direction of the graph. Mermaid has about 20 kinds
-of diagram. Its pie, xychart, sankey, radar and treemap are charts, and
-compile to the same chart specs as Vega-Lite.
+The parsers came first for the subset that a flowchart needs: nodes, edges,
+labels, subgraphs and the direction of the graph. Mermaid has more than 30
+kinds of diagram. Its charts, such as the pie, the xychart, the sankey, the
+radar and the treemap, compile to Vega-Lite or to Vega, as phase 7 says.
 
 ## usql
 
@@ -465,8 +474,9 @@ pixels with vega.js tells nothing. D17 decides what the comparison measures
 instead: the meaning of a chart. These must match exactly, within a
 tolerance for floats:
 
-1. The Vega spec that `vegalite` compiles, against the one that vega-lite.js
-   compiles.
+1. The structure of the Vega spec that `vegalite` compiles, against the one
+   that vega-lite.js compiles: the same datasets by name, the same scales by
+   name and type, and the same marks by name and type (D32).
 2. The rows of each dataset after the transforms.
 3. The type and the domain of each scale.
 4. The number of items of each mark and the datum bound to each item.
@@ -493,8 +503,8 @@ later.
 | Tier | Charts | What the runtime needs |
 | --- | --- | --- |
 | 0 | line, area and stacked area, bar (grouped, stacked, horizontal), scatter and bubble, pie and donut, heat map, histogram, layers with two y axes | the marks rect, line, area, symbol, arc, rule and text. The transforms stack, bin and aggregate. Linear, log, time, band, point and ordinal scales |
-| 1 | box plot and error bars, radar, choropleth map, treemap, sunburst, sankey, funnel, candlestick, violin, density and regression, streamgraph, gauge, small multiples | the transforms quantile, kde, regression, loess, stratify, treemap and partition. Polar layout, projections, facets. A time scale that skips the days with no trade |
-| 2 | parallel coordinates, chord, force graph, tree, circle packing, waterfall, beeswarm, contour, hex bins, word cloud | one layout transform each: pack, tree, force, contour, hexbin, wordcloud |
+| 1 | box plot and error bars, radar, choropleth map, treemap, sunburst, sankey, funnel, candlestick, violin, density and regression, streamgraph, gauge, small multiples, waterfall | the transforms quantile, kde, regression, loess, stratify, treemap and partition. Polar layout, projections, facets. A time scale that skips the days with no trade |
+| 2 | parallel coordinates, chord, force graph, tree, circle packing, beeswarm, contour, hex bins, word cloud | one layout transform each: pack, tree, force, contour, hexbin, wordcloud |
 | 3 | flowchart and other layered graphs, from DOT and Mermaid | the layered layout and edge routing (D18) |
 
 Vega has the transforms for most of tiers 1 and 2. It has no sankey, no
@@ -606,7 +616,8 @@ transforms, and the transforms `density`, `geojson`, `geopoint`, `kde`,
 `stratify` and `regression`, all of phase 5. Most of the other differences
 come from vega.js itself. A transform of Vega changes the rows that the
 datasets which derive from the same source share, and zuzu copies a row
-before it changes it. `docs/BACKLOG.md` lists what is left.
+before it changes it. D32 says that zuzu follows vega.js here.
+`docs/BACKLOG.md` lists what is left.
 
 The phase holds these packages:
 
@@ -621,13 +632,13 @@ The phase holds these packages:
 4. `dataflow` reads JSON, CSV, TSV and DSV, and runs 20 transforms.
 5. `scale` holds the scales of Vega and their ticks.
 6. `layout` draws the axes, the legends and the titles in the look of zuzu.
-   The conformance job of CI runs the oracle and fails when a share falls
-   below the exit.
-
-Phase 3 was done on 2026-11-10, when the maintainers accepted the share.
 7. The root package runs a spec: it works out each signal, dataset and scale
    when something first asks for it, builds the marks and the facets, and
    grows the canvas to hold the guides, as the autosize `pad` of Vega does.
+
+The conformance job of CI runs the oracle and fails when a share falls
+below the exit. Phase 3 was done on 2026-11-10, when the maintainers
+accepted the share.
 
 ### Phase 4. Vega-Lite
 
@@ -648,8 +659,8 @@ and compares the result with the references, as phase 3 does:
 3. The compiled spec has the same structure as the one of vega-lite.js for
    50 percent of the specs: the same datasets by name, the same scales by
    name and type, and the same marks by name and type. The share of specs
-   whose JSON is the same is reported, with no exit, until open question 14
-   is answered.
+   whose JSON is the same is reported, with no exit, because D32 compares
+   the structure only (open question 14).
 
 The specs that need the transforms of phase 5 count against the share, as
 in phase 3.
@@ -741,7 +752,6 @@ zuzu chose these rules where the documents of Vega say nothing (D6):
 - `heatmap` writes its image as a PNG in a URL of data.
 - The oracle finds the specs that read random numbers by two runs with two
   seeds, and the check compares only their counts (D28).
-
 - `force` runs its iterations at once, as the static mode of Vega does,
   since zuzu draws a still image. Its nbody force sums over every pair,
   the exact form of the approximation of Barnes and Hut.
@@ -806,7 +816,8 @@ The parse was slow because okage computed the sine, the cosine and the
 other functions of an arc with math/big, at about 9 microseconds a call. A
 path with arcs took about 250 microseconds to parse, and a symbol, a slice
 of a pie and a rect with round corners each have arcs. The okage peer
-found the cause, and okage v0.2.1 holds the fix. zuzu requires v0.2.1.
+found the cause, and okage v0.2.1 holds the fix. zuzu requires v0.2.1 or
+later.
 
 Either way the gain is larger than the 7 to 10 percent of the estimate
 above, so `raster` exists. It draws every mark but text with the drawing of
@@ -870,13 +881,15 @@ icon or an image as a URL of data, which the SVG writer writes once in its
 definitions. The direct renderer draws a PNG, a JPEG and an SVG. Four packs
 are bundled under `icons/`.
 
-The test module checks 32 fixtures of DOT and 32 of the flowcharts of
-Mermaid against `dot -Tjson0` and `mmdc`, and every bundled icon against
-`@iconify/utils`. `test/README.md` says how to write the references again.
+The test module checks fixtures of DOT and of Mermaid against `dot -Tjson0`
+and `mmdc`, and every bundled icon against `@iconify/utils`. On 2026-11-12
+it holds 53 fixtures of DOT and 85 of Mermaid: flowcharts, and state, class,
+entity relationship, requirement and agentflow diagrams. `test/README.md`
+says how to write the references again.
 
 The nine charts of Mermaid that D31 names compile to Vega-Lite or Vega in
 `graph/mermaid`, each with its fixtures. The plan of a gantt is worked out
-in Go, and its 16 fixtures give the same start and end of each task as
+in Go, and its 18 fixtures give the same start and end of each task as
 mermaid.js. An axis of time reads a `tickCount` of an interval and a step.
 The known gaps are in `docs/BACKLOG.md`, under "Phase 7".
 
@@ -886,6 +899,14 @@ Later on 2026-11-11, DOT gained labels of HTML through the package `html` of
 okage v0.4.0, sides of ports, and `margin`, so that the schemas that dbtpl
 writes draw. The root package gained `Sniff` and `WithBackground` for
 programs that detect and draw a file, such as iv.
+
+On 2026-11-12 zuzu also draws the sequence, state, class, entity
+relationship, requirement, block, swimlane, use case, agentflow, timeline
+and C4 diagrams of Mermaid, its mindmap, its architecture diagram and its
+gitGraph. D32 sets the order of the kinds that are left, and
+`docs/BACKLOG.md` lists them. The swimlane diagram lays out with the
+parameters `lanes` and `laneEdges` of `zuzu.layered`, which wait for a
+review (open question 29).
 
 ### Phase 8. The browser
 
@@ -1022,7 +1043,8 @@ day. D31 took these leads:
    replacing text, and to clean every SVG of an icon or of an image of
    scripts, `foreignObject`, handlers of events and references outside it.
 3. Both said that `layout: elk` must not pass in silence, since ELK routes
-   edges in its own way. D31 reports it.
+   edges in its own way. D31 reports it. D32 later made it a hint, which
+   zuzu accepts with no issue.
 4. DeepSeek said that an SVG that names the URL of an image makes its
    viewer fetch it. D31 draws a box with the label instead, and never writes
    a URL from outside.
@@ -1049,7 +1071,7 @@ stays true.
 2. Answered on 2026-11-10 by D16: zuzu bundles IBM Plex Sans.
 3. Answered on 2026-11-10 by D12: the default theme has the look of zuzu.
 4. Does the browser component receive the scene graph from the server, or
-   the spec and the data for vega.js? See Rendering above. The maintainers
+   the spec and the data for vega.js? See "The browser" above. The maintainers
    left this to be decided later, on 2026-11-10.
 5. Answered on 2026-11-10 by D7: events are not in the first release, and
    can come at a later date.
@@ -1059,13 +1081,13 @@ stays true.
    Gemini.
 8. Answered on 2026-11-10 by D12 and D17: no comparison of layout with
    vega.js remains, so the way vega.js measures text does not matter.
-9. Answered on 2026-11-10: `LICENSE` has the same copyright line as the
-   other `xo` repositories, with the years 2015-2026, under the MIT License
-   (D22).
-10. Answered on 2026-11-10: the okage peer writes the API when zuzu needs
-    it, and the SVG output comes first (D11).
-11. Answered on 2026-11-10: the four first schemes stay (D14), and many more
-    come from the upstream themes that transit draws from (D15).
+9. Answered on 2026-11-10 by D22: `LICENSE` has the same copyright line as
+   the other `xo` repositories, with the years 2015-2026, under the MIT
+   License.
+10. Answered on 2026-11-10 by D11: the okage peer writes the API when zuzu
+    needs it, and the SVG output comes first.
+11. Answered on 2026-11-10 by D14 and D15: the four first schemes stay, and
+    many more come from the upstream themes that transit draws from.
 12. Which fonts suit the schemes from editor themes, and does zuzu list a
     font for each? The fonts must be under the Open Font License or a
     license like it, and zuzu bundles none of them (D15, D16).
@@ -1076,17 +1098,9 @@ stays true.
 14. Answered on 2026-11-12 by D32: the first check of D17 compares the
     structure, the datasets, the scales and the marks by name and type, not
     the JSON of vega-lite.js.
-15. Answered on 2026-11-10 by D30. What are the names and the parameters of the transforms and the scale
-    that zuzu adds for the charts of tiers 1 and 2 that Vega cannot draw?
-    The plan says that zuzu adds a sankey and a time scale that skips the
-    days with no trade, with names that start with `zuzu.` (D6). Tier 2
-    also names a chord diagram and hex bins, which Vega has no transform
-    for. The plan does not say what each takes and writes: for example,
-    the fields of the source, the target and the value of a sankey, and
-    the width and the padding of its nodes, or whether the time scale reads
-    a list of the days to skip or a calendar of weekdays. Phase 5 waits for
-    this answer to draw those four targets from a spec.
-
+15. Answered on 2026-11-10 by D30: D30 names the transforms and the scale
+    that zuzu adds for the sankey, the chord diagram, the hex bins and the
+    days with no trade, and their parameters.
 16. Answered on 2026-11-11 by D31: the design of the diagrams of DOT and
     Mermaid and of the transform `zuzu.layered` is accepted.
 17. Answered on 2026-11-12 by D32: zuzu adds the kinds of Mermaid in the

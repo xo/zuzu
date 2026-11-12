@@ -47,7 +47,9 @@ const (
 type Issue struct { //nolint:errname // The API names it Issue, as an issue of a report (D24).
 	// Err is the sentinel error of the issue.
 	Err error
-	// Path is where the feature is in the spec, such as marks[2].encode.
+	// Path is where the feature is in the source: a JSON pointer into a
+	// spec, such as /marks/2/encode, or a place in a diagram, such as
+	// line 12 or node a.
 	Path string
 	// Message says what the feature is.
 	Message string

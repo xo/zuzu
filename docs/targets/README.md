@@ -58,5 +58,6 @@ layouts. The script writes each SVG element itself, from the tokens of
 
 Each target uses only the parts of SVG that okage renders: paths, shapes,
 text, linear gradients and markers. It uses no CSS, no `@media` rule and no
-filter. On 2026-11-10 all 106 files rendered with the package `svg` of okage
-with no error, at 640 by 220 to 560 pixels, in 5 to 220 ms each.
+filter. On 2026-11-10, with six schemes, all 106 files rendered with the
+package `svg` of okage with no error, at 640 by 220 to 560 pixels, in 5 to
+220 ms each. With the thirteen schemes, the script writes 162 files.
