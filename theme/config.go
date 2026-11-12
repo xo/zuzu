@@ -1,5 +1,14 @@
 package theme
 
+// The keys of the config of a spec that ask for a look (D32): a mode,
+// light or dark, and a scheme by its name, such as mermaid-forest. A
+// Mermaid diagram fills them from its theme. A mode or a scheme that the
+// caller of a render gives wins over them.
+const (
+	ConfigMode   = "zuzu.mode"
+	ConfigScheme = "zuzu.scheme"
+)
+
 // The styles that the compiler of Vega-Lite names for the color of a mark
 // that a spec does not set (D6, D14). The config of a theme gives them the
 // first color of the categories, or the text color.

@@ -348,7 +348,7 @@ func TestMindmapIssues(t *testing.T) {
 		{body + "    ::icon(book)\n", "names no pack"},
 		{"---\nconfig:\n  mindmap:\n    useWidth: 500\n---\n" + body, "mindmap.useWidth"},
 		{"---\nconfig:\n  mindmap:\n    colorBy: section\n---\n" + body, "mindmap.colorBy section"},
-		{"---\nconfig:\n  theme: dark\n---\n" + body, "the theme of Mermaid"},
+		{"---\nconfig:\n  theme: sepia\n---\n" + body, "the theme of Mermaid"},
 		{"---\nconfig:\n  layout: cose\n---\n" + body, "layout cose"},
 	}
 	for _, test := range tests {

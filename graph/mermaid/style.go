@@ -1,12 +1,16 @@
 package mermaid
 
 import (
+	"encoding/json/jsontext"
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
+	"github.com/xo/zuzu/theme"
+	"github.com/xo/zuzu/vega"
 )
 
 // dashed is the dash of a dashed line: a dashed relation of a class or
@@ -20,10 +24,10 @@ const dashed = "4,3"
 const animatedDash = "9,5"
 
 // lookSetting reports a setting of the top level of the config that every
-// graph reads: the layout, the look and the theme, which a graph draws in
-// its own way, htmlLabels and markdownAutoWrap, which change how a label
-// wraps, and the settings that change nothing in an image. It returns
-// false for any other setting.
+// graph reads: the layout and the look, which a graph draws in its own
+// way, the theme, which Look reads, htmlLabels and markdownAutoWrap, which
+// change how a label wraps, and the settings that change nothing in an
+// image. It returns false for any other setting.
 func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
 	if inert(kind, k) || hint(k, v) {
 		return true, nil
@@ -37,6 +41,9 @@ func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
 	case "look":
 		return true, nil
 	case "theme", "themeVariables", "themeCSS":
+		if k == "theme" && knownTheme(v) {
+			return true, nil
+		}
 		return true, is.Add("config", "the %s of Mermaid, drawn in the look of zuzu", k)
 	case "fontFamily":
 		// Graph gives each label the weight and the style that the name
@@ -51,6 +58,38 @@ func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// themes are the themes of Mermaid 12.3.0. A theme with dark in its name
+// selects the dark mode of zuzu, and each other theme selects the scheme
+// of zuzu with its colors, named mermaid- and the name of the theme (D32).
+var themes = []string{
+	"default", "base", "neutral", "forest", "dark", "neo", "neo-dark",
+	"redux", "redux-dark", "redux-color", "redux-dark-color",
+}
+
+// knownTheme reports whether a value of the setting theme names a theme
+// of Mermaid 12.3.0. Any other value stays an issue.
+func knownTheme(v any) bool {
+	s, ok := v.(string)
+	return ok && slices.Contains(themes, s)
+}
+
+// Look returns the keys of the Vega config that the theme of a diagram
+// asks for (D32): zuzu.mode dark for a theme with dark in its name, and
+// zuzu.scheme with the scheme of zuzu that has the colors of each other
+// theme. The runtime takes each one where the caller of a render sets no
+// mode or no scheme. Look returns nil for a diagram with no theme or with a
+// theme that Mermaid 12.3.0 does not have.
+func Look(d *Diagram) vega.Config {
+	name, _ := d.Config["theme"].(string)
+	if !knownTheme(name) {
+		return nil
+	}
+	if strings.Contains(name, "dark") {
+		return vega.Config{theme.ConfigMode: jsontext.Value(`"dark"`)}
+	}
+	return vega.Config{theme.ConfigScheme: jsontext.Value(strconv.Quote("mermaid-" + name))}
 }
 
 // hint reports whether a setting of the top level of the config is a hint
@@ -101,12 +140,12 @@ func isGraph(kind string) bool {
 }
 
 // accepted reports whether zuzu accepts a setting of the config with no
-// issue: a setting that inert names, or a font family with no weight and
-// no style, such as fontFamily: Arial or sequence.actorFontFamily:
-// courier. zuzu draws in IBM Plex Sans only, so the name of a family
+// issue: a setting that inert names, a theme that Look reads, or a font
+// family with no weight and no style, such as fontFamily: Arial or
+// sequence.actorFontFamily: courier. zuzu draws in IBM Plex Sans only, so the name of a family
 // changes nothing (D32).
 func accepted(kind, path string, v any) bool {
-	if inert(kind, path) {
+	if inert(kind, path) || path == "theme" && knownTheme(v) {
 		return true
 	}
 	key := strings.ToLower(path[strings.LastIndex(path, ".")+1:])

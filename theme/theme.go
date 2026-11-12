@@ -60,13 +60,43 @@ func neutrals(m Mode) Neutrals {
 	}
 }
 
-// Scheme is a color scheme: the colors of the data.
+// over returns the neutrals with each field that own sets in place of its
+// own. A band that own does not set is its text at BandOpacity over its
+// background, as docs/STYLE.md says.
+func (n Neutrals) over(own Neutrals) Neutrals {
+	if own == (Neutrals{}) {
+		return n
+	}
+	out := n
+	for _, f := range []struct {
+		dst *string
+		src string
+	}{
+		{&out.Background, own.Background}, {&out.Panel, own.Panel}, {&out.Text, own.Text},
+		{&out.Muted, own.Muted}, {&out.Faint, own.Faint}, {&out.Grid, own.Grid},
+		{&out.Axis, own.Axis}, {&out.Edge, own.Edge}, {&out.Band, own.Band},
+	} {
+		if f.src != "" {
+			*f.dst = f.src
+		}
+	}
+	if own.Band == "" {
+		out.Band = mix(out.Background, out.Text, BandOpacity)
+	}
+	return out
+}
+
+// Scheme is a color scheme: the colors of the data. A scheme from an
+// upstream theme can also bring neutrals of its own for a mode (D15).
 type Scheme struct {
 	name  string
 	light []string
 	dark  []string
 	up    int
 	down  int
+	// own holds the neutrals of the scheme for each mode, by the mode. An
+	// empty field keeps the neutral of the mode.
+	own [2]Neutrals
 }
 
 // Name returns the name of the scheme, such as zuzu.
@@ -104,9 +134,78 @@ var (
 	}
 )
 
+// The text and the line colors that the themes of Mermaid share: a dark
+// gray, black, and the ink of redux.
+const (
+	mermaidGray  = "#333333"
+	mermaidBlack = "#000000"
+	mermaidInk   = "#28253d"
+)
+
+// The schemes of the light themes of Mermaid 12.3.0, which the theme of a
+// Mermaid diagram selects (D32). docs/STYLE.md says how their colors come
+// from the theme variables of Mermaid, under the MIT license. Each brings
+// the text and the line color of its theme for the light mode.
+var (
+	mermaidDefault = Scheme{
+		name:  "mermaid-default",
+		light: []string{"#8683de", "#8e8f2e", "#bf6fbe", "#bb7d39", "#09a069", "#d4659d", "#6a983d", "#d86769", "#00a1a4", "#1a94e1"},
+		up:    4,
+		down:  7,
+		own:   [2]Neutrals{{Text: mermaidGray, Edge: mermaidGray}},
+	}
+	mermaidBase = Scheme{
+		name:  "mermaid-base",
+		light: []string{"#ab8530", "#b075ca", "#829332", "#5f8ce3", "#609a43", "#da6386", "#00a176", "#d26e57", "#009fc1"},
+		up:    4,
+		down:  5,
+		own:   [2]Neutrals{{Text: mermaidGray, Edge: "#0b0b0b"}},
+	}
+	mermaidNeutral = Scheme{
+		name:  "mermaid-neutral",
+		light: []string{"#777777", "#b0b0b0", "#868686", "#c6c6c6", "#989898", "#d1d1d1", "#7f7f7f", "#bbbbbb", "#919191", "#a3a3a3"},
+		dark:  []string{"#5e5e5e", "#969696", "#6d6d6d", "#ababab", "#7f7f7f", "#b6b6b6", "#666666", "#a0a0a0", "#777777", "#898989"},
+		up:    0,
+		down:  1,
+		own:   [2]Neutrals{{Text: mermaidBlack, Edge: "#666666"}},
+	}
+	mermaidForest = Scheme{
+		name:  "mermaid-forest",
+		light: []string{"#789536", "#009cd1", "#da647d", "#359e5b", "#7188e2", "#00a189", "#b672c6", "#9d8a2d", "#cc724c"},
+		up:    3,
+		down:  2,
+		own:   [2]Neutrals{{Text: mermaidBlack, Edge: mermaidBlack}},
+	}
+	mermaidNeo = Scheme{
+		name:  "mermaid-neo",
+		light: []string{"#8982dd", "#8d902e", "#bf6ebe", "#bb7d3a", "#129f68", "#d4659c", "#6a983d", "#d86867", "#00a1a4", "#2493e1"},
+		up:    4,
+		down:  7,
+		own:   [2]Neutrals{{Text: mermaidGray, Edge: mermaidBlack}},
+	}
+	mermaidRedux = Scheme{
+		name:  "mermaid-redux",
+		light: []string{"#787583", "#b2afbe", "#878593", "#c8c5d4", "#9a97a6", "#d3d0df", "#807d8b", "#bdbac9", "#928f9e", "#a4a1b0"},
+		dark:  []string{"#5f5d6a", "#9794a3", "#6e6b79", "#aca9b8", "#807d8b", "#b7b4c3", "#676472", "#a29fae", "#787583", "#8a8796"},
+		up:    0,
+		down:  1,
+		own:   [2]Neutrals{{Text: mermaidInk, Edge: mermaidBlack}},
+	}
+	mermaidReduxColor = Scheme{
+		name:  "mermaid-redux-color",
+		light: []string{"#f4a8ff", "#46ecd5", "#ffb86a", "#dab2ff", "#7bf1a8", "#c4b4ff", "#ffa2a2", "#ffdf20", "#a3b3ff", "#bbf451"},
+		up:    4,
+		down:  6,
+		own:   [2]Neutrals{{Text: mermaidInk, Edge: mermaidBlack}},
+	}
+)
+
 // schemes returns the schemes that zuzu ships, in the order of docs/STYLE.md.
 func schemes() []Scheme {
-	return []Scheme{Zuzu, Pastel, Harbor, Ember}
+	return []Scheme{
+		Zuzu, Pastel, Harbor, Ember,
+		mermaidDefault, mermaidBase, mermaidNeutral, mermaidForest, mermaidNeo, mermaidRedux, mermaidReduxColor,
+	}
 }
 
 // Lookup returns the scheme with a name.
@@ -145,12 +244,17 @@ type Theme struct {
 
 // New returns the theme of a mode and a scheme. A scheme without its own
 // dark colors lifts each light color for the dark mode, and a scheme with
-// fewer than ten colors gets the rest mixed toward the text color.
+// fewer than ten colors gets the rest mixed toward the text color. A
+// neutral that the scheme brings for the mode replaces that of the mode.
 func New(m Mode, s Scheme) Theme {
 	if s.name == "" {
 		s = Zuzu
 	}
-	n := neutrals(m)
+	own := s.own[0]
+	if m == Dark {
+		own = s.own[1]
+	}
+	n := neutrals(m).over(own)
 	cat := slices.Clone(s.light)
 	if m == Dark {
 		if s.dark != nil {

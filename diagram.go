@@ -120,13 +120,13 @@ var mermaidKinds = map[string]bool{
 // chart.
 func parseDiagram(src []byte, d Dialect, o options) (*Chart, Report, error) {
 	var g *graph.Graph
+	var md *mermaid.Diagram
 	var report Report
 	var err error
 	switch d {
 	case DOT:
 		g, report, err = dot.Parse(string(src), o.strict)
 	default:
-		var md *mermaid.Diagram
 		if md, err = mermaid.Read(string(src)); err != nil {
 			return nil, nil, err
 		}
@@ -141,6 +141,9 @@ func parseDiagram(src []byte, d Dialect, o options) (*Chart, Report, error) {
 	spec, err := graph.Compile(g)
 	if err != nil {
 		return nil, report, err
+	}
+	if md != nil {
+		addLook(spec, md)
 	}
 	c, _, err := FromVega(spec)
 	if err != nil {
@@ -172,6 +175,7 @@ func mermaidChart(md *mermaid.Diagram, o options) (*Chart, Report, error) {
 	} else if spec, err = vega.Parse(b); err != nil {
 		return nil, report, err
 	}
+	addLook(spec, md)
 	c, _, err := FromVega(spec)
 	if err != nil {
 		return nil, report, err
@@ -179,4 +183,17 @@ func mermaidChart(md *mermaid.Diagram, o options) (*Chart, Report, error) {
 	c.opts = o
 	c.report = report
 	return c, report, nil
+}
+
+// addLook puts the mode or the scheme that the theme of a Mermaid diagram
+// asks for in the config of its spec, as zuzu.mode or zuzu.scheme (D32).
+// The runtime takes it where the caller of a render sets no mode or no
+// scheme.
+func addLook(spec *vega.Spec, md *mermaid.Diagram) {
+	for k, v := range mermaid.Look(md) {
+		if spec.Config == nil {
+			spec.Config = vega.Config{}
+		}
+		spec.Config[k] = v
+	}
 }

@@ -85,11 +85,10 @@ func strictCheck(t *testing.T, src string) error {
 	if err != nil {
 		t.Fatalf("%q: %v", src, err)
 	}
-	switch d.Kind {
-	case "flowchart", "graph", "stateDiagram-v2", "classDiagram", "erDiagram":
-		_, _, err = Graph(d, true)
-	default:
+	if IsChart(d.Kind) {
 		_, _, _, err = Chart(d, true)
+	} else {
+		_, _, err = Graph(d, true)
 	}
 	return err
 }
@@ -189,6 +188,84 @@ func TestHints(t *testing.T) {
 	src := "---\nconfig:\n  layout: tidy\n---\nflowchart LR\n  A --> B\n"
 	if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
 		t.Errorf("%q: expected an unsupported setting, got %v", src, err)
+	}
+}
+
+// TestThemes reads each theme of Mermaid 12.3.0 with no issue in every
+// kind, in the front matter and in a directive, and checks the look that
+// Look gives for it (D32). Another theme, themeVariables and themeCSS stay
+// issues.
+func TestThemes(t *testing.T) {
+	t.Parallel()
+	bodies := []string{
+		"flowchart LR\n  A --> B\n",
+		"stateDiagram-v2\n  A --> B\n",
+		"classDiagram\n  A --> B\n",
+		"erDiagram\n  A ||--o{ B : has\n",
+		"requirementDiagram\n  requirement r {\n    id: 1\n  }\n",
+		"sequenceDiagram\n  A->>B: hi\n",
+		"pie\n  \"a\" : 1\n",
+		"sankey\nA,B,1\n",
+		"journey\n  section S\n    T: 5: Me\n",
+		"architecture-beta\n  service a(server)[A]\n",
+		"mindmap\n  root\n",
+		"wardley-beta\ncomponent A [0.5, 0.5]\n",
+		"radar-beta\naxis A, B, C\ncurve c{1, 2, 3}\n",
+		"treemap-beta\n\"A\": 1\n",
+		"quadrantChart\n  A: [0.5, 0.5]\n",
+		"xychart-beta\n  bar [1, 2]\n",
+		"gitGraph\n  commit\n",
+		"block-beta\n  a b\n",
+	}
+	looks := map[string]string{
+		"default": `zuzu.scheme:"mermaid-default"`, "base": `zuzu.scheme:"mermaid-base"`,
+		"neutral": `zuzu.scheme:"mermaid-neutral"`, "forest": `zuzu.scheme:"mermaid-forest"`,
+		"neo": `zuzu.scheme:"mermaid-neo"`, "redux": `zuzu.scheme:"mermaid-redux"`,
+		"redux-color": `zuzu.scheme:"mermaid-redux-color"`,
+		"dark":        `zuzu.mode:"dark"`, "neo-dark": `zuzu.mode:"dark"`,
+		"redux-dark": `zuzu.mode:"dark"`, "redux-dark-color": `zuzu.mode:"dark"`,
+	}
+	for name, want := range looks {
+		for _, head := range []string{
+			"---\nconfig:\n  theme: " + name + "\n---\n",
+			"%%{init: {'theme': '" + name + "'}}%%\n",
+		} {
+			for _, body := range bodies {
+				if err := strictCheck(t, head+body); err != nil {
+					t.Errorf("%q: %v", head+body, err)
+				}
+			}
+			d, err := Read(head + bodies[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for k, v := range Look(d) {
+				got = append(got, k+":"+string(v))
+			}
+			if len(got) != 1 || got[0] != want {
+				t.Errorf("%s: the look %v, want %s", name, got, want)
+			}
+		}
+	}
+	for _, body := range bodies {
+		for _, head := range []string{
+			"---\nconfig:\n  theme: sepia\n---\n",
+			"---\nconfig:\n  theme: Forest\n---\n",
+			"---\nconfig:\n  theme: forest\n  themeVariables:\n    primaryColor: '#ff0000'\n---\n",
+			"---\nconfig:\n  theme: forest\n  themeCSS: '.node rect { fill: red; }'\n---\n",
+		} {
+			if err := strictCheck(t, head+body); !errors.Is(err, vega.ErrUnsupported) {
+				t.Errorf("%q: expected an issue, got %v", head+body, err)
+			}
+		}
+	}
+	d, err := Read("---\nconfig:\n  theme: sepia\n---\n" + bodies[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l := Look(d); l != nil {
+		t.Errorf("the theme sepia: the look %v", l)
 	}
 }
 

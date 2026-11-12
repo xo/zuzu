@@ -92,14 +92,56 @@ const SCHEMES = {
         cat: ["#268bd2", "#859900", "#b58900", "#dc322f", "#2aa198", "#6c71c4", "#cb4b16", "#d33682"],
       },
     },
+  },  // A scheme from a light theme of Mermaid 12.3.0, which the theme of a
+  // Mermaid diagram selects (D32), brings the text and the line color of
+  // its theme for the light mode. docs/STYLE.md says how its colors come from
+  // the theme variables, and licenses/mermaid.txt holds the license.
+  "mermaid-default": {
+    source: "mermaid 12.3.0 themeVariables of default, MIT",
+    cat: ["#8683de", "#8e8f2e", "#bf6fbe", "#bb7d39", "#09a069", "#d4659d", "#6a983d", "#d86769", "#00a1a4", "#1a94e1"],
+    up: 4, down: 7, neutrals: { light: { text: "#333333", edge: "#333333" } },
+  },
+  "mermaid-base": {
+    source: "mermaid 12.3.0 themeVariables of base, MIT",
+    cat: ["#ab8530", "#b075ca", "#829332", "#5f8ce3", "#609a43", "#da6386", "#00a176", "#d26e57", "#009fc1"],
+    up: 4, down: 5, neutrals: { light: { text: "#333333", edge: "#0b0b0b" } },
+  },
+  "mermaid-neutral": {
+    source: "mermaid 12.3.0 themeVariables of neutral, MIT",
+    cat: ["#777777", "#b0b0b0", "#868686", "#c6c6c6", "#989898", "#d1d1d1", "#7f7f7f", "#bbbbbb", "#919191", "#a3a3a3"],
+    dark: ["#5e5e5e", "#969696", "#6d6d6d", "#ababab", "#7f7f7f", "#b6b6b6", "#666666", "#a0a0a0", "#777777", "#898989"],
+    up: 0, down: 1, neutrals: { light: { text: "#000000", edge: "#666666" } },
+  },
+  "mermaid-forest": {
+    source: "mermaid 12.3.0 themeVariables of forest, MIT",
+    cat: ["#789536", "#009cd1", "#da647d", "#359e5b", "#7188e2", "#00a189", "#b672c6", "#9d8a2d", "#cc724c"],
+    up: 3, down: 2, neutrals: { light: { text: "#000000", edge: "#000000" } },
+  },
+  "mermaid-neo": {
+    source: "mermaid 12.3.0 themeVariables of neo, MIT",
+    cat: ["#8982dd", "#8d902e", "#bf6ebe", "#bb7d3a", "#129f68", "#d4659c", "#6a983d", "#d86867", "#00a1a4", "#2493e1"],
+    up: 4, down: 7, neutrals: { light: { text: "#333333", edge: "#000000" } },
+  },
+  "mermaid-redux": {
+    source: "mermaid 12.3.0 themeVariables of redux, MIT",
+    cat: ["#787583", "#b2afbe", "#878593", "#c8c5d4", "#9a97a6", "#d3d0df", "#807d8b", "#bdbac9", "#928f9e", "#a4a1b0"],
+    dark: ["#5f5d6a", "#9794a3", "#6e6b79", "#aca9b8", "#807d8b", "#b7b4c3", "#676472", "#a29fae", "#787583", "#8a8796"],
+    up: 0, down: 1, neutrals: { light: { text: "#28253d", edge: "#000000" } },
+  },
+  "mermaid-redux-color": {
+    source: "mermaid 12.3.0 themeVariables of redux-color, MIT",
+    cat: ["#f4a8ff", "#46ecd5", "#ffb86a", "#dab2ff", "#7bf1a8", "#c4b4ff", "#ffa2a2", "#ffdf20", "#a3b3ff", "#bbf451"],
+    up: 4, down: 6, neutrals: { light: { text: "#28253d", edge: "#000000" } },
   },
 };
 function theme(mode, scheme = "zuzu") {
-  const s = SCHEMES[scheme], own = s.modes?.[mode];
-  const m = { ...MODES[mode], ...(own || {}), name: mode };
+  // A scheme can also bring some neutrals for a mode and keep its colors,
+  // as a scheme from a theme of Mermaid does.
+  const s = SCHEMES[scheme], own = s.modes?.[mode], part = s.neutrals?.[mode];
+  const m = { ...MODES[mode], ...(own || {}), ...(part || {}), name: mode };
   // A band behind a group of rows is the text at an opacity of 0.06 over
   // the background, so a scheme with its own neutrals gets its own band.
-  if (own) m.band = d3.color(d3.interpolateRgb(m.bg, m.text)(BAND)).formatHex();
+  if (own || part) m.band = d3.color(d3.interpolateRgb(m.bg, m.text)(BAND)).formatHex();
   let cat = own ? own.cat : mode === "dark" ? (s.dark || s.cat.map((c) => d3.hsl(c).brighter(0.45).formatHex())) : s.cat;
   // A palette with fewer than ten colors gets the rest as each color mixed
   // toward the text color, so that a chart with ten series still differs.
@@ -1134,7 +1176,7 @@ figcaption a { color: inherit; }
     <p>The look that zuzu aims for, at the quality of nivo and visx, in the light and the dark mode, drawn from real data. These are targets and not output of zuzu. docs/STYLE.md holds the rules they follow, and gen-targets.mjs draws them.</p>
   </header>
   ${TIER.map((name, i) => `<section><h2>${name}</h2>${cards(i)}</section>`).join("\n  ")}
-  <section id="schemes"><h2>Color schemes</h2><p>A theme is a mode and a color scheme. The same charts in each scheme, in both modes. The chart does not change, only the scheme. catppuccin and solarized come from the palettes of those editor themes, and bring their own background and text colors.</p>${schemeCards}</section>
+  <section id="schemes"><h2>Color schemes</h2><p>A theme is a mode and a color scheme. The same charts in each scheme, in both modes. The chart does not change, only the scheme. catppuccin and solarized come from the palettes of those editor themes, and bring their own background and text colors. The schemes named mermaid- come from the light themes of Mermaid, and bring their text and line colors.</p>${schemeCards}</section>
 </main>
 </body>
 </html>

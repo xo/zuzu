@@ -433,6 +433,29 @@ as `classic` and `neo`, draw in the look of zuzu too. A graph accepts
 `layout: dagre`, and another layout, such as `elk.box` or `tidy-tree`, is
 an issue. A mindmap accepts `cose-bilkent` and `tidy-tree` too.
 
+### The theme
+
+The `theme` of the config selects a look of zuzu, in every kind (D32):
+
+| Theme | Look |
+| --- | --- |
+| `dark`, `neo-dark`, `redux-dark`, `redux-dark-color` | the dark mode |
+| `default`, `base`, `neutral`, `forest`, `neo`, `redux`, `redux-color` | the scheme `mermaid-` and the name of the theme, such as `mermaid-forest` |
+
+"Schemes from the themes of Mermaid" in [STYLE.md](STYLE.md) holds the
+colors of each scheme. A scheme changes the colors only, and the shapes,
+the sizes and the type stay those of zuzu. The compiled spec carries the
+look in its `config`, as `zuzu.mode` or `zuzu.scheme`. A mode that the
+caller gives with `WithMode`, or a scheme that the caller gives with
+`WithScheme`, wins over the theme, as [API.md](API.md) says. A theme with
+`dark` in its name sets the mode only, so the scheme stays that of the
+caller, or `zuzu`. Each other theme sets the scheme only, so the mode stays
+that of the caller, or light.
+
+A theme that Mermaid 12.3.0 does not have, such as `sepia` or `Forest`, is
+an issue. `themeVariables` and `themeCSS` are issues too, except the theme
+variables that a chart reads, as the sections of the charts say.
+
 ### Settings that change nothing
 
 These settings change nothing in a still image. zuzu accepts them in every
@@ -705,8 +728,8 @@ the subgraph that holds it, as the subgraphs above say. With
 
 These parts are issues: a callback of `click` and the target of a link, as
 "Links and tooltips" says, a statement that starts with `callback` or
-`href`, the `theme` and the `themeVariables` of Mermaid, which draw in the
-look of zuzu, the other settings of the section `flowchart`, such as
+`href`, a `theme` that Mermaid does not have and the `themeVariables`,
+which draw in the look of zuzu, the other settings of the section `flowchart`, such as
 `minNodeWidth`, and any other style, such as `animation` on a node.
 
 ### Icons and images
@@ -813,8 +836,8 @@ says.
 These parts are issues: `scale`, a floating note with no state,
 such as `note "text" as N1`, a kind of state other than `choice`, `fork`
 and `join`, which draws as a state, the settings of the section `state` of
-the config other than `wrappingWidth`, the `theme` and the
-`themeVariables` of Mermaid, and a style that a flowchart does not read.
+the config other than `wrappingWidth`, a `theme` that Mermaid does not
+have, the `themeVariables`, and a style that a flowchart does not read.
 
 ### Class diagram
 
@@ -893,8 +916,8 @@ A class takes a link and a tooltip from `click`, `link` and `callback`, as
 
 These parts are issues: a callback, the settings of
 the section `class` of the config other than `hideEmptyMembersBox` and
-`hierarchicalNamespaces`, the `theme` and the `themeVariables` of
-Mermaid, and a style that a flowchart does not read.
+`hierarchicalNamespaces`, a `theme` that Mermaid does not have, the
+`themeVariables`, and a style that a flowchart does not read.
 
 ### Entity relationship diagram
 
@@ -962,8 +985,8 @@ class or a style of an entity with no attributes wins over the font of
 its markdown.
 
 These parts are issues: `click`, the settings of the section `er` of the
-config, the `theme` and the `themeVariables` of Mermaid, and a style that
-a flowchart does not read.
+config, a `theme` that Mermaid does not have, the `themeVariables`, and a
+style that a flowchart does not read.
 
 ### Requirement diagram
 
@@ -1037,8 +1060,8 @@ the bold and the italic words of such a line in bold and in italic.
 These parts are issues: a class or a style of a name before the definition
 of the name, the body of a second definition of a name, which Mermaid
 ignores, the settings of the section `requirement` of the config, the
-layout `elk`, the look `handDrawn`, the `theme` and the `themeVariables`
-of Mermaid, and a style that a flowchart does not read. A relation to a
+layout `elk`, the look `handDrawn`, a `theme` that Mermaid does not have,
+the `themeVariables`, and a style that a flowchart does not read. A relation to a
 name that is not a requirement or an element is an error, as in Mermaid.
 A name that is a requirement and also an element is an error. Mermaid
 draws its two boxes on top of each other.
@@ -1120,8 +1143,8 @@ wrap a label.
 ### Charts
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
-config that a chart does not read is an issue, and so are the `theme` and
-the `themeCSS`. Each chart but `sankey`, `mindmap` and `block` joins
+config that a chart does not read is an issue, and so are a `theme` that
+Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap` and `block` joins
 `accTitle` and `accDescr` into the description of the spec, as "The
 description" says. Mermaid does not read them in a sankey, a mindmap or a
 block diagram either, so there they are errors, as in Mermaid. Each chart

@@ -1,0 +1,13 @@
+---
+title: The forest theme
+config:
+  theme: forest
+---
+flowchart LR
+  A[Plant] --> B{Rain?}
+  B -->|Yes| C[Grow]
+  B -->|No| D[Water]
+  D --> C
+  subgraph S [Garden]
+    C --> E[Harvest]
+  end

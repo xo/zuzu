@@ -172,8 +172,8 @@ the wrong place does not compile.
 | `WithLoader(Loader)` | none | how the data of a `url` is read (D25) |
 | `WithValues(name string, rows []map[string]any)` | none | the rows of a named dataset, given by the program |
 | `WithResultSet(name string, rs ResultSet)` | none | the rows of a named dataset, read from the result of a query |
-| `WithMode(theme.Mode)` | `theme.Light` | the light or the dark mode (D14) |
-| `WithScheme(theme.Scheme)` | `theme.Zuzu` | the color scheme (D14, D15) |
+| `WithMode(theme.Mode)` | `zuzu.mode` of the spec, then `theme.Light` | the light or the dark mode (D14) |
+| `WithScheme(theme.Scheme)` | `zuzu.scheme` of the spec, then `theme.Zuzu` | the color scheme (D14, D15) |
 | `WithLocation(*time.Location)` | `time.Local` | the time zone of time scales and formats (D27) |
 | `WithLocale(format.Locale)` | `format.EnUS` | the locale of numbers and dates (D27) |
 | `WithRandom(func() rand.Source)` | a source seeded from the system | the random numbers of a render (D28) |
@@ -185,6 +185,18 @@ the wrong place does not compile.
 | `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
 | `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |
 | `WithEmoji(*text.Fallback)` | none, so an emoji draws nothing | the font of the emoji, from the package `text/emoji`, which draws an emoji in color (D32) |
+
+A spec can ask for a look in its `config`, with two keys that Vega does not
+have (D6, D32). `zuzu.mode` is `light` or `dark`, and `zuzu.scheme` is the
+name of a scheme that `theme.Lookup` finds, such as `mermaid-forest`. The
+compiler of Vega-Lite passes both on to the Vega config. The `theme` of a
+Mermaid diagram fills them. A mode that the caller gives with `WithMode`
+wins over `zuzu.mode`, and a scheme that the caller gives with `WithScheme`
+wins over `zuzu.scheme`, so a program that sets its own look keeps it. A
+value that zuzu does not have is an issue, even when the caller sets the
+look. It is an error in the strict mode. In the loose mode, it is a line of
+the report, and the render keeps the look of the caller or the default.
+`theme.ConfigMode` and `theme.ConfigScheme` name the two keys.
 
 A Go function cannot have two types, so the logger of a render is
 `WithRenderLogger`, and `WithLogger` is the logger of `Parse`.
@@ -531,11 +543,19 @@ const (
 
 // Scheme is a color scheme. Zuzu, Pastel, Harbor and Ember are built in,
 // and Schemes lists every scheme by name, with those from upstream themes
-// (D15).
+// (D15) and from the themes of Mermaid, such as mermaid-forest (D32). A
+// scheme from an upstream theme can bring its own neutrals for a mode.
 type Scheme struct{ /* unexported */ }
 
 func Lookup(name string) (Scheme, bool)
 func Schemes() []string
+
+// ConfigMode and ConfigScheme are the keys of the config of a spec that
+// ask for a mode and a scheme (D32).
+const (
+	ConfigMode   = "zuzu.mode"
+	ConfigScheme = "zuzu.scheme"
+)
 
 // Config returns the Vega config that a mode and a scheme make (D14).
 func Config(m Mode, s Scheme) vega.Config

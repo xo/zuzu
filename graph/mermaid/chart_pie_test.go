@@ -194,7 +194,7 @@ func TestPieIssues(t *testing.T) {
 		{"pie\n\"A\" : 1\n\"A\" : 2", `the second slice "A"`},
 		{"---\nconfig:\n  pie:\n    highlightSlice: hover\n---\npie\n\"A\" : 1", "pie.highlightSlice"},
 		{"---\nconfig:\n  pie:\n    legendPosition: center\n---\npie\n\"A\" : 1", "legend position center"},
-		{"---\nconfig:\n  theme: forest\n---\npie\n\"A\" : 1", "theme"},
+		{"---\nconfig:\n  theme: sepia\n---\npie\n\"A\" : 1", "theme"},
 		{"---\nconfig:\n  themeVariables:\n    pie2: red\n---\npie\n\"A\" : 1", "themeVariables"},
 		{"---\nconfig:\n  pie:\n    zuzu.textPlacement: middle\n---\npie\n\"A\" : 1", "text placement middle"},
 		{"---\nconfig:\n  pie:\n    zuzu.textPlacement: circle\n    textPosition: 0.5\n---\npie\n\"A\" : 1", "pie.textPosition"},

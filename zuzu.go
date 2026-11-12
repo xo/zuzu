@@ -236,7 +236,11 @@ type renderOptions struct {
 	loader     Loader
 	values     map[string][]dataflow.Row
 	resultSets map[string]ResultSet
+	// mode and scheme are the look of WithMode and WithScheme, and
+	// hasMode and hasScheme say that the caller set them, so that they
+	// win over the look that the config of the spec asks for (D32).
 	mode       theme.Mode
+	hasMode    bool
 	scheme     theme.Scheme
 	hasScheme  bool
 	loc        *time.Location
@@ -298,12 +302,16 @@ func WithResultSet(name string, rs ResultSet) RenderOption {
 	}
 }
 
-// WithMode sets the light or the dark mode (D14).
+// WithMode sets the light or the dark mode (D14). It wins over the mode
+// that the spec asks for with zuzu.mode in its config, such as the dark
+// theme of a Mermaid diagram (D32).
 func WithMode(m theme.Mode) RenderOption {
-	return func(o *renderOptions) { o.mode = m }
+	return func(o *renderOptions) { o.mode, o.hasMode = m, true }
 }
 
-// WithScheme sets the color scheme (D14).
+// WithScheme sets the color scheme (D14). It wins over the scheme that the
+// spec asks for with zuzu.scheme in its config, such as the forest theme
+// of a Mermaid diagram (D32).
 func WithScheme(s theme.Scheme) RenderOption {
 	return func(o *renderOptions) { o.scheme, o.hasScheme = s, true }
 }
@@ -371,7 +379,10 @@ type View struct {
 
 // NewView runs the spec and keeps its state.
 func (c *Chart) NewView(ctx context.Context, opts ...RenderOption) (*View, Report, error) {
-	rt := newRuntime(ctx, c, opts)
+	rt, err := newRuntime(ctx, c, opts)
+	if err != nil {
+		return nil, nil, err
+	}
 	s, err := rt.render()
 	if err != nil {
 		return nil, rt.report, err
@@ -398,7 +409,10 @@ func (c *Chart) NewView(ctx context.Context, opts ...RenderOption) (*View, Repor
 		// The guides of a smaller plot can take another size, so a render
 		// that misses the size corrects the plot again, twice at most.
 		for range 3 {
-			again := newRuntime(ctx, c, append(slices.Clone(opts), WithSize(fw, fh)))
+			again, err := newRuntime(ctx, c, append(slices.Clone(opts), WithSize(fw, fh)))
+			if err != nil {
+				return nil, nil, err
+			}
 			if s, err = again.render(); err != nil {
 				return nil, again.report, err
 			}

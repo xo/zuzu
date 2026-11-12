@@ -213,7 +213,7 @@ func TestStateIssues(t *testing.T) {
 		{`note "floating" as N1`, "a note that floats, with no state"},
 		{"state h <<history>>", "the kind of state history, drawn as a state"},
 		{"a\nclassDef x text-decoration:underline", "the style text-decoration"},
-		{"---\nconfig:\n  theme: forest\n---\nstateDiagram-v2\na", "the theme of Mermaid, drawn in the look of zuzu"},
+		{"---\nconfig:\n  theme: sepia\n---\nstateDiagram-v2\na", "the theme of Mermaid, drawn in the look of zuzu"},
 		{"%%{init: {'state': {'nodeSpacing': 10}}}%%\nstateDiagram-v2\na", "the setting state.nodeSpacing"},
 	}
 	for _, test := range tests {

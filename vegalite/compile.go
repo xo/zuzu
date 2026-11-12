@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -164,10 +165,11 @@ func readConfig(raw []byte) *config {
 // passedConfig are the parts of the config of a spec that the Vega config
 // holds with the same names and meaning: the styles of marks, the guides,
 // the ranges and the background, which the runtime applies, as
-// vega-lite.js passes them on.
+// vega-lite.js passes them on, and the mode and the scheme that a spec
+// asks for (D32).
 var passedConfig = []string{
 	"style", "axis", "axisX", "axisY", "axisTop", "axisBottom", "axisLeft", "axisRight", "axisBand",
-	"legend", "title", "range", "background",
+	"legend", "title", "range", "background", theme.ConfigMode, theme.ConfigScheme,
 }
 
 // styleConfig returns the parts of the config of a spec that pass on to the

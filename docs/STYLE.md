@@ -94,6 +94,60 @@ targets show two prototypes:
 
 [`targets/licenses/`](targets/licenses/) holds the license of each source.
 
+### Schemes from the themes of Mermaid
+
+The `theme` of a Mermaid diagram selects a look of zuzu (D32). A theme with
+`dark` in its name, such as `dark`, `neo-dark`, `redux-dark` or
+`redux-dark-color`, selects the dark mode. Each other theme selects the
+scheme with its colors, named `mermaid-` and the name of the theme. The
+colors come from the theme variables of Mermaid 12.3.0, as mmdc resolves
+them, under the MIT license in
+[`targets/licenses/mermaid.txt`](targets/licenses/mermaid.txt).
+
+1. The categorical colors take the hues of `cScale0` to `cScale11` of the
+   theme, the colors that Mermaid gives to the sections of a diagram. A
+   gray, and a hue within 20 degrees of a hue before it, are left out. The
+   first hue is that of `cScale0`. Each next hue is the first in the order
+   of `cScale` that differs from the hue before it by 90 degrees or more.
+   If none does, it is the hue that differs most. `base` and `forest` keep
+   nine hues, so their tenth color is mixed toward the text color.
+2. Each of these colors has a lightness of 58 and a chroma of 50 in CIE LCh.
+   So it has a contrast of about 3.3:1 with `bg`, as the colors of `zuzu`
+   have. Mermaid draws these hues as pale fills, which do not read as a line
+   or a small mark.
+3. `neutral` and `redux` have only grays in `cScale`. So `mermaid-neutral`
+   takes ten grays, as the pie of `neutral` has grays, and `mermaid-redux`
+   takes ten grays in the hue of the ink of `redux`, `#28253d`, at a chroma
+   of 8, as the border of its clusters, `#bdbccc`, has. Their lightness in
+   CIE LCh is 50, 72, 56, 80, 63, 84, 53, 76, 60 and 67, so that neighbors
+   differ and the text reads on each. A light gray lifted for the dark mode
+   is almost white, so in the dark mode each gray is 10 darker, and the
+   text of the dark mode reads on it:
+
+   | Scheme | Colors of the dark mode, from 1 |
+   | --- | --- |
+   | `mermaid-neutral` | `#5e5e5e` `#969696` `#6d6d6d` `#ababab` `#7f7f7f` `#b6b6b6` `#666666` `#a0a0a0` `#777777` `#898989` |
+   | `mermaid-redux` | `#5f5d6a` `#9794a3` `#6e6b79` `#aca9b8` `#807d8b` `#b7b4c3` `#676472` `#a29fae` `#787583` `#8a8796` |
+4. `mermaid-redux-color` takes `cScale0` to `cScale9` of `redux-color` as
+   they are. These colors are light, as those of `pastel` are.
+5. A scheme brings two neutrals of its theme for the light mode: `text` is
+   the `textColor` of the theme, and `edge` is its `lineColor`. `band`
+   follows the text. The other neutrals, and the neutrals of the dark mode,
+   are those of zuzu, because a theme of Mermaid has one variant (D15). The
+   line of a theme of Mermaid is darker than `muted`.
+6. A scheme changes colors only. The shapes, the sizes and the type stay
+   those of zuzu.
+
+| Scheme | Colors, from 1 | Rise, fall | `text` | `edge` |
+| --- | --- | --- | --- | --- |
+| `mermaid-default` | `#8683de` `#8e8f2e` `#bf6fbe` `#bb7d39` `#09a069` `#d4659d` `#6a983d` `#d86769` `#00a1a4` `#1a94e1` | 5, 8 | `#333333` | `#333333` |
+| `mermaid-base` | `#ab8530` `#b075ca` `#829332` `#5f8ce3` `#609a43` `#da6386` `#00a176` `#d26e57` `#009fc1` | 5, 6 | `#333333` | `#0b0b0b` |
+| `mermaid-neutral` | `#777777` `#b0b0b0` `#868686` `#c6c6c6` `#989898` `#d1d1d1` `#7f7f7f` `#bbbbbb` `#919191` `#a3a3a3` | 1, 2 | `#000000` | `#666666` |
+| `mermaid-forest` | `#789536` `#009cd1` `#da647d` `#359e5b` `#7188e2` `#00a189` `#b672c6` `#9d8a2d` `#cc724c` | 4, 3 | `#000000` | `#000000` |
+| `mermaid-neo` | `#8982dd` `#8d902e` `#bf6ebe` `#bb7d3a` `#129f68` `#d4659c` `#6a983d` `#d86867` `#00a1a4` `#2493e1` | 5, 8 | `#333333` | `#000000` |
+| `mermaid-redux` | `#787583` `#b2afbe` `#878593` `#c8c5d4` `#9a97a6` `#d3d0df` `#807d8b` `#bdbac9` `#928f9e` `#a4a1b0` | 1, 2 | `#28253d` | `#000000` |
+| `mermaid-redux-color` | `#f4a8ff` `#46ecd5` `#ffb86a` `#dab2ff` `#7bf1a8` `#c4b4ff` `#ffa2a2` `#ffdf20` `#a3b3ff` `#bbf451` | 5, 7 | `#28253d` | `#000000` |
+
 ## Type
 
 zuzu bundles IBM Plex Sans (D16). The targets name it first, then Inter,

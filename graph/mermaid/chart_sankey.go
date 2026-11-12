@@ -226,7 +226,7 @@ func (c *chart) settings(section string, read []string, own ...string) (map[stri
 					}
 				}
 			}
-		case slices.Contains(own, k), inert(c.d.Kind, k):
+		case slices.Contains(own, k), accepted(c.d.Kind, k, cfg[k]):
 		case k == "theme" || k == "themeVariables" || k == "themeCSS":
 			err = c.add("the %s of Mermaid, drawn in the look of zuzu", k)
 		default:

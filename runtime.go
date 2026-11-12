@@ -66,8 +66,9 @@ type runtime struct {
 	err error
 }
 
-// newRuntime makes the runtime of a render.
-func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
+// newRuntime makes the runtime of a render. A look that the config of the
+// spec asks for and zuzu does not have is an error in the strict mode.
+func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) (*runtime, error) {
 	o := renderOptions{scheme: theme.Zuzu}
 	for _, opt := range opts {
 		opt(&o)
@@ -88,13 +89,18 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
 	} else {
 		rt.rand = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) //nolint:gosec // A chart asks for random data, not a secret (D28).
 	}
-	rt.theme = theme.New(o.mode, o.scheme)
+	if err := rt.look(); err != nil {
+		return nil, err
+	}
 	if o.hasBackground && o.background != "transparent" {
 		rt.theme.Background = o.background
 	}
 	rt.config = rt.theme.Config()
 	rt.endLabels = map[string]map[string]bool{}
 	for k, raw := range c.spec.Config {
+		if k == theme.ConfigMode || k == theme.ConfigScheme {
+			continue
+		}
 		var v any
 		if err := json.Unmarshal(raw, &v); err == nil {
 			rt.config[k] = mergeConfig(rt.config[k], v)
@@ -102,7 +108,51 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
 	}
 	rt.root = rt.newScope(nil, &c.spec.Scope, "", nil)
 	rt.root.builtins(c.spec)
-	return rt
+	return rt, nil
+}
+
+// look sets the theme of the render from the mode and the scheme of the
+// caller. Where the caller sets none, it takes the mode of zuzu.mode and
+// the scheme of zuzu.scheme in the config of the spec, such as the theme
+// of a Mermaid diagram (D32). A value that zuzu does not have is an issue,
+// whether the caller sets the look or not.
+func (rt *runtime) look() error {
+	o := rt.opts
+	mode, scheme := o.mode, o.scheme
+	cfg := rt.chart.spec.Config
+	if raw, ok := cfg[theme.ConfigMode]; ok {
+		var name string
+		_ = json.Unmarshal(raw, &name)
+		var m theme.Mode
+		switch name {
+		case "light":
+			m = theme.Light
+		case "dark":
+			m = theme.Dark
+		default:
+			if err := rt.issue(vega.ErrUnsupported, "config."+theme.ConfigMode, "the mode %s", raw); err != nil {
+				return err
+			}
+			m = mode
+		}
+		if !o.hasMode {
+			mode = m
+		}
+	}
+	if raw, ok := cfg[theme.ConfigScheme]; ok {
+		var name string
+		_ = json.Unmarshal(raw, &name)
+		s, found := theme.Lookup(name)
+		if !found {
+			if err := rt.issue(vega.ErrUnsupported, "config."+theme.ConfigScheme, "the color scheme %s", raw); err != nil {
+				return err
+			}
+		} else if !o.hasScheme {
+			scheme = s
+		}
+	}
+	rt.theme = theme.New(mode, scheme)
+	return nil
 }
 
 // issue handles a feature that zuzu does not support: an error in the

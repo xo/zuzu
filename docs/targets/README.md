@@ -7,9 +7,9 @@ real data. The targets are not output of zuzu, and they can change.
 
 | File | What it is |
 | --- | --- |
-| `index.html` | the gallery, which the script writes: every target in the light and the dark mode, side by side, and four charts in each of the six color schemes |
+| `index.html` | the gallery, which the script writes: every target in the light and the dark mode, side by side, and four charts in each of the thirteen color schemes |
 | `svg/<chart>-light.svg`, `svg/<chart>-dark.svg` | the targets in the default scheme |
-| `svg/<chart>-<scheme>-<mode>.svg` | four charts in each of the other five schemes (D14, D15) |
+| `svg/<chart>-<scheme>-<mode>.svg` | four charts in each of the other twelve schemes (D14, D15, D32) |
 | `licenses/` | the license of each upstream theme that a scheme takes its colors from (D15) |
 | `gen-targets.mjs` | the script that writes the targets and the gallery |
 | `package.json` | the packages of the script, with pinned versions |

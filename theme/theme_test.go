@@ -1,9 +1,11 @@
 package theme
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -149,5 +151,67 @@ func TestTheEdgesTakeTheColorOfAnEdge(t *testing.T) {
 				t.Errorf("%s: the %s of %s is %v, want %s", m, c.prop, c.style, got, c.want)
 			}
 		}
+	}
+}
+
+// TestTheMermaidSchemesMatchTheStyle checks the schemes of the themes of
+// Mermaid against their tables in docs/STYLE.md: the colors, the rise and
+// the fall, the text and the edge of the light mode, and the colors of the
+// dark mode where a scheme gives them.
+func TestTheMermaidSchemesMatchTheStyle(t *testing.T) {
+	t.Parallel()
+	doc := style(t)
+	colors := regexp.MustCompile("#[0-9a-f]{6}")
+	rows := regexp.MustCompile("(?m)^\\| `(mermaid-[a-z-]+)` \\| ((?:`#[0-9a-f]{6}` ?)+) \\| ([0-9]+), ([0-9]+) \\| `(#[0-9a-f]{6})` \\| `(#[0-9a-f]{6})` \\|$").
+		FindAllStringSubmatch(doc, -1)
+	if len(rows) != 7 {
+		t.Fatalf("docs/STYLE.md has %d schemes of Mermaid, expected 7", len(rows))
+	}
+	for _, row := range rows {
+		s, ok := Lookup(row[1])
+		if !ok {
+			t.Errorf("Lookup(%q) found nothing", row[1])
+			continue
+		}
+		if got, want := strings.Join(s.light, " "), strings.Join(colors.FindAllString(row[2], -1), " "); got != want {
+			t.Errorf("%s: the package has %s and docs/STYLE.md has %s", row[1], got, want)
+		}
+		if got, want := fmt.Sprintf("%d, %d", s.up+1, s.down+1), row[3]+", "+row[4]; got != want {
+			t.Errorf("%s: the rise and the fall are %s, and docs/STYLE.md has %s", row[1], got, want)
+		}
+		th := New(Light, s)
+		if th.Text != row[5] || th.Edge != row[6] {
+			t.Errorf("%s: the text and the edge are %s and %s, and docs/STYLE.md has %s and %s", row[1], th.Text, th.Edge, row[5], row[6])
+		}
+	}
+	dark := regexp.MustCompile("(?m)^   \\| `(mermaid-[a-z-]+)` \\| ((?:`#[0-9a-f]{6}` ?)+) \\|$").FindAllStringSubmatch(doc, -1)
+	if len(dark) != 2 {
+		t.Fatalf("docs/STYLE.md has %d schemes of Mermaid with dark colors, expected 2", len(dark))
+	}
+	for _, row := range dark {
+		s, _ := Lookup(row[1])
+		if got, want := strings.Join(New(Dark, s).Category, " "), strings.Join(colors.FindAllString(row[2], -1), " "); got != want {
+			t.Errorf("%s: the dark mode has %s and docs/STYLE.md has %s", row[1], got, want)
+		}
+	}
+}
+
+// TestASchemeBringsItsOwnNeutrals checks that a neutral of a scheme
+// replaces that of its mode only, and that the band follows the text.
+func TestASchemeBringsItsOwnNeutrals(t *testing.T) {
+	t.Parallel()
+	light := New(Light, mermaidForest)
+	if light.Text != "#000000" || light.Edge != "#000000" {
+		t.Errorf("the light forest has the text %s and the edge %s", light.Text, light.Edge)
+	}
+	if want := mix(light.Background, light.Text, BandOpacity); light.Band != want {
+		t.Errorf("the band of the light forest is %s, want %s", light.Band, want)
+	}
+	n := neutrals(Light)
+	if light.Background != n.Background || light.Muted != n.Muted || light.Axis != n.Axis {
+		t.Errorf("the light forest changed a neutral that it does not bring: %+v", light.Neutrals)
+	}
+	if dark := New(Dark, mermaidForest); dark.Neutrals != neutrals(Dark) {
+		t.Errorf("the dark forest has %+v, want the neutrals of the dark mode", dark.Neutrals)
 	}
 }

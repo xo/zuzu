@@ -451,7 +451,7 @@ func TestSequenceIssues(t *testing.T) {
 		{"sequenceDiagram\nrect nocolor\nA->>B: hi\nend", "nocolor"},
 		{"---\nconfig:\n  sequence:\n    bottomMarginAdj: 2\n---\nsequenceDiagram\nA->>B: hi", "sequence.bottomMarginAdj"},
 		{"---\nconfig:\n  sequence:\n    messageAlign: middle\n---\nsequenceDiagram\nA->>B: hi", "sequence.messageAlign"},
-		{"---\nconfig:\n  theme: dark\n---\nsequenceDiagram\nA->>B: hi", "theme"},
+		{"---\nconfig:\n  theme: sepia\n---\nsequenceDiagram\nA->>B: hi", "theme"},
 	}
 	for _, test := range tests {
 		report, err := compileMermaid(t, test.src, false)

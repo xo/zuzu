@@ -23,12 +23,18 @@ is in `docs/BACKLOG.md`.
 3. `animate` and `animation` on a link of Mermaid draw the link dashed, as
    one still frame of Mermaid, with no issue. A still image has no motion
    (open question 24).
-4. The `theme` of Mermaid selects a look of zuzu. `dark` and each theme
-   whose name ends in `-dark` select the dark mode. Each other theme, such
-   as `forest` or `neutral`, selects a color scheme of zuzu that has the
-   colors of that theme. A scheme that zuzu does not have yet comes first
-   in `docs/STYLE.md`, as D14 and D15 say. `themeVariables` and `themeCSS`
-   stay issues (open question 21).
+4. The `theme` of Mermaid selects a look of zuzu. Each theme with `dark`
+   in its name, such as `dark`, `redux-dark` or `redux-dark-color`, selects
+   the dark mode. Each other theme, such as `forest` or `neutral`, selects
+   a color scheme of zuzu that has the colors of that theme. A scheme that
+   zuzu does not have yet comes first in `docs/STYLE.md`, as D14 and D15
+   say. `themeVariables` and `themeCSS` stay issues (open question 21).
+   The theme of the source applies by default. A mode or a scheme that the
+   caller gives with `WithMode` or `WithScheme` wins over it, so a program
+   that sets its own look keeps it (open question 27). The compiled spec
+   carries the theme in its `config` as `zuzu.mode` or `zuzu.scheme`, and
+   the runtime takes each one only where the caller sets no mode or no
+   scheme.
 
 ## Fonts and text
 

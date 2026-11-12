@@ -376,7 +376,7 @@ func TestTimelineSettings(t *testing.T) {
 		"disableMulticolor that is not a boolean": "---\nconfig:\n  timeline:\n    disableMulticolor: 1\n---\n" + body,
 		"the padding of Mermaid":                  "---\nconfig:\n  timeline:\n    padding: 10\n---\n" + body,
 		"the colors of the sections":              "---\nconfig:\n  themeVariables:\n    cScale0: '#ff0000'\n---\n" + body,
-		"the theme":                               "---\nconfig:\n  theme: forest\n---\n" + body,
+		"an unknown theme":                        "---\nconfig:\n  theme: sepia\n---\n" + body,
 	}
 	for name, src := range tests {
 		if _, err := chartOf(src, true); !errors.Is(err, vega.ErrUnsupported) {
@@ -389,6 +389,7 @@ func TestTimelineSettings(t *testing.T) {
 	}
 	for _, src := range []string{
 		"---\nconfig:\n  timeline:\n    disableMulticolor: false\n    useMaxWidth: false\n  look: neo\n---\n" + body,
+		"---\nconfig:\n  theme: forest\n---\n" + body,
 		"%%{init: {'timeline': {'disableMulticolor': true}}}%%\n" + body,
 	} {
 		if report, err := chartOf(src, true); err != nil || len(report) != 0 {
