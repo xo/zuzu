@@ -112,6 +112,8 @@ func TestInertSettings(t *testing.T) {
 		"timeline":        "timeline\n  2020 : a\n",
 		"c4":              "C4Context\n  Person(a, \"A\")\n",
 		"ishikawa":        "ishikawa-beta\n  P\n  A\n",
+		"cynefin":         "cynefin-beta\n  complex \"a\"\n",
+		"info":            "info\n",
 	}
 	sections := map[string]string{
 		"flowchart": "flowchart", "stateDiagram-v2": "state", "classDiagram": "class", "erDiagram": "er",
@@ -120,6 +122,7 @@ func TestInertSettings(t *testing.T) {
 		"timeline": "timeline",
 		"c4":       "c4",
 		"ishikawa": "ishikawa",
+		"cynefin":  "cynefin", "info": "info",
 	}
 	for name, body := range bodies {
 		src := "---\nconfig:\n" + inertConfig + "  " + sections[name] + ":\n    useMaxWidth: false\n---\n" + body
@@ -181,6 +184,7 @@ func TestHints(t *testing.T) {
 		"xychart-beta\n  bar [1, 2]\n",
 		"C4Context\n  Person(a, \"A\")\n",
 		"ishikawa-beta\n  P\n  A\n",
+		"cynefin-beta\n  complex \"a\"\n", "info\n",
 	}
 	// The look handDrawn and the layout elk are hints, in the config or
 	// at the top of the front matter, with a description (D32).

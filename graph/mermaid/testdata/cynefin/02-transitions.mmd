@@ -1,0 +1,18 @@
+cynefin-beta
+  title Strategy Categorization
+
+  complex
+  "Market research"
+  complicated
+  "Competitive analysis"
+  clear
+  "Standard pricing"
+  chaotic
+  "Crisis management"
+
+  complex --> complicated : "Pattern identified"
+  complicated --> clear : "Best practice codified"
+  clear --> chaotic
+  chaotic --> complex : "Stabilized"
+  %% A transition from a domain to itself draws nothing, as in Mermaid.
+  complex --> complex : "Self-loop"

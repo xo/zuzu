@@ -168,6 +168,10 @@ func Read(src string) (*Diagram, error) {
 			if d.Kind == "gitGraph:" {
 				d.Kind, d.Header = "gitGraph", strings.TrimSpace(":"+d.Header)
 			}
+			// A Cynefin diagram can start with cynefin-beta and a colon.
+			if d.Kind == "cynefin-beta:" {
+				d.Kind = "cynefin-beta"
+			}
 			d.N = n0 + k + 1
 			continue
 		}

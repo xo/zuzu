@@ -114,6 +114,7 @@ var mermaidKinds = map[string]bool{
 	"zenuml": true, "venn-beta": true, "ishikawa": true, "ishikawa-beta": true, "wardley-beta": true,
 	"treeView-beta": true, "eventmodeling": true, "swimlane-beta": true, "cynefin-beta": true, "usecase-beta": true,
 	"agentflow-beta": true, "railroad-beta": true, "info": true,
+	"cynefin-beta:": true,
 }
 
 // parseDiagram reads a source of DOT or Mermaid and compiles it into a

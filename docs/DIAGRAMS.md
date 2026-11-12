@@ -1648,6 +1648,8 @@ the source draws once, with its label.
 | `timeline` | Vega rects, rules, paths and text, laid out in Go: the periods along an axis, each with its events |
 | `C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment` | Vega rects, paths and text, laid out in Go in the rows of Mermaid |
 | `ishikawa`, `ishikawa-beta` | Vega rules, symbols, paths, rects and text, laid out in Go: the problem at the head of a spine, and the causes as bones |
+| `cynefin-beta` | Vega rects, paths and text, laid out in Go as Mermaid lays them out: the four domains in the quarters and confusion in the middle |
+| `info` | Vega text: the version of Mermaid |
 
 #### pie
 
@@ -2675,6 +2677,109 @@ bones take `edgeWidth`. The arrowhead of the bone of a cause is
 `arrowLength` long, and the arrowhead of a smaller bone is 0.75 of it.
 The padding around the diagram is 8 pixels, scaled by
 `ishikawa.diagramPadding` over 20.
+
+#### cynefin-beta
+
+The keyword is `cynefin-beta`, or `cynefin-beta:`. A Cynefin diagram draws
+the four domains of the Cynefin framework, the items in each domain, and
+the transitions between them. Statements can follow the keyword on its
+line, as in Mermaid.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `title Text` | the title, over the `title` of the front matter |
+| a domain: `complex`, `complicated`, `clear`, `chaotic` or `confusion` | the start of a block of items of that domain |
+| a string in double or single quotes after a domain, as `"Restart service"` | an item of the domain |
+| `complex --> complicated : "Label"` | a transition from one domain to another, with a label or none |
+| `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` | the description of the Vega spec, the texts joined in order |
+
+zuzu reads the statements as the grammar of Mermaid 12.3 reads them:
+
+1. The items of a block can be on the line of the domain, or on the lines
+   after it, and two blocks can be on one line.
+2. A block of a domain that the source names again replaces the items of
+   the block before it, as in Mermaid. A block with no items draws its
+   domain with none.
+3. A transition is on one line and nothing follows it. Its label is a
+   string. A transition from a domain to itself draws nothing, with no
+   issue, as in Mermaid.
+4. A backslash in a string escapes the next character. An escape of a new
+   line or a tab draws as a space, as in the SVG of Mermaid. An entity,
+   such as `#quot;`, reads as its character.
+5. `title` alone sets an empty title, which draws no title.
+
+These are errors, as in Mermaid: a string before the first domain or after
+a transition, a word that is not a domain, such as `complexity`, a string
+with no end quote, a label that is not a string, a transition with text
+after it, and `-->` on a line of its own.
+
+zuzu lays out a Cynefin diagram with the sizes of Mermaid 12.3. The
+diagram is 800 by 600 pixels, or `cynefin.width` by `cynefin.height`.
+Complex is the top left quarter, complicated the top right, chaotic the
+bottom left and clear the bottom right. A dashed wavy boundary runs from
+the top to the bottom and another from the left to the right, through the
+middle. Each boundary is 7 curves that wave by `cynefin.boundaryAmplitude`,
+8 pixels by default, and 0 makes it straight. The waves come from
+`cynefin.seed`, with the numbers of Mermaid, so the same seed draws the
+same waves. When the seed is 0, the default, zuzu seeds the waves with the
+id of the SVG of mmdc, `my-svg`, and draws the waves of mmdc. A thick
+boundary, the cliff, runs from the middle down to the bottom between
+clear and chaotic. Confusion is an ellipse in the middle, 0.15 of the
+width and of the height across each half.
+
+The name of each domain is at its center, with its model and its practice
+under it, such as "Probe → Sense → Respond" and "Emergent Practices".
+`cynefin.showDomainDescriptions: false` hides them. The items of a domain
+are badges under its name, one under the other. Confusion shows its first
+3 items, and a dashed badge, such as "+2 more", counts the rest, as in
+Mermaid. A transition is a curve from the center of one domain to the
+center of another, bent to its left by 0.15 of its length, with an
+arrowhead at its end. Its label is over the control point of the curve. A
+label of a Cynefin diagram does not wrap, as in Mermaid.
+
+Each domain takes a color of the category scheme of the theme. In the
+scheme `zuzu`, complicated is blue violet, complex teal, clear saffron,
+chaotic raspberry and confusion violet, the hues that Mermaid gives them.
+A domain is a light tint of its color, and its items have a tint and an
+outline in its color. The cliff takes the color of chaotic, and the
+boundaries, the transitions and their arrowheads take the color `edge`.
+
+zuzu reads `cynefin.width`, `cynefin.height`, `cynefin.padding`,
+`cynefin.showDomainDescriptions`, `cynefin.boundaryAmplitude` and
+`cynefin.seed`. zuzu draws its own margin of 8 pixels, and
+`cynefin.padding` replaces it. A value of the wrong type, such as a width
+that is not a positive number, is an issue. zuzu also reads these
+variables of `themeVariables.cynefin`: `complexBg`, `complicatedBg`,
+`clearBg`, `chaoticBg` and `confusionBg` replace the color of a domain,
+`boundaryColor` the color of the boundaries, `cliffColor` the color of the
+cliff, `arrowColor` the color of the transitions, `textColor` the color of
+the items and the labels, and `labelColor` the color of the names. The
+other variables of `themeVariables.cynefin`, such as `cliffWidth` or
+`itemFontSize`, are issues.
+
+zuzu draws a Cynefin diagram in another way than Mermaid 12.3.0:
+
+1. Mermaid centers the title over the diagram. zuzu puts it at the top
+   left, as in every chart.
+2. Mermaid draws the outline of an item in the color of the boundaries.
+   zuzu draws it in the color of the domain.
+3. Mermaid colors the domains with the colors of `themeVariables.cynefin`,
+   whatever the theme. zuzu colors them with the category scheme that the
+   theme selects.
+
+#### info
+
+The keyword is `info`. `showInfo` can follow it, on its line or the next,
+and changes nothing, as in Mermaid. A `title`, an `accTitle` and an
+`accDescr` can come after them. Each other text is an error, as in
+Mermaid.
+
+mmdc draws the text `v12.3.0`, the version of Mermaid, at 32 pixels, for
+`info` and for `info showInfo`. zuzu draws the same text at the same size,
+because zuzu reads Mermaid 12.3.0. It does not draw the version of zuzu.
+Mermaid draws no title on an info diagram, not even the `title` of the
+front matter, and neither does zuzu. `accTitle` and `accDescr` go in the
+description of the Vega spec. An info diagram has 2 fixtures.
 
 ### Other kinds
 
