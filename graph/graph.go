@@ -40,9 +40,11 @@ type Graph struct {
 	// no < and > around it, or empty. It draws in the place of Title, at
 	// the top left of the diagram.
 	TitleHTML string
-	Nodes     []*Node
-	Edges     []*Edge
-	Clusters  []*Cluster
+	// TitleStyle holds the fontWeight and the fontStyle of Title, or nil.
+	TitleStyle map[string]string
+	Nodes      []*Node
+	Edges      []*Edge
+	Clusters   []*Cluster
 	// RankSep and NodeSep are the space between the ranks and between the
 	// nodes of a rank, or 0 for the defaults.
 	RankSep, NodeSep float64

@@ -152,8 +152,8 @@ func (p *parser) label(v, id, scheme, path string) (string, string, error) {
 // braces and the bars outside the tags split the fields, and the text of
 // each field is HTML. A field draws its lines in their fonts, at the left
 // when each of its lines ends with <br align="left"/>. A table in a field,
-// a line in more than one font, a font with a color, a size or a face, and
-// a line at the right are issues.
+// a line in more than one font, a font with a color or a size, and a line
+// at the right are issues. A face gives the field its weight and its style.
 func (p *parser) htmlRecord(src, scheme, path string) ([]graph.Field, error) {
 	var out []graph.Field
 	for _, part := range splitRecord(src) {
@@ -196,14 +196,28 @@ func (p *parser) htmlField(lines []html.Line, path string) (graph.Field, error) 
 				continue
 			}
 			ft := graph.Font{Bold: s.Font.Bold, Italic: s.Font.Italic, Underline: s.Font.Underline}
+			x := s.Font
+			// A face gives a weight and a style, such as Helvetica-Bold,
+			// and zuzu draws the rest of its name in IBM Plex Sans (D32).
+			// A field draws bold or not.
+			weight, style := graph.FontFace(x.Face)
+			switch weight {
+			case "":
+			case graph.BoldWeight:
+				ft.Bold = true
+			default:
+				if err := p.issues.Add(path, "the weight %s of the face %s in a field of a record", weight, x.Face); err != nil {
+					return f, err
+				}
+			}
+			ft.Italic = ft.Italic || style != ""
 			if first {
 				font, first = ft, false
 			} else if ft != font {
 				mixed = true
 			}
-			x := s.Font
-			if x.Color != "" || x.Size != 0 || x.Face != "" || x.Overline || x.Strike || x.Sub || x.Sup {
-				if err := p.issues.Add(path, "a font with a color, a size, a face or a line over or through its text in a field of a record"); err != nil {
+			if x.Color != "" || x.Size != 0 || x.Overline || x.Strike || x.Sub || x.Sup {
+				if err := p.issues.Add(path, "a font with a color or a size, or a line over or through its text, in a field of a record"); err != nil {
 					return f, err
 				}
 			}

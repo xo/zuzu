@@ -1,0 +1,113 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,250.25,328.5",
+  "fontname": "Times-Italic",
+  "label": "Font names",
+  "lheight": "0.23",
+  "lp": "125.12,12.25",
+  "lwidth": "0.89",
+  "_subgraph_cnt": 1,
+  "objects": [
+    {
+      "name": "cluster_light",
+      "bb": "102.25,175,242.25,250.75",
+      "fontname": "Arial Light",
+      "label": "Arial Light",
+      "lheight": "0.22",
+      "lp": "172.25,238.88",
+      "lwidth": "0.83",
+      "_gvid": 0,
+      "nodes": [
+        5
+      ]
+    },
+    {
+      "_gvid": 1,
+      "name": "a",
+      "fontname": "Helvetica-Bold",
+      "height": "0.5",
+      "label": "Helvetica-Bold",
+      "pos": "113.25,310.5",
+      "shape": "box",
+      "width": "1.5243"
+    },
+    {
+      "_gvid": 2,
+      "name": "b",
+      "fontname": "Courier",
+      "height": "0.5",
+      "label": "Courier",
+      "pos": "55.25,201",
+      "shape": "box",
+      "width": "1.0243"
+    },
+    {
+      "_gvid": 3,
+      "name": "c",
+      "fontname": "Times-BoldItalic",
+      "height": "0.5",
+      "label": "Times-BoldItalic",
+      "pos": "55.25,128",
+      "shape": "box",
+      "width": "1.5347"
+    },
+    {
+      "_gvid": 4,
+      "name": "d",
+      "fontname": "Helvetica-Bold",
+      "height": "0.67361",
+      "label": "{<font face=\"Helvetica-Bold\">bold field<\/font>|plain field}",
+      "pos": "55.25,48.75",
+      "rects": "15.75,48.75,94.75,72.5 15.75,25,94.75,48.75",
+      "shape": "record",
+      "width": "1.0972"
+    },
+    {
+      "_gvid": 5,
+      "name": "e",
+      "fontname": "Helvetica-Oblique",
+      "height": "0.5",
+      "label": "Helvetica-Oblique",
+      "pos": "172.25,201",
+      "shape": "box",
+      "width": "1.7118"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 1,
+      "head": 2,
+      "fontname": "Helvetica-Oblique",
+      "label": "oblique",
+      "lp": "114.58,266.62",
+      "pos": "e,64.546,219.23 103.93,292.23 94.757,275.22 80.606,249 69.922,229.19"
+    },
+    {
+      "_gvid": 2,
+      "tail": 2,
+      "head": 3,
+      "head_lp": "42.875,153.9",
+      "headlabel": "light",
+      "label": "",
+      "labelfontname": "Arial Light",
+      "pos": "e,55.25,146.03 55.25,182.81 55.25,175.23 55.25,166.1 55.25,157.54"
+    },
+    {
+      "_gvid": 3,
+      "tail": 3,
+      "head": 4,
+      "label": "",
+      "pos": "e,55.25,73 55.25,109.86 55.25,102.31 55.25,93.171 55.25,84.316"
+    },
+    {
+      "_gvid": 1,
+      "tail": 1,
+      "head": 5,
+      "label": "",
+      "pos": "e,165.99,219.27 127.85,292.28 132.14,286.8 136.64,280.57 140.25,274.5 148.68,260.32 156.24,243.51 161.89,229.65"
+    }
+  ]
+}

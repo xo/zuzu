@@ -1,0 +1,54 @@
+{
+  "name": "%1",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,346,36",
+  "rankdir": "LR",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "deploy",
+      "height": "0.5",
+      "label": "Deploy 🚀",
+      "pos": "38.375,18",
+      "shape": "box",
+      "width": "1.066"
+    },
+    {
+      "_gvid": 1,
+      "name": "tests",
+      "height": "0.5",
+      "label": "Tests ✅",
+      "pos": "179.62,18",
+      "shape": "box",
+      "width": "0.89931"
+    },
+    {
+      "_gvid": 2,
+      "name": "ship",
+      "height": "0.5",
+      "label": "Ship 🇯🇵 to 👨‍👩‍👧",
+      "pos": "297.5,18",
+      "shape": "box",
+      "width": "1.3472"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 0,
+      "head": 1,
+      "label": "go 🎉",
+      "lp": "112,26.625",
+      "pos": "e,147.04,18 77.058,18 95.115,18 116.83,18 135.54,18"
+    },
+    {
+      "_gvid": 1,
+      "tail": 1,
+      "head": 2,
+      "label": "",
+      "pos": "e,248.78,18 212.29,18 220.12,18 228.75,18 237.43,18"
+    }
+  ]
+}

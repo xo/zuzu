@@ -1,0 +1,18 @@
+digraph {
+	fontname="Times-Italic"
+	label="Font names"
+	node [shape=box, fontname="Helvetica-Bold"]
+	a [label="Helvetica-Bold"]
+	b [label="Courier", fontname="Courier"]
+	c [label="Times-BoldItalic", fontname="Times-BoldItalic"]
+	d [shape=record, label=<{<font face="Helvetica-Bold">bold field</font>|plain field}>]
+	subgraph cluster_light {
+		label="Arial Light"
+		fontname="Arial Light"
+		e [label="Helvetica-Oblique", fontname="Helvetica-Oblique"]
+	}
+	a -> b [label="oblique", fontname="Helvetica-Oblique"]
+	b -> c [headlabel="light", labelfontname="Arial Light"]
+	c -> d
+	a -> e
+}

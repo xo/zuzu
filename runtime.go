@@ -72,7 +72,7 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) *runtime {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	rt := &runtime{ctx: ctx, chart: c, opts: o, progs: map[string]*expr.Program{}, measure: text.NewEstimate()}
+	rt := &runtime{ctx: ctx, chart: c, opts: o, progs: map[string]*expr.Program{}, measure: text.NewEstimate(o.fallbacks...)}
 	rt.report = append(rt.report, c.report...)
 	rt.loc = o.loc
 	if rt.loc == nil {

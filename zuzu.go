@@ -54,6 +54,10 @@ const (
 	// ErrUnknownName is the error of a reference to a signal, a dataset or a
 	// scale that the spec does not have.
 	ErrUnknownName Error = "unknown name"
+	// ErrNoGlyph is the error of a character of a text that no font of the
+	// render has, in the strict mode. In the loose mode, the character
+	// draws nothing and the report names it once (D32).
+	ErrNoGlyph Error = "no font has the character"
 )
 
 // Report lists what zuzu did not draw in the loose mode, and what it warns
@@ -243,6 +247,9 @@ type renderOptions struct {
 	logger     *slog.Logger
 	icons      map[string]*icon.Pack
 	iconLoader IconLoader
+	// fallbacks are the fonts of WithEmoji, for the characters that IBM
+	// Plex Sans does not have.
+	fallbacks []*text.Fallback
 	// background is the color of WithBackground as CSS, and hasBackground
 	// says that the option set it.
 	background    string
@@ -457,10 +464,10 @@ func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Rep
 }
 
 // Image renders the chart and draws it with the direct renderer of okage
-// (D11). The text draws in the bundled IBM Plex Sans (D16), and in no font
-// of the system, so that a chart gives the same pixels on every machine. A
-// character that the bundled font lacks draws nothing. The pixels are
-// premultiplied, as image.RGBA expects.
+// (D11). The text draws in the bundled IBM Plex Sans (D16), and the fonts
+// of WithEmoji, and in no font of the system, so that a chart gives the
+// same pixels on every machine. A character that no font has draws nothing
+// (D32). The pixels are premultiplied, as image.RGBA expects.
 func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, Report, error) {
 	s, report, err := c.Render(ctx, opts...)
 	if err != nil {
@@ -474,9 +481,15 @@ func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, R
 	if o.hasScale {
 		ropts = append(ropts, raster.WithScale(o.scale))
 	}
-	fonts := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
-		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
-	img, err := raster.Draw(s, append(ropts, raster.WithRenderer(fonts))...)
+	fopts := []okagesvg.Option{
+		okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family),
+	}
+	for _, f := range o.fallbacks {
+		fopts = append(fopts, okagesvg.WithFontFile(f.Data()))
+	}
+	ropts = append(ropts, raster.WithRenderer(okagesvg.New(fopts...)), raster.WithFallbacks(o.fallbacks...))
+	img, err := raster.Draw(s, ropts...)
 	if err != nil {
 		return nil, report, fmt.Errorf("drawing the image: %w", err)
 	}

@@ -526,6 +526,48 @@ func str(cfg map[string]any, keys ...string) string {
 // names each part that zuzu does not draw, and in the strict mode such a
 // part is an error.
 func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
+	g, report, err := readGraph(d, strict)
+	if err != nil {
+		return g, report, err
+	}
+	familyStyle(g, str(d.Config, "fontFamily"))
+	return g, report, nil
+}
+
+// familyStyle gives each node, edge and cluster of a graph the weight and
+// the style that the setting fontFamily names, such as Helvetica-Bold,
+// unless its own style sets them. zuzu draws in IBM Plex Sans only, so the
+// rest of the name changes nothing (D32).
+func familyStyle(g *graph.Graph, family string) {
+	weight, style := graph.FontFace(family)
+	if weight == "" && style == "" {
+		return
+	}
+	set := func(st map[string]string) map[string]string {
+		if st == nil {
+			st = map[string]string{}
+		}
+		if _, ok := st["fontWeight"]; !ok && weight != "" {
+			st["fontWeight"] = weight
+		}
+		if _, ok := st["fontStyle"]; !ok && style != "" {
+			st["fontStyle"] = style
+		}
+		return st
+	}
+	for _, n := range g.Nodes {
+		n.Style = set(n.Style)
+	}
+	for _, e := range g.Edges {
+		e.Style = set(e.Style)
+	}
+	for _, c := range g.Clusters {
+		c.Style = set(c.Style)
+	}
+}
+
+// readGraph reads a graph of any kind.
+func readGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	switch d.Kind {
 	case "flowchart", "graph", "flowchart-elk":
 	case "stateDiagram", "stateDiagram-v2":

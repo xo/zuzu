@@ -1,0 +1,15 @@
+---
+config:
+  fontFamily: Helvetica-Oblique
+---
+flowchart LR
+  A[Times-Bold] --> B[Arial Black]
+  B -->|oblique| C[Courier]
+  subgraph S[Light]
+    D[plain]
+  end
+  C --> D
+  style A font-family:Times-Bold
+  style B font-family:Arial Black,font-style:normal
+  style C font-family:courier
+  style S font-family:Arial Light

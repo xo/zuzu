@@ -212,7 +212,7 @@ func (g *gantt) config() error {
 			}
 			g.rightPadding = &n
 		default:
-			if inert(g.c.d.Kind, "gantt."+k) {
+			if accepted(g.c.d.Kind, "gantt."+k, v) {
 				continue
 			}
 			if err := g.c.add("zuzu does not read the setting gantt.%s", k); err != nil {

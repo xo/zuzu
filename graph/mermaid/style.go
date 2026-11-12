@@ -38,6 +38,11 @@ func lookSetting(is *graph.Issues, kind, k string, v any) (bool, error) {
 		return true, nil
 	case "theme", "themeVariables", "themeCSS":
 		return true, is.Add("config", "the %s of Mermaid, drawn in the look of zuzu", k)
+	case "fontFamily":
+		// Graph gives each label the weight and the style that the name
+		// gives, and zuzu draws the rest of the name in IBM Plex Sans
+		// (D32).
+		return true, nil
 	case "htmlLabels", "markdownAutoWrap":
 		// labelWrap reads them.
 		if _, ok := v.(bool); !ok {
@@ -70,7 +75,7 @@ func graphSection(is *graph.Issues, kind, section string, v any, read ...string)
 		path := section + "." + k
 		var err error
 		switch {
-		case slices.Contains(read, k), inert(kind, path):
+		case slices.Contains(read, k), accepted(kind, path, m[k]):
 		case path == "flowchart.htmlLabels":
 			if _, ok := m[k].(bool); !ok {
 				err = is.Add("config", "the setting %s: %v", path, m[k])
@@ -93,6 +98,27 @@ func isGraph(kind string) bool {
 		return true
 	}
 	return false
+}
+
+// accepted reports whether zuzu accepts a setting of the config with no
+// issue: a setting that inert names, or a font family with no weight and
+// no style, such as fontFamily: Arial or sequence.actorFontFamily:
+// courier. zuzu draws in IBM Plex Sans only, so the name of a family
+// changes nothing (D32).
+func accepted(kind, path string, v any) bool {
+	if inert(kind, path) {
+		return true
+	}
+	key := strings.ToLower(path[strings.LastIndex(path, ".")+1:])
+	if !strings.HasSuffix(key, "fontfamily") {
+		return false
+	}
+	s, ok := v.(string)
+	if !ok {
+		return false
+	}
+	weight, style := graph.FontFace(s)
+	return weight == "" && style == ""
 }
 
 // inert reports whether a setting changes nothing in a still image of a
@@ -232,6 +258,7 @@ func linkCSS(s string, add func(format string, args ...any) error) (map[string]s
 // when link is true.
 func readCSS(s string, link bool, add func(format string, args ...any) error) (map[string]string, error) {
 	st := map[string]string{}
+	family := ""
 	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' }) {
 		k, v, ok := strings.Cut(part, ":")
 		if !ok {
@@ -260,6 +287,11 @@ func readCSS(s string, link bool, add func(format string, args ...any) error) (m
 			st["fontWeight"] = v
 		case "font-size":
 			st["fontSize"] = v
+		case "font-family":
+			// The name of a family gives a weight and a style, such as
+			// Helvetica-Bold, and zuzu draws the rest of the name in IBM
+			// Plex Sans (D32). font-weight and font-style win over it.
+			family = v
 		case "font-style":
 			switch v {
 			case "normal", "italic":
@@ -280,6 +312,13 @@ func readCSS(s string, link bool, add func(format string, args ...any) error) (m
 				return nil, err
 			}
 		}
+	}
+	weight, style := graph.FontFace(family)
+	if _, ok := st["fontWeight"]; !ok && weight != "" {
+		st["fontWeight"] = weight
+	}
+	if _, ok := st["fontStyle"]; !ok && style != "" {
+		st["fontStyle"] = style
 	}
 	return st, nil
 }

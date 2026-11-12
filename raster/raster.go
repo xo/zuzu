@@ -63,6 +63,17 @@ func WithRenderer(r *okagesvg.Renderer) Option {
 	}
 }
 
+// WithFallbacks sets the fonts for the characters that IBM Plex Sans does
+// not have, such as the font of the package text/emoji, in order (D32). A
+// line measures with them for its limit, as the layout measured it, and a
+// character that no font has draws nothing. The renderer of WithRenderer
+// must hold the same fonts, so that it draws them.
+func WithFallbacks(fallbacks ...*text.Fallback) Option {
+	return func(d *drawer) {
+		d.fallbacks = fallbacks
+	}
+}
+
 // WithScale draws a scene at a scale, as a ratio of device pixels to the
 // pixels of the scene. A scale of 2 gives an image of twice the width and
 // twice the height, with the same layout and sharper lines and text. A
@@ -77,10 +88,11 @@ func WithScale(scale float64) Option {
 // the scale of WithScale, rounded to whole pixels, as okage rounds the size
 // of an SVG. The pixels are premultiplied, as image.RGBA expects.
 func Draw(s *scene.Scene, opts ...Option) (*image.RGBA, error) {
-	d := &drawer{measure: text.NewEstimate(), scale: 1}
+	d := &drawer{scale: 1}
 	for _, o := range opts {
 		o(d)
 	}
+	d.measure = text.NewEstimate(d.fallbacks...)
 	if !(d.scale > 0) || math.IsInf(d.scale, 0) {
 		return nil, ErrSize
 	}
@@ -111,8 +123,9 @@ type drawer struct {
 	scale float64
 	// fonts shapes the text, and measure measures a line for its limit, as
 	// the SVG writer measures it.
-	fonts   *okagesvg.Renderer
-	measure *text.Estimate
+	fonts     *okagesvg.Renderer
+	measure   *text.Estimate
+	fallbacks []*text.Fallback
 	// images holds each image that the call decoded, by its URL.
 	images map[string]*picture
 }
@@ -676,7 +689,9 @@ func dataURL(u string) ([]byte, bool) {
 // text draws a text item: the outlines of the glyphs of each line, from the
 // layout of text of okage, at the place that shape.TextOf gives, as the SVG
 // writer writes it and okage draws it. A stroke is a halo under the fill. A
-// line that no font draws draws nothing, as in SVG.
+// glyph in color, such as an emoji of Noto Color Emoji, draws over the
+// outlines in its own colors (D32). A character that no font has draws
+// nothing, and a line that no font draws draws nothing, as in SVG.
 func (d *drawer) text(it *scene.Item, ts okage.Transform) error {
 	if len(it.Text) == 0 {
 		return nil
@@ -700,24 +715,107 @@ func (d *drawer) text(it *scene.Item, ts okage.Transform) error {
 	case "oblique":
 		style.Style = okagesvg.FontStyleOblique
 	}
+	font := text.Font{Family: text.Family, Size: t.Size, Weight: int(style.Weight), Italic: it.FontStyle != ""}
 	pb := okage.NewPathBuilder()
+	var colors []placed
 	for i, line := range t.Lines {
-		run, err := d.fonts.ShapeText(shape.Collapse(line), style)
-		if errors.Is(err, okage.ErrSVGTextNoFont) {
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("drawing the text %q: %w", line, err)
+		// Each piece of a line shapes on its own, so that a sequence of
+		// emoji, such as a flag, draws as one glyph, and the pieces follow
+		// one another. A piece of spaces alone draws no glyph, and okage
+		// gives no run for it, so it takes its measured width.
+		var runs []*okagesvg.TextRun
+		var widths []float64
+		width := 0.0
+		pieces := d.measure.Split(d.drawable(shape.Collapse(line)))
+		for _, piece := range pieces {
+			run, err := d.fonts.ShapeText(piece, style)
+			w := 0.0
+			switch {
+			case errors.Is(err, okage.ErrSVGTextNoFont):
+				run = nil
+				if len(pieces) > 1 && strings.TrimSpace(piece) == "" {
+					w = d.measure.Width(font, piece)
+				}
+			case err != nil:
+				return fmt.Errorf("drawing the text %q: %w", line, err)
+			default:
+				w = float64(run.Width())
+			}
+			runs, widths = append(runs, run), append(widths, w)
+			width += w
 		}
 		x := 0.0
 		switch t.Anchor {
 		case "middle":
-			x = -float64(run.Width()) / 2
+			x = -width / 2
 		case "end":
-			x = -float64(run.Width())
+			x = -width
 		}
-		run.AppendPath(pb, float32(x), float32(float64(i)*t.LineHeight))
+		y := float64(i) * t.LineHeight
+		for j, run := range runs {
+			if run != nil {
+				run.AppendPath(pb, float32(x), float32(y))
+				if run.HasColorGlyphs() {
+					colors = append(colors, placed{run, x, y})
+				}
+			}
+			x += widths[j]
+		}
 	}
-	d.paintPath(pb, it, "#000", place(ts, t.X, t.Y, t.Angle), true)
+	at := place(ts, t.X, t.Y, t.Angle)
+	d.paintPath(pb, it, "#000", at, true)
+	d.colorGlyphs(colors, it, at)
 	return nil
+}
+
+// drawable returns a line without the characters that no font has, which
+// draw nothing (D32). okage draws such a character as the box of its
+// missing glyph.
+func (d *drawer) drawable(line string) string {
+	miss := d.measure.Missing(line)
+	if len(miss) == 0 {
+		return line
+	}
+	return strings.Map(func(r rune) rune {
+		if slices.Contains(miss, r) {
+			return -1
+		}
+		return r
+	}, line)
+}
+
+// placed is a run with glyphs in color, and the origin of the run.
+type placed struct {
+	run  *okagesvg.TextRun
+	x, y float64
+}
+
+// colorGlyphs draws the glyphs in color of the runs of a text item, in
+// their own colors, with the transform of the item. An item with an
+// opacity draws them in a layer with that opacity.
+func (d *drawer) colorGlyphs(colors []placed, it *scene.Item, ts okage.Transform) {
+	if len(colors) == 0 {
+		return
+	}
+	opacity := opacityOf(it.Opacity) * opacityOf(it.FillOpacity)
+	if opacity <= 0 {
+		return
+	}
+	target := d.pm
+	if opacity < 1 {
+		layer, ok := okage.NewPixmap(d.pm.Width(), d.pm.Height())
+		if !ok {
+			return
+		}
+		target = layer
+	}
+	m := target.AsMut()
+	for _, c := range colors {
+		c.run.RenderColorGlyphs(&m, ts.PreTranslate(float32(c.x), float32(c.y)))
+	}
+	if target != d.pm {
+		pp := okage.DefaultPixmapPaint()
+		pp.Opacity = float32(opacity)
+		d.pm.DrawPixmap(0, 0, target.AsRef(), &pp, okage.Transform{SX: 1, SY: 1}, nil)
+	}
 }

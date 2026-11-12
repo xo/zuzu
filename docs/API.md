@@ -184,6 +184,7 @@ the wrong place does not compile.
 | `WithRenderLogger(*slog.Logger)` | none | where a render logs |
 | `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
 | `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |
+| `WithEmoji(*text.Fallback)` | none, so an emoji draws nothing | the font of the emoji, from the package `text/emoji`, which draws an emoji in color (D32) |
 
 A Go function cannot have two types, so the logger of a render is
 `WithRenderLogger`, and `WithLogger` is the logger of `Parse`.
@@ -368,8 +369,14 @@ package zuzu
 const (
 	ErrUnknownDialect Error = "unknown spec dialect"
 	ErrNoLoader       Error = "no loader for url data"
+	ErrNoGlyph        Error = "no font has the character"
 )
 ```
+
+`ErrNoGlyph` is the error of a character of a text that no font of the
+render has, such as a character of Chinese, or an emoji without
+`WithEmoji`. The character draws nothing. In the loose mode, the report
+names each such character once for each render (D32).
 
 A constant cannot wrap another error, so the issue does it. An issue for an
 unsupported mark, transform or function unwraps to its own sentinel and to
@@ -561,6 +568,42 @@ package `script`.
 
 The package `script` holds the evaluator that runs scripts in goja (D9). A
 program that does not import it does not link goja.
+
+### Emoji
+
+zuzu draws text in IBM Plex Sans (D16). The package `text/emoji` bundles
+Noto Color Emoji, the font of 10.7 MB that draws an emoji in color (D32). A
+program that does not import the package does not hold the font. A render
+takes the font with `WithEmoji`, as it takes a pack of icons:
+
+```go
+package text
+
+// Fallback is a font for the characters that IBM Plex Sans does not have.
+type Fallback struct{ /* unexported */ }
+
+func NewFallback(family string, data []byte) *Fallback
+func (f *Fallback) Family() string
+func (f *Fallback) Data() []byte
+```
+
+```go
+package emoji
+
+// Font returns Noto Color Emoji as a fallback.
+func Font() *text.Fallback
+```
+
+```go
+img, report, err := c.Image(ctx, zuzu.WithEmoji(emoji.Font()))
+```
+
+With the font, an emoji measures at the width that the font gives it, so
+that its label fits, and the PNG of `Image` draws it in color. The SVG
+names the family `'Noto Color Emoji'` after the family of a text that
+holds a character that IBM Plex Sans does not have, and a viewer draws
+the emoji in the color font that it has. Without the font, an emoji is a
+character that no font has: it draws nothing, and it is `ErrNoGlyph`.
 
 ## Where the models agreed and differed
 

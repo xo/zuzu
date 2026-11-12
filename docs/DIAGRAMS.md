@@ -54,6 +54,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `newrank` | nothing. zuzu always ranks the nodes of a cluster with the nodes of the whole graph, as dot does with `newrank=true` |
 | the graph | `splines` | curved or straight edges. Another value is an issue |
 | the graph | `layout` | `dot`. Another layout is an issue |
+| the graph | `fontname` | the weight and the style of the title, as below |
 | the graph, a node, an edge, a cluster | `colorscheme` | the color scheme of its colors, as below |
 | the graph, a node, an edge, a cluster | `URL`, `href`, `tooltip` | the link and the tooltip, as "Links and tooltips" says |
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
@@ -65,10 +66,11 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | a node | `style` | `filled`, `radial`, `dashed`, `dotted`, `bold`, `rounded` |
 | a node | `color`, `fillcolor`, `fontcolor`, `penwidth`, `fontsize` | the paint. The size of the node fits its label at its `fontsize`. `setlinewidth(n)` in `style` is the old form of `penwidth` |
 | a node | `gradientangle` | the angle of a fill of two colors, as below |
+| a node, an edge, a cluster | `fontname` | the weight and the style of the label, as below |
 | an edge | `label` | the label, or a label of HTML |
 | an edge | `headlabel`, `taillabel` | the labels at the ends, as below |
 | an edge | `xlabel` | a label beside the middle of the edge, as below |
-| an edge | `labelfontcolor`, `labelfontsize` | the paint of the labels at the ends. They take `fontcolor` and `fontsize` by default |
+| an edge | `labelfontcolor`, `labelfontsize`, `labelfontname` | the paint of the labels at the ends. They take `fontcolor`, `fontsize` and `fontname` by default |
 | an edge | `labeldistance`, `labelangle` | the place of the labels at the ends, as below |
 | an edge | `arrowhead`, `arrowtail`, `dir` | the arrowheads, as below. `dir` is `forward`, `back`, `both` or `none` |
 | an edge | `arrowsize` | the scale of the arrowheads |
@@ -109,6 +111,29 @@ colors and of the colors of its label of HTML. A cluster takes the
 that zuzu does not know in the form `/scheme/index`, and a name that is not
 in its named scheme, such as `/greens3/red`, are issues. A list of colors,
 such as `/blues9/2:/reds9/8` or `1:2`, reads each color in this way.
+
+### Font names
+
+zuzu draws all text in IBM Plex Sans (D16). It reads a weight and a style
+from the words of a name in `fontname`, and accepts the rest of the name
+with no issue (D32). A word ends at each character that is not a letter or
+a digit, such as a space, a dash or a colon, and before an upper case
+letter that follows a lower case one. So `Times-BoldItalic` gives `Bold`
+and `Italic`:
+
+| Word | What zuzu draws |
+| --- | --- |
+| `Thin`, `Hairline` | the weight 100 |
+| `ExtraLight`, `UltraLight` | the weight 200 |
+| `Light` | the weight 300 |
+| `Medium` | the weight 500 |
+| `SemiBold`, `DemiBold`, `Demi`, `Bold`, `ExtraBold`, `Heavy`, `Black` | the weight 600, the heaviest weight that zuzu bundles |
+| `Italic`, `Oblique`, `It` | italic. The bundled font slants only as italic |
+
+`Helvetica`, `Times-Roman` and `Courier` draw in the regular weight. The
+weights under 400 draw as 400 in the PNG, because zuzu bundles no lighter
+weight. The SVG names the weight, and a viewer with a lighter weight of
+Plex draws it.
 
 ### Gradients
 
@@ -256,10 +281,11 @@ each field is HTML. A line of a field draws in its font: bold, italic or
 with a line under it. A field whose lines each end in `<br align="left"/>`
 draws them at the left of the field. A label of HTML with no brace and no
 bar, such as a table, draws in the shape of the record, as a label of HTML
-does. A field of HTML has no port, as in Graphviz. A table in a field, a
-line in more than one font, a font with a color, a size or a face, a line
-at the right, and a field with lines at the left and at the center are
-issues.
+does. A field of HTML has no port, as in Graphviz. The `face` of a font
+gives the line its weight and its style, as `fontname` does below. A table
+in a field, a line in more than one font, a font with a color or a size,
+a face with a weight other than bold, a line at the right, and a field
+with lines at the left and at the center are issues.
 
 ### Labels of HTML
 
@@ -431,6 +457,25 @@ changes only the scale of the PNG of `mmdc`.
 `htmlLabels` changes the wrap of a label in a graph and in a mindmap. A
 graph reads it, as "Labels that wrap" says. A mindmap does not read it, and
 it is an issue there.
+
+### Font names
+
+zuzu draws all text in IBM Plex Sans (D16). It reads a weight and a style
+from the name of a font family, as "Font names" of DOT says, and accepts
+the rest of the name with no issue (D32). So `Helvetica-Bold` draws in the
+weight 600, and `Times-Italic` draws in italic. These parts name a family:
+
+| Part | What zuzu does |
+| --- | --- |
+| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, a state diagram, a class diagram and an entity relationship diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
+| `sequence.actorFontFamily`, `sequence.messageFontFamily`, `sequence.noteFontFamily` | gives the weight and the style to the participants, the messages or the notes. Each wins over `fontFamily`, and `actorFontWeight` and the other weights win over each |
+| `font-family` in a style, such as `style A font-family:Times-Bold` | gives the weight and the style to the label. `font-weight` and `font-style` in the same style win over it |
+| another setting whose name ends in `FontFamily`, such as `usecase.actorFontFamily` | nothing |
+
+A name with no weight and no style, such as `courier` or `Trebuchet MS`,
+is no issue anywhere. A name with a weight or a style in a part that does
+not read it, such as `fontFamily` in a pie, is an issue. `fontFamily` in
+`themeVariables` is an issue with the rest of `themeVariables`.
 
 ### Flowchart
 
@@ -619,9 +664,10 @@ Another `view` draws the subgraph open, as in Mermaid. `view: collapsed`
 on the id of a node that is not a subgraph is an issue.
 
 A style reads `fill`, `stroke`, `stroke-width`, `color`,
-`stroke-dasharray`, `stroke-dashoffset`, `font-weight`, `font-size` and
-`font-style`. `font-style` is `normal` or `italic`, and `oblique` draws as
-`italic`. The scene has no offset of a dash, so `stroke-dashoffset` starts
+`stroke-dasharray`, `stroke-dashoffset`, `font-weight`, `font-size`,
+`font-style` and `font-family`. `font-style` is `normal` or `italic`, and
+`oblique` draws as `italic`. `font-family` gives a weight and a style, as
+"Font names" says. The scene has no offset of a dash, so `stroke-dashoffset` starts
 the dash of the line at the offset. If the offset falls in a gap, the dash
 starts at the next dash. Mermaid puts the style of a node on its shape of
 SVG, where `border` and `background` change nothing, so zuzu reads them
@@ -1765,6 +1811,34 @@ relationship diagram, the requirement diagram, and the charts above,
 which hold the sequence diagram, the mindmap, the architecture diagram, the
 git graph and the block diagram. Every other kind of Mermaid is an error that wraps
 `mermaid.ErrKind`. D32 sets the order of the next kinds.
+
+## Emoji and missing characters
+
+zuzu draws all text in IBM Plex Sans (D16). An emoji draws in color when
+the render has the font of the package `text/emoji`, which
+`zuzu.WithEmoji(emoji.Font())` gives (D32). The font is Noto Color Emoji.
+With it, an emoji measures at the width that the font gives it, so that a
+node holds its label. A flag, such as `🇯🇵`, a sequence with a joiner,
+such as `👨‍👩‍👧`, and an emoji with a tone of skin draw as one glyph, as
+in a browser.
+
+A character that no font of the render has draws nothing and measures as
+nothing. Such a character is an emoji without the font, or a character of
+a script that Plex does not cover, such as Chinese or Japanese. The report
+names each such character once for each render, and it is an error that
+wraps `zuzu.ErrNoGlyph` in the strict mode. The check runs when the chart
+renders, so a source with such a character parses with no issue.
+
+The SVG names the family `'Noto Color Emoji'` for a text with an emoji, so
+that a viewer with that font, or with another font of emoji, draws it in
+color.
+
+The charts of Mermaid that lay out their text when they compile, such as
+a sequence diagram, a pie, a gantt, a journey, a mindmap, a treemap and
+an architecture diagram, measure an emoji as nothing, because the font
+comes with the render. Their labels with an emoji can be too narrow for
+the emoji. The graphs of DOT and of Mermaid lay out when they render, and
+measure an emoji with the font.
 
 ## The look
 

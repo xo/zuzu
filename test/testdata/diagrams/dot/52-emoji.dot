@@ -1,0 +1,9 @@
+digraph {
+	rankdir=LR
+	node [shape=box]
+	deploy [label="Deploy 🚀"]
+	tests [label="Tests ✅"]
+	ship [label="Ship 🇯🇵 to 👨‍👩‍👧"]
+	deploy -> tests [label="go 🎉"]
+	tests -> ship
+}

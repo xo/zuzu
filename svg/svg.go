@@ -46,6 +46,25 @@ const (
 // IBM Plex Sans (D16).
 const DefaultFont = shape.DefaultFont
 
+// emojiFont returns a list of font families with Noto Color Emoji before
+// its generic family, such as sans-serif, or at its end. The writer names
+// it for a text with a character that IBM Plex Sans does not have, which
+// the zuzu of a render draws with the font of WithEmoji, so that a viewer
+// draws an emoji in color (D32).
+func emojiFont(family string) string {
+	emoji := "'" + text.EmojiFamily + "'"
+	i := strings.LastIndexByte(family, ',')
+	last := strings.TrimSpace(family[i+1:])
+	switch last {
+	case "serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui":
+		if i < 0 {
+			return emoji + ", " + last
+		}
+		return family[:i] + ", " + emoji + ", " + last
+	}
+	return family + ", " + emoji
+}
+
 // Write writes a scene as SVG.
 func Write(w io.Writer, s *scene.Scene) error {
 	wr := &writer{measure: text.NewEstimate()}
@@ -344,8 +363,12 @@ func (w *writer) text(it *scene.Item) {
 	if t.Anchor != "start" {
 		fmt.Fprintf(w.out, ` text-anchor="%s"`, t.Anchor)
 	}
-	if it.Font != "" {
-		fmt.Fprintf(w.out, ` font-family="%s"`, esc(it.Font))
+	family := it.Font
+	if slices.ContainsFunc(t.Lines, func(l string) bool { return len(w.measure.Missing(l)) > 0 }) {
+		family = emojiFont(cmp.Or(family, DefaultFont))
+	}
+	if family != "" {
+		fmt.Fprintf(w.out, ` font-family="%s"`, esc(family))
 	}
 	fmt.Fprintf(w.out, ` font-size="%s"`, num(t.Size))
 	if it.FontWeight != "" {

@@ -615,6 +615,11 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	if g.Title != "" && g.TitleHTML == "" {
 		title := map[string]any{"text": g.Title, "anchor": "start"}
+		for _, k := range []string{"fontWeight", "fontStyle"} {
+			if v := g.TitleStyle[k]; v != "" {
+				title[k] = v
+			}
+		}
 		if g.TitleOffset != nil {
 			title["offset"] = *g.TitleOffset
 		}

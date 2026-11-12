@@ -492,7 +492,7 @@ func (p *parser) subgraph(s *scope) (*scope, error) {
 	}
 	for _, k := range slices.Sorted(maps.Keys(attrs)) {
 		switch k {
-		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "penwidth", "pencolor", "gradientangle", "colorscheme":
+		case "label", "rank", "style", "color", "fillcolor", "bgcolor", "fontcolor", "fontname", "penwidth", "pencolor", "gradientangle", "colorscheme":
 		case urlAttr, "href", "tooltip":
 			if cl == nil {
 				// Graphviz links only the box of a cluster.
@@ -640,6 +640,8 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 				continue
 			}
 			e.LabelStyle = labelStyle(e.LabelStyle, "color", c)
+		case "labelfontname":
+			e.LabelStyle = fontName(e.LabelStyle, v)
 		case "dir":
 			dir = v
 		case "arrowhead":
@@ -657,7 +659,7 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 			e.TargetPort = v
 		case "tailport":
 			e.SourcePort = v
-		case "color", "penwidth", "style", "fontcolor", "fontsize", "colorscheme", urlAttr, "href", "tooltip":
+		case "color", "penwidth", "style", "fontcolor", "fontsize", "fontname", "colorscheme", urlAttr, "href", "tooltip":
 		default:
 			if err := p.issues.Add(path, "the attribute %s of an edge", k); err != nil {
 				return err
@@ -732,6 +734,8 @@ func (p *parser) graphAttrs(a map[string]string) error {
 		case "colorscheme":
 		case urlAttr, "href", "tooltip":
 			// They are read after the loop, with the label.
+		case "fontname":
+			p.g.TitleStyle = fontName(p.g.TitleStyle, v)
 		case "rankdir":
 			switch strings.ToUpper(v) {
 			case "TB", "BT", "LR", "RL":
@@ -855,7 +859,7 @@ func (p *parser) finish() error {
 		}
 		for _, k := range slices.Sorted(maps.Keys(a)) {
 			switch k {
-			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle", "colorscheme":
+			case "label", "shape", "style", "color", "fillcolor", "fontcolor", "fontsize", "fontname", "penwidth", "width", "height", "fixedsize", "margin", "xlabel", "gradientangle", "colorscheme":
 			case urlAttr, "href", "tooltip":
 			case "sides", "skew", "distortion":
 				// Only a polygon reads these. Graphviz draws every other
@@ -996,6 +1000,9 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 	if v := a["fontsize"]; v != "" {
 		st["fontSize"] = v
 	}
+	if v := a["fontname"]; v != "" {
+		fontName(st, v)
+	}
 	style := a["style"]
 	// setlinewidth(n) in a style is the old form of penwidth. A penwidth
 	// wins over it.
@@ -1121,6 +1128,27 @@ func (p *parser) link(a map[string]string, path string, names map[byte]string) (
 		href = ""
 	}
 	return href, strings.TrimRight(sub(a["tooltip"], true), "\n"), nil
+}
+
+// fontName sets the weight and the style that the name of a font gives,
+// such as Helvetica-Bold, in a style, and makes the style when it is nil.
+// zuzu draws in IBM Plex Sans only, so the rest of the name changes
+// nothing (D32).
+func fontName(st map[string]string, v string) map[string]string {
+	weight, style := graph.FontFace(v)
+	if weight == "" && style == "" {
+		return st
+	}
+	if st == nil {
+		st = map[string]string{}
+	}
+	if weight != "" {
+		st["fontWeight"] = weight
+	}
+	if style != "" {
+		st["fontStyle"] = style
+	}
+	return st
 }
 
 // label reads a label of DOT: \n, \l and \r end a line, and \N names the

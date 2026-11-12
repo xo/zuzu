@@ -42,6 +42,7 @@ var seqRead = []string{
 	"sequence.diagramMarginY", "sequence.messageAlign", "sequence.noteAlign",
 	"sequence.actorFontSize", "sequence.actorFontWeight", "sequence.messageFontSize",
 	"sequence.messageFontWeight", "sequence.noteFontSize", "sequence.noteFontWeight",
+	"fontFamily", "sequence.actorFontFamily", "sequence.messageFontFamily", "sequence.noteFontFamily",
 }
 
 // sequenceSettings reads the config of a sequence diagram. Each setting
@@ -66,6 +67,20 @@ func (c *chart) sequenceSettings() (seqConfig, error) {
 	}
 	font := func(prefix string, size float64, weight int) text.Font {
 		f := text.Font{Family: text.Family, Size: num(prefix+"FontSize", size), Weight: weight}
+		// The name of a family gives a weight and a style, such as
+		// Helvetica-Bold, and zuzu draws the rest of the name in IBM Plex
+		// Sans (D32). The family of the section wins over fontFamily, and
+		// a weight of the section wins over both.
+		family := str(cfg, "fontFamily")
+		if v, ok := seq[prefix+"FontFamily"].(string); ok {
+			family = v
+		}
+		if w, st := graph.FontFace(family); w != "" || st != "" {
+			if w != "" {
+				f.Weight = text.Weight(w)
+			}
+			f.Italic = st != ""
+		}
 		switch v := seq[prefix+"FontWeight"].(type) {
 		case float64:
 			f.Weight = int(v)
@@ -1038,10 +1053,14 @@ func (l *seqLayout) spec() map[string]any {
 		return enc
 	}
 	texts := func(set, style string, f text.Font) {
-		mark(set, "text", set, style, map[string]any{
+		enc := map[string]any{
 			"x": field("x"), "y": field("y"), "text": field("lines"), "align": field("align"), "baseline": field("baseline"),
 			"fontSize": value(f.Size), "fontWeight": value(f.Weight), "lineHeight": value(lh(f)),
-		})
+		}
+		if f.Italic {
+			enc["fontStyle"] = value("italic")
+		}
+		mark(set, "text", set, style, enc)
 	}
 	cluster := graph.StyleCluster
 	mark("boxes", "rect", "boxes", cluster, box(map[string]any{}))

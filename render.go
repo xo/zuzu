@@ -140,6 +140,9 @@ func (rt *runtime) render() (*scene.Scene, error) {
 		// credits (D31).
 		Credits: rt.credits,
 	}
+	if err := rt.missingGlyphs(&sc.Root, map[rune]bool{}); err != nil {
+		return nil, err
+	}
 	bg, err := s.signal("background")
 	if err != nil {
 		return nil, err
