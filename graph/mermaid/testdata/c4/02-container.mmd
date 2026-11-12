@@ -1,0 +1,14 @@
+C4Container
+  title Containers of the bank
+  Person(customer, "Customer", "A customer", $link="https://example.com/customer")
+  Container_Boundary(app, "Internet Banking") {
+    Container(spa, "Single-Page App", "JavaScript, Angular", "Runs in the browser")
+    Container_Ext(mobile, "Mobile App", "Kotlin", "Runs on a phone")
+    ContainerDb(db, "Database", "PostgreSQL", "Holds the users")
+    ContainerDb_Ext(api, "API", "Java", "Serves the data")
+    ContainerQueue(queue, "Queue", "RabbitMQ")
+    ContainerQueue_Ext(bus, "Bus", "Kafka")
+  }
+  Rel(customer, spa, "Uses", "HTTPS")
+  Rel_Back(db, api, "Reads from and writes to", "JDBC")
+  Rel(spa, api, "Calls", $link="https://example.com/api")

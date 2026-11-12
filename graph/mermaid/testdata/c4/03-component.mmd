@@ -1,0 +1,15 @@
+C4Component
+  title Components of the API
+  Container(spa, "Single-Page App", "Angular")
+  Container_Boundary(api, "API Application") {
+    Component(sign, "Sign In Controller", "Spring MVC", "Signs users in")
+    Component_Ext(accounts, "Accounts", "Spring MVC")
+    ComponentDb(cache, "Cache", "Redis")
+    ComponentDb_Ext(store, "Store", "S3")
+    ComponentQueue(jobs, "Jobs", "SQS")
+    ComponentQueue_Ext(audit, "Audit", "Kafka")
+    Rel(sign, cache, "Reads")
+  }
+  Rel(spa, api, "Calls", "JSON/HTTPS")
+  Container(worker, "Worker", "Go", $shape="component")
+  System(legacy, "Legacy", "Old system", $tags="db")

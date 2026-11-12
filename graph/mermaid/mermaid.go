@@ -204,6 +204,8 @@ func configSection(kind string) string {
 		return "classDiagram"
 	case "stateDiagram-v2":
 		return "stateDiagram"
+	case c4Context, c4Container, c4Component, c4Dynamic, c4Deployment:
+		return "c4"
 	}
 	return strings.TrimSuffix(kind, "-beta")
 }

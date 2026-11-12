@@ -1,0 +1,16 @@
+C4Deployment
+  title Deployment of the bank
+  Deployment_Node(phone, "Phone", "iOS or Android") {
+    Container(mobile, "Mobile App", "Swift")
+  }
+  Deployment_Node(dc, "Data center", "Frankfurt") {
+    Node(web, "Web server", "Ubuntu", "Two machines") {
+      Container(app, "Web App", "Java")
+    }
+    Deployment_Node(dbs, "Database server", "Ubuntu") {
+      ContainerDb(db, "Database", "Oracle")
+    }
+  }
+  Rel(mobile, app, "Calls", "HTTPS")
+  Rel(app, db, "Reads", "JDBC")
+  UpdateElementStyle(dbs, $bgColor="#f4f4f4")

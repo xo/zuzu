@@ -1,0 +1,12 @@
+C4Dynamic
+  title Sign in
+  ContainerDb(db, "Database", "SQL")
+  Container(spa, "SPA", "Angular")
+  Container_Boundary(b, "API") {
+    Component(sign, "Sign In", "Spring")
+    Component(security, "Security", "Spring")
+  }
+  RelIndex(1, spa, sign, "Submits credentials to", "JSON/HTTPS")
+  Rel(sign, security, "Checks with")
+  Rel(security, db, "Reads", "JDBC")
+  UpdateRelStyle(sign, security, $textColor="blue", $offsetY="20")

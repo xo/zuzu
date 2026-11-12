@@ -401,6 +401,7 @@ takes the name that Mermaid gives to the kind:
 | `classDiagram`, `classDiagram-v2` | `classDiagram` |
 | `requirementDiagram` | `requirement` |
 | `stateDiagram`, `stateDiagram-v2` | `stateDiagram` |
+| `C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment` | `c4` |
 | a keyword that ends in `-beta`, such as `xychart-beta` | the keyword without `-beta`, such as `xychart` |
 | any other keyword, such as `gantt` | the keyword |
 
@@ -1265,11 +1266,12 @@ config that a chart does not read is an issue, and so are a `theme` that
 Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap` and `block` joins
 `accTitle` and `accDescr` into the description of the spec, as "The
 description" says. Mermaid does not read them in a sankey, a mindmap or a
-block diagram either, so there they are errors, as in Mermaid. Each chart
+block diagram either, so there they are errors, as in Mermaid. A C4
+diagram reads `accTitle` as its title, as "C4" says. Each chart
 has about 5 fixtures in `graph/mermaid/testdata`, the gantt has 18, the git
-graph has 12, the block diagram has 6, and the timeline has 6. A test
-draws each fixture
-and checks that each value of the source draws once, with its label.
+graph has 12, the block diagram has 6, the timeline has 6, and the C4
+diagrams have 5. A test draws each fixture and checks that each value of
+the source draws once, with its label.
 
 | Keyword | Compiles to |
 | --- | --- |
@@ -1288,6 +1290,7 @@ and checks that each value of the source draws once, with its label.
 | `gitGraph` | Vega rules, paths and text, laid out in Go with the rules of Mermaid: a lane for each branch and a step for each commit |
 | `block`, `block-beta` | Vega rects, paths and text, laid out in Go on a grid of columns |
 | `timeline` | Vega rects, rules, paths and text, laid out in Go: the periods along an axis, each with its events |
+| `C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment` | Vega rects, paths and text, laid out in Go in the rows of Mermaid |
 
 #### pie
 
@@ -2033,15 +2036,141 @@ false is an issue. The other settings of `timeline`, such as `padding` and
 `leftMargin`, are issues, and so are the colors of `themeVariables`, such
 as `cScale0`.
 
+#### C4
+
+The keywords are `C4Context`, `C4Container`, `C4Component`, `C4Dynamic`
+and `C4Deployment`. The five kinds read the same statements, as in
+Mermaid. The keyword is alone on its line, and each statement is on a line
+of its own.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `Person(alias, "Label", "Description")`, `Person_Ext` | a person |
+| `System(alias, "Label", "Description")`, `System_Ext`, `SystemDb`, `SystemDb_Ext`, `SystemQueue`, `SystemQueue_Ext` | a software system |
+| `Container(alias, "Label", "Technology", "Description")`, with the same six forms | a container |
+| `Component(alias, "Label", "Technology", "Description")`, with the same six forms | a component |
+| `Enterprise_Boundary(alias, "Label") {`, `System_Boundary`, `Container_Boundary` | a boundary of the type `ENTERPRISE`, `SYSTEM` or `CONTAINER`, up to its `}` |
+| `Boundary(alias, "Label", "type") {` | a boundary of a type, `system` by default |
+| `Deployment_Node(alias, "Label", "type", "Description") {`, `Node`, `Node_L`, `Node_R` | a deployment node of a type, `node` by default |
+| `Rel(from, to, "Label", "Technology")`, `BiRel`, `Rel_Back` | a relationship with an arrowhead at `to`, at both ends, or at `from` |
+| `Rel_U`, `Rel_Up`, `Rel_D`, `Rel_Down`, `Rel_L`, `Rel_Left`, `Rel_R`, `Rel_Right` | a relationship, as `Rel` draws it |
+| `RelIndex(1, from, to, "Label")` | a relationship. The index draws nothing |
+| `UpdateElementStyle(alias, $bgColor="grey", $fontColor="red", $borderColor="red", $shape="cylinder")` | the colors and the shape of an element, or the colors of a boundary |
+| `UpdateRelStyle(from, to, $textColor="blue", $lineColor="blue", $offsetX="5", $offsetY="-10")` | the colors of a relationship and the place of its label |
+| `UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")` | the number of elements and of boundaries in a row |
+| `title Text`, `accTitle: Text` | the title. The last of the two wins, as in Mermaid 12.3 |
+| `accDescr: Text`, `accDescr { ... }`, `accDescription Text` | the description of the Vega spec |
+
+The arguments of a statement are in parentheses right after its keyword,
+with commas between them. An argument is a text in double quotes or a text
+with no quotes. A text with no quotes runs to the next comma, as in
+Mermaid. So `Person(a)` takes the `)` and the lines after it, up to the
+next comma, and it is an error when no comma comes. Two commas, or `""`,
+give an empty argument. Each argument has a place, as the table shows,
+and Mermaid ignores an argument after the last place. zuzu reports it.
+
+A named argument, such as `$tags="v1"`, sets the part of its name from any
+place. An element reads `$label`, `$descr`, `$techn`, `$sprite`, `$tags`,
+`$link`, `$shape`, `$bgColor`, `$fontColor` and `$borderColor`. A boundary
+reads `$label`, `$type`, `$descr`, `$sprite`, `$tags`, `$link`, `$bgColor`,
+`$fontColor` and `$borderColor`. A relationship reads `$label`, `$techn`,
+`$descr`, `$sprite`, `$tags`, `$link`, `$textColor`, `$lineColor`,
+`$offsetX` and `$offsetY`. Another name is an issue. A second statement
+with the alias of an element or of a boundary updates it, and it keeps its
+place. A second relationship between the same two ends replaces the first.
+
+An element draws as a shape of its kind: a person as a head over a body, a
+database as a cylinder, a queue as a cylinder on its side, and every other
+element as a rounded rectangle. `$shape`, `$sprite` or a tag can name
+another shape: `person`, `box` or `rounded`, `cylinder`, `database` or
+`db`, `queue` or `pipe`, and `component`, a rectangle with a line at each
+side. The shape of `$shape` wins over the shape of `$sprite`, which wins
+over the shape of the first tag that names one. An element shows its
+name, its kind in brackets, such as `[Software System]` or
+`[Container: Java]`, and its description. The texts wrap at the width of
+the element less its padding, scaled by 11/14 (D32).
+
+zuzu places the elements and the boundaries as Mermaid 12.3 does:
+
+1. The diagram is a boundary. Each boundary places its elements first, in
+   the order of the source, and then its boundaries under them.
+2. Elements fill a row from left to right, up to `c4ShapeInRow`, 4 by
+   default. A row also ends where the next element passes 800 pixels, the
+   width of the screen of `mmdc`, so that a row holds two elements of the
+   default width. A boundary that starts a row of boundaries takes the
+   count of elements of the boundary before it, as in Mermaid.
+3. Boundaries fill a row up to `c4BoundaryInRow`, 2 by default. The width
+   of 800 pixels splits between the boundaries of a row.
+4. An element is `c4.width` wide at least, 216 by default, with
+   `c4.c4ShapePadding` around its texts, 20 by default. The first element
+   of a row is `c4.c4ShapeMargin` from the edge of its boundary, 50 by
+   default, and two elements are two times it apart. A boundary is
+   `c4.diagramMarginX` and `c4.diagramMarginY` inside its parent, 50 and
+   10 by default, under its title.
+5. A relationship goes from the edge of the box of one end toward the
+   middle of the other end. An end can be a boundary. The first
+   relationship is straight, and each other one is a curve, as in Mermaid.
+6. The label of a relationship starts at the middle of its line, moved by
+   `$offsetX` and `$offsetY`. The technology goes under it in brackets, in
+   italic. In a `C4Dynamic`, each label starts with the number of the
+   relationship in the order of the source, as in `1: Calls`.
+
+zuzu reads `c4.c4ShapeMargin`, `c4.c4ShapePadding`, `c4.width`,
+`c4.diagramMarginX`, `c4.diagramMarginY`, `c4.nextLinePaddingX`, and
+`c4.wrap`, which wraps the texts of an element, true by default. `wrap` at
+the top of the config wraps the texts of a boundary when `c4.wrap` is true
+too, as in Mermaid. Each other setting is an issue, and so is
+`c4.c4ShapeInRow`, which Mermaid 12.3 does not read.
+
+These are errors, as in Mermaid: a diagram with no statement, a text after
+the keyword, a statement with no `(` right after its keyword or with no
+arguments, a text with no end quote, a named argument with an empty value,
+two statements on a line, a word that is not a keyword, a line with
+`direction` and `TB`, `BT`, `LR` or `RL`, a boundary with no `{`, a
+statement on the line of a `{`, an empty boundary, a boundary that starts
+with a title, a `}` with no boundary, a boundary with no `}`, and a
+relationship to an alias that is not an element or a boundary. zuzu also
+makes these errors, which draw wrong in Mermaid: a named argument in the
+place of an alias, a boundary inside itself, and a boundary with the alias
+`global`.
+
+These are issues: a relationship with no label, which Mermaid does not
+draw, a named argument in the place of a label, which Mermaid draws as no
+label, the direction of `Rel_U` and the other directions, and the side of
+`Node_L` and `Node_R`, which Mermaid does not use either. A `$sprite`, a
+tag or a `$shape` that names no shape, the `$descr` of a relationship, a
+sprite of a boundary, and `$shadowing`, `$legendText` and `$techn` of
+`UpdateElementStyle` are issues too, and Mermaid does not draw them either.
+An update of an element or of a relationship that does not exist yet does
+nothing in Mermaid, and it is an issue.
+
+zuzu draws a C4 diagram in other ways than Mermaid in four places. A
+comment after a statement on its line is a comment, and Mermaid reads it
+as an error. The `title` of the front matter draws when the diagram has no
+`title`, and Mermaid does not draw it. A boundary with a fill draws under
+its elements, and Mermaid draws it over them. The texts are in the sizes
+of zuzu, so the boxes are smaller than in Mermaid.
+
+The look is the look of zuzu. An element is a shape with a tint of its
+color. A person, a system, a container and a component take the first
+four colors of the category scheme, and each external element takes the
+fifth, as Mermaid colors the elements by kind. A color of
+`UpdateElementStyle` replaces the color of the scheme, and its `bgColor`
+draws opaque. A boundary is a panel with a dashed outline, and a
+deployment node is a panel with a solid outline. Its title, its type and
+its description are at its top left. A relationship and its arrowheads
+take the token Edge, and `$lineColor` replaces it. A `$link` gives an
+element, a boundary or a relationship a link (D32).
+
 ### Other kinds
 
 zuzu draws the flowchart, the state diagram, the class diagram, the entity
 relationship diagram, the requirement diagram, the agentflow diagram, and
 the charts above, which hold the sequence diagram, the mindmap, the
-architecture diagram, the git graph, the block diagram and the timeline.
-The agentflow diagram reads into a graph, as the flowchart does. Every
-other kind of Mermaid is an error that wraps `mermaid.ErrKind`. D32 sets
-the order of the next kinds.
+architecture diagram, the git graph, the block diagram, the timeline and
+the five kinds of C4 diagram. The agentflow diagram reads into a graph, as
+the flowchart does. Every other kind of Mermaid is an error that wraps
+`mermaid.ErrKind`. D32 sets the order of the next kinds.
 
 ## Emoji and missing characters
 

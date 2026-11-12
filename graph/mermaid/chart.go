@@ -62,6 +62,11 @@ var charts = map[string]compiler{
 	"block":             blockChart,
 	"block-beta":        blockChart,
 	"timeline":          timelineChart,
+	c4Context:           c4Chart,
+	c4Container:         c4Chart,
+	c4Component:         c4Chart,
+	c4Dynamic:           c4Chart,
+	c4Deployment:        c4Chart,
 }
 
 // IsChart reports whether a kind of diagram is a chart that Chart

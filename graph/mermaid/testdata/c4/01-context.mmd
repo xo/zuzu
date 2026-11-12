@@ -1,0 +1,24 @@
+C4Context
+  title System context of a bank
+  accTitle: The bank
+  Enterprise_Boundary(bank, "The bank") {
+    Person(customer, "Customer", "A customer of the bank")
+    System(banking, "Internet Banking", "Shows the accounts")
+    System_Boundary(core, "Core") {
+      SystemDb(mainframe, "Mainframe", "Holds the accounts")
+      SystemQueue(events, "Events", "Carries the events")
+    }
+  }
+  Person_Ext(visitor, "Visitor", "Reads the site")
+  System_Ext(mail, "Mail", "Sends e-mail")
+  SystemDb_Ext(archive, "Archive")
+  SystemQueue_Ext(feed, "Feed")
+
+  BiRel(customer, banking, "Uses")
+  Rel(banking, mainframe, "Reads", "JDBC")
+  Rel(banking, mail, "Sends e-mail with")
+  Rel(mail, customer, "Mails")
+
+  UpdateElementStyle(customer, $fontColor="white", $bgColor="#7a3e9d", $borderColor="black")
+  UpdateRelStyle(mail, customer, $textColor="red", $lineColor="red", $offsetX="-40", $offsetY="10")
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
