@@ -3,8 +3,9 @@ package zuzu
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
 
@@ -45,7 +46,7 @@ func (s *scope) buildAxes(path string) ([]scene.Mark, error) {
 	for i := range s.spec.Axes {
 		a := &s.spec.Axes[i]
 		p := fmt.Sprintf("%s/axes/%d", path, i)
-		m, err := s.buildAxis(a)
+		m, err := s.buildAxis(a, p)
 		if err != nil {
 			var is vega.Issue
 			if isIssue(err, &is) {
@@ -64,7 +65,7 @@ func (s *scope) buildAxes(path string) ([]scene.Mark, error) {
 }
 
 // buildAxis resolves an axis and draws it.
-func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
+func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	sc, err := s.scale(a.Scale)
 	if err != nil {
 		return nil, err
@@ -78,6 +79,11 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 	ax := &layout.Axis{Orient: orient, Scale: sc, Length: w, Cross: h}
 	if orient == "left" || orient == "right" {
 		ax.Length, ax.Cross = h, w
+	}
+	if ax.Length <= 0 {
+		// A group with no size along the axis still has an axis, along the
+		// range of its scale, as in Vega.
+		ax.Length = rangeEnd(sc)
 	}
 	ax.Grid = a.Grid != nil && *a.Grid
 	if g, ok := cfg["grid"].(bool); ok && a.Grid == nil {
@@ -159,10 +165,25 @@ func (s *scope) buildAxis(a *vega.Axis) (*scene.Mark, error) {
 	m := s.rt.style().Axis(ax)
 	// The config and the axis style its parts, over the look of zuzu.
 	styleGuide(&m, s.guideProps(cfg, a.Extra), axisParts)
+	if err := s.guideEncode(&m, a.Encode, axisEncodeParts, path, "an axis"); err != nil {
+		return nil, err
+	}
 	if a.ZIndex != nil {
 		m.ZIndex = *a.ZIndex
 	}
 	return &m, nil
+}
+
+// rangeEnd returns the far end of the range of a scale of positions, or 0
+// for a range that is not of numbers.
+func rangeEnd(sc scale.Scale) float64 {
+	end := 0.0
+	for _, v := range sc.Range() {
+		if f, ok := v.(float64); ok && !math.IsNaN(f) && !math.IsInf(f, 0) {
+			end = math.Max(end, f)
+		}
+	}
+	return end
 }
 
 // labelFormat returns the function that writes the label of a value of a
@@ -192,24 +213,11 @@ func (s *scope) labelFormat(sc scale.Scale, fv, ftv vega.Value, ax *layout.Axis)
 				return f(t)
 			}, nil
 		}
-		f, err := format.Number(spec, *s.rt.locale)
-		if err != nil {
-			if err := s.rt.issue(vega.ErrUnsupported, "", "the format %q", spec); err != nil {
-				return nil, err
-			}
-			return expr.String, nil
-		}
-		return func(v any) string {
-			if _, ok := v.(string); ok {
-				return expr.String(v)
-			}
-			return f(expr.Number(v))
-		}, nil
 	}
 	switch {
-	case isTime:
+	case isTime && spec == "":
 		return timeLabel(*s.rt.locale, loc), nil
-	case scale.Discrete(sc.Type()):
+	case scale.Discrete(sc.Type()) && spec == "":
 		return func(v any) string {
 			if v == nil {
 				return "null"
@@ -217,38 +225,73 @@ func (s *scope) labelFormat(sc scale.Scale, fv, ftv vega.Value, ax *layout.Axis)
 			return expr.String(v)
 		}, nil
 	}
-	return s.numberLabel(sc, ax), nil
-}
-
-// numberLabel returns a format of numbers with a thousands separator and
-// as many decimals as the step between the ticks needs.
-func (s *scope) numberLabel(sc scale.Scale, ax *layout.Axis) func(any) string {
-	dom := sc.Domain()
-	step := 1.0
-	if len(dom) >= 2 {
-		count := 10.0
-		if ax != nil {
-			count = math.Min(layout.MaxLabels, math.Max(2, ax.Count))
-			if ax.Count <= 0 {
-				count = math.Max(2, math.Min(layout.MaxLabels, ax.Length/40))
-			}
+	f, err := s.numberLabel(sc, spec, ax)
+	if err != nil {
+		if err := s.rt.issue(vega.ErrUnsupported, "", "the format %q", spec); err != nil {
+			return nil, err
 		}
-		step = scale.TickStep(expr.Number(dom[0]), expr.Number(dom[len(dom)-1]), count)
+		return expr.String, nil
 	}
-	decimals := 0
-	if step > 0 && !math.IsNaN(step) && !math.IsInf(step, 0) {
-		str := strconv.FormatFloat(step, 'f', -1, 64)
-		if _, frac, ok := strings.Cut(str, "."); ok {
-			decimals = min(len(frac), 6)
-		}
-	}
-	f, _ := format.Number(",."+strconv.Itoa(decimals)+"f", *s.rt.locale)
 	return func(v any) string {
 		if _, ok := v.(string); ok {
 			return expr.String(v)
 		}
 		return f(expr.Number(v))
+	}, nil
+}
+
+// legendTicks is the number of ticks that a legend of a scale of numbers
+// asks for, as in layout.
+const legendTicks = 5
+
+// numberLabel returns the format of the labels of the numbers of a scale,
+// as Vega writes them. The labels of a linear scale take the spec, by
+// default ",f", with the precision that the step between two ticks needs
+// when the spec gives none. A log scale writes the spec, by default ",",
+// and only some of its ticks between two powers take a label. Any other
+// scale writes the spec as it is.
+func (s *scope) numberLabel(sc scale.Scale, spec string, ax *layout.Axis) (func(float64) string, error) {
+	loc := *s.rt.locale
+	count := float64(legendTicks)
+	if ax != nil {
+		count = ax.TickCount()
 	}
+	if show := scale.LogLabels(sc, count); show != nil {
+		if spec == "" {
+			spec = ","
+		}
+		f, err := format.Number(spec, loc)
+		if err != nil {
+			return nil, err
+		}
+		return func(v float64) string {
+			if !show(v) {
+				return ""
+			}
+			return f(v)
+		}, nil
+	}
+	dom := sc.Domain()
+	if spec != "" && (scale.Discrete(sc.Type()) || !linearish(sc.Type()) || len(dom) < 2) {
+		return format.Number(spec, loc)
+	}
+	lo, hi := 0.0, 1.0
+	if len(dom) >= 2 {
+		lo, hi = expr.Number(dom[0]), expr.Number(dom[len(dom)-1])
+	}
+	return format.Ticks(spec, lo, hi, scale.TickStep(lo, hi, count), loc)
+}
+
+// linearish reports whether a scale type maps numbers along a line or a
+// curve, so that its ticks are the round numbers of its domain: linear,
+// pow, sqrt and symlog, also as sequential or diverging.
+func linearish(typ string) bool {
+	typ = strings.TrimPrefix(strings.TrimPrefix(typ, "sequential-"), "diverging-")
+	switch typ {
+	case "linear", "pow", "sqrt", "symlog", "sequential":
+		return true
+	}
+	return false
 }
 
 // timeLabel returns a format of times that names the largest unit that
@@ -307,7 +350,7 @@ func (s *scope) buildLegends(path string) ([]scene.Mark, error) {
 	for i := range s.spec.Legends {
 		l := &s.spec.Legends[i]
 		p := fmt.Sprintf("%s/legends/%d", path, i)
-		m, err := s.buildLegend(l)
+		m, err := s.buildLegend(l, p)
 		if err != nil {
 			var is vega.Issue
 			if isIssue(err, &is) {
@@ -326,7 +369,7 @@ func (s *scope) buildLegends(path string) ([]scene.Mark, error) {
 }
 
 // buildLegend resolves a legend and draws it.
-func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
+func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	lg := &layout.Legend{}
 	get := func(name string) (scale.Scale, error) {
 		if name == "" {
@@ -424,7 +467,7 @@ func (s *scope) buildLegend(l *vega.Legend) (*scene.Mark, error) {
 	}
 	m := s.rt.style().Legend(lg)
 	styleGuide(&m, s.guideProps(cfg, l.Extra), legendStyleParts)
-	if err := s.legendEncode(&m, l.Encode); err != nil {
+	if err := s.guideEncode(&m, l.Encode, legendParts, path, "a legend"); err != nil {
 		return nil, err
 	}
 	if l.ZIndex != nil {
@@ -441,31 +484,49 @@ type legendPlace struct {
 	offset, x, y float64
 }
 
-// legendParts are the roles of the parts of a legend that the encode of a
-// legend names.
-var legendParts = map[string]string{
-	"title": "legend-title", "labels": "legend-label", "symbols": "legend-symbol",
-	"gradient": "legend-gradient", "entries": "legend-entry",
-}
+// legendParts and axisEncodeParts are the roles of the parts of a legend
+// and of an axis that the encode of a guide names. The look of zuzu draws
+// no ticks on an axis (docs/STYLE.md), so an encode of ticks has nothing to
+// style.
+var (
+	legendParts = map[string]string{
+		"legend": "legend", "title": "legend-title", "labels": "legend-label", "symbols": "legend-symbol",
+		"gradient": "legend-gradient", "entries": "legend-entry",
+	}
+	axisEncodeParts = map[string]string{
+		"axis": "axis", "title": "axis-title", "labels": "axis-label", "grid": "axis-grid",
+		"domain": "axis-domain", "ticks": "",
+	}
+)
 
-// legendEncode applies the encode of a legend to its parts, with the datum
-// of each item, which holds its value and its label. The layout places the
-// parts, so an encoding of a place is left out.
-func (s *scope) legendEncode(m *scene.Mark, enc vega.GuideEncode) error {
-	for name, el := range enc {
-		role, ok := legendParts[name]
+// guideEncode applies the encode of a legend or an axis to its parts, with
+// the datum of each item, which holds its value and its label. The layout
+// places the parts, so an encoding of a place goes in the report.
+func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[string]string, path, kind string) error {
+	for _, name := range slices.Sorted(maps.Keys(enc)) {
+		el := enc[name]
+		role, ok := parts[name]
 		if !ok {
+			if err := s.rt.issue(vega.ErrUnsupported, path+"/encode/"+name, "the encode of the part %s of %s", name, kind); err != nil {
+				return err
+			}
+			continue
+		}
+		if role == "" {
 			continue
 		}
 		sets := vega.Encode{}
-		for set, props := range el.Sets {
+		for _, set := range slices.Sorted(maps.Keys(el.Sets)) {
 			kept := vega.Props{}
-			for k, v := range props {
+			for _, k := range slices.Sorted(maps.Keys(el.Sets[set])) {
 				switch k {
 				case "x", "y", "x2", "y2", "xc", "yc", "width", "height":
+					if err := s.rt.issue(vega.ErrUnsupported, path+"/encode/"+name+"/"+set, "the encode of %s of the %s of %s", k, name, kind); err != nil {
+						return err
+					}
 					continue
 				}
-				kept[k] = v
+				kept[k] = el.Sets[set][k]
 			}
 			sets[set] = kept
 		}

@@ -253,6 +253,18 @@ func (s *scope) itemDatum(typ string, it *scene.Item) map[string]any {
 		"datum": it.Datum, "x": it.X, "y": it.Y, "x2": it.X2, "y2": it.Y2,
 		"width": it.Width, "height": it.Height, "text": textValue(it.Text),
 	}
+	switch typ {
+	case scene.Rect, scene.Group, scene.Image:
+		// An item that the encoding gives from x to x2 keeps x2 as its
+		// encoded end, which roundEnds reads. Vega gives the larger end
+		// as x2, and the smaller as x.
+		if it.X2 == it.X || it.X2 == it.X+it.Width {
+			d["x2"] = it.X + it.Width
+		}
+		if it.Y2 == it.Y || it.Y2 == it.Y+it.Height {
+			d["y2"] = it.Y + it.Height
+		}
+	}
 	if b := s.rt.style().ItemBounds(typ, it); !b.IsEmpty() {
 		d["bounds"] = map[string]any{"x1": b.X1, "y1": b.Y1, "x2": b.X2, "y2": b.Y2}
 	}

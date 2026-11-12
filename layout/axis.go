@@ -45,29 +45,36 @@ type Axis struct {
 	LabelLimit float64
 }
 
+// TickCount returns the number of ticks that the axis asks its scale for:
+// the count of the spec, or one each 40 pixels. A scale of numbers has no
+// more than MaxLabels ticks.
+func (a *Axis) TickCount() float64 {
+	count := a.Count
+	if count <= 0 {
+		count = math.Max(2, math.Min(MaxLabels, a.Length/40))
+		if a.Scale.Type() == scale.Trading {
+			// A label of a trading scale is short and marks a period,
+			// such as a week, so the axis takes one each 50 pixels.
+			count = math.Max(2, a.Length/50)
+		}
+	}
+	if !scale.Discrete(a.Scale.Type()) {
+		count = math.Min(count, MaxLabels)
+	}
+	return count
+}
+
 // vertical reports whether the axis runs up and down.
 func (a *Axis) vertical() bool {
 	return a.Orient == "left" || a.Orient == "right"
 }
 
 // ticks returns the values of the ticks and their positions along the
-// axis. A scale of numbers has no more than MaxLabels ticks.
+// axis.
 func (a *Axis) ticks() ([]any, []float64) {
 	vals := a.Values
 	if vals == nil {
-		count := a.Count
-		if count <= 0 {
-			count = math.Max(2, math.Min(MaxLabels, a.Length/40))
-			if a.Scale.Type() == scale.Trading {
-				// A label of a trading scale is short and marks a period,
-				// such as a week, so the axis takes one each 50 pixels.
-				count = math.Max(2, a.Length/50)
-			}
-		}
-		if !scale.Discrete(a.Scale.Type()) {
-			count = math.Min(count, MaxLabels)
-		}
-		vals = a.Scale.Ticks(count)
+		vals = a.Scale.Ticks(a.TickCount())
 	}
 	bw := a.Scale.Bandwidth()
 	var out []any
@@ -118,8 +125,8 @@ func (s Style) Axis(a *Axis) scene.Mark {
 	vals, pos := a.ticks()
 	if a.Grid {
 		grid := scene.Mark{Type: scene.Rule, Role: "axis-grid"}
-		for _, p := range pos {
-			it := scene.Item{Stroke: scene.Paint{Color: t.Grid}, StrokeWidth: ptr(1)}
+		for i, p := range pos {
+			it := scene.Item{Stroke: scene.Paint{Color: t.Grid}, StrokeWidth: ptr(1), Datum: map[string]any{"value": vals[i]}}
 			if a.vertical() {
 				it.X, it.X2, it.Y, it.Y2 = 0, a.Cross, p, p
 			} else {
@@ -174,6 +181,11 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 	color := s.Theme.Muted
 	for i, v := range vals {
 		str := a.Format(v)
+		if str == "" {
+			// A format writes no label for some ticks, such as the ticks
+			// of a log scale between two powers.
+			continue
+		}
 		var it scene.Item
 		switch a.Orient {
 		case "bottom":

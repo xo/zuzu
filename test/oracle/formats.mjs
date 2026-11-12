@@ -9,6 +9,8 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { format } from 'd3-format';
 import { timeFormat, utcFormat, timeParse, utcParse } from 'd3-time-format';
+import { scaleLinear } from 'd3-scale';
+import { tickStep } from 'd3-array';
 
 const out = process.argv[2];
 if (!out) {
@@ -87,3 +89,21 @@ const dateParse = texts.map((s) => {
   return [s, Number.isNaN(t) ? null : t];
 });
 writeFileSync(join(out, 'date.json'), JSON.stringify(dateParse, null, 0) + '\n');
+
+// The labels of the ticks of a linear scale, which an axis or a legend
+// writes with tickFormat of d3-scale: a domain, a count, a spec, the step
+// of the ticks, the ticks and their labels.
+const tickCases = [
+  [[0, 25], 5, 's'], [[0, 12e6], 10, 's'], [[0, 100], 10, 's'], [[0, 1.2], 10, 's'],
+  [[0, 10], 5, '~s'], [[-3e3, 4e3], 7, '.1s'], [[0, 1], 5, ''], [[0, 1.1], 10, ''],
+  [[0, 2.5e9], 5, ''], [[0, 1], 10, '%'], [[0, 0.05], 5, '%'], [[0, 1], 4, 'e'],
+  [[1, 1.1], 10, 'r'], [[0, 1e-3], 5, 'g'], [[0, 50], 10, ','], [[0, 0.3], 6, ',f'],
+  [[100, 200], 5, '$'], [[0, 5000], 5, ',.2f'], [[-1, 1], 8, '+f'], [[0, 1], 5, 'p'],
+];
+const ticks = tickCases.map(([d, count, spec]) => {
+  const s = scaleLinear().domain(d);
+  const f = s.tickFormat(count, spec || undefined);
+  const t = s.ticks(count);
+  return [spec, d[0], d[1], Math.abs(tickStep(d[0], d[1], count)), t, t.map(f)];
+});
+writeFileSync(join(out, 'ticks.json'), JSON.stringify(ticks, null, 0) + '\n');

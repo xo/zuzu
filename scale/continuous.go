@@ -507,3 +507,34 @@ func logTicks(lo, hi, base, count float64) []float64 {
 	}
 	return out
 }
+
+// LogLabels returns a function that reports whether a tick of a log scale
+// takes a label, or nil for a scale that is not log. Between two powers of
+// the base, a log scale has a tick at each multiple of the lower power. If
+// there are more ticks than count asks for, only the multiples up to a
+// limit take a label, such as 1, 2 and 3 times each power. The limit is the
+// base times count over the number of ticks, and at least 1, as in d3.
+func LogLabels(s Scale, count float64) func(float64) bool {
+	c, ok := s.(*continuous)
+	if !ok || c.baseType() != "log" || c.base <= 1 {
+		return nil
+	}
+	if count <= 0 || math.IsNaN(count) {
+		count = 10
+	}
+	n := len(c.Ticks(count))
+	if n == 0 {
+		return nil
+	}
+	limit := math.Max(1, c.base*count/float64(n))
+	lb := math.Log(c.base)
+	return func(v float64) bool {
+		v = math.Abs(v)
+		if v == 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+			return true
+		}
+		p := math.Floor(math.Log(v)/lb + 1e-9)
+		m := v / math.Pow(c.base, p)
+		return m <= limit+1e-9
+	}
+}
