@@ -258,6 +258,7 @@ var mermaidSizes = map[string]map[string]float64{
 	"kanban":          {"": 16},
 
 	rrIR: {"": 16}, rrEBNF: {"": 16}, rrABNF: {"": 16}, rrPEG: {"": 16},
+	"treeView-beta": {"": 16},
 }
 
 // scaleWrap returns the width in the pixels of zuzu of a width at which

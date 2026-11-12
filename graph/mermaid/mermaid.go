@@ -58,6 +58,11 @@ type Diagram struct {
 	// unread holds the parts of the front matter that zuzu does not read,
 	// which Graph and Chart report.
 	unread []unread
+	// body holds the lines of the source from the line of the kind to the
+	// end, as the source gives them, with no directive. The first is the
+	// line N. A kind that reads its source as the lexer of Mermaid does,
+	// such as a tree view, reads it.
+	body []string
 }
 
 // unread is a part of the front matter that zuzu does not read: the number
@@ -155,7 +160,8 @@ func Read(src string) (*Diagram, error) {
 		body = wrapDirective.ReplaceAllString(body, "")
 	}
 	n0 := i
-	for k, l := range strings.Split(body, "\n") {
+	split := strings.Split(body, "\n")
+	for k, l := range split {
 		t := strings.TrimSpace(l)
 		if t == "" || strings.HasPrefix(t, "%%") {
 			continue
@@ -173,6 +179,7 @@ func Read(src string) (*Diagram, error) {
 				d.Kind = "cynefin-beta"
 			}
 			d.N = n0 + k + 1
+			d.body = split[k:]
 			continue
 		}
 		// A comment runs to the end of the line.

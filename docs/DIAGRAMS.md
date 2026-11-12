@@ -1654,6 +1654,7 @@ the source draws once, with its label.
 | `kanban` | Vega rects, rules and text, laid out in Go: the columns side by side, each with its cards |
 | `packet`, `packet-beta` | Vega rects and text, laid out in Go: the fields on rows of bits |
 | `railroad-beta`, `railroad-ebnf-beta`, `railroad-abnf-beta`, `railroad-peg-beta` | Vega rects, paths and text, laid out in Go with the sizes of Mermaid: a track for each rule |
+| `treeView-beta` | Vega rules, rects, paths, text and icons, laid out in Go: a row for each item, indented by its depth |
 
 #### pie
 
@@ -3095,6 +3096,127 @@ kind. Each box has a tint of its color and an outline in its color. A
 terminal has round corners, and a special has a dashed outline. A text
 with only spaces draws an empty box, as in Mermaid. The name of a rule is
 bold. The tracks and the markers take the color `edge`.
+
+#### treeView-beta
+
+The keyword is `treeView-beta`, alone on its line. A tree view draws a tree
+of files and directories, one item on each row. Each item after the
+keyword is a name and its annotations, in any order:
+
+| Part | What zuzu draws |
+| --- | --- |
+| a name, as `index.js`, `"my file"` or `'my file'` | an item, a file |
+| a name that ends in `/`, as `src/` | a directory, with its name in bold and without the `/` |
+| `:::highlight` | a band behind the row of the item |
+| `:::name` with another name | nothing, as in Mermaid |
+| `icon(pack:name)`, `icon(name)` | the icon before the name |
+| `icon(none)`, `icon()` | no icon |
+| `## Text` | the description of the item, in a column at the right |
+| `title Text`, before the first item | the title |
+| `accTitle: Text`, `accDescr: Text`, `accDescr { ... }`, before the first item | the description of the Vega spec, the texts joined in order |
+
+The indent of an item sets its parent. The parent is the last item before
+it with a smaller indent. An item with no such item has the root as its
+parent. Mermaid draws the root as a directory `/` on the first row, and so
+does zuzu. An indent counts its spaces and tabs, and a tab counts as one,
+as in Mermaid. The last annotation of a kind wins, so `a :::x :::y` has
+the class `y`.
+
+A tree can also be drawn with the characters of boxes, as the command
+`tree` draws it:
+
+```
+treeView-beta
+├── src/
+│   ├── index.ts
+│   └── utils.ts
+└── README.md
+```
+
+When a line after the keyword holds `─`, `━`, `│`, `┃`, `├`, `┣`, `└` or
+`┗`, zuzu reads the tree as Mermaid 12.3 does. The first `├`, `┣`, `└` or
+`┗` that is not at the start of its line sets the width of a level, 4 by
+default. The depth of an item is its column over that width, rounded,
+plus 1. A line of only `│` and spaces drops.
+
+zuzu reads the source as the lexer of Mermaid 12.3 reads it:
+
+1. A comment on a line of its own drops, as in Mermaid. `%%` after a name
+   with no quotes is part of the name.
+2. A name with no quotes runs to the end of the line, or to the space
+   before an annotation. Its spaces at the end drop, and the spaces in it
+   stay.
+3. A name in quotes ends at its end quote. Two names in quotes on one line
+   are two items.
+4. A word that starts with `title`, such as `titles.txt`, starts a title,
+   as in Mermaid. So `titles.txt` is the title `title` and the item
+   `s.txt`, before the first item, and an error after it.
+5. An annotation takes a space before it. A description runs to the end of
+   the line, and can hold `:::` and `##`.
+
+Spaces at the end of a line after a name in quotes or after an
+annotation, a line of only spaces, and `%%` alone on an indented line read
+as the indent of the next item, as in Mermaid. So each is an error when
+the next line has an indent too, or at the end of the source.
+
+These are errors, as in Mermaid: text after the keyword on its line, even
+a space, a title, an accTitle or an accDescr after the first item, a
+character that starts no part, such as the `i` of `icon(a:b:c)` or the `:`
+of `"a":::b`, and the keyword on a later line. In a tree drawn with boxes,
+a branch with no name and a line with an indent and no branch are errors
+too.
+
+zuzu reads these settings of `treeView`, in the pixels of Mermaid, and a
+value that is not a number of 0 or more, or not true or false, is an
+issue:
+
+| Setting | What it does |
+| --- | --- |
+| `rowIndent` | the indent of a level, with `paddingX`. 10 by default |
+| `paddingX` | the space at the left and the right of a name. 5 by default |
+| `paddingY` | the space above and under a name. 5 by default |
+| `lineThickness` | the width of the lines, as a multiple of `edgeWidth`. 1 by default |
+| `showIcons` | draws an icon before each item: a folder, a file, or the icon of its name |
+| `defaultIconPack` | the pack of an icon with no pack, such as `bell` |
+| `filenameIcons` | an icon by the name of a file, such as `Dockerfile: docker` |
+| `extensionIcons` | an icon by the extension of a file, such as `.ts: typescript`. `none` hides the icon |
+
+An icon with no pack takes the pack of `defaultIconPack`, except `folder`
+and `file`, which are the folder and the file of a tree view. zuzu draws
+these two as shapes of its own. Every other icon draws as "Icons and
+images" says, and a missing icon draws as a box with a question mark, as
+in Mermaid. In zuzu, a missing icon is an issue too, when the chart
+renders.
+
+zuzu reads these theme variables of `treeView`, and each other theme
+variable is an issue:
+
+| Theme variable | What it does |
+| --- | --- |
+| `labelFontSize` | the size of a label, as 16 pixels in Mermaid are 11 in zuzu. A size of 20 draws at 13.75 |
+| `labelColor` | the color of a name |
+| `lineColor` | the color of the lines |
+| `iconColor` | the color of an icon of one color |
+| `descriptionColor` | the color of a description |
+| `highlightBg`, `highlightStroke` | the fill and the outline of a band |
+
+zuzu lays out a tree view in Go with the sizes of Mermaid 12.3, scaled by
+11/16, because Mermaid draws its labels at 16 pixels (D32). A label does
+not wrap, as in Mermaid. Each item is a row, in the order of the source.
+A line runs down from each item with children to the middle of the row of
+its last child, and a line runs from it to each child. The descriptions
+are in a column after the widest name. A band runs from the left of its
+row to past the right of the tree, and each band is a little wider than
+the band before it, as in Mermaid.
+
+The look is the look of zuzu. A line takes the color `edge` and the width
+`edgeWidth`. A name takes the color of a label, and a description is in
+italic in the color `muted`. A band is a tint of the first color of the
+category scheme with an outline, and an icon takes that color too.
+
+zuzu draws a tree view in another way than Mermaid 12.3.0 in one place.
+Mermaid draws no title, from the front matter or from `title`. zuzu draws
+the title, as in the other kinds.
 
 ### Other kinds
 
