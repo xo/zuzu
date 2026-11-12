@@ -253,8 +253,20 @@ Mermaid do.
 `headlabel` and `taillabel` are labels at the head and at the tail of an
 edge. Each sits beside the edge, just past its end, at the right of the
 edge as it runs from the tail to the head. If that place covers a node,
-another label or an edge, the label goes to the left. The space between
-two ranks grows to hold the labels at the ends of the edges between them.
+another label or an edge, the label goes to the left. If the left also
+covers a node or another label, as when many edges end at the same port,
+the label moves away from its edge or along it, in steps, so that the
+labels at the same end spread apart. A step is the height of the label,
+or its width if that is smaller, plus 2 points. The label moves 6 steps at
+most each way, and stays on a side of its own edge. Of the places that
+cover the fewest nodes and labels, the label takes the one where the
+edges that it cuts and its steps add up to the least, and of those the
+nearest. A label that covers a box by 2 points or less does not move. An
+edge can end inside the margin of its node, so a label can cover the part
+of its own node that lies outside the end. The labels at the ends of the
+relations of a class diagram of Mermaid move in the same way. The space
+between two ranks grows to hold the labels at the ends of the edges
+between them.
 If an edge sets `labeldistance` or `labelangle`, the center of each label
 is 10 times `labeldistance` points from the end, at `labelangle` degrees
 counterclockwise from the edge, as in dot. The defaults are 1 and -25.

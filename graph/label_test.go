@@ -140,3 +140,81 @@ func TestRectCuts(t *testing.T) {
 		}
 	}
 }
+
+func TestEndLabelsSpread(t *testing.T) {
+	t.Parallel()
+	// Three edges end at the same port of t, and three leave the same
+	// port of s, each with a label at that end.
+	const w, h = 120.0, 14.0
+	west, east := []float64{-1, 0}, []float64{1, 0}
+	in := LayoutInput{Direction: LR}
+	for _, id := range []string{"a", "b", "c", "t", "s", "x", "y", "z"} {
+		in.Nodes = append(in.Nodes, LayoutNode{ID: id, Width: 80, Height: 40})
+	}
+	for _, id := range []string{"a", "b", "c"} {
+		in.Edges = append(in.Edges, LayoutEdge{Source: id, Target: "t", HeadLabelWidth: w, HeadLabelHeight: h, TargetPort: []float64{-40, -10}, TargetSide: west})
+	}
+	for _, id := range []string{"x", "y", "z"} {
+		in.Edges = append(in.Edges, LayoutEdge{Source: "s", Target: id, TailLabelWidth: w, TailLabelHeight: h, SourcePort: []float64{40, 10}, SourceSide: east})
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var labels []rect
+	for i, e := range l.Edges {
+		x, y, ex, ey := e.HeadLabelX, e.HeadLabelY, e.EndX, e.EndY
+		if i >= 3 {
+			x, y, ex, ey = e.TailLabelX, e.TailLabelY, e.StartX, e.StartY
+		}
+		b := labelBox(x, y, w, h)
+		// Each label stays near its own end.
+		if d := math.Hypot(x-ex, y-ey); d > w/2+endAlong+endBeside+float64(endSteps)*(h+endApart)+h {
+			t.Errorf("label %d at %v, %v is %v from its end %v, %v", i, x, y, d, ex, ey)
+		}
+		for j, o := range labels {
+			if b.overlaps(o) {
+				t.Errorf("label %d %v covers label %d %v", i, b, j, o)
+			}
+		}
+		for j, n := range l.Nodes {
+			if b.overlaps(labelBox(n.X, n.Y, n.Width, n.Height)) {
+				t.Errorf("label %d %v covers node %s", i, b, in.Nodes[j].ID)
+			}
+		}
+		labels = append(labels, b)
+	}
+	again, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range l.Edges {
+		if l.Edges[i].HeadLabelX != again.Edges[i].HeadLabelX || l.Edges[i].HeadLabelY != again.Edges[i].HeadLabelY ||
+			l.Edges[i].TailLabelX != again.Edges[i].TailLabelX || l.Edges[i].TailLabelY != again.Edges[i].TailLabelY {
+			t.Errorf("edge %d: the labels moved between two layouts", i)
+		}
+	}
+}
+
+func TestRectInside(t *testing.T) {
+	t.Parallel()
+	r := rect{0, 0, 40, 20}
+	for _, c := range []struct {
+		p    [2]float64
+		want rect
+	}{
+		// On a side, and outside: the whole box.
+		{[2]float64{0, 10}, r},
+		{[2]float64{-5, 10}, r},
+		// 3 inside the left side: the box 3 smaller on each side.
+		{[2]float64{3, 10}, rect{3, 3, 37, 17}},
+	} {
+		if got := r.inside(c.p); got != c.want {
+			t.Errorf("%v: got %v, want %v", c.p, got, c.want)
+		}
+	}
+	// At the center, no part lies deeper, and the box covers nothing.
+	if got := r.inside([2]float64{20, 10}); got.overlaps(r) {
+		t.Errorf("the center: got %v, which overlaps the box", got)
+	}
+}

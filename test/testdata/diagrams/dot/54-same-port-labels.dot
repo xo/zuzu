@@ -1,0 +1,38 @@
+digraph same_port_labels {
+	// Three foreign keys end at the port id of users, and three leave the
+	// port id of teams, each with a label at that end.
+	rankdir=LR
+	node [shape=plaintext]
+	users [label=<
+		<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue">users</td></tr>
+		<tr><td align="left" port="id">id: integer</td></tr>
+		<tr><td align="left" port="name">name: text</td></tr>
+		</table>>]
+	posts [label=<
+		<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue">posts</td></tr>
+		<tr><td align="left" port="user_id">user_id: integer</td></tr>
+		</table>>]
+	comments [label=<
+		<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue">comments</td></tr>
+		<tr><td align="left" port="user_id">user_id: integer</td></tr>
+		</table>>]
+	likes [label=<
+		<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue">likes</td></tr>
+		<tr><td align="left" port="user_id">user_id: integer</td></tr>
+		</table>>]
+	teams [label=<
+		<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+		<tr><td bgcolor="lightblue">teams</td></tr>
+		<tr><td align="left" port="id">id: integer</td></tr>
+		</table>>]
+	posts:user_id:e -> users:id:w [headlabel="posts_user_id_fkey"]
+	comments:user_id:e -> users:id:w [headlabel="comments_user_id_fkey"]
+	likes:user_id:e -> users:id:w [headlabel="likes_user_id_fkey"]
+	teams:id:e -> posts:user_id:w [taillabel="teams_to_posts"]
+	teams:id:e -> comments:user_id:w [taillabel="teams_to_comments"]
+	teams:id:e -> likes:user_id:w [taillabel="teams_to_likes"]
+}

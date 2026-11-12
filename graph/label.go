@@ -2,17 +2,24 @@ package graph
 
 import (
 	"math"
+	"slices"
 )
 
 // The gaps of the labels that take no space in the ranks, in pixels: a
 // label at an end starts endAlong past the end along the edge and keeps
-// endBeside from its line, so that it clears the arrowhead, and an xlabel
+// endBeside from its line, so that it clears the arrowhead, labels at the
+// same end that move apart keep endApart from each other, and an xlabel
 // keeps xGap from its edge.
 const (
 	endAlong  = 3.0
 	endBeside = 4.0
+	endApart  = 2.0
 	xGap      = 3.0
 )
+
+// endSteps is the number of steps that a label at an end can move away from
+// its first places, along its edge and away from it.
+const endSteps = 6
 
 // rect is a box from x1, y1 to x2, y2.
 type rect struct{ x1, y1, x2, y2 float64 }
@@ -25,6 +32,22 @@ func rectAt(c [2]float64, w, h float64) rect {
 // overlaps reports whether two boxes share more than a border.
 func (a rect) overlaps(b rect) bool {
 	return a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2
+}
+
+// inside returns the part of the box that lies deeper in it than a point,
+// the box cut on each side by the distance from the point to its nearest
+// side. It returns a box that overlaps nothing when no part lies deeper,
+// and the whole box when the point is outside it.
+func (a rect) inside(p [2]float64) rect {
+	d := min(p[0]-a.x1, a.x2-p[0], p[1]-a.y1, a.y2-p[1])
+	if d <= 0 {
+		return a
+	}
+	if 2*d >= a.x2-a.x1 || 2*d >= a.y2-a.y1 {
+		inf := math.Inf(1)
+		return rect{inf, inf, inf, inf}
+	}
+	return rect{a.x1 + d, a.y1 + d, a.x2 - d, a.y2 - d}
 }
 
 // cuts reports whether the segment from p to q passes through the box, by
@@ -121,6 +144,48 @@ func endPlaces(e, in, right [2]float64, w, h, dist, angle float64) [][2]float64 
 	return out
 }
 
+// spot is a place to try for the center of a label at an end of an edge,
+// and the number of steps that it lies from the first places.
+type spot struct {
+	c     [2]float64
+	steps int
+}
+
+// endSpread returns more places for the center of a label of a size at an
+// end of an edge, for when the places of endPlaces cover a node or another
+// label, as when the heads of many edges end at the same port. Each place
+// keeps to a side of the edge, and lies up to endSteps steps farther from
+// the edge and farther along it than the place of endPlaces on that side. A
+// step is the height or the width of the label, the smaller one, and
+// endApart. The nearest places come first.
+func endSpread(e, in, right [2]float64, w, h float64) []spot {
+	type place struct {
+		s spot
+		d int
+	}
+	along, step := endAlong+reach(in, w, h), math.Min(w, h)+endApart
+	var out []place
+	for a := range endSteps + 1 {
+		for b := range endSteps + 1 {
+			if a == 0 && b == 0 {
+				continue
+			}
+			for _, s := range []float64{1, -1} {
+				side := [2]float64{s * right[0], s * right[1]}
+				k, m := along+float64(a)*step, endBeside+reach(side, w, h)+float64(b)*step
+				c := [2]float64{e[0] + in[0]*k + side[0]*m, e[1] + in[1]*k + side[1]*m}
+				out = append(out, place{spot{c, a + b}, a*a + b*b})
+			}
+		}
+	}
+	slices.SortStableFunc(out, func(p, q place) int { return p.d - q.d })
+	spots := make([]spot, len(out))
+	for j, p := range out {
+		spots[j] = p.s
+	}
+	return spots
+}
+
 // ends returns the head and the tail of an edge: each end, the direction
 // into the edge there, and the side at the right of the edge.
 func ends(ep *EdgePlace) (head, headIn, headRight, tail, tailIn, tailRight [2]float64) {
@@ -172,30 +237,85 @@ func placeLabels(in *LayoutInput, out *Layout) {
 	for i, ep := range out.Edges {
 		routes[i] = smooth(ep.Points)
 	}
-	cost := func(b rect) int {
-		c := 0
-		for _, o := range boxes {
+	index := make(map[string]int, len(in.Nodes))
+	for i, n := range in.Nodes {
+		index[n.ID] = i
+	}
+	// cost returns the number of nodes and labels that a box covers, and
+	// the number of edges that it cuts. The node at index own counts only
+	// where the box covers its part inner.
+	cost := func(b rect, own int, inner rect) (int, int) {
+		covers, cuts := 0, 0
+		for j, o := range boxes {
+			if j == own {
+				o = inner
+			}
 			if b.overlaps(o) {
-				c += 2
+				covers++
 			}
 		}
 		for _, r := range routes {
 			for j := 1; j < len(r); j++ {
 				if b.cuts(r[j-1], r[j]) {
-					c++
+					cuts++
 					break
 				}
 			}
 		}
-		return c
+		return covers, cuts
 	}
-	pick := func(w, h float64, places [][2]float64) [2]float64 {
+	// choose returns the place that covers and cuts the least, where a
+	// node or a label that it covers counts as two edges that it cuts.
+	choose := func(w, h float64, places [][2]float64) [2]float64 {
 		best, least := places[0], math.MaxInt
 		for _, p := range places {
-			if c := cost(rectAt(p, w, h)); c < least {
-				best, least = p, c
-				if c == 0 {
+			if covers, cuts := cost(rectAt(p, w, h), -1, rect{}); 2*covers+cuts < least {
+				best, least = p, 2*covers+cuts
+				if least == 0 {
 					break
+				}
+			}
+		}
+		return best
+	}
+	pick := func(w, h float64, places [][2]float64) [2]float64 {
+		best := choose(w, h, places)
+		boxes = append(boxes, rectAt(best, w, h))
+		return best
+	}
+	// pickEnd places a label at an end of an edge, at the node own. When
+	// the place that choose gives covers another node or label, as when
+	// many edges end at the same port, the label moves to the place of
+	// endPlaces or endSpread that covers the fewest of them. Of those, it
+	// takes the one where the edges that it cuts and its steps away from
+	// the end add up to the least, and of those the nearest. Here a label
+	// covers a box only where it reaches more than endApart into it, so
+	// that a label that only touches a box stays where it is. An edge can
+	// end inside the margin of its node, so the label can cover as much of
+	// its own node as lies outside the end.
+	pickEnd := func(e, into, right [2]float64, w, h, dist, angle float64, own string) [2]float64 {
+		skip, ok := index[own]
+		if !ok {
+			skip = -1
+		}
+		var inner rect
+		if skip >= 0 {
+			inner = boxes[skip].inside(e)
+		}
+		core := func(c [2]float64) rect {
+			return rectAt(c, max(w-2*endApart, 0), max(h-2*endApart, 0))
+		}
+		places := endPlaces(e, into, right, w, h, dist, angle)
+		best := choose(w, h, places)
+		if covers, cuts := cost(core(best), skip, inner); covers > 0 && dist <= 0 {
+			spots := make([]spot, 0, len(places))
+			for _, p := range places {
+				spots = append(spots, spot{p, 0})
+			}
+			for _, p := range append(spots, endSpread(e, into, right, w, h)...) {
+				c, k := cost(core(p.c), skip, inner)
+				if c < covers || c == covers && k+p.steps < cuts {
+					best, covers, cuts = p.c, c, k+p.steps
 				}
 			}
 		}
@@ -209,11 +329,11 @@ func placeLabels(in *LayoutInput, out *Layout) {
 		}
 		head, headIn, headRight, tail, tailIn, tailRight := ends(ep)
 		if w, h := e.HeadLabelWidth, e.HeadLabelHeight; w > 0 {
-			c := pick(w, h, endPlaces(head, headIn, headRight, w, h, e.LabelDistance, e.LabelAngle))
+			c := pickEnd(head, headIn, headRight, w, h, e.LabelDistance, e.LabelAngle, e.Target)
 			ep.HeadLabelX, ep.HeadLabelY = c[0], c[1]
 		}
 		if w, h := e.TailLabelWidth, e.TailLabelHeight; w > 0 {
-			c := pick(w, h, endPlaces(tail, tailIn, tailRight, w, h, e.LabelDistance, e.LabelAngle))
+			c := pickEnd(tail, tailIn, tailRight, w, h, e.LabelDistance, e.LabelAngle, e.Source)
 			ep.TailLabelX, ep.TailLabelY = c[0], c[1]
 		}
 		if w, h := e.XLabelWidth, e.XLabelHeight; w > 0 {

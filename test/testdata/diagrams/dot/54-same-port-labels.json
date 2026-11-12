@@ -1,0 +1,117 @@
+{
+  "name": "same_port_labels",
+  "directed": true,
+  "strict": false,
+  "bb": "0,0,444.25,219",
+  "rankdir": "LR",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "users",
+      "height": "1.2153",
+      "label": "\n\t\t<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"4\">\n\t\t<tr><td bgcolor=\"lightblue\">users<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"id\">id: integer<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"name\">name: text<\/td><\/tr>\n\t\t<\/table>",
+      "pos": "344.88,96.5",
+      "shape": "plaintext",
+      "width": "1.1632"
+    },
+    {
+      "_gvid": 1,
+      "name": "posts",
+      "height": "0.84722",
+      "label": "\n\t\t<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"4\">\n\t\t<tr><td bgcolor=\"lightblue\">posts<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"user_id\">user_id: integer<\/td><\/tr>\n\t\t<\/table>",
+      "pos": "211.62,188.5",
+      "shape": "plaintext",
+      "width": "1.5382"
+    },
+    {
+      "_gvid": 2,
+      "name": "comments",
+      "height": "0.84722",
+      "label": "\n\t\t<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"4\">\n\t\t<tr><td bgcolor=\"lightblue\">comments<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"user_id\">user_id: integer<\/td><\/tr>\n\t\t<\/table>",
+      "pos": "211.62,109.5",
+      "shape": "plaintext",
+      "width": "1.5382"
+    },
+    {
+      "_gvid": 3,
+      "name": "likes",
+      "height": "0.84722",
+      "label": "\n\t\t<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"4\">\n\t\t<tr><td bgcolor=\"lightblue\">likes<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"user_id\">user_id: integer<\/td><\/tr>\n\t\t<\/table>",
+      "pos": "211.62,30.5",
+      "shape": "plaintext",
+      "width": "1.5382"
+    },
+    {
+      "_gvid": 4,
+      "name": "teams",
+      "height": "0.84722",
+      "label": "\n\t\t<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"4\">\n\t\t<tr><td bgcolor=\"lightblue\">teams<\/td><\/tr>\n\t\t<tr><td align=\"left\" port=\"id\">id: integer<\/td><\/tr>\n\t\t<\/table>",
+      "pos": "79.5,109.5",
+      "shape": "plaintext",
+      "width": "1.1319"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 0,
+      "tail": 1,
+      "head": 0,
+      "head_lp": "362.5,88.25",
+      "headlabel": "posts_user_id_fkey",
+      "headport": "id:w",
+      "pos": "e,310,96.5 260,175.25 296.92,175.25 274.85,112.78 298.87,99.12",
+      "tailport": "user_id:e"
+    },
+    {
+      "_gvid": 1,
+      "tail": 2,
+      "head": 0,
+      "head_lp": "377.12,104.75",
+      "headlabel": "comments_user_id_fkey",
+      "headport": "id:w",
+      "pos": "e,310,96.5 260,96.25 277.88,96.25 284.97,96.412 298.64,96.475",
+      "tailport": "user_id:e"
+    },
+    {
+      "_gvid": 2,
+      "tail": 3,
+      "head": 0,
+      "head_lp": "258.62,88.25",
+      "headlabel": "likes_user_id_fkey",
+      "headport": "id:w",
+      "pos": "e,310,96.5 260,17.25 297.09,17.25 274.74,80.112 298.83,93.863",
+      "tailport": "user_id:e"
+    },
+    {
+      "_gvid": 3,
+      "tail": 4,
+      "head": 1,
+      "headport": "user_id:w",
+      "pos": "e,163.25,175.25 113.25,96.25 150.26,96.25 128.05,158.91 152.1,172.62",
+      "tail_lp": "155.25,104.5",
+      "taillabel": "teams_to_posts",
+      "tailport": "id:e"
+    },
+    {
+      "_gvid": 4,
+      "tail": 4,
+      "head": 2,
+      "headport": "user_id:w",
+      "pos": "e,163.25,96.25 113.25,96.25 131.13,96.25 138.22,96.25 151.89,96.25",
+      "tail_lp": "56.625,104.5",
+      "taillabel": "teams_to_comments",
+      "tailport": "id:e"
+    },
+    {
+      "_gvid": 5,
+      "tail": 4,
+      "head": 3,
+      "headport": "user_id:w",
+      "pos": "e,163.25,17.25 113.25,96.25 150.26,96.25 128.05,33.586 152.1,19.878",
+      "tail_lp": "154.12,88",
+      "taillabel": "teams_to_likes",
+      "tailport": "id:e"
+    }
+  ]
+}
