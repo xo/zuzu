@@ -36,3 +36,17 @@ func TestReportOrder(t *testing.T) {
 		}
 	}
 }
+
+// TestGraphAttrsStrict checks that an issue of an attribute of the graph is
+// the error in the strict mode, and a line of the report in the loose mode.
+func TestGraphAttrsStrict(t *testing.T) {
+	t.Parallel()
+	src := `digraph { zz=1 a -> b }`
+	if _, _, err := Parse(src, true); err == nil {
+		t.Error("the strict mode: no error for the graph attribute zz")
+	}
+	_, report, err := Parse(src, false)
+	if err != nil || len(report) != 1 {
+		t.Errorf("the loose mode: the report %v and the error %v", report, err)
+	}
+}

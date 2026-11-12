@@ -280,11 +280,17 @@ func Parse(src string, strict bool) (*graph.Graph, vega.Report, error) {
 	return p.g, p.issues.Report, nil
 }
 
-// stmts reads statements to the closing brace of a scope.
-func (p *parser) stmts(s *scope, graphAttrs map[string]string) error {
+// stmts reads statements to the closing brace of a scope. The scope of the
+// graph reads the attributes of the graph at its end, and an issue of
+// them is the error in the strict mode.
+func (p *parser) stmts(s *scope, graphAttrs map[string]string) (err error) {
 	if graphAttrs == nil {
 		graphAttrs = map[string]string{}
-		defer func() { _ = p.graphAttrs(graphAttrs) }()
+		defer func() {
+			if err == nil {
+				err = p.graphAttrs(graphAttrs)
+			}
+		}()
 	}
 	for {
 		if p.is("}") {
