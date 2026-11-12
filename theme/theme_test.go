@@ -24,14 +24,14 @@ func TestTheModesMatchTheStyle(t *testing.T) {
 	t.Parallel()
 	rows := regexp.MustCompile("(?m)^\\| `([a-z]+)` \\| `(#[0-9a-f]{6})` \\| `(#[0-9a-f]{6})` \\|").
 		FindAllStringSubmatch(style(t), -1)
-	if len(rows) != 7 {
-		t.Fatalf("docs/STYLE.md has %d rows of modes, expected 7", len(rows))
+	if len(rows) != 9 {
+		t.Fatalf("docs/STYLE.md has %d rows of modes, expected 9", len(rows))
 	}
 	for _, m := range []Mode{Light, Dark} {
 		n := neutrals(m)
 		got := map[string]string{
 			"bg": n.Background, "panel": n.Panel, "text": n.Text, "muted": n.Muted,
-			"faint": n.Faint, "grid": n.Grid, "axis": n.Axis,
+			"faint": n.Faint, "grid": n.Grid, "axis": n.Axis, "edge": n.Edge, "band": n.Band,
 		}
 		for _, row := range rows {
 			want := row[2]
@@ -41,6 +41,19 @@ func TestTheModesMatchTheStyle(t *testing.T) {
 			if got[row[1]] != want {
 				t.Errorf("%s %s: the package has %s and docs/STYLE.md has %s", m, row[1], got[row[1]], want)
 			}
+		}
+	}
+}
+
+// TestTheBandIsTheTextOverTheBackground checks that the band of each mode
+// is the color that the text at BandOpacity gives over the background, as
+// docs/STYLE.md says.
+func TestTheBandIsTheTextOverTheBackground(t *testing.T) {
+	t.Parallel()
+	for _, m := range []Mode{Light, Dark} {
+		n := neutrals(m)
+		if got := mix(n.Background, n.Text, BandOpacity); got != n.Band {
+			t.Errorf("%s: the text at %v over the background is %s, and the band is %s", m, BandOpacity, got, n.Band)
 		}
 	}
 }
@@ -110,5 +123,31 @@ func TestTheSequentialRampRuns(t *testing.T) {
 	}
 	if th.Sequential(0) == th.Sequential(1) {
 		t.Error("the ramp has the same color at both ends")
+	}
+}
+
+// TestTheEdgesTakeTheColorOfAnEdge checks that the styles of an edge and
+// its arrowheads take the color edge, a guide line the color axis, and a
+// band the text color (D32).
+func TestTheEdgesTakeTheColorOfAnEdge(t *testing.T) {
+	t.Parallel()
+	for _, m := range []Mode{Light, Dark} {
+		th := New(m, Zuzu)
+		styles, _ := th.Config()["style"].(map[string]any)
+		for _, c := range []struct {
+			style, prop, want string
+		}{
+			{StyleEdge, "stroke", th.Edge},
+			{StyleArrow, "fill", th.Edge},
+			{StyleArrow, "stroke", th.Edge},
+			{StyleArrowOpen, "stroke", th.Edge},
+			{StyleGuide, "stroke", th.Axis},
+			{StyleBand, "fill", th.Text},
+		} {
+			s, _ := styles[c.style].(map[string]any)
+			if got := s[c.prop]; got != c.want {
+				t.Errorf("%s: the %s of %s is %v, want %s", m, c.prop, c.style, got, c.want)
+			}
+		}
 	}
 }

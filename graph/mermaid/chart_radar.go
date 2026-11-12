@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/xo/zuzu/graph"
 )
 
 var (
@@ -287,10 +289,10 @@ func radarChart(c *chart) (map[string]any, bool, error) {
 	field := func(name string) map[string]any { return map[string]any{"field": name} }
 	color := map[string]any{"scale": "color", "field": "curve"}
 	spec["marks"] = []any{
-		map[string]any{"type": "path", "name": "graticule", "from": map[string]any{"data": "rings"}, "style": []any{"zuzu.edge"}, "encode": map[string]any{"update": map[string]any{
+		map[string]any{"type": "path", "name": "graticule", "from": map[string]any{"data": "rings"}, "style": []any{graph.StyleGuide}, "encode": map[string]any{"update": map[string]any{
 			"path": field("path"), "strokeWidth": map[string]any{"value": 1},
 		}}},
-		map[string]any{"type": "rule", "name": "axes", "from": map[string]any{"data": "axes"}, "style": []any{"zuzu.edge"}, "encode": map[string]any{"update": map[string]any{
+		map[string]any{"type": "rule", "name": "axes", "from": map[string]any{"data": "axes"}, "style": []any{graph.StyleGuide}, "encode": map[string]any{"update": map[string]any{
 			"x": field("x"), "y": field("y"), "x2": field("x2"), "y2": field("y2"),
 		}}},
 		map[string]any{"type": "text", "name": "axisLabels", "from": map[string]any{"data": "axes"}, "style": []any{"zuzu.nodeLabel"}, "encode": map[string]any{"update": map[string]any{

@@ -33,9 +33,12 @@ const D = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
 // the colors of the data. Any scheme works in either mode.
 const FONT = "'IBM Plex Sans', Inter, 'Helvetica Neue', Arial, sans-serif";
 const MODES = {
-  light: { name: "light", bg: "#ffffff", panel: "#f5f6f8", text: "#1b2230", muted: "#5f6b7d", faint: "#98a2b3", grid: "#eceff3", axis: "#cfd5de", fillOpacity: 0.2 },
-  dark: { name: "dark", bg: "#10141b", panel: "#171c25", text: "#e7ebf2", muted: "#9ba5b7", faint: "#6a7487", grid: "#1e242e", axis: "#333c4a", fillOpacity: 0.24 },
+  light: { name: "light", bg: "#ffffff", panel: "#f5f6f8", text: "#1b2230", muted: "#5f6b7d", faint: "#98a2b3", grid: "#eceff3", axis: "#cfd5de", edge: "#848e9f", band: "#f1f2f3", fillOpacity: 0.2 },
+  dark: { name: "dark", bg: "#10141b", panel: "#171c25", text: "#e7ebf2", muted: "#9ba5b7", faint: "#6a7487", grid: "#1e242e", axis: "#333c4a", edge: "#707a8d", band: "#1d2128", fillOpacity: 0.24 },
 };
+// BAND is the opacity of the text that draws a band behind a group of rows,
+// so that the band of each mode is the text at 0.06 over the background.
+const BAND = 0.06;
 // Each scheme gives ten categorical colors for the light mode, the index of
 // the color for a rise and a fall, and, if it wants, its own colors for the
 // dark mode. Without them, the dark mode lifts each light color.
@@ -67,11 +70,11 @@ const SCHEMES = {
     up: 1, down: 3,
     modes: {
       light: {
-        bg: "#eff1f5", panel: "#e6e9ef", text: "#4c4f69", muted: "#6c6f85", faint: "#9ca0b0", grid: "#dce0e8", axis: "#bcc0cc",
+        bg: "#eff1f5", panel: "#e6e9ef", text: "#4c4f69", muted: "#6c6f85", faint: "#9ca0b0", grid: "#dce0e8", axis: "#bcc0cc", edge: "#7c7f93",
         cat: ["#1e66f5", "#40a02b", "#df8e1d", "#d20f39", "#04a5e5", "#8839ef", "#fe640b", "#179299", "#ea76cb", "#7287fd"],
       },
       dark: {
-        bg: "#1e1e2e", panel: "#181825", text: "#cdd6f4", muted: "#a6adc8", faint: "#6c7086", grid: "#313244", axis: "#45475a",
+        bg: "#1e1e2e", panel: "#181825", text: "#cdd6f4", muted: "#a6adc8", faint: "#6c7086", grid: "#313244", axis: "#45475a", edge: "#7f849c",
         cat: ["#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8", "#89dceb", "#cba6f7", "#fab387", "#94e2d5", "#f5c2e7", "#b4befe"],
       },
     },
@@ -81,11 +84,11 @@ const SCHEMES = {
     up: 1, down: 3,
     modes: {
       light: {
-        bg: "#fdf6e3", panel: "#eee8d5", text: "#586e75", muted: "#657b83", faint: "#93a1a1", grid: "#eee8d5", axis: "#93a1a1",
+        bg: "#fdf6e3", panel: "#eee8d5", text: "#586e75", muted: "#657b83", faint: "#93a1a1", grid: "#eee8d5", axis: "#93a1a1", edge: "#839496",
         cat: ["#268bd2", "#859900", "#b58900", "#dc322f", "#2aa198", "#6c71c4", "#cb4b16", "#d33682"],
       },
       dark: {
-        bg: "#002b36", panel: "#073642", text: "#93a1a1", muted: "#839496", faint: "#586e75", grid: "#073642", axis: "#586e75",
+        bg: "#002b36", panel: "#073642", text: "#93a1a1", muted: "#839496", faint: "#586e75", grid: "#073642", axis: "#586e75", edge: "#657b83",
         cat: ["#268bd2", "#859900", "#b58900", "#dc322f", "#2aa198", "#6c71c4", "#cb4b16", "#d33682"],
       },
     },
@@ -94,6 +97,9 @@ const SCHEMES = {
 function theme(mode, scheme = "zuzu") {
   const s = SCHEMES[scheme], own = s.modes?.[mode];
   const m = { ...MODES[mode], ...(own || {}), name: mode };
+  // A band behind a group of rows is the text at an opacity of 0.06 over
+  // the background, so a scheme with its own neutrals gets its own band.
+  if (own) m.band = d3.color(d3.interpolateRgb(m.bg, m.text)(BAND)).formatHex();
   let cat = own ? own.cat : mode === "dark" ? (s.dark || s.cat.map((c) => d3.hsl(c).brighter(0.45).formatHex())) : s.cat;
   // A palette with fewer than ten colors gets the rest as each color mixed
   // toward the text color, so that a chart with ten series still differs.
@@ -1053,9 +1059,9 @@ chart("flowchart", 3, "Flowchart with a layered layout", "the zuzu pipeline", (t
   const fillOf = { in: t.cat[0], data: t.cat[2], step: t.text, out: t.cat[1] };
   const line = d3.line().curve(d3.curveBasis);
   const defs = el("marker", { id: "arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" },
-    el("path", { d: "M0,1L9,5L0,9Z", fill: t.faint }));
+    el("path", { d: "M0,1L9,5L0,9Z", fill: t.edge }));
   const body = g({ transform: `translate(${ox},${oy}) scale(${r2(s)})` },
-    E.map(([a, b, later]) => el("path", { d: line(gr.edge(a, b).points.map((p) => [p.x, p.y])), fill: "none", stroke: t.faint, "stroke-width": 1.5, "stroke-dasharray": later ? "4 4" : null, "marker-end": "url(#arrow)" })),
+    E.map(([a, b, later]) => el("path", { d: line(gr.edge(a, b).points.map((p) => [p.x, p.y])), fill: "none", stroke: t.edge, "stroke-width": 1.25, "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": later ? "4 4" : null, "marker-end": "url(#arrow)" })),
     N.map(([id, label]) => {
       const n = gr.node(id), k = kind[id], c = fillOf[k];
       return g({ transform: `translate(${n.x - n.width / 2},${n.y - n.height / 2})` },

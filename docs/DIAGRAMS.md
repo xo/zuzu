@@ -1082,15 +1082,15 @@ the task has no length, and that is an issue. An item of `excludes` or
 `includes` that is not a date, a day of the week or `weekends` excludes or
 includes no day. Each statement with such items is one issue.
 
-A section draws as Mermaid draws it, in the look of a group of a
-hierarchy. Every other section, from the first, has a band behind its
-rows. The band starts at the left of the names
-of the sections and ends at the end of the time axis. It is a tint of the
-color of the section, so that the grid and the names of the tasks show
-through it. The name of each section is at the left of the names of its
-tasks, in the middle of its rows, 11 pixels and bold. The names take the
-place of the legend. A gantt with no named section draws no band and no
-name.
+A section draws as Mermaid draws it. Every other section, from the
+first, has a band behind its rows. The band starts at the left of the
+names of the sections and ends at the end of the time axis. It is in the
+color `band` of `docs/STYLE.md`, the same for each section (D32). zuzu
+draws it in the text color at a low opacity, so that the grid and the
+names of the tasks show through it. The name of each section is at the
+left of the names of its tasks, in the middle of its rows, 11 pixels and
+bold. The names take the place of the legend. A gantt with no named
+section draws no band and no name.
 
 #### journey
 
@@ -1385,7 +1385,8 @@ side straight, and turns at right angles with round corners. An edge with
 A service is a square tile with a tint of the first color of the scheme
 and an outline, with its icon in that color and its title below it. A
 group is a panel with its icon and its title at the top left. A junction is
-a dot. An edge and its arrows are in the color of the axis, and the title
+a dot. An edge, its arrows and its junctions are in the color `edge` of
+`docs/STYLE.md`, and the title
 of an edge sits on its middle. zuzu reads `architecture.iconSize`, the size
 of a tile, 56 by default, `architecture.fontSize`, 11 by default,
 `architecture.padding`, the space inside a group, 16 by default, and
@@ -1406,9 +1407,13 @@ kinds is open question 17 of `docs/PLAN.md`.
 ## The look
 
 A node is a shape with a tint of its color and an outline of 1.25. An edge
-is a line of 1.25 in the color of the axis, with a small arrowhead. A label
+is a line of 1.25 in the color `edge` of `docs/STYLE.md`, with a small
+arrowhead in the same color (D32). The messages of a sequence diagram and
+their arrowheads take `edge` too. A guide line, such as a lifeline or a
+divider of a sequence diagram, or a ring of a radar, takes the lighter
+color `axis`. A label
 is 11 pixels. A cluster is a panel with its title at the top left. A color
 that the source gives replaces the color of the theme. A node with an
 opaque fill from the source and no color of text takes the text color of
 the light theme or of the dark theme, whichever reads on the fill. The styles are in
-`theme/config.go`, from `zuzu.node` to `zuzu.icon`.
+`theme/config.go`, from `zuzu.node` to `zuzu.band`.

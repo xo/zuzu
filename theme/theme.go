@@ -35,20 +35,28 @@ type Neutrals struct {
 	Muted      string // the subtitle, the labels of an axis, a legend
 	Faint      string // the source line, the title of an axis, a guide line
 	Grid       string // the grid lines
-	Axis       string // a base line, a border, an edge of a graph
+	Axis       string // a base line, a border, a guide line of a diagram
+	Edge       string // an edge of a diagram, its arrowheads, a message
+	Band       string // a band behind a group of rows, as it shows over the background
 }
+
+// BandOpacity is the opacity of the text that draws a band behind a group
+// of rows. Band is the text at this opacity over the background, and zuzu
+// draws the band in the text color at this opacity, so that the grid lines
+// and the labels under it still show.
+const BandOpacity = 0.06
 
 // neutrals returns the neutrals of a mode, from docs/STYLE.md.
 func neutrals(m Mode) Neutrals {
 	if m == Dark {
 		return Neutrals{
 			Background: "#10141b", Panel: "#171c25", Text: "#e7ebf2", Muted: "#9ba5b7",
-			Faint: "#6a7487", Grid: "#1e242e", Axis: "#333c4a",
+			Faint: "#6a7487", Grid: "#1e242e", Axis: "#333c4a", Edge: "#707a8d", Band: "#1d2128",
 		}
 	}
 	return Neutrals{
 		Background: "#ffffff", Panel: "#f5f6f8", Text: "#1b2230", Muted: "#5f6b7d",
-		Faint: "#98a2b3", Grid: "#eceff3", Axis: "#cfd5de",
+		Faint: "#98a2b3", Grid: "#eceff3", Axis: "#cfd5de", Edge: "#848e9f", Band: "#f1f2f3",
 	}
 }
 

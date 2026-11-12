@@ -52,6 +52,11 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		style = u.mark
 	}
 	styles := []string{style}
+	// The color of the theme is a default, as the config of a kind of mark
+	// is, so a style that the spec names comes after it and wins.
+	if u.paintStyle != "" {
+		styles = append(styles, u.paintStyle)
+	}
 	switch st := u.props["style"].(type) {
 	case string:
 		styles = append(styles, st)
@@ -59,9 +64,6 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		for _, x := range st {
 			styles = append(styles, expr.String(x))
 		}
-	}
-	if u.paintStyle != "" {
-		styles = append(styles, u.paintStyle)
 	}
 	// The styles of the look of zuzu, which the config of the theme gives
 	// (D14): the round end of a bar, and the ring of a point.

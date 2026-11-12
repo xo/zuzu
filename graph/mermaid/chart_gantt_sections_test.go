@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/theme"
 )
 
 func TestGanttSections(t *testing.T) {
@@ -20,7 +21,8 @@ func TestGanttSections(t *testing.T) {
 		}
 	}
 	// A band runs behind every other section, from the left of its name to
-	// the end of the time axis, in a tint of the color of the section.
+	// the end of the time axis, in the text color at the opacity of a band
+	// (D32).
 	bands := map[string]*scene.Item{}
 	var left float64
 	for _, it := range items {
@@ -34,12 +36,13 @@ func TestGanttSections(t *testing.T) {
 			bands[name] = it.item
 		}
 	}
+	text := theme.New(theme.Light, theme.Zuzu).Text
 	if len(bands) != 2 || bands["Design"] == nil || bands["Ship"] == nil {
 		t.Fatalf("the bands are %v, not of Design and Ship", bands)
 	}
 	for name, b := range bands {
-		if b.X >= left || b.X2 != 640 || b.FillOpacity == nil || *b.FillOpacity != 0.14 {
-			t.Errorf("the band of %s runs from %v to %v with the opacity %v", name, b.X, b.X2, b.FillOpacity)
+		if b.X >= left || b.X2 != 640 || b.FillOpacity == nil || *b.FillOpacity != theme.BandOpacity || b.Fill.Color != text {
+			t.Errorf("the band of %s runs from %v to %v in %v with the opacity %v", name, b.X, b.X2, b.Fill.Color, b.FillOpacity)
 		}
 	}
 	// The bar of each task is inside the band of its section.

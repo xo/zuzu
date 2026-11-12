@@ -1045,10 +1045,10 @@ func (l *seqLayout) spec() map[string]any {
 	}))
 	texts("boxLabels", graph.StyleClusterTitle, l.boxFont())
 	mark("frames", "rect", "frames", cluster, box(map[string]any{"fillOpacity": value(0)}))
-	mark("dividers", "rule", "dividers", graph.StyleEdge, map[string]any{
+	mark("dividers", "rule", "dividers", graph.StyleGuide, map[string]any{
 		"x": field("x"), "x2": field("x2"), "y": field("y"), "strokeDash": value([]any{4, 3}),
 	})
-	mark("lifelines", "rule", "lifelines", graph.StyleEdge, map[string]any{
+	mark("lifelines", "rule", "lifelines", graph.StyleGuide, map[string]any{
 		"x": field("x"), "y": field("y"), "y2": field("y2"), "strokeWidth": value(1),
 	})
 	mark("activationBacks", "rect", "activations", graph.StyleEdgeLabelBox, box(map[string]any{

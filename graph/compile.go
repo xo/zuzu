@@ -28,6 +28,8 @@ const (
 	StyleClusterTitle = theme.StyleClusterTitle
 	StyleIcon         = theme.StyleIcon
 	StyleIconStroke   = theme.StyleIconStroke
+	StyleGuide        = theme.StyleGuide
+	StyleBand         = theme.StyleBand
 )
 
 // paintKeys are the keys of a style of a node, an edge or a cluster that

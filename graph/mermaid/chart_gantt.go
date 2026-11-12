@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/layout"
 	"github.com/xo/zuzu/text"
 )
@@ -36,9 +37,6 @@ const (
 	// the row of a task.
 	ganttWidth = 640
 	ganttRow   = 26
-	// ganttTint is the opacity of the band of a section, the tint of a
-	// group of a hierarchy and of a node of a diagram.
-	ganttTint = 0.14
 )
 
 // ganttChart compiles a chart of the kind gantt into Vega-Lite: a bar for
@@ -197,7 +195,7 @@ func (g *gantt) spec() (map[string]any, error) {
 	}
 	var secs []any
 	if named {
-		secs = g.sections(rows, !g.compact, tone, color)
+		secs = g.sections(rows, !g.compact)
 	}
 	bar := func(rows []any, mark map[string]any) map[string]any {
 		mark["type"] = "bar"
@@ -419,14 +417,11 @@ func ganttNames(names []any, x, y map[string]any) []any {
 
 // sections returns the layers that draw the sections as Mermaid does: a
 // band behind the rows of every other section, across the chart, and the
-// name of each section at the left of the names of its tasks. A section
-// draws as a group of a hierarchy does in the look of zuzu: the band is a
-// tint of the color of the section, and the name is 11 pixels, bold, in the
-// color of the text. The band is a tint and not a panel, so that the grid
-// and the names of the tasks under it still show. labeled tells whether
-// the axis writes the key of each row. tone gives the color of a section
-// when the sections take colors in turn.
-func (g *gantt) sections(rows []ganttLane, labeled bool, tone func(string) int, color any) []any {
+// name of each section at the left of the names of its tasks. The band
+// takes the style zuzu.band, in the color band of docs/STYLE.md (D32), and
+// the name is 11 pixels, bold, in the color of the text. labeled tells
+// whether the axis writes the key of each row.
+func (g *gantt) sections(rows []ganttLane, labeled bool) []any {
 	type run struct {
 		name        string
 		first, last int
@@ -453,11 +448,7 @@ func (g *gantt) sections(rows []ganttLane, labeled bool, tone func(string) int, 
 	for i, r := range runs {
 		y0, y1 := float64(r.first*ganttRow), float64((r.last+1)*ganttRow)
 		if i%2 == 0 {
-			band := map[string]any{"section": r.name, "y0": y0, "y1": y1}
-			if g.sectionStyles > 0 {
-				band["tone"] = tone(r.name)
-			}
-			bands = append(bands, band)
+			bands = append(bands, map[string]any{"section": r.name, "y0": y0, "y1": y1})
 		}
 		if r.name != "" {
 			names = append(names, map[string]any{"section": r.name, "y": (y0 + y1) / 2})
@@ -469,10 +460,10 @@ func (g *gantt) sections(rows []ganttLane, labeled bool, tone func(string) int, 
 	return []any{
 		map[string]any{
 			"data": map[string]any{"values": bands},
-			"mark": map[string]any{"type": "rect", "fillOpacity": ganttTint},
+			"mark": map[string]any{"type": "rect", "style": graph.StyleBand},
 			"encoding": map[string]any{
 				"x": map[string]any{"value": -left}, "x2": map[string]any{"value": ganttWidth},
-				"y": pixels("y0"), "y2": map[string]any{"field": "y1"}, "color": color,
+				"y": pixels("y0"), "y2": map[string]any{"field": "y1"},
 			},
 		},
 		map[string]any{
