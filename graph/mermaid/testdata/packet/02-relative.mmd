@@ -1,0 +1,9 @@
+packet-beta
+  title UDP Packet
+  accTitle: UDP
+  accDescr: The header of a datagram
+  +16: "Source Port"
+  +16: "Destination Port"
+  32-47: "Length"
+  48-63: "Checksum"
+  64-95: "Data (variable length)"

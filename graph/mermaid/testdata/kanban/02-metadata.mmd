@@ -1,0 +1,14 @@
+---
+config:
+  kanban:
+    ticketBaseUrl: 'https://tickets.example.com/browse/#TICKET#'
+---
+kanban
+  todo[Todo]
+    a[Create parsing tests]@{ ticket: MC-2038, assigned: 'K.Sveidqvist', priority: 'High' }
+    b[Last item]@{ priority: 'Very Low', assigned: 'knsv' }
+    c[Plain card]
+  done[Done]
+    d[Update DB function]@{ ticket: MC-2037, assigned: knsv, priority: 'Very High' }
+    e[Medium card]@{ priority: 'Medium' }
+    f[Low card]@{ priority: 'Low' }

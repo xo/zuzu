@@ -1597,9 +1597,9 @@ zuzu holds the words that a line of Mermaid holds (D32). A width of 120 in
 Mermaid wraps at about 94 pixels in zuzu, and a width of 200 at about 157.
 The rule holds for each width of the table above, for `sequence.width` in
 a sequence diagram, for `journey.maxLabelWidth` and for the texts of a C4
-diagram. Mermaid 12.3 draws the labels of a timeline and of a mindmap at
-16 pixels, so the widths of a timeline and `mindmap.maxNodeWidth` scale
-by 11/16. A width of 200 in a timeline or a mindmap wraps at 137.5 pixels
+diagram. Mermaid 12.3 draws the labels of a timeline, of a mindmap and of
+a kanban at 16 pixels, so the widths of a timeline, `mindmap.maxNodeWidth`
+and the widths of a kanban scale by 11/16. A width of 200 in a timeline or a mindmap wraps at 137.5 pixels
 in zuzu. In a kind whose labels have more than one size in Mermaid, each
 label takes the ratio of its own size (D32). A ratio comes from the font
 and the size that mmdc measures with. mmdc measures each label of a
@@ -1650,6 +1650,8 @@ the source draws once, with its label.
 | `ishikawa`, `ishikawa-beta` | Vega rules, symbols, paths, rects and text, laid out in Go: the problem at the head of a spine, and the causes as bones |
 | `cynefin-beta` | Vega rects, paths and text, laid out in Go as Mermaid lays them out: the four domains in the quarters and confusion in the middle |
 | `info` | Vega text: the version of Mermaid |
+| `kanban` | Vega rects, rules and text, laid out in Go: the columns side by side, each with its cards |
+| `packet`, `packet-beta` | Vega rects and text, laid out in Go: the fields on rows of bits |
 
 #### pie
 
@@ -2780,6 +2782,154 @@ because zuzu reads Mermaid 12.3.0. It does not draw the version of zuzu.
 Mermaid draws no title on an info diagram, not even the `title` of the
 front matter, and neither does zuzu. `accTitle` and `accDescr` go in the
 description of the Vega spec. An info diagram has 2 fixtures.
+
+#### kanban
+
+The keyword is `kanban`. Each node is on a line of its own. The first node
+is a column, and so is each node with the indent of the first. Each other
+node is a card of the column before it, at any indent deeper than the
+first. A node under a card is a card of the same column, as in Mermaid.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| a node with an id and a text in a shape, as `todo[Todo]` or `id2("A text")` | a column or a card with the text |
+| a text in a shape with no id, as `[A card]` | a column or a card with the text |
+| an id alone, as `Todo` | a column or a card with the id as its text |
+| the data of a node after it, in `@{` and `}`, as `a[A]@{ ticket: MC-2038, assigned: 'knsv', priority: 'High' }` | the ticket, the assignee and the priority of a card, and a text from `label` |
+| `::icon(fa fa-book)` after a node | nothing, as in Mermaid |
+| `:::urgent` after a node | nothing, as in Mermaid |
+
+zuzu reads the statements as the grammar of Mermaid 12.3 reads them:
+
+1. A shape is `[…]`, `(…)`, `((…))`, `)…(`, `))…((` or `{{…}}`, as in a
+   mindmap. Mermaid draws each shape as a column or a card, and so does
+   zuzu.
+2. A text in a shape can be in double quotes, or a string of markdown in
+   double quotes and backticks. A text with no quotes, a string and the
+   data of a node can run over more lines, up to their end.
+3. Each text is markdown, as in Mermaid, so `**bold**` draws in bold. `<br>`
+   starts a new line, and an entity, such as `#quot;`, reads as its
+   character.
+4. The data of a node is a map of YAML. `label` replaces the text of the
+   node. `ticket`, `assigned` and `priority` draw on a card. Mermaid draws
+   nothing for `icon` and for each other key, and zuzu reads them with no
+   issue (D32).
+5. `accTitle`, `accDescr` and `title` are not statements of a kanban.
+   Mermaid reads each as the text of a node, and so does zuzu.
+
+These are errors, as in Mermaid: two nodes on a line, a text after a node,
+a shape with no text or with no end, a space between a string and the end
+of its shape, a node after a node with less indent than the first node, a
+`shape` in the data of a node with a capital letter or an underscore, a
+`^` in the data of a node, an icon or a class before the first node, and
+the keyword `kanban` on a later line.
+
+zuzu lays out a kanban in Go with the sizes of Mermaid 12.3, scaled by
+11/16, because Mermaid draws the labels of a kanban at 16 pixels (D32):
+
+1. The columns are side by side, in the order of the source. A column is
+   `kanban.sectionWidth` wide, 200 pixels of Mermaid by default, which is
+   137.5 pixels in zuzu. Its name is at its top, and wraps at its width.
+2. The cards of every column start under the tallest name, as in Mermaid.
+   A card is 15 pixels of Mermaid narrower than its column, and its text
+   wraps at 10 pixels less than the card. Each column is as tall as its
+   cards.
+3. The ticket of a card is at its bottom left, and the assignee at its
+   bottom right, under the text.
+4. A card with the priority `Very High`, `High`, `Low` or `Very Low` has a
+   line at its left in the color of Mermaid: red, orange, blue or light
+   blue. Mermaid draws no line for `Medium` or another value, and neither
+   does zuzu.
+
+With `kanban.ticketBaseUrl`, the ticket of a card is a link (D32): the URL
+with the ticket in place of `#TICKET#`. Mermaid opens the link in another
+window. The SVG of zuzu holds the link and not the target, as "Links and
+tooltips" says. A link with a scheme that zuzu does not write, such as
+`javascript:`, is an issue, and the ticket draws with no link.
+
+zuzu reads `kanban.sectionWidth`, a positive number, and
+`kanban.ticketBaseUrl`, a text. Another value of either is an issue.
+Mermaid 12.3 reads `kanban.padding` and `mindmap.maxNodeWidth` and draws
+nothing for them, so zuzu reads them with no issue (D32). Each other
+setting is an issue, such as `mindmap.padding`, which sets the margin of
+the image of Mermaid.
+
+zuzu draws a kanban in other ways than Mermaid in three places. Mermaid
+does not draw the `title` of the front matter, and zuzu draws it. The
+texts are in the sizes of zuzu, so a line of a text can hold a word more
+or less than in Mermaid. Mermaid colors only the first ten columns. zuzu
+colors each column, and the eleventh column takes the first color again.
+
+The look is the look of zuzu. Each column takes the next color of the
+category scheme, as Mermaid colors the columns by their order. A column is
+a box with a tint of its color, and its name is in its color. A card is a
+box of the background with an outline in the color of its column. The
+ticket and the assignee are in the color `muted`.
+
+#### packet
+
+The keyword is `packet` or `packet-beta`. Each statement is on a line of
+its own, and a statement can follow the keyword on its line, as in
+Mermaid.
+
+| Statement | What zuzu draws |
+| --- | --- |
+| `0-15: "Source Port"` | a field of the bits 0 to 15 |
+| `106: "URG"` | a field of one bit |
+| `+16: "Source Port"` | a field of 16 bits after the field before it |
+| `title Text` | the title |
+| `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` | the description of the Vega spec, the texts joined in order |
+
+A label is a string in double or single quotes. A backslash in it takes
+the character after it, as in Mermaid, so `"a \"b\""` is `a "b"`. The
+last `title` with a text is the title, and the `title` of the front matter
+draws when the packet has none.
+
+These are errors, as in Mermaid: a field that does not start at the bit
+after the field before it, or a first field that does not start at 0, a
+field that ends before it starts, a field of `+0` bits, a label with no
+quotes, two statements on a line, a number with a 0 before it, such as
+`01`, a number with a fraction, and a word that is not a statement, such
+as `TITLE`.
+
+zuzu lays out a packet with the sizes of Mermaid 12.3, as Mermaid lays it
+out:
+
+1. A row holds `packet.bitsPerRow` bits, 32 by default. A bit is
+   `packet.bitWidth` wide, 32 pixels by default, and a row is
+   `packet.rowHeight` high, 32 pixels by default.
+2. A field that does not fit in the rest of its row goes on in the next
+   row, with its label in each row.
+3. A field is as wide as its bits, less `packet.paddingX`, 5 pixels by
+   default. Two rows have `packet.paddingY` between them, 5 pixels by
+   default, and 10 more when the numbers of the bits draw.
+4. With `packet.showBits`, true by default, the number of the first bit of
+   each field is over its left end, and the number of its last bit over
+   its right end. A field of one bit has one number, in its middle.
+5. With `packet.bitOrder: descending`, the bits of a row run from right to
+   left, and the number over the left end of a field is its last bit.
+
+zuzu reads `packet.rowHeight`, `packet.bitWidth`, `packet.bitsPerRow`,
+`packet.paddingX`, `packet.paddingY`, `packet.showBits` and
+`packet.bitOrder`. A value that is not a positive number, a `bitsPerRow`
+with a fraction, a `showBits` that is not true or false, and a `bitOrder`
+that is not `ascending` or `descending` are issues. Each other setting is
+an issue.
+
+zuzu reads the theme variables of a packet in `themeVariables.packet`, as
+Mermaid does (D32): the colors `blockFillColor`, `blockStrokeColor`,
+`labelColor`, `startByteColor`, `endByteColor` and `titleColor`, and the
+sizes `blockStrokeWidth`, `labelFontSize`, `byteFontSize` and
+`titleFontSize`, in pixels. A color that is not a text, a size that is not
+a positive number, and each other theme variable are issues.
+
+zuzu draws the title of a packet at its top left, as the title of every
+chart. Mermaid draws it under the packet, in the middle. A label that is
+wider than its field draws past the field, as in Mermaid.
+
+The look is the look of zuzu. A field is a box with a tint of the first
+color of the scheme and an outline. Its label is in the color `text`, and
+the numbers of its bits are in the color `muted`.
 
 ### Other kinds
 

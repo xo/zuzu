@@ -114,6 +114,8 @@ func TestInertSettings(t *testing.T) {
 		"ishikawa":        "ishikawa-beta\n  P\n  A\n",
 		"cynefin":         "cynefin-beta\n  complex \"a\"\n",
 		"info":            "info\n",
+		"kanban":          "kanban\n  a[A]\n    b[B]\n",
+		"packet":          "packet\n  0-3: \"a\"\n",
 	}
 	sections := map[string]string{
 		"flowchart": "flowchart", "stateDiagram-v2": "state", "classDiagram": "class", "erDiagram": "er",
@@ -123,6 +125,8 @@ func TestInertSettings(t *testing.T) {
 		"c4":       "c4",
 		"ishikawa": "ishikawa",
 		"cynefin":  "cynefin", "info": "info",
+		"kanban": "kanban",
+		"packet": "packet",
 	}
 	for name, body := range bodies {
 		src := "---\nconfig:\n" + inertConfig + "  " + sections[name] + ":\n    useMaxWidth: false\n---\n" + body

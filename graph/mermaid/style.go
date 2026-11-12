@@ -246,8 +246,8 @@ const (
 // mermaidSizes are the sizes in pixels, in the measure of IBM Plex Sans,
 // at which mmdc measures the labels that wrap, by kind of diagram and by
 // label, where the size is not 14. The label "" is each label of the kind
-// that the map does not name. A timeline and a mindmap draw their labels
-// at 16. A use case diagram draws a use case at 12, and an actor at 14.
+// that the map does not name. A timeline, a mindmap and a kanban draw their
+// labels at 16. A use case diagram draws a use case at 12, and an actor at 14.
 // mmdc measures every label of a sequence diagram at 16 pixels in Times
 // New Roman, which is as wide as 14.5 pixels of the font of zuzu (D32).
 var mermaidSizes = map[string]map[string]float64{
@@ -255,6 +255,7 @@ var mermaidSizes = map[string]map[string]float64{
 	"mindmap":         {"": 16},
 	"sequenceDiagram": {"": 14.5},
 	"usecase-beta":    {labelUsecase: 12},
+	"kanban":          {"": 16},
 }
 
 // scaleWrap returns the width in the pixels of zuzu of a width at which

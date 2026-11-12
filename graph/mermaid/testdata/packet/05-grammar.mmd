@@ -1,0 +1,10 @@
+packet 0-3: "Version"
+  %% A comment
+  title
+  + 4 : 'IHL'
+  8 - 13: "DSCP" %% a comment after a field
+
+  14-15: "a \"quoted\" field"
+  accDescr {
+    A block of text
+  }
