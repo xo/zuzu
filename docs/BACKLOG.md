@@ -71,32 +71,27 @@ numbers before strings.
 
 ### Do the work of D32
 
-D32 records the answers of the maintainers of 2026-11-12. Each item names
-its part of D32.
+D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
+zuzu did parts 1 to 3 and 5 to 10, and drew the requirement, gitGraph and
+block diagrams of part 11. These are left:
 
-1. Read `description` in the front matter of Mermaid as the description of
-   the spec (1).
-2. Accept `look: handDrawn` and `layout: elk` with no issue (2).
-3. Draw a link with `animate` or `animation` dashed, with no issue (3).
-4. Map the `theme` of Mermaid to the dark mode or to a color scheme with
-   the colors of that theme. Add each scheme to `docs/STYLE.md` first
-   (4).
-5. Read a weight or a style from `fontname` of DOT and `fontFamily` of
-   Mermaid, and accept the rest of the name (5).
-6. Bundle Noto Color Emoji in a package of its own that a caller passes
-   with an option, and draw an emoji in color in the PNG. A character that
-   no font has draws nothing and goes in the report. Ask the okage peer
-   how its fallback of fonts takes a second font (6).
-7. Scale the width of a wrap of Mermaid by 11/14 (7).
-8. Add the token Edge to `docs/STYLE.md`, then to
-   `docs/targets/gen-targets.mjs`, and draw the targets again. Use it for
-   the edges, the arrowheads and the messages of every diagram (8).
-9. Add the token Band in the same way, for the sections of a gantt (9).
-10. Add a link and a tooltip to an item of the scene, write them in the
-    SVG as `<a>` and `<title>`, and fill them from `URL`, `href` and
-    `tooltip` of DOT and `click` and `link` of Mermaid (10).
-11. Draw the kinds of Mermaid in the order of D32, about five at a time:
-    requirement, gitGraph, block, swimlane and usecase first (11).
+1. The `theme` of Mermaid (4). A spec cannot ask for a mode or a scheme,
+   because only the options `WithMode` and `WithScheme` of the caller set
+   the theme. Open question 27 asks how. It is the issue of 557 files of
+   the corpus of mermaid-go-renderer.
+2. The next kinds of Mermaid in the order of D32 (11): swimlane, usecase,
+   agentflow, timeline and C4, then venn, treeView, railroad,
+   eventmodeling, zenuml, cynefin, ishikawa, kanban, packet and info.
+3. A kind of Mermaid that lays out when it is read, such as a sequence, a
+   pie, a gantt, a journey, a mindmap, a treemap or an architecture
+   diagram, measures an emoji as nothing, because `WithEmoji` is an option
+   of the render. Its labels can be too narrow (6).
+4. The SVG writer measures the `limit` of a text without the font of
+   emoji (6).
+5. A weight or a style in `fontFamily` draws only in the graphs and in the
+   sequence. It is an issue in the other kinds (5).
+6. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
+   issues, because the package `html` of okage keeps no link (10).
 
 ### Draw a look by hand
 
@@ -138,10 +133,10 @@ them come from the corpus of `github.com/bvolpato/mermaid-go-renderer`.
 
 The corpus of `github.com/bvolpato/mermaid-go-renderer` at commit 9af8f11
 holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
-zuzu drew 1947 of them, and 450 with no issue. Of the files that zuzu does
-not draw, 862 are of kinds that it does not draw. Of the files with an
-issue, 741 fail only on `description` in the front matter, which D32
-reads.
+zuzu drew 2390 of them, and 1758 with no issue. Of the files that zuzu
+does not draw, 419 are of kinds that it does not draw. Of the files with
+an issue, 557 have the `theme` of Mermaid, which open question 27 is
+about.
 
 1. A top-level `direction LR` in a flowchart is dropped with no issue.
    Mermaid sets the direction of the graph with it.
@@ -167,6 +162,12 @@ reads.
     reads `0` as a date of 2000 and the end as a time of the day of the
     render. It needs the time of the render (see "Give a chart of Mermaid
     the time of the render").
+12. A value with `\,` in a `classDef` of a flowchart, such as
+    `stroke-dasharray: 9\,5`, splits at the comma.
+13. A part of a style with no colon, such as `fill#969`, is dropped with
+    no issue in a flowchart. The block diagram reports it.
+14. `layout: elk.box`, `layout: elk.rectpacking`, the section `elk` of the
+    config, and `layout: dagre` in a chart are issues.
 
 ### Draw more of Mermaid
 
@@ -225,9 +226,7 @@ The compilers of the charts work around each of these:
    value of `y`.
 4. A text mark of an arc does not read `theta` and `radius`.
 5. An axis has no `labelExpr` and no `titlePadding`. They are issues.
-6. A mark's own `style` goes before the style of its paint, so a mark cannot
-   take the colors of `zuzu.edge`, and an unfilled point draws with a
-   stroke in the color of the background.
+6. An unfilled point draws with a stroke in the color of the background.
 7. A rule of Vega-Lite with one item takes the look of a reference, and its
    label writes a time as a number.
 8. `x2: {"value": "width"}` is dropped with no issue, and the rect does not
@@ -235,6 +234,9 @@ The compilers of the charts work around each of these:
 9. The axis of an encoding reports `zindex`, `labelFontSize`,
    `labelPadding`, `titleFontSize`, `titlePadding`, `tickSize`, `tickWidth`
    and `domainWidth`. `config.axisX` and `config.axisY` apply some of them.
+10. The channel `href` is read and dropped with no issue, and a field of
+    the channel `tooltip` only joins the aggregate. Neither becomes an
+    encoding of Vega, though the scene now carries both.
 
 ### Fix the bounds of a text and the place of an axis title
 

@@ -171,6 +171,7 @@ The module also embeds files that are not Go packages:
 | Files | License | Why |
 | --- | --- | --- |
 | IBM Plex Sans, weights 400, 500 and 600, upright and italic | SIL Open Font License 1.1 | the bundled font (D16) |
+| Noto Color Emoji 2.057, the CBDT build, in `text/emoji` | SIL Open Font License 1.1 | the color emoji of a package that a caller imports (D32) |
 | the color schemes, one JSON file each | the license of each upstream theme, MIT or compatible | the schemes of D15, with the license file of each source |
 
 The test module adds Node.js with vega.js and vega-lite.js as the oracle
@@ -1108,3 +1109,16 @@ stays true.
 25. Answered on 2026-11-12 by D32: the changes to D31 are accepted.
 26. Answered on 2026-11-12 by D32: an item of the scene carries a link and a
     tooltip, and the SVG writer writes them.
+27. How does a diagram of Mermaid ask for the mode or the scheme that its
+    `theme` maps to (D32 part 4)? Only the options `WithMode` and
+    `WithScheme` of the caller set the theme, and the guides read the theme
+    and not the config of the spec. zuzu can write keys such as
+    `zuzu.mode` and `zuzu.scheme` in the config of the spec, which apply
+    when the caller sets no theme. It can add a method such as
+    `Chart.Theme`, which returns the mode and the scheme that the source
+    asks for, so that the caller passes them on. Or it can keep the issue
+    and name the mode or the scheme in it. `redux-dark-color` is dark, and
+    its name does not end in `-dark`. A scheme of zuzu cannot hold its own
+    neutral colors yet.
+28. Answered on 2026-11-12 by D32: the id of a commit of a gitGraph with
+    no id comes from a hash, so that the same source gives the same image.

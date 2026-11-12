@@ -72,19 +72,27 @@ is in `docs/BACKLOG.md`.
     timeline, C4, venn, treeView, railroad, eventmodeling, zenuml, cynefin,
     ishikawa, kanban, packet and info (open question 17).
 
+## The ids of a gitGraph
+
+12. Mermaid gives a commit of a gitGraph with no id a random id. zuzu takes
+    the id from a hash of the number, the branch and the message of the
+    commit, so that the same source gives the same image. D28 does not
+    apply, because the source asks for no random number (open question
+    28).
+
 ## Conformance
 
-12. The first check of D17 compares the structure of the Vega that zuzu
+13. The first check of D17 compares the structure of the Vega that zuzu
     compiles from Vega-Lite with the Vega of vega-lite.js: the same
     datasets by name, the same scales by name and type, and the same marks
     by name and type. It does not compare the JSON (open question 14).
-13. A transform of Vega that changes rows in place shares them with the
+14. A transform of Vega that changes rows in place shares them with the
     datasets that derive from the same source, as vega.js does. zuzu
     follows vega.js here.
 
 ## Reviews
 
-14. The maintainers accepted the changes to D30 of 2026-11-11 and
+15. The maintainers accepted the changes to D30 of 2026-11-11 and
     2026-11-12, the transform `zuzu.sankeylabels` and its parameter `side`
     (open question 23), and the changes to D31 of 2026-11-12 (open
     question 25).
