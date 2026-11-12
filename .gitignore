@@ -30,6 +30,11 @@
 /test/oracle/node_modules/
 /test/oracle/package-lock.json
 
+# The output of test/cmd/review, the page that shows each source drawn by
+# its original renderer next to zuzu, with the SVG files of both sides. Run
+# the tool to see it, as test/README.md says.
+/docs/review/
+
 # The output of test/cmd/targets, which compares the writer with the targets.
 /docs/targets/scene/
 /docs/targets/zuzu/

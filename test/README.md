@@ -19,6 +19,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `cmd/wasm/` | a program that imports zuzu, so that CI can build it with TinyGo (D29) |
 | `cmd/conform/` | the tool that compares zuzu with the references (D17) |
 | `cmd/gallery/` | the tool that draws the specs of the corpus with zuzu, on a page |
+| `cmd/review/` | the tool that writes a page that shows each source drawn by its original renderer next to the same source drawn by zuzu |
 | `cmd/compile/` | the tool that prints the Vega spec that zuzu compiles from a Vega-Lite spec |
 | `cmd/mmdcref/` | the tool that reads an SVG that `mmdc` drew and writes the reference of a fixture of Mermaid (D31) |
 | `conform/` | the comparison of datasets, scales and marks that `cmd/conform` runs |
@@ -26,7 +27,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `diagrams/` | the test that checks the fixtures against their references (D31) |
 | `testdata/icons/` | the digests of the bundled icons, and a small pack of turns and flips |
 | `icons/` | the test that checks the package `icon` against `@iconify/utils` (D31) |
-| `oracle/` | the oracles, which run vega.js, vega-lite.js, d3, mermaid.js and `@iconify/utils` in Node.js, and the script that draws the references of the diagrams |
+| `oracle/` | the oracles, which run vega.js, vega-lite.js, d3, mermaid.js and `@iconify/utils` in Node.js, the script that draws the references of the diagrams, and `svg.mjs`, which draws the SVG of vega.js for `cmd/review` |
 
 ## The corpus
 
@@ -125,6 +126,58 @@ It draws each spec of the first target with zuzu, and writes the SVG files
 and a page, `index.html`, that shows them with the issues of each. Add
 `-dark` for the dark mode, `-only text` to draw some specs, and `-n` to draw
 at most that many.
+
+## Compare zuzu with the originals
+
+`cmd/review` draws each source with its original renderer and with zuzu,
+and writes a page that shows the two side by side. The sources are these:
+
+1. The Vega, Vega-Lite and Deneb specs of the corpus that the inventory
+   puts in the first target. The original is vega.js, through
+   `oracle/svg.mjs`. vega-lite.js compiles a Vega-Lite spec for the
+   original, and zuzu compiles it for the zuzu side.
+2. The fixtures of DOT in `testdata/diagrams/dot`. The original is
+   `dot -Tsvg` of Graphviz.
+3. The fixtures of Mermaid in `testdata/diagrams/mermaid` and in
+   `graph/mermaid/testdata`. The original is `mmdc` of mermaid-cli.
+
+The tool needs Node.js with `npm install` done in `oracle`, and `dot` and
+`mmdc` on the `PATH`. If one of them is missing, the tool draws the other
+sources, and each row without an original says why. If `mmdc` cannot find
+its Chrome, give it a configuration of puppeteer in `PUPPETEER_CONFIG`, as
+for the references of the diagrams.
+
+Run this in this folder:
+
+```bash
+go run ./cmd/review
+```
+
+It writes `index.html` and the SVG files to `docs/review` in the root of
+the repository, which git ignores. On 2026-11-12 it drew 863 sources in
+about 17 seconds. It keeps the SVG of each original, and draws an
+original again only when its source is newer. A second run takes about 2
+seconds. The flags are these:
+
+| Flag | What it does |
+| --- | --- |
+| `-out dir` | writes the page to this folder, `../docs/review` by default |
+| `-only text` | draws only the sources whose name holds the text |
+| `-front list` | draws only these front ends, a comma list of `vega`, `vegalite`, `deneb`, `dot` and `mermaid` |
+| `-force` | draws each original again |
+| `-j n` | draws this many sources at the same time, half of the processors by default |
+
+The page has a tab for each front end, with the count of the sources, of
+the errors on each side and of the sources with report lines. Each row
+shows the original on the left and zuzu on the right, with the errors and
+the report lines under the drawing. Open `index.html` in a browser, or
+serve the folder from this folder:
+
+```bash
+python3 -m http.server 8000 --bind 127.0.0.1 --directory ../docs/review
+```
+
+Then open `http://127.0.0.1:8000/`.
 
 ## Write the cases of the expressions and the formats
 
