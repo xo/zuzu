@@ -1,4 +1,6 @@
 <div align="center">
+  <img src="docs/zuzu.svg" alt="zuzu" width="600"/>
+  <br/>
   <a href="#about" title="About">About</a> |
   <a href="#status" title="Status">Status</a> |
   <a href="#design" title="Design">Design</a> |

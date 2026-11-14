@@ -161,6 +161,7 @@ On 2026-11-12 the repository holds these files:
 | `docs/decisions/` | the decisions, one file each, with an index |
 | `docs/STYLE.md` | the rules and the tokens of the look (D12, D14) |
 | `docs/DIAGRAMS.md` | the parts of DOT and of Mermaid that zuzu reads (D31) |
+| `docs/zuzu.svg` | the logo of zuzu, which `README.md` shows |
 | `docs/survey/` | the survey of other libraries and the page that compares them (D23) |
 | `docs/targets/` | the script that draws the target SVGs and their gallery, which git ignores (D13) |
 | `*.go`, `testdata/` | the package `zuzu`: the API of D24 and the runtime that runs a spec, with its golden files, and the tests of the documents |
