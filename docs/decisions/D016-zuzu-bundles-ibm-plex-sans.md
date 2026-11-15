@@ -1,6 +1,6 @@
 # D16. zuzu bundles IBM Plex Sans
 
-Status: Decided. Amended by D32.
+Status: Decided. Amended by D32 and D34.
 
 The maintainers decided on 2026-11-10, answering open question 2, that zuzu
 bundles IBM Plex Sans. The targets already use it (D13).
@@ -17,7 +17,8 @@ The six files are the TTF files of the release `@ibm/plex-sans@1.1.0` of
 and the six hold 1.2 MB. The italic faces joined on 2026-11-11, so that the
 direct renderer draws a text in the italic style with a true italic face.
 They come from the same release as the upright faces, under the same
-license.
+license. Since D34, the module embeds the six faces as one collection
+in WOFF2, and `text.Fonts` decodes it into a TrueType collection.
 
 A test that must give the same bytes on every machine uses the bundled font
 and never a font of the system.

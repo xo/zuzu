@@ -626,8 +626,10 @@ program that does not import it does not link goja.
 
 zuzu draws text in IBM Plex Sans (D16). The package `text/emoji` bundles
 Noto Color Emoji, the font of 10.7 MB that draws an emoji in color (D32). A
-program that does not import the package does not hold the font. A render
-takes the font with `WithEmoji`, as it takes a pack of icons:
+program that does not import the package does not hold the font.
+`NewFallback` accepts a font in TrueType, OpenType, WOFF, WOFF2 or EOT, and
+`Data` gives it as TrueType or OpenType (D34). A render takes the font with
+`WithEmoji`, as it takes a pack of icons:
 
 ```go
 package text

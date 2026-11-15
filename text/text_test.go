@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -70,21 +71,8 @@ func labels(t *testing.T) []label {
 func okageDB(t *testing.T) *okagesvg.FontDatabase {
 	t.Helper()
 	db := okagesvg.NewFontDatabase()
-	err := fs.WalkDir(Fonts(), "fonts", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || !strings.HasSuffix(path, ".ttf") {
-			return err
-		}
-		b, err := fs.ReadFile(Fonts(), path)
-		if err != nil {
-			return err
-		}
-		if len(db.LoadFontData(b)) == 0 {
-			t.Errorf("okage loaded no face from %s", path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	if n := len(db.LoadFontData(fonts()[collection].Data)); n != 6 {
+		t.Fatalf("okage loaded %d faces from %s, want 6", n, collection)
 	}
 	return db
 }
@@ -183,6 +171,46 @@ func TestTheFontsHoldTheirLicense(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "SIL Open Font License") {
 		t.Error("fonts/LICENSE.txt is not the Open Font License")
+	}
+}
+
+// TestTheFontsDecodeFromWOFF2 checks that the embedded collection decodes
+// into the six faces of IBM Plex Sans, 400, 500 and 600, upright and
+// italic, and that Fonts holds no other font (D34).
+func TestTheFontsDecodeFromWOFF2(t *testing.T) {
+	t.Parallel()
+	files, err := fs.Glob(Fonts(), "fonts/*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{collection, "fonts/LICENSE.txt"}; !slices.Equal(files, want) {
+		t.Errorf("Fonts holds %q, want %q", files, want)
+	}
+	faces, err := parsed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, f := range faces {
+		got = append(got, fmt.Sprintf("%d %t", f.weight, f.italic))
+	}
+	want := []string{"400 false", "500 false", "600 false", "400 true", "500 true", "600 true"}
+	if !slices.Equal(got, want) {
+		t.Errorf("the faces are %q, want %q", got, want)
+	}
+}
+
+// TestFallbackRefusesWhatDoesNotDecode checks that a font that does not
+// decode gives no data and no glyph (D34). The package text/emoji tests a
+// font in a web format that decodes.
+func TestFallbackRefusesWhatDoesNotDecode(t *testing.T) {
+	t.Parallel()
+	bad := NewFallback("bad", []byte("wOF2 is not a font"))
+	if got := bad.Data(); got != nil {
+		t.Errorf("Data of a font that does not decode gives %d bytes, want none", len(got))
+	}
+	if _, err := bad.parse(); err == nil {
+		t.Error("a font that does not decode parses")
 	}
 }
 

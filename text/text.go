@@ -21,18 +21,42 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing/fstest"
 	"unicode"
 
 	gotext "github.com/go-text/typesetting/font"
+	okagesvg "github.com/xo/okage/svg"
 )
 
-// fonts holds the bundled weights of IBM Plex Sans, upright and italic,
-// and their license.
+// embedded holds the bundled weights of IBM Plex Sans, upright and italic,
+// as one collection in WOFF2, and their license (D34).
 //
-//go:embed fonts/IBMPlexSans-Regular.ttf fonts/IBMPlexSans-Medium.ttf fonts/IBMPlexSans-SemiBold.ttf
-//go:embed fonts/IBMPlexSans-Italic.ttf fonts/IBMPlexSans-MediumItalic.ttf fonts/IBMPlexSans-SemiBoldItalic.ttf
-//go:embed fonts/LICENSE.txt
-var fonts embed.FS
+//go:embed fonts/IBMPlexSans.woff2 fonts/LICENSE.txt
+var embedded embed.FS
+
+// collection is the name of the collection of the bundled faces in Fonts.
+const collection = "fonts/IBMPlexSans.ttc"
+
+// fonts decodes the bundled collection from WOFF2 once, into a TrueType
+// collection beside its license. The data is embedded, and a test decodes
+// it, so an error here is a fault of the build.
+var fonts = sync.OnceValue(func() fstest.MapFS {
+	license, err := embedded.ReadFile("fonts/LICENSE.txt")
+	if err != nil {
+		panic(fmt.Sprintf("text: reading the license of the bundled fonts: %v", err))
+	}
+	b, err := embedded.ReadFile("fonts/IBMPlexSans.woff2")
+	if err == nil {
+		b, err = okagesvg.ConvertFontData(b)
+	}
+	if err != nil {
+		panic(fmt.Sprintf("text: decoding the bundled fonts: %v", err))
+	}
+	return fstest.MapFS{
+		"fonts/LICENSE.txt": {Data: license},
+		collection:          {Data: b},
+	}
+})
 
 // Family is the family of the bundled font.
 const Family = "IBM Plex Sans"
@@ -44,18 +68,30 @@ const EmojiFamily = "Noto Color Emoji"
 
 // Fallback is a font for the characters that IBM Plex Sans does not have,
 // such as the font of the package text/emoji (D32). It is safe for
-// concurrent use, and it parses its font once, on its first use.
+// concurrent use, and it decodes and parses its font once, on its first use.
 type Fallback struct {
 	family string
-	data   []byte
+	sfnt   func() ([]byte, error)
 	parse  func() (*gotext.Font, error)
 }
 
-// NewFallback returns a fallback of a family from the bytes of a font
-// file, TrueType or OpenType. The bytes must not change after the call.
+// NewFallback returns a fallback of a family from the bytes of a font file:
+// TrueType, OpenType, WOFF, WOFF2 or EOT (D34). The bytes must not change
+// after the call.
 func NewFallback(family string, data []byte) *Fallback {
-	return &Fallback{family: family, data: data, parse: sync.OnceValues(func() (*gotext.Font, error) {
-		ft, err := gotext.ParseTTF(bytes.NewReader(data))
+	sfnt := sync.OnceValues(func() ([]byte, error) {
+		b, err := okagesvg.ConvertFontData(data)
+		if err != nil {
+			return nil, fmt.Errorf("decoding the font %s: %w", family, err)
+		}
+		return b, nil
+	})
+	return &Fallback{family: family, sfnt: sfnt, parse: sync.OnceValues(func() (*gotext.Font, error) {
+		b, err := sfnt()
+		if err != nil {
+			return nil, err
+		}
+		ft, err := gotext.ParseTTF(bytes.NewReader(b))
 		if err != nil {
 			return nil, fmt.Errorf("parsing the font %s: %w", family, err)
 		}
@@ -68,16 +104,21 @@ func (f *Fallback) Family() string {
 	return f.family
 }
 
-// Data returns the bytes of the font file, so that a renderer such as
-// okage can load it. Do not change them.
+// Data returns the bytes of the font as a TrueType or OpenType file, so
+// that a renderer such as okage can load it. It decodes a font in a web
+// format on the first call. It returns nil when the font does not decode.
+// Do not change the bytes.
 func (f *Fallback) Data() []byte {
-	return f.data
+	b, _ := f.sfnt()
+	return b
 }
 
-// Fonts returns the bundled font files and their license, so that a
-// renderer such as okage can load them. The files are in the folder fonts.
+// Fonts returns the bundled fonts and their license, so that a renderer
+// such as okage can load them. The files are in the folder fonts. The six
+// faces are one TrueType collection, IBMPlexSans.ttc. The package embeds the
+// collection in WOFF2 and decodes it on the first call (D34).
 func Fonts() fs.FS {
-	return fonts
+	return fonts()
 }
 
 // Font is a font at a size.
@@ -305,26 +346,17 @@ type parsedFont struct {
 	italic bool
 }
 
-// parsed parses the bundled weights once.
+// parsed parses the bundled weights once, and reads the weight and the
+// style of each face from the face.
 var parsed = sync.OnceValues(func() ([]parsedFont, error) {
-	var out []parsedFont
-	for _, f := range []struct {
-		file   string
-		weight int
-		italic bool
-	}{
-		{"IBMPlexSans-Regular.ttf", 400, false}, {"IBMPlexSans-Medium.ttf", 500, false}, {"IBMPlexSans-SemiBold.ttf", 600, false},
-		{"IBMPlexSans-Italic.ttf", 400, true}, {"IBMPlexSans-MediumItalic.ttf", 500, true}, {"IBMPlexSans-SemiBoldItalic.ttf", 600, true},
-	} {
-		b, err := fonts.ReadFile("fonts/" + f.file)
-		if err != nil {
-			return nil, fmt.Errorf("reading %s: %w", f.file, err)
-		}
-		ft, err := gotext.ParseTTF(bytes.NewReader(b))
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", f.file, err)
-		}
-		out = append(out, parsedFont{ft.Font, f.weight, f.italic})
+	faces, err := gotext.ParseTTC(bytes.NewReader(fonts()[collection].Data))
+	if err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", collection, err)
+	}
+	out := make([]parsedFont, 0, len(faces))
+	for _, f := range faces {
+		a := f.Describe().Aspect
+		out = append(out, parsedFont{f.Font, int(a.Weight), a.Style == gotext.StyleItalic})
 	}
 	return out, nil
 })

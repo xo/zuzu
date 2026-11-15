@@ -398,10 +398,11 @@ bundles IBM Plex Sans for text (D16), and Noto Color Emoji for an emoji
 
 ### Pass the bundled fonts to okage
 
-D16. The package `text` embeds IBM Plex Sans, and `text.Fonts` returns the
-files. Since phase 6, `Chart.Image` loads them into a renderer of okage
-with no font of the system, and sets the family as the sans serif family,
-so that an image draws the same font that the layout measured. A character
+D16. The package `text` embeds IBM Plex Sans as one collection in WOFF2,
+and `text.Fonts` returns it, decoded into a TrueType collection (D34). Since phase 6,
+`Chart.Image` loads them into a renderer of okage with no font of the
+system, and sets the family as the sans serif family, so that an image
+draws the same font that the layout measured. A character
 that IBM Plex Sans and the font of `WithEmoji` lack draws nothing, and the
 report names it (D32). The option `WithFonts` of API.md,
 which gives other fonts, and a fallback to the fonts of the system, are not

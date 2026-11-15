@@ -15,7 +15,7 @@ done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
 draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
 of DOT and Mermaid of D31, and since then every other kind of Mermaid
 12.3, in the order of D32. Code follows the plan (D3).
-Every decision from D1 to D33 is decided. The parameters `lanes` and
+Every decision from D1 to D34 is decided. The parameters `lanes` and
 `laneEdges` that an agent added to D31 wait for a review (open question
 29). The open questions are at the end of `docs/PLAN.md`.
 
@@ -45,11 +45,11 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | building for WebAssembly | D29 |
 | working on expressions, formats or scripting | [docs/EXPRESSIONS.md](docs/EXPRESSIONS.md), then D9 and D33 |
 | working on the scene graph or a renderer | "Architecture" and "Rendering" in [docs/PLAN.md](docs/PLAN.md), then D10, D11 and D8 |
-| working on text, fonts or the measurement of a label | "Text" in [docs/PLAN.md](docs/PLAN.md), then D11, D16 and D32 |
+| working on text, fonts or the measurement of a label | "Text" in [docs/PLAN.md](docs/PLAN.md), then D11, D16, D32 and D34 |
 | working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12 and D14 |
 | changing or adding a target SVG | [docs/targets/README.md](docs/targets/README.md), then D13 |
 | adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15 and D33 |
-| choosing or adding a font | D16, then D32 |
+| choosing or adding a font | D16, then D32 and D34 |
 | naming a package | D21 |
 | deciding whether zuzu supports a feature of Vega | "The Vega subset" in [docs/PLAN.md](docs/PLAN.md), then D6 and D7 |
 | testing against vega.js or the corpus | "Conformance" in [docs/PLAN.md](docs/PLAN.md), then D17 and D32 |
@@ -182,7 +182,7 @@ On 2026-11-12 the repository holds these files:
 | `graph/` | the model of a diagram, the layered layout and its compile to Vega, with the readers of DOT in `graph/dot` and of Mermaid in `graph/mermaid` (D31) |
 | `icon/` | the reader of icons of Iconify and of SVG, and the cleaning of an SVG (D31) |
 | `icons/` | the bundled packs of icons, one package each, each with its license (D31) |
-| `text/` | the measurement of text and the bundled IBM Plex Sans, in `text/fonts` with its license (D11, D16) |
+| `text/` | the measurement of text and the bundled IBM Plex Sans, one collection in WOFF2 in `text/fonts` with its license (D11, D16, D34) |
 | `text/emoji/` | the bundled Noto Color Emoji with its license, in a package that a caller imports (D32) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
 | `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |
