@@ -60,7 +60,15 @@ them for a rise and one for a fall. A scheme can give its own colors for the
 dark mode. Without them, the dark mode lifts each light color. A palette with
 fewer than ten colors gets the rest mixed toward the text color. The
 sequential ramp runs from the background through the first color, so it
-reads in both modes.
+reads in both modes. The background is the one that the chart draws: the
+background of the spec when it sets one, and the background of the mode
+otherwise (D35).
+
+A Vega spec can name a scheme of Vega, such as `blues`. A sequential name
+takes the sequential ramp, and a diverging name, such as `redblue`, takes
+the diverging ramp. A cyclical name, `rainbow` or `sinebow`, takes a wheel
+of the ten categorical colors, in order, with the last joined to the first
+(D35).
 
 | Scheme | Character |
 | --- | --- |
@@ -178,7 +186,7 @@ background color, drawn under the fill with `paint-order="stroke"`.
 2. The title is at the top left, at a base line of 34. The subtitle is at 54.
 3. The legend, if there is one, is a row below the subtitle. Each item is a
    rounded square of 10, or a short line for a line series, then its label.
-   The row wraps when it is full.
+   The row wraps at the width of the plot (D35).
 4. The source line is at the bottom left, 14 from the bottom.
 5. There is no border and no frame around the plot area. The background is
    one color.
@@ -201,7 +209,7 @@ background color, drawn under the fill with `paint-order="stroke"`.
 
 | Mark | Rule |
 | --- | --- |
-| line | 2 wide, round joins and caps, a monotone curve. The last point has a dot of radius 3, and the name of the series follows it in the color of the series. A dashed line whose gaps are no longer than its width has flat caps, because a round cap closes such a gap |
+| line | 2 wide, round joins and caps, a monotone curve. The last point has a dot of radius 3, and the name of the series follows it in the color of the series. A closed line, such as the line of a radar, has no name at its end, and the legend names it (D35). A dashed line whose gaps are no longer than its width has flat caps, because a round cap closes such a gap |
 | area | the line on top, and a gradient of the same color below, from 0.32 opacity to 0.02 |
 | stacked area | full colors at 0.88 opacity, with a line of 1 in the background color between the layers |
 | bar | the end away from zero has round corners of radius 3. A group of bars has a gap of 8 percent of a band between its bars |

@@ -1087,9 +1087,9 @@ stays true.
     needs it, and the SVG output comes first.
 11. Answered on 2026-11-10 by D14 and D15: the four first schemes stay, and
     many more come from the upstream themes that transit draws from.
-12. Which fonts suit the schemes from editor themes, and does zuzu list a
-    font for each? The fonts must be under the Open Font License or a
-    license like it, and zuzu bundles none of them (D15, D16).
+12. Answered on 2026-11-20 by D35: zuzu bundles a monospace, a humanist
+    sans, a serif and a rounded sans, each in an optional package, and a
+    scheme can name one of them.
 13. Answered on 2026-11-10: the share of phase 3 is accepted. 80 percent of
     the 540 specs of the first target match in all three checks of D17, and
     85 percent of the datasets, 90 percent of the scales and 90 percent of
@@ -1126,8 +1126,11 @@ stays true.
     default, and a mode or a scheme that the caller gives wins over it.
 28. Answered on 2026-11-12 by D32: the id of a commit of a gitGraph with
     no id comes from a hash, so that the same source gives the same image.
-29. A maintainer has to review the parameters `lanes` and `laneEdges` of
-    `zuzu.layered`, which an agent added to D31 on 2026-11-12 for the
-    swimlane diagram of Mermaid, and the fields `titleWidth` and
-    `titleHeight` of a cluster row, which an agent added the same day for
-    the tab of a package of a use case diagram.
+29. Answered on 2026-11-20 by D35: the maintainers accept the parameters
+    `lanes` and `laneEdges` of `zuzu.layered`, and the fields `titleWidth`
+    and `titleHeight` of a row of a cluster.
+30. Which font of each kind does zuzu bundle (D35 part 11)? The candidates
+    are JetBrains Mono or IBM Plex Mono for the monospace, Inter or Source
+    Sans 3 for the humanist sans, IBM Plex Serif or Source Serif 4 for the
+    serif, and Nunito or Quicksand for the rounded sans. Each one must be
+    under the Open Font License or a license like it (D16).

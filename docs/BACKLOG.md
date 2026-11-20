@@ -89,8 +89,6 @@ zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
    11/14 for all of them (7): a sequence wraps its messages at 16 pixels
    and its actors and notes at 14, and a use case diagram draws its use
    cases at 12 and its actors at 14.
-6. The node property `algorithm`, an ELK layout for one subgraph, is an
-   issue. D32 part 2 does not say whether it is a hint.
 
 
 ### Draw two looks by hand
@@ -112,12 +110,13 @@ Before the work starts:
    D16 asks: the Open Font License or a license like it. Check the license
    of Excalifont, and find a font for the look of xkcd under such a
    license.
-2. Design the option that selects a look. `look: handDrawn` of Mermaid
-   selects the look like Excalidraw (D32 part 2).
-3. Make the font of a look opt-in: a caller can give another font, and by
+2. Make the font of a look opt-in: a caller can give another font, and by
    default a look draws with the font that zuzu tests it with (D32 part 2).
-4. A wobble must be the same on each render, so that the output stays
+3. A wobble must be the same on each render, so that the output stays
    deterministic.
+
+D35 part 12 says how a caller selects a look: the option `WithLook`, the key
+`zuzu.look` of the spec, and `look: handDrawn` of Mermaid.
 
 ### Add an ELK layout
 
@@ -183,8 +182,8 @@ is item 10 below.
 13. A line of a timeline that ends in `: ` with a space is an error in
     Mermaid, and zuzu reads the next line as its event.
 14. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
-    where Mermaid draws it as math, and draws as its LaTeX source. To draw
-    the math, zuzu needs a renderer of math, and that needs a decision.
+    where Mermaid draws it as math, and draws as its LaTeX source. D35
+    part 13 leaves it so for now, and says what a renderer of math needs.
 15. zuzu reads `text: a, b` in the body of a requirement, and Mermaid gives
     an error of the parse at the comma.
 16. A sequence diagram decodes `#lt;br#gt;` into `<br>` and then starts a
@@ -199,8 +198,8 @@ is item 10 below.
     the spaces.
 20. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
     an issue.
-21. `venn.theme` is an issue. Mermaid applies the theme of a section, and
-    D32 part 4 names only the theme at the top of the config.
+21. `venn.theme` is an issue. D35 part 10 says that it applies, as
+    "Do the work of D35" lists.
 22. Several kinds draw the title of the front matter, which Mermaid does
     not draw: ishikawa, kanban, railroad, tree view, event model and C4.
     zuzu draws it in every kind.
@@ -302,13 +301,12 @@ its cause is not known yet.
      have them.
 2. Vega:
    - `calendar-view` draws its cells in the one-hue ramp of the theme, not
-     in the pink to green of `pinkyellowgreen`. A diverging scheme of Vega
-     takes the sequential ramp of the theme, though D14 gives a scheme a
-     diverging ramp. The encode of `x` of the labels of its axes is in the
-     report, so the months do not move, and the years cover "Jan".
-   - `wind-vectors` loses the hues of `rainbow`. A cyclical scheme takes
-     the sequential ramp of the theme, which starts at the background of
-     the theme, and the spec sets a dark background of its own.
+     in the pink to green of `pinkyellowgreen`, and the years cover "Jan",
+     because the encode of `x` of the labels of its axes is in the report.
+     D35 parts 1 and 4 fix both, as "Do the work of D35" lists.
+   - `wind-vectors` loses the hues of `rainbow`, and its ramp starts at the
+     background of the theme, not at the dark background of the spec. D35
+     parts 2 and 3 fix both.
    - The fit of `autosize` diverges in `flight-passengers`, because the
      title is wider than the plot. Each pass makes the width smaller by the
      same overflow, 500, 354, 208 and 62, and the x axis keeps two labels.
@@ -335,7 +333,8 @@ its cause is not known yet.
      group. The conditional `opacity` with no default is dropped.
 4. The charts of zuzu on `docs/survey/compare.html`:
    - `zuzu.endLabel` names a closed line in a facet at one vertex, so the
-     names of the radar pile up. The spec turns it off.
+     names of the radar pile up. The spec turns it off. D35 part 6 says that
+     a closed line gets no end label.
 5. Mermaid, in `usecase/01-relations`:
    - The ellipse of CheckCard is outside the boundary Front desk, but
      covers its top border by 3 pixels, and the label «include» touches
@@ -348,6 +347,29 @@ its cause is not known yet.
    `labeled-scatter-plot` and `word-cloud` need the npm package `canvas`,
    which `test/oracle/package.json` does not install. vega.js does not know
    the projection `airy` of `projections`.
+
+### Do the work of D35
+
+D35 records the answers of the maintainers of 2026-11-20. These parts need
+code. Change `docs/STYLE.md` first, then the package `theme`, then
+`docs/targets/gen-targets.mjs`, and draw the targets again (D13).
+`docs/STYLE.md` already holds parts 1, 2, 3, 5 and 6.
+
+1. A diverging scheme name of Vega takes the diverging ramp of the theme.
+2. A cyclical scheme name of Vega, `rainbow` or `sinebow`, takes a wheel
+   of the ten categorical colors of the scheme.
+3. A ramp starts from the background that the chart draws, which is the
+   background of the spec when it sets one.
+4. An encode of the `x` or the `y` of a part of an axis or a legend applies,
+   as in vega.js, and leaves the report.
+5. The row of a legend wraps at the width of the plot.
+6. `zuzu.endLabel` names no closed line. Then turn the end labels of the
+   radar of the survey back on, and draw its static SVGs again.
+7. The numbers of the bits of a packet diagram draw at 10, not 9
+   (`pkBitFont` in `graph/mermaid/chart_packet.go`).
+8. The node property `algorithm` of Mermaid reads with no issue, as a hint.
+9. A theme in the section of a kind of Mermaid, such as `venn.theme`,
+   applies to that diagram.
 
 ### Fix the bounds of a text and the place of an axis title
 
@@ -390,11 +412,12 @@ lists. Each theme with a license that MIT does not allow stays out. The two
 prototypes in the targets, `catppuccin` and `solarized`, show the mapping
 from a palette to the tokens of a scheme.
 
-### Choose a font for each scheme from an editor theme
+### Bundle the fonts that a scheme can name
 
-Open question 12. A scheme can name a font that suits its theme. zuzu
-bundles IBM Plex Sans for text (D16), and Noto Color Emoji for an emoji
-(D32).
+D35 part 11. zuzu bundles a monospace, a humanist sans, a serif and a
+rounded sans, each in an optional package as `text/emoji` is, and a scheme
+can name one of them. Open question 30 chooses each font. Each package
+embeds its font in WOFF2 with its license, as `text` does (D34).
 
 ### Pass the bundled fonts to okage
 

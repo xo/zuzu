@@ -15,9 +15,8 @@ done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
 draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
 of DOT and Mermaid of D31, and since then every other kind of Mermaid
 12.3, in the order of D32. Code follows the plan (D3).
-Every decision from D1 to D34 is decided. The parameters `lanes` and
-`laneEdges` that an agent added to D31 wait for a review (open question
-29). The open questions are at the end of `docs/PLAN.md`.
+Every decision from D1 to D35 is decided. The open questions are at the
+end of `docs/PLAN.md`.
 
 ## Standing rules
 
@@ -46,14 +45,14 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | working on expressions, formats or scripting | [docs/EXPRESSIONS.md](docs/EXPRESSIONS.md), then D9 and D33 |
 | working on the scene graph or a renderer | "Architecture" and "Rendering" in [docs/PLAN.md](docs/PLAN.md), then D10, D11 and D8 |
 | working on text, fonts or the measurement of a label | "Text" in [docs/PLAN.md](docs/PLAN.md), then D11, D16, D32 and D34 |
-| working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12 and D14 |
+| working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12, D14 and D35 |
 | changing or adding a target SVG | [docs/targets/README.md](docs/targets/README.md), then D13 |
 | adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15 and D33 |
-| choosing or adding a font | D16, then D32 and D34 |
+| choosing or adding a font | D16, then D32, D34 and D35 |
 | naming a package | D21 |
 | deciding whether zuzu supports a feature of Vega | "The Vega subset" in [docs/PLAN.md](docs/PLAN.md), then D6 and D7 |
 | testing against vega.js or the corpus | "Conformance" in [docs/PLAN.md](docs/PLAN.md), then D17 and D32 |
-| working on DOT, Mermaid, icons or a graph layout | [docs/DIAGRAMS.md](docs/DIAGRAMS.md), then "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18, D31 and D32 |
+| working on DOT, Mermaid, icons or a graph layout | [docs/DIAGRAMS.md](docs/DIAGRAMS.md), then "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18, D31, D32 and D35 |
 | working on the browser component | "The browser" in [docs/PLAN.md](docs/PLAN.md), then D19 |
 | working on charts for `usql` | "usql" in [docs/PLAN.md](docs/PLAN.md), then D20 |
 | adding an outside package | D5, then the table of dependencies in [docs/PLAN.md](docs/PLAN.md) |
