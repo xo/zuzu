@@ -69,10 +69,19 @@ var (
 	tagRE       = regexp.MustCompile(`<br\s*/?>`)
 	// emRE matches the tags of bold and italic text inside a label.
 	emRE = regexp.MustCompile(`</?(?:em|strong)>`)
+	// katexRE matches a formula that KaTeX drew as MathML in a label.
+	// Mermaid drops the TeX of a formula, so the reference writes each one
+	// as an empty formula, $$$$.
+	katexRE = regexp.MustCompile(`(?s)<span class="katex"[^>]*>.*?</span>`)
+	// flexRE matches a line of a label with math, a row of text and of
+	// formulas, which the reference reads as a span.
+	flexRE = regexp.MustCompile(`(?s)<div style="display: flex;[^"]*">([^<]*)</div>`)
 )
 
 // text returns the text of the HTML of a label.
 func text(s string) string {
+	s = katexRE.ReplaceAllLiteralString(s, "$$$$")
+	s = flexRE.ReplaceAllString(s, "<span>$1</span>")
 	s = tagRE.ReplaceAllString(s, "\n")
 	s = emRE.ReplaceAllString(s, "")
 	var out []string

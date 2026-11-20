@@ -65,6 +65,15 @@ type Graph struct {
 	// the word stays whole on a line of its own, and the label is wider
 	// than the wrap width, as the HTML labels of Mermaid are.
 	BreakWords bool
+	// Math draws the math of KaTeX in the labels, each text between two
+	// $$, with the font of math of the render (D36). A label with math is
+	// one row of its runs of text and of its formulas, with no wrap, and
+	// each newline in it is a space, as Mermaid 12.3 draws it. Each line
+	// of a field, such as a member of a class, is a label of its own.
+	// MathSource holds the labels with math that draw their source as
+	// text, because a formula in them does not lay out.
+	Math       bool
+	MathSource []string
 
 	// Description is the text of the diagram for a screen reader, or
 	// empty. Compile writes it as the description of the spec.

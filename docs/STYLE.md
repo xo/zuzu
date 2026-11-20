@@ -187,6 +187,11 @@ Helvetica Neue, Arial and the generic sans-serif.
 A label that sits on a busy mark gets a halo: a stroke of 3 in the
 background color, drawn under the fill with `paint-order="stroke"`.
 
+A formula of math in a label of Mermaid draws in STIX Two Math, at the size
+and in the color of the text of the label (D36). A thin space, 3/18 of the
+size of the text, as `\,` of TeX, stands between a formula and the text
+next to it, so that the two do not touch.
+
 ## The frame
 
 1. The chart has a margin of 24 on each side.

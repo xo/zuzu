@@ -173,12 +173,7 @@ is item 9 below.
     `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
     lines. Some of its routes share a line, and the titles of its lanes do
     not turn in a layout LR.
-11. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
-    where Mermaid draws it as math, and draws as its LaTeX source. D36
-    draws it with the math layout of okage. The work waits for okage D78
-    and the release of okage that holds the layout. "The order of the work"
-    in D36 lists the steps.
-12. The reader of every kind cuts a `%%` in the middle of a line, also
+11. The reader of every kind cuts a `%%` in the middle of a line, also
     inside single quotes and after a colon of ZenUML, as in `A->B: 50%%
     off`. In Mermaid each lexer cuts a comment by its own rule: a kind of
     jison cuts `%%` where a token can start, a timeline also cuts a single
@@ -187,13 +182,32 @@ is item 9 below.
     `flowchart LR %% c` is an error in mmdc, and `sequenceDiagram%% c`
     draws. Each reader handles its comments itself. The railroad kinds
     already do.
-13. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
+12. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
     the spaces.
-14. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
+13. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
     an issue.
-15. The priority line of a kanban card takes the colors of Mermaid, red,
+14. The priority line of a kanban card takes the colors of Mermaid, red,
     orange, blue and light blue, and not tokens of `docs/STYLE.md`.
 
+
+### Draw the math of KaTeX as Mermaid does
+
+D36. zuzu draws math with the math layout of okage v0.19.0. These parts
+differ from Mermaid 12.3:
+
+1. okage does not have `\phase` yet. A formula with it draws its source,
+   and the report names it. okage plans it next. `\omicron`,
+   `\impliedby`, `\eth`, `\Finv`, `\Game` and `\notni` come in the next
+   release of okage, and zuzu then moves to it.
+2. The browser of Mermaid draws MathML in its own font of math. Its
+   formulas are often wider than those of STIX Two Math: `x^2` by about a
+   third, and a lone relation such as `\subset` more than twice. zuzu puts
+   a thin space between text and a formula, where Mermaid puts none, so a
+   label with both is a little wider than its formula and its text.
+3. Mermaid sets a message of a sequence diagram with math closer to its
+   line than a message of text. zuzu keeps the gap of its own look.
+4. `test/cmd/review` and `test/cmd/gallery` draw with no font of math, so
+   their labels with math draw the source.
 
 ### Draw more of Mermaid
 

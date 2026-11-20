@@ -3635,13 +3635,19 @@ the flowchart does. Every other kind of Mermaid is an error that wraps
 ## Math of KaTeX
 
 Mermaid 12.3 draws a text between two `$$` in a label, such as
-`$$x^2$$`, as math with KaTeX. zuzu draws no math. It draws the label as
-its source, with the `$$` and the LaTeX, and reports it. Each label with
-math is one issue in the loose mode, and an error in the strict mode.
-Labels with the same text give one issue, as the report names each text
-once.
+`$$x^2$$`, as math with KaTeX. zuzu draws it as math with the math layout
+of okage, in STIX Two Math (D36). The font comes from the package
+`text/math`, and the option `zuzu.WithMath` of `zuzu.Parse` gives it:
 
-Mermaid draws math in these kinds, and zuzu reports it in them:
+```go
+c, report, err := zuzu.Parse(src, zuzu.WithMath(math.Font()))
+```
+
+It is an option of the parse, because a sequence diagram, a mindmap and a
+block diagram lay out their labels when they compile. A program that does
+not import `text/math` does not hold the font.
+
+Mermaid draws math in these kinds and labels, and so does zuzu:
 
 | Kind | Labels | When |
 | --- | --- | --- |
@@ -3649,10 +3655,40 @@ Mermaid draws math in these kinds, and zuzu reports it in them:
 | mindmap and block diagram | the label of a node or a block, and the label of an edge of a block diagram | in a label of HTML, as above |
 | sequence diagram | a participant, a message, a note, and a block and its sections, such as `loop` and `else`. The title of a `box` draws as text in Mermaid | always |
 
+A formula draws in the display style, at the size of the text of its
+label, as Mermaid asks KaTeX to. A line of a label with math is a row of
+its text and its formulas, each centered on the middle of the line, with
+no wrap. The spaces at the ends of each run of text drop, as in Mermaid,
+and a thin space of 3/18 of the size of the text stands between a run of
+text and a formula, as `docs/STYLE.md` says.
+The line is as high as a line of text, or as its tallest formula when that
+is higher, so a fraction makes its node, its note or its row higher. A
+line of math alone is as high as its formula. In a graph, a label with
+math is one row, as in Mermaid, so `<br>` and a new line in it are a space.
+Each member of a class and each cell of an ER diagram is a label of its
+own.
+
+A formula draws as a path, in the color of the text of its label, and the
+SVG names its TeX in `aria-label`, so a viewer needs no font of math. A
+formula with `\color` draws each part in its color. The PNG draws the
+same paths.
+
+A label with math draws its source, with the `$$` and the TeX, and goes in
+the report in two cases. Each is an error in the strict mode:
+
+1. The parse has no font of math. Labels with the same text give one issue.
+2. okage cannot lay out the formula, such as one with a command that it
+   does not have, like `\phase`. The issue names the command, and the line
+   of the formula draws its source.
+
 With `htmlLabels: false`, Mermaid draws the source of the math as text in a
 graph, a mindmap and a block diagram. zuzu draws the same, so that is no
 issue. The other kinds, such as a gantt, a timeline, a pie or a C4
 diagram, draw the source in Mermaid too, and that is no issue either.
+
+The browser of Mermaid draws math in its own font of math, not in STIX Two
+Math, so the sizes differ a little. The tests compare the size of a label
+with math to mmdc within the tolerance of the diagrams (D31).
 
 ## Emoji and missing characters
 

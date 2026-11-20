@@ -88,6 +88,7 @@ type options struct {
 	strict  bool
 	funcs   map[string]expr.Func
 	logger  *slog.Logger
+	math    *text.MathFont
 }
 
 // WithDialect sets the dialect of a spec that has no $schema.
@@ -111,6 +112,21 @@ func WithFunction(name string, fn expr.Func) Option {
 		}
 		o.funcs[name] = fn
 	}
+}
+
+// WithMath gives a parse a font of math, so that the math of KaTeX in a
+// label of Mermaid, written as $$...$$, draws as math (D36). The package
+// text/math gives the font, STIX Two Math:
+//
+//	c, report, err := zuzu.Parse(src, zuzu.WithMath(math.Font()))
+//
+// It is an option of Parse, because some kinds of Mermaid lay out their
+// labels when they compile. The chart keeps the font, and each render of
+// it uses the font. Without the font, a label with math draws its source,
+// and the report names it. A program that does not import text/math does
+// not hold the font.
+func WithMath(f *text.MathFont) Option {
+	return func(o *options) { o.math = f }
 }
 
 // WithLogger sets where zuzu logs.

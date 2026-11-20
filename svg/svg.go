@@ -151,7 +151,7 @@ func (w *writer) mark(m *scene.Mark) error {
 		}
 	case scene.Path, scene.Shape:
 		for i := range m.Items {
-			w.path(&m.Items[i])
+			w.path(&m.Items[i], m.Role == scene.RoleMath)
 		}
 	case scene.Text:
 		for i := range m.Items {
@@ -317,10 +317,15 @@ func (w *writer) arc(it *scene.Item) {
 	w.end(it, "path")
 }
 
-// path writes a path item at its position.
-func (w *writer) path(it *scene.Item) {
+// path writes a path item at its position. A path of math, the outline of a
+// formula, writes its TeX as its label, so that a reader of the screen
+// reads it (D36).
+func (w *writer) path(it *scene.Item, math bool) {
 	w.open(it)
 	fmt.Fprintf(w.out, `<path transform="%s" d="%s"`, transform(it.X, it.Y, it.Angle), esc(it.Path))
+	if math && len(it.Text) > 0 {
+		fmt.Fprintf(w.out, ` role="img" aria-label="%s"`, esc(strings.Join(it.Text, " ")))
+	}
 	w.style(it, "none")
 	w.end(it, "path")
 }

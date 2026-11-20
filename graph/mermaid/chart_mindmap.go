@@ -35,7 +35,10 @@ type mindmapNode struct {
 	// The layout: the lines of the label, the size of the label, of the
 	// icon and of the shape, the center, the side of the root, +1 for the
 	// right and -1 for the left, and the height of the band of the subtree.
+	// maths holds the layout of each line of the label with math of KaTeX,
+	// or nil for a line of text, and is nil for a label with no math.
 	lines        []textLine
+	maths        []*text.MathLine
 	tw, th, isz  float64
 	w, h, x, y   float64
 	side         int
@@ -116,13 +119,13 @@ func mindmapChart(c *chart) (map[string]any, bool, error) {
 	}
 	// Mermaid 12.3 draws the math of KaTeX in a label of HTML, and the
 	// source in a label of SVG, as zuzu does.
+	m := text.NewEstimate()
 	if !breakWords {
+		m.SetMath(c.d.Math)
 		for _, n := range nodes {
-			if hasMath(n.label) {
-				c.line = n.line
-				if err := c.add(mathIssue, n.label); err != nil {
-					return nil, false, err
-				}
+			c.line = n.line
+			if err := c.checkMath(n.label); err != nil {
+				return nil, false, err
 			}
 		}
 	}
@@ -131,12 +134,14 @@ func mindmapChart(c *chart) (map[string]any, bool, error) {
 	for i, k := range root.kids {
 		mindmapColor(k, i%mindmapColors+1, byDepth)
 	}
-	m := text.NewEstimate()
+	ml := newMathLines(m)
 	for _, n := range nodes {
-		mindmapMeasure(n, pad, maxWidth, breakWords, m)
+		if !mindmapMath(n, pad, maxWidth, ml) {
+			mindmapMeasure(n, pad, maxWidth, breakWords, m)
+		}
 	}
 	mindmapPlace(root)
-	return mindmapSpec(nodes), false, nil
+	return mindmapSpec(nodes, m), false, nil
 }
 
 // mindmapNodes reads the nodes of a mindmap, each with its parent, its
@@ -393,17 +398,7 @@ func (c *chart) mindmapHTML() (bool, error) {
 // size of its shape. When breakWords is true, a word that is wider than
 // the label breaks.
 func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, breakWords bool, m text.Measurer) {
-	n.size, n.weight = mindmapFont, 400
-	if n.parent == nil {
-		n.size, n.weight = mindmapRootFont, boldWeight
-	}
-	if n.icon != "" {
-		n.isz = math.Round(n.size * 1.6)
-	}
-	limit := scaleWrap("mindmap", "", maxWidth-2*pad)
-	if n.isz > 0 {
-		limit -= n.isz + 6
-	}
+	limit := mindmapFontOf(n, maxWidth, pad)
 	label := n.label
 	if n.soft {
 		// Mermaid draws the text on one line, with no break, when it fits.
@@ -421,6 +416,67 @@ func mindmapMeasure(n *mindmapNode, pad, maxWidth float64, breakWords bool, m te
 		n.tw = max(n.tw, l.w)
 	}
 	n.th = float64(len(n.lines)) * n.size * 1.3
+	mindmapShapeSize(n, pad)
+}
+
+// mindmapMath lays out the label of a node with math of KaTeX, sets the
+// size of its shape and reports whether it did. A line with math lays out
+// in one row with no wrap, and each other line wraps as text (D36). A
+// label that runs over more lines of the source is one line. A label with
+// no line that lays out as math lays out as text.
+func mindmapMath(n *mindmapNode, pad, maxWidth float64, ml *mathLines) bool {
+	if text.MathOf(ml.m) == nil || !text.HasMath(n.label) {
+		return false
+	}
+	limit := mindmapFontOf(n, maxWidth, pad)
+	f := text.Font{Family: text.Family, Size: n.size, Weight: int(n.weight)}
+	lh := n.size * 1.3
+	label := n.label
+	if n.soft {
+		label = strings.ReplaceAll(label, "\n", " ")
+	}
+	var lines []textLine
+	var maths []*text.MathLine
+	tw, th, found := 0.0, 0.0, false
+	for s := range strings.SplitSeq(label, "\n") {
+		if l := ml.line(f, s, lh); l != nil {
+			lines, maths = append(lines, textLine{w: l.Width}), append(maths, l)
+			tw, th, found = max(tw, l.Width), th+l.Height, true
+			continue
+		}
+		for _, tl := range wrapRuns(markdownRuns(s), n.size, int(n.weight), max(limit, 40), ml.m) {
+			lines, maths = append(lines, tl), append(maths, nil)
+			tw, th = max(tw, tl.w), th+lh
+		}
+	}
+	if !found {
+		return false
+	}
+	n.lines, n.maths, n.tw, n.th = lines, maths, tw, th
+	mindmapShapeSize(n, pad)
+	return true
+}
+
+// mindmapFontOf sets the size and the weight of the font of a node and the
+// size of its icon, and returns the width at which its label wraps.
+func mindmapFontOf(n *mindmapNode, maxWidth, pad float64) float64 {
+	n.size, n.weight = mindmapFont, 400
+	if n.parent == nil {
+		n.size, n.weight = mindmapRootFont, boldWeight
+	}
+	if n.icon != "" {
+		n.isz = math.Round(n.size * 1.6)
+	}
+	limit := scaleWrap("mindmap", "", maxWidth-2*pad)
+	if n.isz > 0 {
+		limit -= n.isz + 6
+	}
+	return limit
+}
+
+// mindmapShapeSize sets the size of the shape of a node around its label
+// and its icon.
+func mindmapShapeSize(n *mindmapNode, pad float64) {
 	w, h := n.tw, n.th
 	if n.isz > 0 {
 		w += n.isz + 6
@@ -529,8 +585,8 @@ func (n *mindmapNode) anchor(dir int) (float64, float64) {
 }
 
 // mindmapSpec writes the Vega spec of a mindmap that mindmapPlace laid
-// out.
-func mindmapSpec(nodes []*mindmapNode) map[string]any {
+// out. m measures the runs of text of a line with math.
+func mindmapSpec(nodes []*mindmapNode, m text.Measurer) map[string]any {
 	minX, minY := math.Inf(1), math.Inf(1)
 	for _, n := range nodes {
 		minX, minY = min(minX, n.x-n.w/2), min(minY, n.y-n.h/2)
@@ -538,14 +594,18 @@ func mindmapSpec(nodes []*mindmapNode) map[string]any {
 	for _, n := range nodes {
 		n.x, n.y = n.x-minX, n.y-minY
 	}
-	var rows, edges, runs, icons []any
+	var rows, edges, runs, icons, formulas []any
 	colors := []any{}
 	for _, n := range nodes {
 		if !slices.Contains(colors, any(n.color)) {
 			colors = append(colors, n.color)
 		}
 		var label []string
-		for _, l := range n.lines {
+		for i, l := range n.lines {
+			if n.maths != nil && n.maths[i] != nil {
+				label = append(label, mathSource(n.maths[i]))
+				continue
+			}
 			label = append(label, l.String())
 		}
 		row := map[string]any{
@@ -597,6 +657,24 @@ func mindmapSpec(nodes []*mindmapNode) map[string]any {
 		y := n.y - n.th/2 + lh/2
 		for i, l := range n.lines {
 			x := left + (n.tw-l.w)/2
+			if n.maths != nil && n.maths[i] != nil {
+				ml := n.maths[i]
+				mid := y - lh/2 + ml.Height/2
+				f := text.Font{Family: text.Family, Size: n.size, Weight: int(n.weight)}
+				texts, paths := mathPieces(m, f, ml, x, mid)
+				for _, t := range texts {
+					runs = append(runs, map[string]any{
+						"node": n.id, "line": i, "x": t.x, "y": mid, "text": t.s,
+						"fontWeight": n.weight, "fontStyle": "normal", "fontSize": n.size,
+					})
+				}
+				for _, p := range paths {
+					p["node"] = n.id
+					formulas = append(formulas, p)
+				}
+				y += ml.Height
+				continue
+			}
 			for _, r := range l.runs {
 				weight, style := n.weight, "normal"
 				if r.bold {
@@ -643,6 +721,10 @@ func mindmapSpec(nodes []*mindmapNode) map[string]any {
 		"fontWeight": field("fontWeight"), "fontStyle": field("fontStyle"),
 		"align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "middle"},
 	}}})
+	if len(formulas) > 0 {
+		data = append(data, map[string]any{"name": "labelMath", "values": formulas})
+		marks = append(marks, mathMarks(&data, "labelMath", formulas, graph.StyleNodeLabel)...)
+	}
 	return map[string]any{
 		"padding":  8,
 		"autosize": "pad",

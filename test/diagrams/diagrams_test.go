@@ -15,6 +15,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/graph/dot"
 	"github.com/xo/zuzu/graph/mermaid"
+	mathfont "github.com/xo/zuzu/text/math"
 )
 
 // ref is a reference in one form for both languages.
@@ -82,9 +84,15 @@ func TestMermaid(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			g, _, err := mermaid.Graph(d, false)
+			// The font of math draws the formulas of KaTeX, as
+			// zuzu.WithMath gives it to a parse (D36).
+			d.Math = mathfont.Font()
+			g, report, err := mermaid.Graph(d, false)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if strings.Contains(string(src), "$$") && (!g.Math || len(g.MathSource) > 0) {
+				t.Errorf("expected each label with math to draw as math, got %v and the report %v", g.MathSource, report)
 			}
 			check(t, g, readMermaid(t, strings.TrimSuffix(f, ".mmd")+".json", g.Direction))
 		})
@@ -249,8 +257,14 @@ func ranks(across map[string]float64) map[string]int {
 	return out
 }
 
-// norm makes a label comparable: its words, joined by one space.
+// formulaRE matches a formula of KaTeX in a label.
+var formulaRE = regexp.MustCompile(`\$\$.*?\$\$`)
+
+// norm makes a label comparable: its words, joined by one space. Each
+// formula of KaTeX is an empty formula, $$$$, as the reference writes it,
+// since Mermaid drops the TeX of a formula from its SVG.
 func norm(s string) string {
+	s = formulaRE.ReplaceAllLiteralString(s, "$$$$")
 	return strings.Join(strings.Fields(strings.ReplaceAll(s, `\n`, " ")), " ")
 }
 

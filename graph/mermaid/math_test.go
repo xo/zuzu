@@ -4,10 +4,76 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
+	mathfont "github.com/xo/zuzu/text/math"
 	"github.com/xo/zuzu/vega"
 )
+
+// TestMathWithFont checks the labels with math of a graph with the font
+// of math (D36): a label whose formulas lay out draws as math with no
+// issue, and a label with a formula that does not lay out draws its
+// source and is an issue that names the command, an error in the strict
+// mode. With no font, the label is the issue of today, and with
+// htmlLabels false, it draws its source with no issue.
+func TestMathWithFont(t *testing.T) {
+	t.Parallel()
+	read := func(src string, font bool) *Diagram {
+		t.Helper()
+		d, err := Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if font {
+			d.Math = mathfont.Font()
+		}
+		return d
+	}
+	const good = "flowchart LR\n  A[\"Area $$x^2$$\"] -->|\"$$\\frac{a}{b}$$\"| B\n  subgraph S[\"$$c$$\"]\n    B\n  end\n"
+	g, report, err := Graph(read(good, true), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !g.Math || len(g.MathSource) > 0 || len(report) > 0 {
+		t.Errorf("expected math with no source and no issue, got %v, %q and %v", g.Math, g.MathSource, report)
+	}
+	// With no font, each label is the issue of today, and no label draws
+	// math.
+	g, report, err = Graph(read(good, false), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Math || len(report) != 3 || report[0].Message != fmt.Sprintf(mathIssue, "Area $$x^2$$") {
+		t.Errorf("expected three issues of the source and no math, got %v and %v", g.Math, report)
+	}
+	// A formula with a command that does not lay out draws its source,
+	// once for each label, and names the command.
+	const bad = "classDiagram\n  class A[\"$$\\nosuch{x}$$\"]\n  class B {\n    +int $$\\nosuch{x}$$ n\n    +int $$y$$ m\n  }\n  A --> B\n"
+	g, report, err = Graph(read(bad, true), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf(mathCommandIssue, `$$\nosuch{x}$$`, `\nosuch`)
+	if len(report) != 2 || report[0].Message != want || !strings.Contains(report[1].Message, `\nosuch`) {
+		t.Errorf("expected the issues %q, got %v", want, report)
+	}
+	if !g.Math || len(g.MathSource) != 2 {
+		t.Errorf("expected the member $$y$$ to draw math and two labels to draw their source, got %v and %q", g.Math, g.MathSource)
+	}
+	if _, _, err := Graph(read(bad, true), true); !errors.Is(err, vega.ErrUnsupported) || !strings.Contains(err.Error(), `\nosuch`) {
+		t.Errorf("in the strict mode, expected an error that names \\nosuch, got %v", err)
+	}
+	// With htmlLabels false, Mermaid draws the source, so zuzu does too,
+	// with no issue and no math.
+	g, report, err = Graph(read("---\nconfig:\n  htmlLabels: false\n---\n"+good, true), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Math || len(g.MathSource) > 0 || len(report) > 0 {
+		t.Errorf("with htmlLabels false, expected no math and no issue, got %v, %q and %v", g.Math, g.MathSource, report)
+	}
+}
 
 // TestMath checks that each label with math of KaTeX is one issue in the
 // loose mode and an error in the strict mode, in the kinds where Mermaid

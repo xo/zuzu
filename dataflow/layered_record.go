@@ -27,6 +27,18 @@ type record struct {
 	// lines holds the size of each line of each field with fonts or an
 	// alignment of its own, which draw one line at a time.
 	lines [][][2]float64
+	// math lays out a text with math of KaTeX in a weight, or returns nil
+	// for a text that draws as text (D36). It is nil for a graph with no
+	// math.
+	math func(v any, weight string) *mathLabel
+}
+
+// mathOf returns the layout of a text with math in a weight, or nil.
+func (rec *record) mathOf(s, weight string) *mathLabel {
+	if rec.math == nil {
+		return nil
+	}
+	return rec.math(s, weight)
 }
 
 // measureFunc measures a text at the size of the layout, in a weight.
@@ -216,6 +228,21 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 		graph.TextSignature(f)
 		return f
 	}
+	// maths writes the rows of a text with math at x and y, at its left
+	// or at its center, in the font of a code, or returns false for a
+	// text with no math.
+	maths := func(t string, x, y float64, left bool, code string) bool {
+		ml := rec.mathOf(t, weight(code))
+		if ml == nil {
+			return false
+		}
+		base := mathBase(r, "textColor")
+		if strings.Contains(code, "i") {
+			base["fontStyle"] = "italic"
+		}
+		out = append(out, ml.rows(base, "node", x, y, left, false)...)
+		return true
+	}
 	split := func(t string) []any {
 		lines := []any{}
 		for l := range strings.SplitSeq(t, "\n") {
@@ -244,7 +271,7 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 				if x > fx {
 					xs = append(xs, x-np.X)
 				}
-				if c != "" {
+				if c != "" && !maths(c, x+padding, cy, true, rec.font(j, k)) {
 					out = append(out, text(x+padding, cy, split(c), "left", rec.font(j, k)))
 				}
 				x += rec.cols[k]
@@ -263,7 +290,9 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 					x, x0, align = fx+padding, fx+padding, "left"
 				}
 				code := rec.font(j, k)
-				out = append(out, text(x, y+lh/2, []any{l}, align, code))
+				if !maths(l, x, y+lh/2, align == "left", code) {
+					out = append(out, text(x, y+lh/2, []any{l}, align, code))
+				}
 				if strings.Contains(code, "u") && lw > 0 {
 					// zuzu draws no decoration of text, so the line under
 					// it is a thin box in the color of the text.
@@ -279,7 +308,9 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 				y += lh
 			}
 		default:
-			out = append(out, text(cx, cy, split(t), "center", ""))
+			if !maths(t, cx, cy, false, "") {
+				out = append(out, text(cx, cy, split(t), "center", ""))
+			}
 		}
 	}
 	return path.String(), out

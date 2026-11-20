@@ -132,6 +132,7 @@ func parseDiagram(src []byte, d Dialect, o options) (*Chart, Report, error) {
 		if md, err = mermaid.Read(string(src)); err != nil {
 			return nil, nil, err
 		}
+		md.Math = o.math
 		if mermaid.IsChart(md.Kind) {
 			return mermaidChart(md, o)
 		}

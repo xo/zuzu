@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/xo/zuzu/graph"
+	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -54,6 +55,9 @@ type Diagram struct {
 	Config map[string]any
 	// Lines are the lines of the body, without comments.
 	Lines []Line
+	// Math is the font of math of zuzu.WithMath, or nil. A kind that lays
+	// out when it compiles lays out its math in it (D36).
+	Math *text.MathFont
 
 	// unread holds the parts of the front matter that zuzu does not read,
 	// which Graph and Chart report.

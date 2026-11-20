@@ -46,14 +46,18 @@ type blockNode struct {
 	own  map[string]string
 	line int
 
-	// The layout. lines is the label in lines, tw and th its size, and size
-	// the size of its font. w and h are the natural size of the block. The
+	// The layout. lines is the label in lines, maths the layout of each
+	// line with math of KaTeX, or nil for a line of text, tw and th the
+	// size of the label, and size the size of its font. w and h are the natural size of the block. The
 	// grid of a composite block has cols columns and rows rows of cells of
 	// cellW by cellH, under a band of titleH for its label. px and py are
 	// the cell of the block in the grid of its parent, and x, y, bw and bh
 	// its box. dw and dh are the size of the shape drawn in the middle of
 	// the box.
-	lines              []string
+	lines []string
+	maths []*text.MathLine
+	// font is the font of a label with math.
+	font               text.Font
 	tw, th, size       float64
 	w, h               float64
 	cellW, cellH       float64
@@ -102,6 +106,8 @@ type blockDiagram struct {
 
 	pad, font float64
 	m         text.Measurer
+	// math lays out the lines of the labels with math of KaTeX.
+	math *mathLines
 }
 
 // The kinds of the tokens of a block diagram.
@@ -189,8 +195,15 @@ func blockChart(c *chart) (map[string]any, bool, error) {
 	}
 	b := &blockDiagram{
 		c: c, byID: map[string]*blockNode{}, classDefs: map[string]map[string]string{},
-		pad: 8, font: 11, m: text.NewEstimate(),
+		pad: 8, font: 11,
 	}
+	// Mermaid 12.3 draws the math of KaTeX in a label of HTML, and the
+	// source in a label of SVG, as zuzu does.
+	m := text.NewEstimate()
+	if htmlLabels(c.d.Config) {
+		m.SetMath(c.d.Math)
+	}
+	b.m, b.math = m, newMathLines(m)
 	if m, _ := c.d.Config["block"].(map[string]any); m != nil && m["padding"] != nil {
 		if v, ok := configNumber(c.d.Config, "block", "padding"); ok && v >= 0 {
 			b.pad = v
@@ -812,10 +825,10 @@ func (b *blockDiagram) check() error {
 	return b.checkMath()
 }
 
-// checkMath reports each label with math of KaTeX: the labels of the
-// blocks in the order of the source, then the labels of the edges. Mermaid
-// 12.3 draws the math in a label of HTML, and the source in a label of SVG,
-// as zuzu does.
+// checkMath reports each label with math of KaTeX that does not draw as
+// math: the labels of the blocks in the order of the source, then the
+// labels of the edges. Mermaid 12.3 draws the math in a label of HTML, and
+// the source in a label of SVG, as zuzu does.
 func (b *blockDiagram) checkMath() error {
 	if !htmlLabels(b.c.d.Config) {
 		return nil
@@ -823,11 +836,9 @@ func (b *blockDiagram) checkMath() error {
 	var walk func(n *blockNode) error
 	walk = func(n *blockNode) error {
 		for _, k := range n.kids {
-			if hasMath(k.label) {
-				b.c.line = k.line
-				if err := b.c.add(mathIssue, k.label); err != nil {
-					return err
-				}
+			b.c.line = k.line
+			if err := b.c.checkMath(k.label); err != nil {
+				return err
 			}
 			if err := walk(k); err != nil {
 				return err
@@ -839,11 +850,9 @@ func (b *blockDiagram) checkMath() error {
 		return err
 	}
 	for _, e := range b.edges {
-		if hasMath(e.label) {
-			b.c.line = e.line
-			if err := b.c.add(mathIssue, e.label); err != nil {
-				return err
-			}
+		b.c.line = e.line
+		if err := b.c.checkMath(e.label); err != nil {
+			return err
 		}
 	}
 	return nil

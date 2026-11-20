@@ -24,8 +24,8 @@ import (
 	"testing/fstest"
 	"unicode"
 
-	gotext "github.com/xo/okage/typesetting/font"
 	okagesvg "github.com/xo/okage/svg"
+	gotext "github.com/xo/okage/typesetting/font"
 )
 
 // embedded holds the bundled weights of IBM Plex Sans, upright and italic,
@@ -172,6 +172,8 @@ type Estimate struct {
 	// has a nil face.
 	fallbacks     []*Fallback
 	fallbackFaces []*gotext.Face
+	// math is the font of math of SetMath, or nil.
+	math *MathFont
 }
 
 // key is a cached measurement.
@@ -188,6 +190,26 @@ const maxCache = 1 << 14
 // that the bundled font does not have, in order.
 func NewEstimate(fallbacks ...*Fallback) *Estimate {
 	return &Estimate{cache: make(map[key]float64), fallbacks: fallbacks}
+}
+
+// SetMath gives the Estimate a font of math, which lays out the math of
+// KaTeX in a label of Mermaid (D36). A nil font draws no math.
+func (e *Estimate) SetMath(f *MathFont) {
+	e.math = f
+}
+
+// Math returns the font of math of SetMath, or nil.
+func (e *Estimate) Math() *MathFont {
+	return e.math
+}
+
+// MathOf returns the font of math of a Measurer that has one, such as an
+// Estimate after SetMath, or nil.
+func MathOf(m Measurer) *MathFont {
+	if mm, ok := m.(interface{ Math() *MathFont }); ok {
+		return mm.Math()
+	}
+	return nil
 }
 
 // Width returns the width of s in the font, in pixels.

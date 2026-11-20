@@ -1,0 +1,1 @@
+{"nodes":[{"id":"Circle","label":"Circle","x":89.51171875,"y":295.625},{"id":"Shape","label":"Shape $$$$","x":89.51171875,"y":52.5}],"edges":[{"source":"Shape","target":"Circle","label":"$$$$","head":"1","tail":"$$$$","points":[[89.51171875,93],[89.51171875,225.5]]}],"clusters":[]}

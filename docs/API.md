@@ -168,6 +168,7 @@ the wrong place does not compile.
 | `WithDialect(Dialect)` | from `$schema`, or the first word of a diagram | `Vega`, `VegaLite`, `DOT` or `Mermaid` |
 | `WithStrict(bool)` | loose | the feature mode (D26) |
 | `WithFunction(name string, fn expr.Func)` | none | a Go function that an expression can call |
+| `WithMath(*text.MathFont)` | none, so the math of KaTeX in a label of Mermaid draws its source | the font of math, from the package `text/math`, which draws a formula of a label as math (D36) |
 | `WithEvaluator(expr.Evaluator)` | the native evaluator | the evaluator of expressions, such as the goja one (D9). Not built yet |
 | `WithLogger(*slog.Logger)` | none | where zuzu logs |
 

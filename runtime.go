@@ -75,6 +75,7 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) (*runtime, e
 		opt(&o)
 	}
 	rt := &runtime{ctx: ctx, chart: c, opts: o, progs: map[string]*expr.Program{}, measure: text.NewEstimate(o.fallbacks...)}
+	rt.measure.SetMath(c.opts.math)
 	rt.report = append(rt.report, c.report...)
 	rt.loc = o.loc
 	if rt.loc == nil {
@@ -766,6 +767,13 @@ func (e *dataEnv) TextSize(txt any, font string, size float64, weight string) (f
 		it.Text = scene.Lines{expr.String(t)}
 	}
 	return e.s.rt.style().TextSize(it)
+}
+
+// Measurer returns the measure of text of the render, which holds the font
+// of math of the chart, for the math of KaTeX of the transform
+// zuzu.layered (D36).
+func (e *dataEnv) Measurer() text.Measurer {
+	return e.s.rt.measure
 }
 
 // MarkShapes returns the kind of a named mark and its items, each with its

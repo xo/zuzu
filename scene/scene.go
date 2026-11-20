@@ -44,6 +44,12 @@ type Mark struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
+// RoleMath is the role of a mark of type path that draws the formulas of
+// the math of KaTeX in a label of Mermaid (D36). Each item holds the
+// outline of a formula, or of a part of it in one color, and its TeX in
+// its field Text, which a path does not draw.
+const RoleMath = "math"
+
 // The types of mark, as Vega names them.
 const (
 	Arc    = "arc"

@@ -92,6 +92,11 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		return nil, err
 	}
 	te, _ := p.env.(TextEnv)
+	// maths lays out the labels with math of KaTeX (D36), or is nil.
+	maths, err := newMathLabels(p)
+	if err != nil {
+		return nil, err
+	}
 	sizeAt := func(text, font string, size float64, weight string) (float64, float64) {
 		if te == nil {
 			return 0.6 * size * float64(len([]rune(text))), size
@@ -165,20 +170,27 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	// other lays out a label that takes no space in the ranks: the label
 	// of HTML in the field name+"HTML" of a row, or the text in
 	// name+"Label". It returns the size of the label, and its layout for
-	// HTML.
-	other := func(r Row, name string, size float64) (float64, float64, *htmlLabel, error) {
+	// HTML or for math.
+	other := func(r Row, name string, size float64) (float64, float64, *htmlLabel, *mathLabel, error) {
 		if src, ok := r[name+"HTML"].(string); ok && src != "" {
 			h, err := layHTML(src, sizeAt, size)
 			if err != nil {
-				return 0, 0, nil, err
+				return 0, 0, nil, nil, err
 			}
-			return h.lay.Width + 4, h.lay.Height + 2, h, nil
+			return h.lay.Width + 4, h.lay.Height + 2, h, nil, nil
+		}
+		ml, err := maths.of(r[name+"Label"], size, "")
+		if err != nil {
+			return 0, 0, nil, nil, err
+		}
+		if ml != nil {
+			return ml.w + 4, ml.h + 2, nil, ml, nil
 		}
 		tw, th := measureAt(r[name+"Label"], size, "")
 		if tw > 0 {
-			return tw + 4, th + 2, nil, nil
+			return tw + 4, th + 2, nil, nil, nil
 		}
-		return 0, 0, nil, nil
+		return 0, 0, nil, nil, nil
 	}
 	in := graph.LayoutInput{Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad, Lanes: lanes, LaneEdges: laneEdges}
 	text := func(r Row, f *Accessor) string {
@@ -202,6 +214,10 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	// labels of HTML of each edge, by their names.
 	xhtmls := map[int]*htmlLabel{}
 	edgeHTMLs := map[int]map[string]*htmlLabel{}
+	// nodeMaths, xmaths, edgeMaths and clusterMaths hold the labels with
+	// math, by the index of their row, and for an edge by their names.
+	nodeMaths, xmaths, clusterMaths := map[int]*mathLabel{}, map[int]*mathLabel{}, map[int]*mathLabel{}
+	edgeMaths := map[int]map[string]*mathLabel{}
 	for i, r := range rows {
 		if rec := readRecord(r, across); rec != nil {
 			records[i] = rec
@@ -226,26 +242,57 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			}
 		}
 		if rec, ok := records[i]; ok {
+			size := sizeOf(r, "fontSize")
+			var merr error
+			rec.math = func(v any, weight string) *mathLabel {
+				ml, err := maths.linesOf(v, size, weight)
+				if err != nil && merr == nil {
+					merr = err
+				}
+				return ml
+			}
 			n.Width, n.Height = rec.size(func(v any, weight string) (float64, float64) {
-				return measureAt(v, sizeOf(r, "fontSize"), weight)
+				if ml := rec.math(v, weight); ml != nil {
+					return ml.w, ml.h
+				}
+				return measureAt(v, size, weight)
 			}, padding)
+			if merr != nil {
+				return nil, fmt.Errorf("the fields of node %s: %w", n.ID, merr)
+			}
 		}
 		label := fields["label"].Get(r)
+		var nm *mathLabel
 		if _, ok := records[i]; !ok && htmls[i] == nil {
-			// A label wraps beside an icon in the line, so the icon
-			// takes a part of the width.
-			limit := expr.Number(r["wrap"])
-			if m, ok := mediaOf(r, padding); ok && m.inline {
-				limit = math.Max(limit-m.w-4, 1)
+			if nm, err = maths.of(label, sizeOf(r, "fontSize"), weightOf(r)); err != nil {
+				return nil, fmt.Errorf("the label of node %s: %w", n.ID, err)
 			}
-			var ls []any
-			if label, ls = wrapRow(label, limit, sizeOf(r, "fontSize"), weightOf(r)); ls != nil {
-				wrapped[i] = ls
+			if nm != nil {
+				// A label with math is one row, with no wrap.
+				nodeMaths[i] = nm
+			} else {
+				// A label wraps beside an icon in the line, so the icon
+				// takes a part of the width.
+				limit := expr.Number(r["wrap"])
+				if m, ok := mediaOf(r, padding); ok && m.inline {
+					limit = math.Max(limit-m.w-4, 1)
+				}
+				var ls []any
+				if label, ls = wrapRow(label, limit, sizeOf(r, "fontSize"), weightOf(r)); ls != nil {
+					wrapped[i] = ls
+				}
 			}
+		}
+		// measureLabel measures the label of the node, as math or as text.
+		measureLabel := func() (float64, float64) {
+			if nm != nil {
+				return nm.w, nm.h
+			}
+			return measureRow(r, label)
 		}
 		if m, ok := mediaOf(r, padding); ok {
 			medias[i] = m
-			m.tw, m.th = measureRow(r, label)
+			m.tw, m.th = measureLabel()
 			if m.inline {
 				n.Width, n.Height = graph.NodeSize(kind, m.tw+m.w+4, math.Max(m.th, m.h), padding)
 			} else {
@@ -257,7 +304,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			}
 		}
 		if !(n.Width > 0) || !(n.Height > 0) {
-			tw, th := measureRow(r, label)
+			tw, th := measureLabel()
 			if ms, ok := r["margin"].([]any); ok && len(ms) == 2 {
 				// A margin of DOT is the space around the label in place
 				// of the padding.
@@ -275,11 +322,15 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			n.Height = v
 		}
 		var xh *htmlLabel
-		if n.XLabelWidth, n.XLabelHeight, xh, err = other(r, "x", sizeOf(r, "fontSize")); err != nil {
-			return nil, fmt.Errorf("the xlabel of HTML of node %s: %w", n.ID, err)
+		var xm *mathLabel
+		if n.XLabelWidth, n.XLabelHeight, xh, xm, err = other(r, "x", sizeOf(r, "fontSize")); err != nil {
+			return nil, fmt.Errorf("the xlabel of node %s: %w", n.ID, err)
 		}
 		if xh != nil {
 			xhtmls[i] = xh
+		}
+		if xm != nil {
+			xmaths[i] = xm
 		}
 		in.Nodes = append(in.Nodes, n)
 	}
@@ -355,6 +406,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			endSize = size
 		}
 		hs := map[string]*htmlLabel{}
+		ms := map[string]*mathLabel{}
 		if src, ok := r["html"].(string); ok && src != "" {
 			h, err := layHTML(src, sizeAt, size)
 			if err != nil {
@@ -363,12 +415,21 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			hs["label"] = h
 			e.LabelWidth, e.LabelHeight = h.lay.Width+8, h.lay.Height+4
 		} else {
-			label, ls := wrapRow(fields["label"].Get(r), expr.Number(r["wrap"]), size, "")
-			if ls != nil {
-				edgeWrapped[i] = ls
+			ml, err := maths.of(fields["label"].Get(r), size, "")
+			if err != nil {
+				return nil, fmt.Errorf("the label of the edge %s -> %s: %w", e.Source, e.Target, err)
 			}
-			if lw, lh := measureAt(label, size, ""); lw > 0 {
-				e.LabelWidth, e.LabelHeight = lw+8, lh+4
+			if ml != nil {
+				ms["label"] = ml
+				e.LabelWidth, e.LabelHeight = ml.w+8, ml.h+4
+			} else {
+				label, ls := wrapRow(fields["label"].Get(r), expr.Number(r["wrap"]), size, "")
+				if ls != nil {
+					edgeWrapped[i] = ls
+				}
+				if lw, lh := measureAt(label, size, ""); lw > 0 {
+					e.LabelWidth, e.LabelHeight = lw+8, lh+4
+				}
 			}
 		}
 		for _, l := range []struct {
@@ -381,15 +442,22 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			{"x", size, &e.XLabelWidth, &e.XLabelHeight},
 		} {
 			var h *htmlLabel
-			if *l.w, *l.h, h, err = other(r, l.name, l.size); err != nil {
-				return nil, fmt.Errorf("the %slabel of HTML of the edge %s -> %s: %w", l.name, e.Source, e.Target, err)
+			var ml *mathLabel
+			if *l.w, *l.h, h, ml, err = other(r, l.name, l.size); err != nil {
+				return nil, fmt.Errorf("the %slabel of the edge %s -> %s: %w", l.name, e.Source, e.Target, err)
 			}
 			if h != nil {
 				hs[l.name] = h
 			}
+			if ml != nil {
+				ms[l.name] = ml
+			}
 		}
 		if len(hs) > 0 {
 			edgeHTMLs[i] = hs
+		}
+		if len(ms) > 0 {
+			edgeMaths[i] = ms
 		}
 		if d := expr.Number(r["labelDistance"]); d > 0 {
 			e.LabelDistance, e.LabelAngle = d, expr.Number(r["labelAngle"])
@@ -408,6 +476,14 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			c.Direction = d
 		}
 		tw, th := measureAt(fields["label"].Get(r), sizeOf(r, "fontSize"), "600")
+		ml, err := maths.of(fields["label"].Get(r), sizeOf(r, "fontSize"), "600")
+		if err != nil {
+			return nil, fmt.Errorf("the title of cluster %s: %w", c.ID, err)
+		}
+		if ml != nil {
+			clusterMaths[i] = ml
+			tw, th = ml.w, ml.h
+		}
 		if src, ok := r["html"].(string); ok && src != "" {
 			h, err := layHTML(src, sizeAt, sizeOf(r, "fontSize"))
 			if err != nil {
@@ -449,6 +525,14 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		if h, ok := xhtmls[i]; ok {
 			out = append(out, h.rows(linkRow(Row{"key": r["key"], "textColor": r["textColor"]}, r), np.XLabelX, np.XLabelY, "")...)
+		}
+		if ml, ok := nodeMaths[i]; ok {
+			o["lines"] = []any{}
+			out = append(out, ml.rows(mathBase(r, "textColor"), "node", expr.Number(o["textX"]), expr.Number(o["textY"]), false, false)...)
+		}
+		if ml, ok := xmaths[i]; ok {
+			o["xLines"] = []any{}
+			out = append(out, ml.rows(mathBase(r, "textColor"), "node", np.XLabelX, np.XLabelY, false, false)...)
 		}
 		if rec, ok := records[i]; ok {
 			var fs []Row
@@ -496,6 +580,17 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			if h, ok := hs[l.name]; ok {
 				out = append(out, h.rows(linkRow(Row{"key": r["key"], "stroke": r["stroke"], "textColor": l.color}, r), l.x, l.y, "")...)
 			}
+			if ml, ok := edgeMaths[i][l.name]; ok {
+				lines, color := l.name+"Lines", "textColor"
+				switch l.name {
+				case "label":
+					lines = "lines"
+				case "head", "tail":
+					color = "endColor"
+				}
+				o[lines] = []any{}
+				out = append(out, ml.rows(mathBase(r, color), "edge", l.x, l.y, false, false)...)
+			}
 		}
 	}
 	for i, r := range clusters {
@@ -506,6 +601,11 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o["depth"], o["titleX"], o["titleY"] = float64(cp.Depth), cp.TitleX, cp.TitleY
 		o["titleWidth"], o["titleHeight"] = titles[i][0], titles[i][1]
 		out = append(out, o)
+		if ml, ok := clusterMaths[i]; ok && cp.Width > 0 {
+			// The text of the title draws nothing, and the math draws it.
+			o["label"] = ""
+			out = append(out, ml.rows(mathBase(r, "textColor"), "cluster", cp.TitleX, cp.TitleY, true, true)...)
+		}
 		if h, ok := clusterHTMLs[i]; ok && cp.Width > 0 {
 			out = append(out, h.rows(linkRow(Row{"key": r["key"], "stroke": r["stroke"], "textColor": r["textColor"]}, r), cp.TitleX+h.lay.Width/2, cp.TitleY+h.lay.Height/2, "")...)
 		}

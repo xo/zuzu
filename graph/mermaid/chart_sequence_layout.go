@@ -161,6 +161,8 @@ type seqLayout struct {
 	s   *sequence
 	cfg seqConfig
 	m   *text.Estimate
+	// math lays out the lines of the labels with math of KaTeX.
+	math *mathLines
 
 	ps  []*seqParticipant
 	idx map[string]int
@@ -212,6 +214,12 @@ func newSeqLayout(s *sequence, cfg seqConfig) *seqLayout {
 		s: s, cfg: cfg, m: text.NewEstimate(), idx: map[string]int{}, rows: map[string][]any{},
 		minX: math.Inf(1), maxX: math.Inf(-1), acts: map[string][]float64{},
 	}
+	// A sequence diagram draws the math of KaTeX in its labels, and the
+	// diagram of ZenUML, which shares this layout, draws the source.
+	if s.c.d.Kind == "sequenceDiagram" {
+		l.m.SetMath(s.c.d.Math)
+	}
+	l.math = newMathLines(l.m)
 	for _, p := range s.participants {
 		if cfg.hideUnused && !p.used {
 			continue
@@ -239,9 +247,10 @@ func lh(f text.Font) float64 {
 // the diagram asks for it. A text wraps as wrapLabel of Mermaid wraps it:
 // a word goes on a new line when the width of the line and the width of
 // the word, without the space between them, reach the width. A text with
-// a break in it, such as <br>, does not wrap, as in Mermaid.
+// a break in it, such as <br>, does not wrap, as in Mermaid. A line with
+// math does not wrap either (D36).
 func (l *seqLayout) lines(t seqText, f text.Font, width float64) []string {
-	if !l.wraps(t) || len(t.lines) != 1 {
+	if !l.wraps(t) || len(t.lines) != 1 || l.mathLine(f, t.lines[0]) != nil {
 		return t.lines
 	}
 	var out []string
@@ -260,13 +269,34 @@ func (l *seqLayout) lines(t seqText, f text.Font, width float64) []string {
 	return append(out, cur)
 }
 
-// size returns the width and the height of lines of text.
+// size returns the width and the height of lines of a label. A line with
+// math is as wide and as high as its layout (D36).
 func (l *seqLayout) size(f text.Font, lines []string) (float64, float64) {
+	w, h := 0.0, 0.0
+	for _, s := range lines {
+		if ml := l.mathLine(f, s); ml != nil {
+			w, h = math.Max(w, ml.Width), h+ml.Height
+			continue
+		}
+		w, h = math.Max(w, l.m.Width(f, s)), h+lh(f)
+	}
+	return math.Ceil(w), h
+}
+
+// plainSize returns the width and the height of lines of text with no
+// math, such as the title of a box, which Mermaid draws as text.
+func (l *seqLayout) plainSize(f text.Font, lines []string) (float64, float64) {
 	w := 0.0
 	for _, s := range lines {
 		w = math.Max(w, l.m.Width(f, s))
 	}
 	return math.Ceil(w), float64(len(lines)) * lh(f)
+}
+
+// mathLine lays out a line of a label with math in a font, or returns nil
+// when the line draws as text.
+func (l *seqLayout) mathLine(f text.Font, s string) *text.MathLine {
+	return l.math.line(f, s, lh(f))
 }
 
 // icon reports whether a kind of participant draws as an icon over its
@@ -331,7 +361,7 @@ func (l *seqLayout) place() {
 				last = i
 			}
 		}
-		tw, _ := l.size(l.boxFont(), box.title.lines)
+		tw, _ := l.plainSize(l.boxFont(), box.title.lines)
 		if first < 0 {
 			continue
 		}
@@ -453,12 +483,24 @@ func lineRows(lines []string) []any {
 }
 
 // textRow adds a row of text to a set: its lines at a place, with an
-// align and a baseline.
+// align and a baseline. A label with math draws with mathRow.
 func (l *seqLayout) textRow(set, kind string, lines []string, f text.Font, x, y float64, align, baseline string) {
+	for _, s := range lines {
+		if l.mathLine(f, s) != nil {
+			l.mathRow(set, kind, lines, f, x, y, align, baseline)
+			return
+		}
+	}
+	l.plainRow(set, kind, lines, f, x, y, align, baseline)
+}
+
+// plainRow adds a row of text with no math to a set: its lines at a
+// place, with an align and a baseline.
+func (l *seqLayout) plainRow(set, kind string, lines []string, f text.Font, x, y float64, align, baseline string) {
 	if len(lines) == 0 {
 		return
 	}
-	w, h := l.size(f, lines)
+	w, h := l.plainSize(f, lines)
 	x0 := x - w/2
 	switch align {
 	case "left":
@@ -615,7 +657,7 @@ func (l *seqLayout) draw() {
 		top = l.cfg.boxMargin
 		for _, b := range l.s.boxes {
 			if len(b.title.lines) > 0 {
-				_, th := l.size(l.boxFont(), b.title.lines)
+				_, th := l.plainSize(l.boxFont(), b.title.lines)
 				top = math.Max(top, l.cfg.boxMargin+th+8)
 			}
 		}
@@ -725,7 +767,7 @@ func (l *seqLayout) boxes(top, bottom float64) {
 		if math.IsInf(x0, 1) {
 			continue
 		}
-		tw, _ := l.size(f, box.title.lines)
+		tw, _ := l.plainSize(f, box.title.lines)
 		x1 = math.Max(x1, x0+tw+20)
 		row := map[string]any{"kind": "box", "x": x0, "x2": x1, "y": 0, "y2": bottom + l.cfg.boxMargin}
 		set := "boxes"
@@ -734,7 +776,7 @@ func (l *seqLayout) boxes(top, bottom float64) {
 			set = "boxesFilled"
 		}
 		l.add(set, row, x0, x1, bottom+l.cfg.boxMargin)
-		l.textRow("boxLabels", "box", box.title.lines, f, x0+10, top-6-float64(len(box.title.lines)-1)*lh(f), "left", "bottom")
+		l.plainRow("boxLabels", "box", box.title.lines, f, x0+10, top-6-float64(len(box.title.lines)-1)*lh(f), "left", "bottom")
 	}
 }
 
@@ -1163,6 +1205,9 @@ func (l *seqLayout) spec() map[string]any {
 			enc["fontStyle"] = value("italic")
 		}
 		mark(set, "text", set, style, enc)
+		if rows := l.rows[set+"Math"]; len(rows) > 0 {
+			marks = append(marks, mathMarks(&data, set+"Math", rows, style)...)
+		}
 	}
 	cluster := graph.StyleCluster
 	mark("boxes", "rect", "boxes", cluster, box(map[string]any{}))

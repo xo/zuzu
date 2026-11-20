@@ -160,7 +160,9 @@ type sequence struct {
 	// blocks is the stack of the keywords of the open blocks.
 	blocks []string
 	// math holds each text with math of KaTeX and its line, for the
-	// report. Mermaid draws the math, and zuzu draws the source.
+	// report. Mermaid draws the math. zuzu draws it with the font of
+	// zuzu.WithMath, and the source when it has no such font or when the
+	// math does not lay out.
 	math []Line
 }
 
@@ -260,7 +262,7 @@ func (s *sequence) parse() error {
 	// diagram, whatever htmlLabels is.
 	for _, m := range s.math {
 		s.c.line = m.N
-		if err := s.c.add(mathIssue, m.Text); err != nil {
+		if err := s.c.checkMath(m.Text); err != nil {
 			return err
 		}
 	}
@@ -579,6 +581,11 @@ func (s *sequence) participant(id string) *seqParticipant {
 	}
 	p := &seqParticipant{id: id, kind: "participant", box: -1, created: -1, destroyed: -1, destroyAt: -1}
 	p.label = seqText{lines: []string{s.decode(id)}}
+	// Mermaid draws the math in the id of a participant with no alias as
+	// it draws it in an alias.
+	if s.c.d.Kind == "sequenceDiagram" && hasMath(p.label.lines[0]) {
+		s.math = append(s.math, Line{Text: p.label.lines[0], N: s.c.line})
+	}
 	s.byID[id] = p
 	s.participants = append(s.participants, p)
 	return p

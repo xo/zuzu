@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/xo/zuzu/graph"
+	"github.com/xo/zuzu/text"
 )
 
 // style returns the style of a block: the classDef default for a block
@@ -45,7 +46,7 @@ func (b *blockDiagram) measure(n *blockNode) {
 			weight = boldWeight
 		}
 	}
-	if n.kind != blockSpace && n.label != "" {
+	if n.kind != blockSpace && n.label != "" && !b.measureMath(n, min(weight, boldWeight)) {
 		n.lines, n.tw = plainLines(n.label, n.size, min(weight, boldWeight), 0, b.m)
 		n.th = float64(len(n.lines)) * n.size * 1.3
 	}
@@ -293,6 +294,8 @@ func (b *blockDiagram) spec() map[string]any {
 		minX, minY = 0, 0
 	}
 	var composites, shapes, labels, titles, edges, arrows, edgeLabels []any
+	// The runs of text and the formulas of the labels with math of KaTeX.
+	var labelRuns, labelMath, titleMath, edgeRuns, edgeMath []any
 	lh := func(n *blockNode) float64 { return n.size * 1.3 }
 	for _, n := range blocks {
 		if n.kind == blockSpace {
@@ -308,7 +311,11 @@ func (b *blockDiagram) spec() map[string]any {
 		if n.kind == blockComposite {
 			r["x"], r["y"], r["width"], r["height"] = n.x, n.y, n.bw, n.bh
 			composites = append(composites, r)
-			if len(n.lines) > 0 {
+			switch {
+			case n.maths != nil:
+				texts, paths := b.mathLabel(n, n.x+b.pad, n.y+n.titleH/2+2, false)
+				titles, titleMath = append(titles, texts...), append(titleMath, paths...)
+			case len(n.lines) > 0:
 				t := map[string]any{"id": n.id, "text": strings.Join(n.lines, " "), "x": n.x + b.pad, "y": n.y + n.titleH/2 + 2, "fontSize": n.size}
 				copyKeys(t, n.row, "textColor", "fontWeight", "fontStyle")
 				titles = append(titles, t)
@@ -321,6 +328,11 @@ func (b *blockDiagram) spec() map[string]any {
 		}
 		r["shape"], r["x"], r["y"], r["width"], r["height"], r["path"] = n.shape, cx, cy, n.dw, n.dh, path
 		shapes = append(shapes, r)
+		if n.maths != nil {
+			texts, paths := b.mathLabel(n, cx, cy, true)
+			labelRuns, labelMath = append(labelRuns, texts...), append(labelMath, paths...)
+			continue
+		}
 		y := cy - n.th/2 + lh(n)/2
 		for i, l := range n.lines {
 			t := map[string]any{"id": n.id, "line": i, "text": l, "x": cx, "y": y, "fontSize": n.size}
@@ -359,7 +371,12 @@ func (b *blockDiagram) spec() map[string]any {
 				"edge": i, "end": end.at, "kind": end.kind, "x": end.x, "y": end.y, "angle": end.a, "fill": fill, "open": open,
 			})
 		}
-		if e.label != "" {
+		if lines, maths, w, h := b.edgeMath(e.label); maths != nil {
+			x, y := (x0+x1)/2, (y0+y1)/2
+			edgeLabels = append(edgeLabels, map[string]any{"edge": i, "text": []any{}, "x": x, "y": y, "width": w + 8, "height": h + 4})
+			texts, paths := b.layLabel(lines, maths, text.Font{Family: text.Family, Size: b.font, Weight: 400}, x, y, true, nil)
+			edgeRuns, edgeMath = append(edgeRuns, keyed(texts, "edge", i)...), append(edgeMath, keyed(paths, "edge", i)...)
+		} else if e.label != "" {
 			ls, w := plainLines(e.label, b.font, 400, 0, b.m)
 			tl := []any{}
 			for _, s := range ls {
@@ -428,6 +445,7 @@ func (b *blockDiagram) spec() map[string]any {
 			"align": value("center"), "baseline": value("middle"),
 		}}},
 	)
+	marks = append(marks, b.labelMathMarks(&data, labelRuns, labelMath, titleMath, edgeRuns, edgeMath)...)
 	return map[string]any{
 		"padding":  8,
 		"autosize": "pad",

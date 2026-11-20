@@ -1,0 +1,1 @@
+{"nodes":[{"id":"A","label":"Start $$$$","x":80,"y":30.5},{"id":"B","label":"Ratio $$$$","x":80,"y":163.875},{"id":"root_end","label":"","x":80,"y":233.75}],"edges":[{"source":"A","target":"B","label":"$$$$","points":[[80,49],[80,141]]},{"source":"B","target":"root_end","points":[[80,186.75],[80,226.75]]}],"clusters":[]}

@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	zlayout "github.com/xo/zuzu/layout"
+	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/text"
 	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
@@ -448,6 +450,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	if g.LaneEdges {
 		layout["laneEdges"] = true
 	}
+	if g.Math {
+		layout["math"] = true
+		if src := mathSource(g); len(src) > 0 {
+			layout["mathSource"] = src
+		}
+	}
 	if g.TitleHTML != "" {
 		// The title of HTML takes the size of the title of a chart.
 		layout["titleHTML"], layout["titleFontSize"] = g.TitleHTML, zlayout.TitleSize
@@ -654,6 +662,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
 		}, map[string]string{"textColor": "fill"}))
 	}
+	marks = append(marks, mathMarks(&data, mathParts(g))...)
 	if links {
 		// Each mark draws a part of a node, an edge or a cluster, and each
 		// row of the layout holds the link and the tooltip of its part.
@@ -801,6 +810,107 @@ func htmlMarks(data *[]any) []any {
 			"fontWeight": field("fontWeight"), "fontStyle": field("fontStyle"),
 			"align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "middle"},
 		}, "fill", "font")
+	}
+	return marks
+}
+
+// mathSource returns the labels of a graph that draw their source in
+// place of their math, sorted and once each.
+func mathSource(g *Graph) []any {
+	src := slices.Clone(g.MathSource)
+	slices.Sort(src)
+	var out []any
+	for _, s := range slices.Compact(src) {
+		out = append(out, s)
+	}
+	return out
+}
+
+// mathParts returns the parts of a graph that hold a label that draws as
+// math, in the order that they draw: cluster for the title of a cluster,
+// edge for a label of an edge, and node for a label of a node or of a
+// field. A label draws as math when it holds math of KaTeX and is not in
+// MathSource, as the transform zuzu.layered decides (D36).
+func mathParts(g *Graph) []string {
+	if !g.Math {
+		return nil
+	}
+	draws := func(texts ...string) bool {
+		for _, s := range texts {
+			if text.HasMath(s) && !slices.Contains(g.MathSource, s) {
+				return true
+			}
+		}
+		return false
+	}
+	var parts []string
+	for _, c := range g.Clusters {
+		if draws(c.Label) {
+			parts = append(parts, "cluster")
+			break
+		}
+	}
+	for _, e := range g.Edges {
+		if draws(e.Label, e.HeadLabel, e.TailLabel, e.XLabel) {
+			parts = append(parts, "edge")
+			break
+		}
+	}
+	for _, n := range g.Nodes {
+		// Each line of a field is a label of its own.
+		texts := []string{n.Label, n.ID, n.XLabel}
+		for _, f := range n.Fields {
+			for _, s := range append([]string{f.Text}, f.Cells...) {
+				texts = append(texts, strings.Split(s, "\n")...)
+			}
+		}
+		if draws(texts...) {
+			parts = append(parts, "node")
+			break
+		}
+	}
+	return parts
+}
+
+// mathMarks returns the marks that draw the labels with math that the
+// transform zuzu.layered lays out (D36), for each part of mathParts: the
+// runs of text of each label in its font, and its formulas, as a mark of
+// type path with the role math. Each path holds the TeX of its formula as
+// its text, which a path does not draw, and which the SVG writes as its
+// label. A row sets fill when its label or its formula has a color of its
+// own, and its field _paint says so. The other rows take the color of the
+// style of their label.
+func mathMarks(data *[]any, parts []string) []any {
+	field := func(f string) map[string]any { return map[string]any{"field": f} }
+	styles := map[string]string{"cluster": StyleClusterTitle, "edge": StyleEdgeLabel, "node": StyleNodeLabel}
+	var marks []any
+	for _, part := range parts {
+		for _, sig := range []string{"", "fill"} {
+			for _, kind := range []string{"mathText", "mathPath"} {
+				name := fmt.Sprintf("math%d", len(marks))
+				test := fmt.Sprintf("datum.kind === %q && datum.part === %q && datum._paint === %q", kind, part, sig)
+				*data = append(*data, map[string]any{"name": name, "source": "layout", "transform": []any{map[string]any{"type": "filter", "expr": test}}})
+				enc := map[string]any{"x": field("x"), "y": field("y")}
+				typ := "text"
+				if kind == "mathText" {
+					enc["text"], enc["fontSize"], enc["fontWeight"], enc["fontStyle"] = field("text"), field("fontSize"), field("fontWeight"), field("fontStyle")
+					enc["align"], enc["baseline"] = map[string]any{"value": "left"}, map[string]any{"value": "middle"}
+				} else {
+					typ = "path"
+					// A formula is a filled outline, with no stroke of the
+					// config of a path.
+					enc["path"], enc["text"], enc["stroke"] = field("path"), field("tex"), map[string]any{"value": nil}
+				}
+				if sig == "fill" {
+					enc["fill"] = field("fill")
+				}
+				m := map[string]any{"type": typ, "from": map[string]any{"data": name}, "style": []string{styles[part]}, "encode": map[string]any{"update": enc}}
+				if typ == "path" {
+					m["role"] = scene.RoleMath
+				}
+				marks = append(marks, m)
+			}
+		}
 	}
 	return marks
 }

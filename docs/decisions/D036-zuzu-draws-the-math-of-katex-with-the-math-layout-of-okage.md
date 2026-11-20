@@ -33,8 +33,10 @@ The oracle of Mermaid 12.3 (mmdc, with Chrome) shows these facts:
    writes no TeX parser and no math layout of its own.
 2. The font. The math draws in STIX Two Math, under the SIL Open Font
    License 1.1, from the package `texmath/stixtwomath` of okage. A package
-   of zuzu, `text/math`, gives it, and `zuzu.WithMath(math.Font())` adds
-   it to a render, as `zuzu.WithEmoji` adds the emoji font (D32). A program
+   of zuzu, `text/math`, gives it. `zuzu.WithMath(math.Font())` is an
+   option of `zuzu.Parse`, not of a render, because a sequence diagram, a
+   mindmap and a block diagram lay out their labels when they compile. The
+   chart keeps the font, and each render of the chart uses it. A program
    that does not import the package does not hold the font. zuzu checks the
    license of the font as it checks each bundled font (D16). This amends
    D16.
@@ -99,5 +101,7 @@ The oracle of Mermaid 12.3 (mmdc, with Chrome) shows these facts:
 ## The answer
 
 On 2026-11-20 the maintainers accepted this decision as written, which
-answers open question 31 of `docs/PLAN.md`. The work waits for the release
-of okage that holds the math layout.
+answers open question 31 of `docs/PLAN.md`. okage v0.19.0 holds the math
+layout. When the work started, the maintainers made `zuzu.WithMath` an
+option of `zuzu.Parse` (part 2), because a render option comes after the
+layout of the kinds that lay out when they compile.
