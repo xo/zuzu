@@ -123,6 +123,11 @@ func TestShapes(t *testing.T) {
 		{`A[\One/]`, "trap-t", "One"},
 		{`A["One (two)"]`, "rect", "One (two)"},
 		{"A[One<br>two]", "rect", "One\ntwo"},
+		{`A[One\ntwo]`, "rect", "One\ntwo"},
+		{`A["One\ntwo"]`, "rect", "One\ntwo"},
+		{`A(One\\ntwo)`, "rounded", "One\\\ntwo"},
+		{"A[\"`One\\ntwo`\"]", "rect", `One\ntwo`},
+		{`A@{ label: "One\ntwo" }`, "rect", "One\ntwo"},
 		{"A[#quot;q#quot;]", "rect", `"q"`},
 		{"A[\"`**bold** text`\"]", "rect", "bold text"},
 		{`A@{ shape: cyl, label: "Store" }`, "cyl", "Store"},
@@ -241,6 +246,76 @@ graph RL
 	}
 	if _, _, err := Graph(d, true); err == nil {
 		t.Error("expected an error in the strict mode")
+	}
+}
+
+func TestLabelNewLine(t *testing.T) {
+	t.Parallel()
+	// As in Mermaid 12.3, the two characters \n start a new line in the
+	// text of a link and of a subgraph too, with or without htmlLabels,
+	// and in an agentflow diagram.
+	for _, src := range []string{
+		"flowchart LR\n  subgraph s [\"t\\nu\"]\n    a -->|e\\nf| b\n    c -- \"g\\nh\" --> d\n  end\n",
+		"%%{init: {\"htmlLabels\": false}}%%\nflowchart LR\n  subgraph s [\"t\\nu\"]\n    a -->|e\\nf| b\n    c -- \"g\\nh\" --> d\n  end\n",
+		"agentflow-beta TB\n  flow s[\"t\\nu\"]\n    a -->|e\\nf| b\n    c -- \"g\\nh\" --> d\n  end\n",
+	} {
+		d, err := Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, _, err := Graph(d, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(g.Clusters) != 1 || g.Clusters[0].Label != "t\nu" {
+			t.Errorf("%q: expected the title t and u, got %v", src, g.Clusters)
+		}
+		var labels []string
+		for _, e := range g.Edges {
+			labels = append(labels, e.Label)
+		}
+		if strings.Join(labels, "|") != "e\nf|g\nh" {
+			t.Errorf("%q: expected the labels e and f, and g and h, got %q", src, labels)
+		}
+	}
+	// In a swimlane diagram, \n is text in the title of a lane, and a new
+	// line in the title of a subgraph inside it and in the labels.
+	d, err := Read("swimlane-beta LR\n  subgraph s [\"t\\nu\"]\n    subgraph i [\"v\\nw\"]\n      a -->|e\\nf| b[x\\ny]\n    end\n  end\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, _, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var titles []string
+	for _, c := range g.Clusters {
+		titles = append(titles, c.Label)
+	}
+	if strings.Join(titles, "|") != `t\nu|v`+"\nw" {
+		t.Errorf("expected the titles t\\nu, and v and w, got %q", titles)
+	}
+	if n := node(t, g, "b"); n.Label != "x\ny" || g.Edges[0].Label != "e\nf" {
+		t.Errorf("expected the labels x and y, and e and f, got %q and %q", n.Label, g.Edges[0].Label)
+	}
+	// With htmlLabels, Mermaid draws a label with math of KaTeX as math,
+	// so \nu is not a new line. Without it, Mermaid draws the source with
+	// a new line.
+	for _, test := range []struct{ src, label string }{
+		{"flowchart LR\n  a[\"$$\\nu$$ x\\ny\"]\n", `$$\nu$$ x\ny`},
+		{"%%{init: {\"htmlLabels\": false}}%%\nflowchart LR\n  a[\"$$\\nu$$ x\\ny\"]\n", "$$\nu$$ x\ny"},
+	} {
+		d, err := Read(test.src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, _, err := Graph(d, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if g.Nodes[0].Label != test.label {
+			t.Errorf("%q: expected the label %q, got %q", test.src, test.label, g.Nodes[0].Label)
+		}
 	}
 }
 

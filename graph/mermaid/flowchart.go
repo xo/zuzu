@@ -482,22 +482,27 @@ func startsLink(st string, agent bool) bool {
 
 // scan returns a scanner of a statement.
 func (f *flowchart) scan(st string) *scanner {
-	return &scanner{s: st, agent: f.af != nil}
+	return &scanner{s: st, agent: f.af != nil, html: f.wrap.html}
 }
 
 // subgraph opens a subgraph: subgraph id, subgraph id[title], subgraph
 // "title", or subgraph and a title with spaces.
 func (f *flowchart) subgraph(rest string) error {
 	id, title := rest, rest
+	read := func(s string) string { return flowLabel(s, f.wrap.html) }
+	if f.cluster() == "" && lanesOn(f.d) {
+		// Mermaid 12.3 draws \n in the title of a lane as text.
+		read = label
+	}
 	switch {
 	case strings.HasPrefix(rest, `"`):
-		title = label(rest)
+		title = read(rest)
 		f.anon++
 		id = fmt.Sprintf("subgraph%d", f.anon)
 	case strings.Contains(rest, "["):
 		i := strings.Index(rest, "[")
 		id = strings.TrimSpace(rest[:i])
-		title = label(strings.TrimSuffix(strings.TrimSpace(rest[i+1:]), "]"))
+		title = read(strings.TrimSuffix(strings.TrimSpace(rest[i+1:]), "]"))
 	}
 	if id == "" {
 		f.anon++
@@ -543,11 +548,12 @@ var delims = []struct{ open, close, shape string }{
 }
 
 // scanner reads a statement. agent reads the links of an agentflow
-// diagram.
+// diagram, and html is htmlLabels, which the text of a link reads.
 type scanner struct {
 	s     string
 	i     int
 	agent bool
+	html  bool
 }
 
 func (sc *scanner) space() {
@@ -660,7 +666,7 @@ func (sc *scanner) link() *link {
 		if head == "-" || head == "=" {
 			end, head = end+head, ""
 		}
-		l.text, l.markdown = label(m[4]), isMarkdown(m[4])
+		l.text, l.markdown = flowLabel(m[4], sc.html), isMarkdown(m[4])
 		body(end, head != "")
 		l.kind = t.kind
 		// Mermaid reads the mark before the start only when it is the
@@ -703,7 +709,7 @@ func (sc *scanner) link() *link {
 		end := strings.Index(sc.s[sc.i+1:], "|")
 		if end >= 0 {
 			raw := sc.s[sc.i+1 : sc.i+1+end]
-			l.text, l.markdown = label(raw), isMarkdown(raw)
+			l.text, l.markdown = flowLabel(raw, sc.html), isMarkdown(raw)
 			sc.i += end + 2
 		}
 	}
@@ -837,7 +843,7 @@ func (f *flowchart) nodeRef(sc *scanner) (string, error) {
 			text = sc.s[start : start+e]
 			end = start + e
 		}
-		n.Label = label(text)
+		n.Label = flowLabel(text, f.wrap.html)
 		f.markdown[id] = isMarkdown(text)
 		n.Shape = d.shape
 		if f.af != nil {
@@ -938,7 +944,7 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 			}
 			n.Shape = v
 		case "label":
-			n.Label = label(v)
+			n.Label = flowLabel(v, f.wrap.html)
 			f.markdown[n.ID] = isMarkdown(v)
 		case "icon":
 			media.Icon = v
@@ -971,7 +977,7 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 		case "algorithm":
 			// algorithm picks an ELK layout for one subgraph. It is a hint,
 			// as layout: elk is, so zuzu lays the subgraph out in its own
-			// layered layout with no issue (D32).
+			// layered layout with no issue (D32, D35 part 9).
 		default:
 			if err := f.add("the property %s of a node", k); err != nil {
 				return err
@@ -1362,6 +1368,18 @@ var entities = regexp.MustCompile(`#([a-z]+|\d+);`)
 func isMarkdown(s string) bool {
 	s = unquote(s)
 	return len(s) >= 2 && strings.HasPrefix(s, "`") && strings.HasSuffix(s, "`")
+}
+
+// flowLabel reads the text of a label of a flowchart as label does, with
+// the two characters \n as a new line too. Mermaid starts a new line there
+// in a text that is not markdown, with or without htmlLabels. html is
+// htmlLabels: with it, Mermaid draws a label with math of KaTeX as math,
+// so that \nu in it is not a new line.
+func flowLabel(s string, html bool) string {
+	if isMarkdown(s) || html && hasMath(s) {
+		return label(s)
+	}
+	return label(strings.ReplaceAll(s, `\n`, "<br>"))
 }
 
 // label reads the text of a label: quotes off, <br> as a new line,

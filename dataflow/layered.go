@@ -337,8 +337,12 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if m := expr.Number(fields["minlen"].Get(r)); m > 0 {
 			e.MinLen = int(m)
 		}
-		if w := expr.Number(fields["weight"].Get(r)); w > 0 {
-			e.Weight = w
+		// A weight of 0 is a weight, as in DOT. A row with no weight has
+		// the weight 1.
+		if v := fields["weight"].Get(r); v != nil && !expr.IsUndefined(v) {
+			if w := expr.Number(v); w >= 0 && !math.IsInf(w, 1) {
+				e.Weight = new(w)
+			}
 		}
 		if c, ok := r["constraint"].(bool); ok && !c {
 			e.NoConstraint = true

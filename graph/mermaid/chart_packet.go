@@ -321,10 +321,11 @@ func packetRows(fields []pkField, bitsPerRow int) [][]pkField {
 }
 
 // The fonts of a packet: a label, and a number of a bit, which Mermaid
-// draws at 12 and 10 pixels.
+// draws at 12 and 10 pixels. A number of a bit draws at the size of a
+// small label in docs/STYLE.md (D35 part 7).
 var (
 	pkFont    = text.Font{Family: text.Family, Size: 11, Weight: 400}
-	pkBitFont = text.Font{Family: text.Family, Size: 9, Weight: 400}
+	pkBitFont = text.Font{Family: text.Family, Size: 10, Weight: 400}
 )
 
 // packetSpec writes the rows of a packet as a Vega spec, with the sizes of

@@ -9,7 +9,9 @@ import (
 
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/scale"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -550,16 +552,17 @@ func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
 		case "category":
 			o.Range = strs(t.Category)
 		case "ordinal", "ramp", "heatmap":
-			o.Range = ramp(t.Sequential, 9)
+			seq := s.rampTheme().Sequential
+			o.Range = ramp(seq, 9)
 			if scale.Discrete(typ) || typ == "quantize" || typ == "quantile" || typ == "threshold" || typ == "bin-ordinal" {
 				n := max(len(o.Domain), 2)
 				if typ != "ordinal" {
 					n = max(n-1, 2)
 				}
-				o.Range = ramp(t.Sequential, n)
+				o.Range = ramp(seq, n)
 			}
 		case "diverging":
-			o.Range = []any{t.Down, t.Grid, t.Up}
+			o.Range = ramp(t.Diverging, 3)
 		default:
 			return fmt.Errorf("the range %q: %w", r.Name, vega.ErrInvalidSpec)
 		}
@@ -608,8 +611,9 @@ func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
 }
 
 // scheme returns the colors of a scheme of a range. zuzu draws its own
-// colors (D12): a scheme of categories takes the colors of the theme, and
-// any other scheme a ramp of the theme.
+// colors (D12): a scheme of categories takes the colors of the theme, a
+// diverging scheme the diverging ramp, a cyclical scheme the wheel of the
+// categorical colors, and any other scheme the sequential ramp (D35).
 func (s *scope) scheme(ref *vega.SchemeRef, typ string, count, n int) []any {
 	t := s.rt.theme
 	name := ""
@@ -619,13 +623,61 @@ func (s *scope) scheme(ref *vega.SchemeRef, typ string, count, n int) []any {
 	if categorical[name] || (typ == "ordinal" && count == 0 && !sequential(name)) {
 		return strs(t.Category)
 	}
+	discrete := scale.Discrete(typ) || typ == "quantize" || typ == "quantile" || typ == "threshold"
+	if cyclical[name] {
+		// A continuous scale with no count takes each categorical color and
+		// the first again, so that it holds every hue of the wheel. A
+		// discrete scale spreads its colors round the wheel, so that the
+		// last is not the first again.
+		switch {
+		case !discrete && count <= 0:
+			return ramp(t.Cyclical, len(t.Category)+1)
+		case !discrete:
+			return ramp(t.Cyclical, count)
+		case count <= 0:
+			count = max(n, 2)
+		}
+		out := make([]any, count)
+		for i := range out {
+			out[i] = t.Cyclical(float64(i) / float64(count))
+		}
+		return out
+	}
 	if count <= 0 {
 		count = 9
-		if scale.Discrete(typ) || typ == "quantize" || typ == "quantile" || typ == "threshold" {
+		if discrete {
 			count = max(n, 2)
 		}
 	}
-	return ramp(t.Sequential, count)
+	if diverging[name] {
+		return ramp(t.Diverging, count)
+	}
+	return ramp(s.rampTheme().Sequential, count)
+}
+
+// rampTheme returns the theme of the render with the background that the
+// chart draws, from which a ramp starts (D35). A background that the caller
+// gives is already the background of the theme, and wins. Else it is the
+// background of the spec, or of the config of the spec, when either sets
+// an opaque color. A color with some opacity counts as drawn over the
+// background of the theme.
+func (s *scope) rampTheme() theme.Theme {
+	t := s.rt.theme
+	if s.rt.opts.hasBackground {
+		return t
+	}
+	bg, err := s.signal("background")
+	c, ok := bg.(string)
+	if err != nil || !ok || c == "" {
+		c, _ = s.rt.config["background"].(string)
+	}
+	over, ok1 := color.Parse(t.Background)
+	v, ok2 := color.Parse(c)
+	if !ok1 || !ok2 || v.A <= 0 {
+		return t
+	}
+	t.Background = color.Mix(over, color.RGBA{R: v.R, G: v.G, B: v.B, A: 1}, v.A, "rgb").Hex()
+	return t
 }
 
 // categorical are the schemes of Vega for categories.
@@ -634,6 +686,16 @@ var categorical = map[string]bool{
 	"dark2": true, "paired": true, "pastel1": true, "pastel2": true, "set1": true, "set2": true,
 	"set3": true, "tableau10": true, "tableau20": true, "observable10": true,
 }
+
+// diverging are the diverging schemes of Vega.
+var diverging = map[string]bool{
+	"blueorange": true, "brownbluegreen": true, "purplegreen": true, "pinkyellowgreen": true,
+	"purpleorange": true, "redblue": true, "redgrey": true, "redyellowblue": true,
+	"redyellowgreen": true, "spectral": true,
+}
+
+// cyclical are the cyclical schemes of Vega.
+var cyclical = map[string]bool{"rainbow": true, "sinebow": true}
 
 // sequential reports whether a scheme name is not a scheme of categories.
 func sequential(name string) bool {

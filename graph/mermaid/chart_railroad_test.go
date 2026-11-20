@@ -298,6 +298,12 @@ func TestRailroadSyntax(t *testing.T) {
 		"railroad-peg-beta\nA <- (B C)? D* E+ ;\n",
 		"railroad-peg-beta\nA <- !(B C) ;\n",
 		"railroad-peg-beta title X\nA <- B ;\n",
+		// A comment can stand where a token can, and %% in a string or
+		// in a comment of EBNF is text.
+		"railroad-ebnf-beta\na = \"x %% y\" ; %% note\n",
+		"railroad-ebnf-beta\na = \"x\" (* c %% d *) ;\n",
+		"railroad-ebnf-beta\n%% note\na = 'x %% y' ;\n",
+		"railroad-abnf-beta %% note\na = \"x\" ;\n",
 	}
 	bad := []string{
 		"railroad-beta\na = terminal(\"x\")\n",
@@ -317,6 +323,9 @@ func TestRailroadSyntax(t *testing.T) {
 		// A semicolon with text after it on its line is a comment of ABNF,
 		// so the rule has no end.
 		"railroad-abnf-beta\na = b ; c\n",
+		// So is a semicolon with a space after it, as mmdc reads it.
+		"railroad-abnf-beta\na = \"x\" ; \n",
+		"railroad-abnf-beta\na = \"x\" ;\t\nb = \"y\" ;\n",
 		"railroad-abnf-beta\na =/ b ;\n",
 		"railroad-abnf-beta\na = 'x' ;\n",
 		"railroad-abnf-beta\na_b = c ;\n",
@@ -369,7 +378,9 @@ func TestRailroadSpec(t *testing.T) {
 	}{
 		{"railroad-beta\ntitle \"A \\\"B\\\"\"\na = terminal(\"x\") ;\n", `A "B"`, ""},
 		{"railroad-abnf-beta\ntitle \"A \\\"B\"\na = \"x\" ;\n", `A \"B`, ""},
-		{"---\ntitle: Front\n---\nrailroad-peg-beta\nA <- B ;\n", "Front", ""},
+		// Mermaid 12.3 draws no title of the front matter in a railroad
+		// diagram.
+		{"---\ntitle: Front\n---\nrailroad-peg-beta\nA <- B ;\n", "", ""},
 		{"---\ntitle: Front\n---\nrailroad-peg-beta\ntitle Own\nA <- B ;\n", "Own", ""},
 		{"railroad-beta\ntitle A\n", "A", ""},
 		{

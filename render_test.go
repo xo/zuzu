@@ -528,6 +528,40 @@ func TestLegendPlaces(t *testing.T) {
 	}
 }
 
+// TestLegendWrapsAtThePlot checks that the row of a legend in a group wraps
+// at the width of the plot area of that group, not at the width of the
+// whole chart (D35). Before, it wrapped at the width of the top level.
+func TestLegendWrapsAtThePlot(t *testing.T) {
+	t.Parallel()
+	s := renderVega(t, `"width": 600, "height": 100,
+		"scales": [{"name": "c", "type": "ordinal", "range": "category",
+			"domain": ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"]}],
+		"marks": [{"type": "group", "encode": {"enter": {"width": {"value": 150}, "height": {"value": 100}}},
+			"legends": [{"fill": "c"}]}]`)
+	g := guide(s, "legend-entry")
+	if g == nil {
+		t.Fatal("no entries")
+	}
+	var labels []scene.Item
+	for _, m := range g.Items {
+		if m.Role == "legend-label" {
+			labels = m.Items
+		}
+	}
+	// The six entries fit in one row of 600, so more than one row shows
+	// the wrap at 150.
+	rows := map[float64]bool{}
+	for _, l := range labels {
+		rows[l.Y] = true
+		if l.X >= 150 {
+			t.Errorf("the label %q starts at %v, past the plot of 150", l.Text, l.X)
+		}
+	}
+	if len(labels) != 6 || len(rows) < 2 {
+		t.Errorf("%d labels in %d rows, want 6 in more than one row", len(labels), len(rows))
+	}
+}
+
 func TestLegendLayout(t *testing.T) {
 	t.Parallel()
 	symbols := func(legend string) []scene.Item {

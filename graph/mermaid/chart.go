@@ -3,6 +3,7 @@ package mermaid
 import (
 	"encoding/json/v2"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
@@ -115,7 +116,7 @@ func Chart(d *Diagram, strict bool) ([]byte, bool, vega.Report, error) {
 			spec["description"] = desc
 		}
 	}
-	if _, ok := spec["title"]; !ok && d.Title != "" {
+	if _, ok := spec["title"]; !ok && d.Title != "" && !untitled(d.Kind) {
 		spec["title"] = map[string]any{"text": d.Title, "anchor": "start"}
 	}
 	b, err := json.Marshal(spec, json.Deterministic(true))
@@ -123,6 +124,20 @@ func Chart(d *Diagram, strict bool) ([]byte, bool, vega.Report, error) {
 		return nil, false, c.issues.Report, fmt.Errorf("writing the spec of a chart: %w", err)
 	}
 	return b, lite, c.issues.Report, nil
+}
+
+// untitled reports whether Mermaid 12.3 draws no title of the front
+// matter in a kind of chart: an ishikawa, a kanban, a railroad diagram, a
+// tree view, an event model and a C4 diagram. zuzu does not draw it
+// either. Such a kind reads the title of the front matter and draws
+// nothing for it, so it is no issue (D32). A title statement of the kind
+// still draws.
+func untitled(kind string) bool {
+	switch kind {
+	case "ishikawa", "ishikawa-beta", "kanban", rrIR, rrEBNF, rrABNF, rrPEG, "treeView-beta", "eventmodeling":
+		return true
+	}
+	return slices.Contains(c4Keywords, kind)
 }
 
 // emptyChart returns the spec of Vega of a chart with nothing in it but its

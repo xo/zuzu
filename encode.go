@@ -566,6 +566,12 @@ func paint(v any) scene.Paint {
 	case *expr.Color:
 		return scene.Paint{Color: x.String()}
 	case map[string]any:
+		// vega.js draws an object as a gradient only when its key gradient
+		// is truthy. Any other object is the string that JavaScript makes of
+		// it, which is not a color.
+		if !expr.Truthy(x["gradient"]) {
+			return scene.Paint{Color: expr.String(x)}
+		}
 		b, err := json.Marshal(x)
 		if err != nil {
 			return scene.Paint{}

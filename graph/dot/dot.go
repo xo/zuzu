@@ -649,7 +649,11 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 		case "arrowtail":
 			e.Tail = v
 		case "weight":
-			e.Weight, _ = strconv.ParseFloat(v, 64)
+			// 0 is a weight, as in Graphviz. A weight that is not a number
+			// of 0 or more counts as 1, as in Graphviz.
+			if w, err := strconv.ParseFloat(v, 64); err == nil && w >= 0 && !math.IsInf(w, 1) {
+				e.Weight = new(w)
+			}
 		case "minlen":
 			m, _ := strconv.ParseFloat(v, 64)
 			e.MinLen = int(m)
@@ -784,18 +788,22 @@ func (p *parser) finish() error {
 	for _, n := range p.g.Nodes {
 		a := p.attrs[n.ID]
 		path := "node " + n.ID
-		n.Label = label(a["label"], n.ID)
-		if a["label"] == "" {
-			n.Label = n.ID
+		// A node with no label draws its id, as the label \N of Graphviz
+		// does. A label with no text, label="", draws no text.
+		v, ok := a["label"]
+		if !ok {
+			v = `\N`
 		}
+		n.Label = label(v, n.ID)
 		n.Shape = "ellipse"
 		if s, ok := a["shape"]; ok {
 			n.Shape = s
 		}
-		src, isHTMLLabel := isHTML(a["label"])
+		src, isHTMLLabel := isHTML(v)
 		if n.Shape == "record" || n.Shape == "Mrecord" {
+			_, split := splitRecord(src, true)
 			switch {
-			case isHTMLLabel && len(splitRecord(src)) == 1:
+			case isHTMLLabel && !split:
 				// A label of HTML with no brace and no bar, such as a
 				// table, draws in the shape of the record, as one field.
 			case isHTMLLabel:
@@ -808,7 +816,7 @@ func (p *parser) finish() error {
 				}
 				n.Fields, isHTMLLabel = fields, false
 			default:
-				n.Fields = record(a["label"], n.ID)
+				n.Fields = record(v, n.ID)
 			}
 			// The fields of one group in braces lie one under another
 			// when the ranks run down. When the ranks run across, they
@@ -821,6 +829,7 @@ func (p *parser) finish() error {
 			}
 			n.Label = strings.Join(parts, " | ")
 		}
+		n.NoLabel = n.Label == ""
 		if n.Shape == "polygon" {
 			s, err := p.polygon(a, path)
 			if err != nil {
@@ -1179,22 +1188,17 @@ func margin(v string) ([]float64, error) {
 }
 
 // record reads the fields of the label of a record, {a|<p>b|c}, flat: a
-// field of a nested group is a field of the record.
+// field of a nested group is a field of the record. A field with no text,
+// as in `a| |b`, is an empty field, as in Graphviz.
 func record(v, id string) []graph.Field {
-	if v == "" {
-		v = id
-	}
 	// An escaped bracket or bar is text, so it hides in a private rune
 	// while the fields split.
 	hide := strings.NewReplacer(`\{`, "\ue001", `\}`, "\ue002", `\|`, "\ue003", `\<`, "\ue004", `\>`, "\ue005")
 	show := strings.NewReplacer("\ue001", "{", "\ue002", "}", "\ue003", "|", "\ue004", "<", "\ue005", ">")
-	v = strings.NewReplacer("{", "|", "}", "|").Replace(hide.Replace(v))
+	parts, _ := splitRecord(hide.Replace(v), false)
 	var out []graph.Field
-	for part := range strings.SplitSeq(v, "|") {
+	for _, part := range parts {
 		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
 		f := graph.Field{}
 		if strings.HasPrefix(part, "<") {
 			if j := strings.Index(part, ">"); j > 0 {

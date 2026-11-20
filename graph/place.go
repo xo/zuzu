@@ -23,7 +23,14 @@ func (l *layout) separation(u, v int) float64 {
 		gap = (l.sep.node + l.sep.edge) / 2
 	}
 	loop := 0.0
-	if u < len(l.loopw) {
+	switch {
+	case l.in.Direction == LR || l.in.Direction == RL:
+		// The loops of a node go above it, at its left before the
+		// layout turns.
+		if v < len(l.loopw) {
+			loop = l.loopw[v]
+		}
+	case u < len(l.loopw):
 		// The loops of a node go at its right.
 		loop = l.loopw[u]
 	}
@@ -207,6 +214,11 @@ func (l *layout) align(layers [][]int, pred [][]int, predW [][]float64, pos []in
 				continue
 			}
 			lo, hi := weightedMedians(pred[v], predW[v], pos)
+			if lo < 0 {
+				// Every edge to the rank before weighs 0, so none pulls
+				// the vertex into line.
+				continue
+			}
 			w := 0.0
 			for k, u := range pred[v] {
 				if u == lo || u == hi {
@@ -237,13 +249,17 @@ func (l *layout) align(layers [][]int, pred [][]int, predW [][]float64, pos []in
 // weightedMedians returns the lower and the upper weighted median of the
 // neighbors of a vertex, in the order of pos, with the weight of the edge to
 // each. With equal weights they are the two middle neighbors, or the one
-// middle neighbor twice.
+// middle neighbor twice. A neighbor whose edge weighs 0 is never a median,
+// and both are -1 when every edge weighs 0.
 func weightedMedians(nb []int, w []float64, pos []int) (int, int) {
 	idx := make([]int, len(nb))
 	total := 0.0
 	for i := range nb {
 		idx[i] = i
 		total += w[i]
+	}
+	if !(total > 0) {
+		return -1, -1
 	}
 	slices.SortStableFunc(idx, func(a, b int) int { return pos[nb[a]] - pos[nb[b]] })
 	lo, hi := -1, -1
@@ -821,17 +837,17 @@ func border(n NodePlace, kind string, from, to [2]float64) [2]float64 {
 }
 
 // loop routes an edge from a node to itself, on the side of the node
-// across the ranks: at its right, or below it when the ranks run from left
-// to right.
+// across the ranks: at its right, or above it when the ranks run across,
+// as in dot.
 func (l *layout) loop(ep *EdgePlace, n NodePlace, e LayoutEdge) {
 	r := 18 + e.LabelWidth/4
 	if l.in.Direction == LR || l.in.Direction == RL {
-		x0, y0 := n.X-n.Width/4, n.Y+n.Height/2
-		x1, y1 := n.X+n.Width/4, n.Y+n.Height/2
-		ep.Points = [][2]float64{{x0, y0}, {x0 - r/2, y0 + r}, {x1 + r/2, y1 + r}, {x1, y1}}
-		ep.EndX, ep.EndY, ep.EndAngle = x1, y1, -90-25
-		ep.StartX, ep.StartY, ep.StartAngle = x0, y0, -90+25
-		ep.LabelX, ep.LabelY = n.X, y0+r*1.3+e.LabelHeight/2
+		x0, y0 := n.X-n.Width/4, n.Y-n.Height/2
+		x1, y1 := n.X+n.Width/4, n.Y-n.Height/2
+		ep.Points = [][2]float64{{x0, y0}, {x0 - r/2, y0 - r}, {x1 + r/2, y1 - r}, {x1, y1}}
+		ep.EndX, ep.EndY, ep.EndAngle = x1, y1, 90+25
+		ep.StartX, ep.StartY, ep.StartAngle = x0, y0, 90-25
+		ep.LabelX, ep.LabelY = n.X, y0-r*1.3-e.LabelHeight/2
 	} else {
 		x0, y0 := n.X+n.Width/2, n.Y-n.Height/4
 		x1, y1 := n.X+n.Width/2, n.Y+n.Height/4

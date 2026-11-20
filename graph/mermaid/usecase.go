@@ -7,6 +7,7 @@ import (
 	"io"
 	"maps"
 	"math"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -53,7 +54,7 @@ func usecaseGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 			b.WriteByte('\n')
 		}
 		starts = append(starts, b.Len())
-		b.WriteString(l.Text)
+		b.WriteString(ucStyleEnd(l.Text))
 	}
 	at := func(off int) int {
 		i := sort.SearchInts(starts, off+1) - 1
@@ -81,6 +82,24 @@ func usecaseGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 		return nil, is.Report, err
 	}
 	return g, is.Report, nil
+}
+
+// ucStyleEndREs match a line of a style and a line of a class with a
+// color, up to the last semicolon, as Mermaid 12.3 matches them before the
+// parse.
+var ucStyleEndREs = []*regexp.Regexp{
+	regexp.MustCompile(`style.*:\S*#.*;`),
+	regexp.MustCompile(`classDef.*:\S*#.*;`),
+}
+
+// ucStyleEnd drops the last semicolon of a line that holds style or
+// classDef, a colon and then a #, as in `style A fill:#f00;`. Mermaid drops
+// it before the parse, so the semicolon is not an error.
+func ucStyleEnd(s string) string {
+	for _, re := range ucStyleEndREs {
+		s = re.ReplaceAllStringFunc(s, func(m string) string { return m[:len(m)-1] })
+	}
+	return s
 }
 
 // ucReadConfig reads the settings of the section usecase of the config: the

@@ -299,11 +299,14 @@ func (t Theme) Mode() Mode {
 
 // Sequential returns the color at v, from 0 to 1, on the sequential ramp of
 // the theme. The ramp runs from the background through the first color, so
-// that it reads in both modes.
+// that it reads in both modes. It runs on to a lighter color on a dark
+// background, and to a darker color on a light one. A caller that draws
+// another background, such as the background of a spec, sets Background
+// first (D35).
 func (t Theme) Sequential(v float64) string {
 	base := t.Category[0]
 	var stops []string
-	if t.mode == Dark {
+	if _, _, l := toHSL(parse(t.Background)); l < 0.5 {
 		stops = []string{
 			mix(t.Background, base, 0.12), mix(t.Background, base, 0.45), base,
 			mix(base, "#ffffff", 0.45), mix(base, "#ffffff", 0.85),
@@ -314,5 +317,21 @@ func (t Theme) Sequential(v float64) string {
 			mix(base, "#000000", 0.35), mix(base, "#000000", 0.6),
 		}
 	}
+	return ramp(stops, v)
+}
+
+// Diverging returns the color at v, from 0 to 1, on the diverging ramp of
+// the theme. The ramp runs from the color of a fall through the grid color
+// to the color of a rise.
+func (t Theme) Diverging(v float64) string {
+	return ramp([]string{t.Down, t.Grid, t.Up}, v)
+}
+
+// Cyclical returns the color at v, from 0 to 1, on the wheel of the theme:
+// the categorical colors in order, with the colors between them mixed, and
+// the last color joined to the first. So 0 and 1 are both the first color
+// (D35).
+func (t Theme) Cyclical(v float64) string {
+	stops := append(slices.Clone(t.Category), t.Category[0])
 	return ramp(stops, v)
 }

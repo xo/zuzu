@@ -141,7 +141,11 @@ func Area(items []scene.Item) (string, bool) {
 		if !ok {
 			return "", false
 		}
-		d.WriteString(a + b + "Z")
+		// An open curve can draw nothing, and a closed one can close itself.
+		d.WriteString(a + b)
+		if a+b != "" && !strings.HasSuffix(b, "Z") {
+			d.WriteString("Z")
+		}
 	}
 	return d.String(), true
 }

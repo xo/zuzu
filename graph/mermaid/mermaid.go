@@ -212,6 +212,16 @@ func Read(src string) (*Diagram, error) {
 	return d, nil
 }
 
+// raw returns the line n of the source as the source gives it, with its
+// comment and the spaces at its end, or false when the body does not hold
+// the line.
+func (d *Diagram) raw(n int) (string, bool) {
+	if i := n - d.N; i >= 0 && i < len(d.body) {
+		return d.body[i], true
+	}
+	return "", false
+}
+
 // yamlText returns a scalar of YAML as text: a string, or a number or a
 // boolean as YAML writes it. A map is not text.
 func yamlText(v any) (string, bool) {
@@ -269,6 +279,28 @@ func configSection(kind string) string {
 		return "railroadPeg"
 	}
 	return strings.TrimSuffix(kind, "-beta")
+}
+
+// themeSection returns the section of the config of a kind of diagram in
+// which Mermaid 12.3 reads a theme, such as venn for venn-beta: the id of
+// the kind, as configSection gives it, with the names that Mermaid gives to
+// a few of them. So a class diagram reads class.theme, and not
+// classDiagram.theme.
+func themeSection(kind string) string {
+	switch s := configSection(kind); s {
+	case "flowchart-elk":
+		return "flowchart"
+	case "classDiagram":
+		return "class"
+	case "stateDiagram":
+		return "state"
+	case "xychart":
+		return "xyChart"
+	case "railroadEbnf", "railroadAbnf", "railroadPeg":
+		return "railroad"
+	default:
+		return s
+	}
 }
 
 // inQuotes reports whether a place of a line is inside double quotes.

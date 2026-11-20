@@ -363,7 +363,8 @@ config:
 - `zuzu.endLabel` names the series of a line whose stroke comes from a
   scale at its last point, with a dot, in its color. The names move apart
   so that they do not overlap, and a legend of the stroke alone is left out
-  when each of its values has a name.
+  when each of its values has a name. A closed line, such as the line of a
+  radar, gets no name, and the legend names it (D35).
 - `zuzu.reference` dashes a rule of Vega-Lite with one place, a reference
   line, and names its value where it starts. A mark of many rules draws
   data and keeps its look.

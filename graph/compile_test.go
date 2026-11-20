@@ -34,6 +34,33 @@ func TestCompileFigure(t *testing.T) {
 	}
 }
 
+func TestCompileNoLabelAndWeight(t *testing.T) {
+	t.Parallel()
+	// A node with NoLabel draws no text, where another node with an empty
+	// label draws its id. An edge of the weight 0 keeps it, and an edge
+	// with no weight writes none.
+	spec, err := Compile(&Graph{
+		Nodes: []*Node{{ID: "a", NoLabel: true}, {ID: "b"}},
+		Edges: []*Edge{{Source: "a", Target: "b", Weight: new(0.0)}, {Source: "b", Target: "a"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	for _, want := range []string{`"key":"a","label":""`, `"key":"b","label":"b"`, `"weight":0`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("expected %s in the spec", want)
+		}
+	}
+	if n := strings.Count(s, `"weight":`); n != 1 {
+		t.Errorf("expected one weight in the spec, got %d", n)
+	}
+}
+
 func TestBusinessEllipse(t *testing.T) {
 	t.Parallel()
 	if got, ok := ShapeOf(businessEllipse); !ok || got != businessEllipse {

@@ -333,6 +333,9 @@ func TestTimelineErrors(t *testing.T) {
 		"the keyword on a later line":     "timeline\n  timeline\n",
 		"an accDescr block with no end":   "timeline\n  accDescr {\n  2020 : a\n",
 		"a colon with no space in events": "timeline\n  2020 : a :b\n  2021 :x\n",
+		"a colon and a space at the end":  "timeline\n  2020 : \n  LinkedIn\n",
+		"a colon and a space after event": "timeline\n  2020 : a : \n  b\n",
+		"a colon and a tab at the end":    "timeline\n  2020 :\t\n  LinkedIn\n",
 	}
 	for name, src := range tests {
 		d, err := mermaid.Read(src)
@@ -341,6 +344,38 @@ func TestTimelineErrors(t *testing.T) {
 		}
 		if _, _, _, err := mermaid.Chart(d, false); !errors.Is(err, mermaid.ErrSyntax) {
 			t.Errorf("%s: expected an error of the syntax, got %v", name, err)
+		}
+	}
+}
+
+func TestTimelineColonAtEnd(t *testing.T) {
+	t.Parallel()
+	// The spaces after a colon at the end of a line count, as in Mermaid
+	// 12.3: with none, the next line is the event, and with two, the
+	// second space is an event with no text, and the next line is a
+	// period.
+	tests := []struct {
+		name, src string
+		periods   []string
+		events    []string
+	}{
+		{"no space", "timeline\n  2002 :\n  LinkedIn\n", []string{"2002"}, []string{"LinkedIn"}},
+		{"two spaces", "timeline\n  2002 :  \n  LinkedIn\n", []string{"2002", "LinkedIn"}, []string{""}},
+	}
+	for _, test := range tests {
+		items, report, err := drawDiagram(t, test.src, true)
+		if err != nil || len(report) != 0 {
+			t.Fatalf("%s: the report %v and the error %v", test.name, report, err)
+		}
+		var periods, events []string
+		for _, it := range drawnOf(items, "periodLabels") {
+			periods = append(periods, it.text)
+		}
+		for _, it := range drawnOf(items, "eventLabels") {
+			events = append(events, it.text)
+		}
+		if !slices.Equal(periods, test.periods) || !slices.Equal(events, test.events) {
+			t.Errorf("%s: expected the periods %q and the events %q, got %q and %q", test.name, test.periods, test.events, periods, events)
 		}
 	}
 }

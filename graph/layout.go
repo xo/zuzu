@@ -50,9 +50,10 @@ type LayoutEdge struct {
 	// Source and Target are the ids of the ends: each a node, or else a
 	// cluster. An edge to a cluster ends at the box of the cluster.
 	Source, Target string
-	// MinLen is 1 or more, and Weight is 1 for 0.
+	// MinLen is 1 or more, and Weight is 1 when it is nil. A Weight of 0
+	// counts for nothing in the ranks and in the places across them.
 	MinLen int
-	Weight float64
+	Weight *float64
 	// NoConstraint takes the edge out of the ranks.
 	NoConstraint bool
 	// LabelWidth and LabelHeight are the size of the label of the edge, or
@@ -80,6 +81,14 @@ type LayoutEdge struct {
 	// port on a side, such as 1, 0 for the east side, or nil. An edge at
 	// such a port ends on the port and leaves it in that direction.
 	SourceSide, TargetSide []float64
+}
+
+// weight returns the weight of the edge, 1 when it has none.
+func (e LayoutEdge) weight() float64 {
+	if e.Weight == nil {
+		return 1
+	}
+	return *e.Weight
 }
 
 // LayoutCluster is a cluster to lay out, with the size of its title.
@@ -175,7 +184,8 @@ type layout struct {
 	flat   []bool
 	label  []int // the vertex of the label of each edge, or -1
 	// loopw is the space that the loops of each node and their labels take
-	// at its right, across the ranks, or 0.
+	// across the ranks, or 0: at its right, or at its left when the ranks
+	// run across, which turns to above.
 	loopw []float64
 	x, y  []float64
 	sep   struct{ rank, node, edge, pad float64 }
@@ -304,11 +314,7 @@ func (l *layout) rank(ids map[string]int, double bool) {
 		if double {
 			m *= 2
 		}
-		w := e.Weight
-		if w <= 0 {
-			w = 1
-		}
-		es = append(es, redge{u: u, v: v, minlen: m, weight: w})
+		es = append(es, redge{u: u, v: v, minlen: m, weight: e.weight()})
 	}
 	es, _ = acyclic(len(in.Nodes), es)
 	ranks := rankNodes(len(in.Nodes), es)
@@ -394,10 +400,7 @@ func (l *layout) chainEdges(ids map[string]int, sideways bool) {
 		if l.flat[i] || len(ch) < 2 {
 			continue
 		}
-		w := in.Edges[i].Weight
-		if w <= 0 {
-			w = 1
-		}
+		w := in.Edges[i].weight()
 		for k := 1; k < len(ch); k++ {
 			l.down[ch[k-1]] = append(l.down[ch[k-1]], ch[k])
 			l.up[ch[k]] = append(l.up[ch[k]], ch[k-1])

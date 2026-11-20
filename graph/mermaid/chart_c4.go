@@ -235,7 +235,10 @@ func c4Chart(c *chart) (map[string]any, bool, error) {
 }
 
 // settings reads the settings of the config that a C4 diagram reads, in
-// the section c4, and wrap at the top. Each other setting is an issue.
+// the section c4, and wrap at the top. Mermaid 12.3 has c4.c4ShapeInRow
+// and c4.c4BoundaryInRow in its config, and reads neither of them, so they
+// change nothing and are no issue (D32). UpdateLayoutConfig sets the
+// numbers of a row. Each other setting is an issue.
 func (p *c4Diagram) settings() error {
 	c := p.c
 	numbers := []struct {
@@ -245,7 +248,7 @@ func (p *c4Diagram) settings() error {
 		{"c4ShapeMargin", &p.margin}, {"c4ShapePadding", &p.pad}, {"width", &p.width},
 		{"diagramMarginX", &p.marginX}, {"diagramMarginY", &p.marginY}, {"nextLinePaddingX", &p.lineX},
 	}
-	read := []string{"wrap", "c4.wrap"}
+	read := []string{"wrap", "c4.wrap", "c4.c4ShapeInRow", "c4.c4BoundaryInRow"}
 	for _, n := range numbers {
 		read = append(read, "c4."+n.key)
 	}

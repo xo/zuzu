@@ -285,7 +285,7 @@ func TestLayWeight(t *testing.T) {
 	// b has two neighbors above it. The heavy edge from a stays straight.
 	in := LayoutInput{
 		Nodes: []LayoutNode{{ID: "a", Width: 20, Height: 20}, {ID: "c", Width: 20, Height: 20}, {ID: "b", Width: 20, Height: 20}},
-		Edges: []LayoutEdge{{Source: "a", Target: "b", Weight: 100}, {Source: "c", Target: "b"}},
+		Edges: []LayoutEdge{{Source: "a", Target: "b", Weight: new(100.0)}, {Source: "c", Target: "b"}},
 	}
 	l, err := Lay(in)
 	if err != nil {
@@ -293,6 +293,71 @@ func TestLayWeight(t *testing.T) {
 	}
 	if a, b := l.Nodes[0], l.Nodes[2]; math.Abs(a.X-b.X) > 0.01 {
 		t.Errorf("a at x %v and b at x %v, want the same x", a.X, b.X)
+	}
+}
+
+func TestLayZeroWeight(t *testing.T) {
+	t.Parallel()
+	// c has the neighbors b and x above it. With the weight 1 on the edge
+	// from x, c goes between them, as in dot. With the weight 0, that edge
+	// does not pull, and c goes under b, as in dot.
+	lay := func(bc, xc *float64) *Layout {
+		t.Helper()
+		in := LayoutInput{
+			Nodes: []LayoutNode{{ID: "a", Width: 20, Height: 20}, {ID: "b", Width: 20, Height: 20}, {ID: "c", Width: 20, Height: 20}, {ID: "x", Width: 20, Height: 20}},
+			Edges: []LayoutEdge{{Source: "a", Target: "b"}, {Source: "b", Target: "c", Weight: bc}, {Source: "x", Target: "c", Weight: xc}},
+		}
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkRules(t, TB, in, l)
+		return l
+	}
+	l := lay(nil, new(1.0))
+	if b, c, x := l.Nodes[1], l.Nodes[2], l.Nodes[3]; !(c.X > math.Min(b.X, x.X)+0.01 && c.X < math.Max(b.X, x.X)-0.01) {
+		t.Errorf("the weight 1: c at x %v, want it between b at %v and x at %v", c.X, b.X, x.X)
+	}
+	l = lay(nil, new(0.0))
+	if b, c := l.Nodes[1], l.Nodes[2]; math.Abs(b.X-c.X) > 0.01 {
+		t.Errorf("the weight 0: c at x %v, want it under b at %v", c.X, b.X)
+	}
+	// When every edge into c weighs 0, c has no median, and the layout
+	// still places it.
+	lay(new(0.0), new(0.0))
+}
+
+func TestLayLoopSide(t *testing.T) {
+	t.Parallel()
+	// A loop goes at the right of its node when the ranks run down or up,
+	// and above it when they run across, as in dot. Its label goes beyond
+	// the loop on the same side.
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 40, Height: 20}, {ID: "b", Width: 40, Height: 20}},
+		Edges: []LayoutEdge{{Source: "a", Target: "a"}, {Source: "a", Target: "b"}, {Source: "b", Target: "b", LabelWidth: 30, LabelHeight: 14}},
+	}
+	for _, dir := range []string{TB, BT, LR, RL} {
+		in.Direction = dir
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range []int{0, 2} {
+			n, e := l.Nodes[k/2], l.Edges[k]
+			for _, p := range e.Points[1:3] {
+				out := p[0] > n.X+n.Width/2
+				if dir == LR || dir == RL {
+					out = p[1] < n.Y-n.Height/2
+				}
+				if !out {
+					t.Errorf("%s: the loop of %s has the point %v, beside the node at %v,%v", dir, in.Nodes[k/2].ID, p, n.X, n.Y)
+				}
+			}
+			if k == 2 && (dir == LR || dir == RL) && !(e.LabelY < e.Points[1][1]) {
+				t.Errorf("%s: the label of the loop at y %v, want it above the loop at %v", dir, e.LabelY, e.Points[1][1])
+			}
+		}
+		checkRules(t, dir, in, l)
 	}
 }
 

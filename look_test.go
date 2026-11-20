@@ -169,6 +169,37 @@ func TestLineEnds(t *testing.T) {
 	}
 }
 
+// TestClosedLineEnds checks that a closed line gets no name at its end, and
+// that the legend names its series (D35). A line is closed when its
+// interpolation closes it, or when its last point is its first, as the line
+// of a radar is. Before, the names of the lines of a radar met at one
+// point.
+func TestClosedLineEnds(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, interpolate, values string
+		labels                    int
+	}{
+		{"an open line", "linear", `[{"k": "p", "x": 0, "y": 0}, {"k": "p", "x": 10, "y": 5}, {"k": "p", "x": 20, "y": 0}]`, 1},
+		{"a line with linear-closed", "linear-closed", `[{"k": "p", "x": 0, "y": 0}, {"k": "p", "x": 10, "y": 5}, {"k": "p", "x": 20, "y": 0}]`, 0},
+		{"a line that ends at its first point", "linear", `[{"k": "p", "x": 0, "y": 0}, {"k": "p", "x": 10, "y": 5}, {"k": "p", "x": 0, "y": 0}]`, 0},
+	} {
+		s := renderVega(t, `"width": 100, "height": 100,
+			"data": [{"name": "d", "values": `+c.values+`}],
+			"scales": [{"name": "c", "type": "ordinal", "domain": ["p"], "range": "category"}],
+			"legends": [{"stroke": "c"}],
+			"marks": [{"type": "line", "from": {"data": "d"}, "encode": {"enter": {
+				"x": {"field": "x"}, "y": {"field": "y"}, "stroke": {"scale": "c", "field": "k"},
+				"interpolate": {"value": "`+c.interpolate+`"}}}}]`)
+		if got := len(marksOf(s, "zuzu-end-label")); got != c.labels {
+			t.Errorf("%s has %d names at its end, want %d", c.name, got, c.labels)
+		}
+		if legend := len(marksOf(s, "legend")) != 0; legend == (c.labels > 0) {
+			t.Errorf("%s: whether the legend draws is %v", c.name, legend)
+		}
+	}
+}
+
 func TestReferenceLine(t *testing.T) {
 	t.Parallel()
 	s := renderVL(t, `"layer": [

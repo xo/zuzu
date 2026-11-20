@@ -172,9 +172,8 @@ func TestVennIssues(t *testing.T) {
 	t.Parallel()
 	const body = "venn-beta\n  set A\n"
 	for _, src := range []string{
-		// Mermaid draws in the theme of venn.theme, which zuzu does not
-		// read.
-		"---\nconfig:\n  venn:\n    theme: forest\n---\n" + body,
+		// Mermaid 12.3 has no theme sepia.
+		"---\nconfig:\n  venn:\n    theme: sepia\n---\n" + body,
 		"---\nconfig:\n  venn:\n    useDebugLayout: true\n---\n" + body,
 		"---\nconfig:\n  venn:\n    width: -5\n---\n" + body,
 		"---\nconfig:\n  venn:\n    gap: 5\n---\n" + body,

@@ -78,8 +78,11 @@ type Graph struct {
 type Node struct {
 	ID string
 	// Label is the text of the node. An empty label draws the id, except
-	// on a node with a Width and a Height, which draws no text.
+	// on a node with a Width and a Height, or with NoLabel, which draws no
+	// text.
 	Label string
+	// NoLabel draws no text for an empty Label, as label="" of DOT does.
+	NoLabel bool
 	// Shape names the shape of the node, such as rect or ellipse. The
 	// shape polygon of DOT has the name that Polygon writes.
 	Shape string
@@ -207,9 +210,10 @@ type Edge struct {
 	// layout places them itself, beside the edge.
 	LabelDistance, LabelAngle float64
 	// MinLen is the least number of ranks that the edge spans, 1 by
-	// default, and Weight how much a short edge counts, 1 by default.
+	// default, and Weight how much a short edge counts, 1 when it is nil.
+	// A Weight of 0 counts for nothing, as weight=0 of DOT does.
 	MinLen int
-	Weight float64
+	Weight *float64
 	// NoConstraint takes the edge out of the ranks.
 	NoConstraint bool
 	// Head and Tail are the arrowheads at the ends: a name of the arrowType

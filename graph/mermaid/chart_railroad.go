@@ -108,8 +108,9 @@ func railroadChart(c *chart) (map[string]any, bool, error) {
 	default:
 		c.acc = append(c.acc, r.accTitle, r.accDescr)
 	}
-	title := c.d.Title
-	if r.hasTitle && r.title != "" {
+	// Mermaid draws no title of the front matter in a railroad diagram.
+	var title string
+	if r.hasTitle {
 		title = r.title
 	}
 	if len(r.rules) == 0 {
@@ -191,6 +192,7 @@ var (
 	rrIdentRE   = regexp.MustCompile(`^[A-Z_a-z][\w-]*`)
 	rrStringRE  = regexp.MustCompile(`^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')`)
 	rrSpaceRE   = regexp.MustCompile(`^[\t \r\n]+`)
+	rrNoteRE    = regexp.MustCompile(`^%%[^\n\r]*`)
 	rrBlockRE   = regexp.MustCompile(`^/\*[\s\S]*?\*/`)
 	rrISORE     = regexp.MustCompile(`^\(\*[\s\S]*?\*\)`)
 	abnfNameRE  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]*`)
@@ -299,6 +301,9 @@ func rrKeyword(word string, head bool) rrMatch {
 // name.
 func rrLexemes(kind string) []rrLexeme {
 	ws := rrLexeme{kind: "space", match: rrRE(rrSpaceRE), hidden: true}
+	// A comment, %% to the end of its line, can stand where a token can.
+	// The spaces before it are a token of spaces.
+	note := rrLexeme{kind: "note", match: rrRE(rrNoteRE), hidden: true}
 	head := rrLexeme{kind: kind, match: rrKeyword(kind, true)}
 	acc := []rrLexeme{{kind: "title", match: rrTitle}, {kind: "accTitle", match: rrAccTitle}, {kind: "accDescr", match: rrAccDescr}}
 	keywords := func(longer map[string][]string, words ...string) []rrLexeme {
@@ -338,7 +343,7 @@ func rrLexemes(kind string) []rrLexeme {
 			rrLexeme{kind: "id", match: rrRE(rrIdentRE)}, rrLexeme{kind: "string", match: rrRE(rrStringRE)},
 			rrLexeme{kind: "comment", match: rrRE(pegNoteRE), hidden: true})
 	}
-	return append([]rrLexeme{ws}, out...)
+	return append([]rrLexeme{ws, note}, out...)
 }
 
 // lex splits the source into tokens, as the lexer of Mermaid 12.3 does: at
@@ -346,25 +351,16 @@ func rrLexemes(kind string) []rrLexeme {
 // token matches is an error, as in Mermaid.
 func (r *railroad) lex() error {
 	d := r.c.d
-	// The source of the body, with each line at its own number, so that
-	// an error names the line of the source.
-	var b strings.Builder
-	b.WriteString(d.Kind)
-	if d.Header != "" {
-		b.WriteString(" " + d.Header)
-	}
-	line := d.N
-	for _, l := range d.Lines {
-		b.WriteString(strings.Repeat("\n", max(l.N-line, 1)))
-		line = max(l.N, line+1)
-		b.WriteString(l.Text)
-	}
+	// The lexer reads the body as the source gives it, from the line of
+	// the kind, with its comments and the spaces at the end of each line,
+	// as Mermaid does. So a comment of ABNF runs to the end of its line
+	// with its spaces, and %% in a string is not a comment.
 	lexemes := rrLexemes(d.Kind)
 	byKind := map[string]rrLexeme{}
 	for _, x := range lexemes {
 		byKind[x.kind] = x
 	}
-	s, line := b.String(), d.N
+	s, line := strings.Join(d.body, "\n"), d.N
 	for s != "" {
 		var tok rrLexeme
 		n := 0

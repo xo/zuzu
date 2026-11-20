@@ -1,0 +1,19 @@
+digraph empty_labels {
+	// A record keeps its fields with no text, a node with label="" draws
+	// no text, an edge of weight 0 does not pull, and the loops go above
+	// their nodes, as in Graphviz.
+	rankdir=LR
+	node [shape=record]
+	r [label="<f0> a| | |<f3> 2"]
+	e [label=""]
+	g [label="{|}"]
+	p [shape=circle, label=""]
+	q [shape=box, label="q"]
+	r:f0 -> e
+	r:f3 -> g [weight=0]
+	e -> p
+	g -> p
+	p -> p
+	q -> q [label="again"]
+	q -> r
+}

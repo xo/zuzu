@@ -225,3 +225,52 @@ func TestPropertyQuotes(t *testing.T) {
 		}
 	}
 }
+
+// TestFrontMatterTitle checks the kinds of chart in which Mermaid 12.3 draws
+// no title of the front matter, and zuzu draws none either, with no issue.
+// A title statement of such a kind still draws, and another kind draws the
+// title of the front matter.
+func TestFrontMatterTitle(t *testing.T) {
+	t.Parallel()
+	const fm = "---\ntitle: Front\n---\n"
+	tests := []struct {
+		src, exp string
+	}{
+		{fm + "ishikawa-beta\n  P\n  A\n", ""},
+		{fm + "kanban\n  a[A]\n    b[B]\n", ""},
+		{fm + "railroad-beta\n  a = terminal(\"b\") ;\n", ""},
+		{fm + "railroad-ebnf-beta\n  a = b ;\n", ""},
+		{fm + "railroad-abnf-beta\n  a = \"b\" ;\n", ""},
+		{fm + "railroad-peg-beta\n  A <- B ;\n", ""},
+		{fm + "treeView-beta\n  a\n", ""},
+		{fm + "eventmodeling\n  tf 01 ui A\n", ""},
+		{fm + "C4Context\n  Person(a, \"A\")\n", ""},
+		{fm + "C4Container\n  Person(a, \"A\")\n", ""},
+		{fm + "C4Context\n  title Own\n  Person(a, \"A\")\n", "Own"},
+		{fm + "railroad-ebnf-beta\n  title Own\n  a = b ;\n", "Own"},
+		{fm + "eventmodeling\n  tf 01 ui A title Own\n", "Own"},
+		{fm + "pie\n  \"a\" : 1\n", "Front"},
+		{fm + "packet\n  0-3: \"a\"\n", "Front"},
+	}
+	for _, test := range tests {
+		d, err := Read(test.src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _, report, err := Chart(d, true)
+		if err != nil || len(report) != 0 {
+			t.Fatalf("%q: the report %v and the error %v", test.src, report, err)
+		}
+		var spec struct {
+			Title struct {
+				Text string `json:"text"`
+			} `json:"title"`
+		}
+		if err := json.Unmarshal(b, &spec); err != nil {
+			t.Fatal(err)
+		}
+		if spec.Title.Text != test.exp {
+			t.Errorf("%q: expected the title %q, got %q", test.src, test.exp, spec.Title.Text)
+		}
+	}
+}

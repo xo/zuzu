@@ -264,3 +264,17 @@ func TestPacketTheme(t *testing.T) {
 		t.Errorf("expected the sizes 14, 8 and 2, got %v, %v and %v", label.FontSize, start.FontSize, field.StrokeWidth)
 	}
 }
+
+func TestPacketBitSize(t *testing.T) {
+	t.Parallel()
+	// A number of a bit draws at 10, the size of a small label in
+	// docs/STYLE.md (D35 part 7).
+	items, report, err := drawDiagram(t, "packet\n  0-15: \"a\"\n", true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	start, end := drawnOf(items, "startBits")[0].item, drawnOf(items, "endBits")[0].item
+	if start.FontSize != 10 || end.FontSize != 10 {
+		t.Errorf("expected the size 10, got %v and %v", start.FontSize, end.FontSize)
+	}
+}

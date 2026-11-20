@@ -254,7 +254,7 @@ agentflow-beta
 	}
 	for _, src := range []string{
 		"---\nconfig:\n  agentflow:\n    minNodeWidth: wide\n---\nagentflow-beta\n  a",
-		"---\nconfig:\n  agentflow:\n    theme: dark\n---\nagentflow-beta\n  a",
+		"---\nconfig:\n  agentflow:\n    theme: sepia\n---\nagentflow-beta\n  a",
 		"---\nconfig:\n  flowchart:\n    padding: 4\n---\nagentflow-beta\n  a",
 		"agentflow-beta\n  a@{ view: collapsed }",
 	} {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
@@ -112,10 +113,11 @@ func (s *scope) encodedField(m *vega.Mark, prop string) (string, string) {
 // endLabel returns a dot at the last point of a line and the name of its
 // series after it, in the color of the line (docs/STYLE.md). The name is
 // the value of the field that the stroke of the line reads through its
-// scale, so a line of one color gets none.
+// scale, so a line of one color gets none. A closed line has no end, so it
+// gets none either, and the legend names it (D35).
 func (s *scope) endLabel(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 	field, scaleName := s.encodedField(m, "stroke")
-	if field == "" {
+	if field == "" || closedLine(sm) {
 		return nil
 	}
 	var last *scene.Item
@@ -145,6 +147,30 @@ func (s *scope) endLabel(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 		{Type: scene.Symbol, Role: "zuzu-end-dot", Items: []scene.Item{dot}},
 		{Type: scene.Text, Role: "zuzu-end-label", Items: []scene.Item{label}},
 	}
+}
+
+// closedLine reports whether a line is closed: its interpolation closes
+// it, such as linear-closed, or its last point is its first, as the line
+// of a radar can be. Vega reads the interpolation from the first item.
+func closedLine(sm *scene.Mark) bool {
+	if len(sm.Items) == 0 {
+		return false
+	}
+	if strings.HasSuffix(sm.Items[0].Interpolate, "-closed") {
+		return true
+	}
+	var first, last *scene.Item
+	for i := range sm.Items {
+		it := &sm.Items[i]
+		if it.Defined != nil && !*it.Defined {
+			continue
+		}
+		if first == nil {
+			first = it
+		}
+		last = it
+	}
+	return first != last && first.X == last.X && first.Y == last.Y
 }
 
 // reference dashes a reference line, a rule across the whole plot, and

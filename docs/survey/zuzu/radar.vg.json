@@ -3,7 +3,6 @@
   "width": 340,
   "height": 270,
   "padding": 4,
-  "config": {"line": {"zuzu.endLabel": false}},
   "signals": [
     {"name": "cx", "update": "width / 2"},
     {"name": "cy", "update": "height / 2"},

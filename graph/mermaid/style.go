@@ -80,10 +80,15 @@ func knownTheme(v any) bool {
 // asks for (D32): zuzu.mode dark for a theme with dark in its name, and
 // zuzu.scheme with the scheme of zuzu that has the colors of each other
 // theme. The runtime takes each one where the caller of a render sets no
-// mode or no scheme. Look returns nil for a diagram with no theme or with a
-// theme that Mermaid 12.3.0 does not have.
+// mode or no scheme. A theme in the section of the kind, such as
+// venn.theme, wins over the theme at the top of the config, as in Mermaid
+// 12.3 (D35 part 10). Look returns nil for a diagram with no theme or with
+// a theme that Mermaid 12.3.0 does not have.
 func Look(d *Diagram) vega.Config {
 	name, _ := d.Config["theme"].(string)
+	if section, ok := d.Config[themeSection(d.Kind)].(map[string]any); ok && knownTheme(section["theme"]) {
+		name, _ = section["theme"].(string)
+	}
 	if !knownTheme(name) {
 		return nil
 	}
@@ -155,14 +160,18 @@ func isGraph(kind string) bool {
 }
 
 // accepted reports whether zuzu accepts a setting of the config with no
-// issue: a setting that inert names, a theme that Look reads, a hint at
+// issue: a setting that inert names, a theme that Look reads, at the top
+// of the config or in the section of the kind, such as venn.theme, a hint at
 // the top level of the config, such as layout: elk, or a font family with
 // no weight and no style, such as fontFamily: Arial or
 // sequence.actorFontFamily: courier. zuzu draws in IBM Plex Sans only, so the name of a family
 // changes nothing (D32).
 func accepted(kind, path string, v any) bool {
-	if inert(kind, path) || path == "theme" && knownTheme(v) || !strings.Contains(path, ".") && hint(path, v) {
+	if inert(kind, path) || !strings.Contains(path, ".") && hint(path, v) {
 		return true
+	}
+	if path == "theme" || path == themeSection(kind)+".theme" {
+		return knownTheme(v)
 	}
 	key := strings.ToLower(path[strings.LastIndex(path, ".")+1:])
 	if !strings.HasSuffix(key, "fontfamily") {

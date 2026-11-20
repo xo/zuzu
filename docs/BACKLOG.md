@@ -17,14 +17,6 @@ decided on the way.
 maintainers (D22). Its list of names is short, and a new maintainer adds a
 name to it.
 
-## Phase 1
-
-### Draw what the writer does not draw yet
-
-1. The interpolations `basis-open`, `basis-closed`, `cardinal-open`,
-   `cardinal-closed`, `catmull-rom-open` and `catmull-rom-closed` return an
-   error.
-
 ## Phase 3
 
 ### Draw the rest of the marks in the look of zuzu
@@ -138,6 +130,14 @@ and places nodes in another way.
    no text.
 4. The shape `subroutine` is too narrow for a short label, so the label
    covers its two inner lines.
+5. With no theme in the source, Mermaid 12.3 draws a flowchart, a
+   swimlane, an agentflow, a sequence, a class, a state, an ER, a
+   requirement, a use case and a venn diagram in the theme `redux-color`,
+   which it sets in the section of each kind. zuzu applies only a theme
+   that the source gives. Whether zuzu applies those defaults needs a
+   decision.
+6. A subgraph title with a break, such as `subgraph s ["t<br>u"]`, draws
+   its lines in one text, not on two lines.
 
 ### Fix what the corpus of mermaid-go-renderer found
 
@@ -146,7 +146,7 @@ holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
 zuzu drew 2808 of them, and 2732 with no issue. Of the 3 that it does not
 draw, one is an example of the documents of Mermaid whose kind is `...`,
 one ends in a link with no node, which mmdc does not draw either, and one
-is item 10 below.
+is item 9 below.
 
 1. A style or a class on the id of a subgraph of a flowchart, such as
    `style sub fill:#f00`, is dropped with no issue. zuzu makes a node of
@@ -159,57 +159,46 @@ is item 10 below.
    names it.
 4. In a layout LR with subgraphs inside subgraphs, the title of an outer
    subgraph covers the border of an inner one.
-5. `\n` in the label of a node draws as text. With `htmlLabels: false`,
-   Mermaid starts a new line there.
-6. A `classDef` of a treemap splits at `\,`. Mermaid reads it as a comma of
+5. A `classDef` of a treemap splits at `\,`. Mermaid reads it as a comma of
    a value, as in a flowchart.
-7. A state or a class diagram reports `flowchart.nodeSpacing`, which
+6. A state or a class diagram reports `flowchart.nodeSpacing`, which
    Mermaid reads there.
-8. In an ER diagram, a text where only a part is bold or italic, such as
+7. In an ER diagram, a text where only a part is bold or italic, such as
    `*first*Name`, draws plain. A line draws in one font.
-9. An outlined label of a sankey stays inside the chart, where Mermaid
+8. An outlined label of a sankey stays inside the chart, where Mermaid
    draws it past the left edge.
-10. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
-    reads `0` as a date of 2000 and the end as a time of the day of the
-    render. It needs the time of the render (see "Give a chart of Mermaid
-    the time of the render").
-11. A swimlane diagram does not do `optimizeRanksByCrossings` with
+9. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
+   reads `0` as a date of 2000 and the end as a time of the day of the
+   render. It needs the time of the render (see "Give a chart of Mermaid
+   the time of the render").
+10. A swimlane diagram does not do `optimizeRanksByCrossings` with
     `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
     lines. Some of its routes share a line, and the titles of its lanes do
     not turn in a layout LR.
-12. In a use case diagram, `colorScheme: rotate` is an issue. Mermaid
-    drops the last `;` of a `style` line, and zuzu reports an error.
-13. A line of a timeline that ends in `: ` with a space is an error in
-    Mermaid, and zuzu reads the next line as its event.
-14. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
+11. In a use case diagram, `colorScheme: rotate` is an issue. It sets
+    the colors of a palette from the colors of a theme of Mermaid, and the
+    look of zuzu has no such palette. It needs a token of `docs/STYLE.md`
+    first.
+12. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
     where Mermaid draws it as math, and draws as its LaTeX source. D36
     draws it with the math layout of okage. The work waits for okage D78
     and the release of okage that holds the layout. "The order of the work"
     in D36 lists the steps.
-15. zuzu reads `text: a, b` in the body of a requirement, and Mermaid gives
-    an error of the parse at the comma.
-16. A sequence diagram decodes `#lt;br#gt;` into `<br>` and then starts a
-    new line there. Mermaid draws the text `<br>`.
-17. The reader of every kind cuts a `%%` in the middle of a line, also
+13. The reader of every kind cuts a `%%` in the middle of a line, also
     inside single quotes and after a colon of ZenUML, as in `A->B: 50%%
-    off`. Mermaid cuts only a line that starts with `%%`. A first line such
-    as `eventmodeling%% note` reads the kind as `eventmodeling%%`.
-18. The reader trims the spaces at the end of a line, so an ABNF rule such
-    as `a = "x" ; ` reads, where mmdc gives an error.
-19. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
+    off`. In Mermaid each lexer cuts a comment by its own rule: a kind of
+    jison cuts `%%` where a token can start, a timeline also cuts a single
+    `%`, a kind of langium has a hidden token for `%%`, and a text token,
+    such as a message of a sequence or a string, keeps `%%` as text. So
+    `flowchart LR %% c` is an error in mmdc, and `sequenceDiagram%% c`
+    draws. Each reader handles its comments itself. The railroad kinds
+    already do.
+14. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
     the spaces.
-20. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
+15. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
     an issue.
-21. `venn.theme` is an issue. D35 part 10 says that it applies, as
-    "Do the work of D35" lists.
-22. Several kinds draw the title of the front matter, which Mermaid does
-    not draw: ishikawa, kanban, railroad, tree view, event model and C4.
-    zuzu draws it in every kind.
-23. The priority line of a kanban card takes the colors of Mermaid, red,
+16. The priority line of a kanban card takes the colors of Mermaid, red,
     orange, blue and light blue, and not tokens of `docs/STYLE.md`.
-24. A setting that Mermaid never reads is accepted in an event model
-    (`eventmodeling.rowHeight`), and reported in C4 (`c4ShapeInRow`). D32
-    part 3 says to accept it.
 
 
 ### Draw more of Mermaid
@@ -235,18 +224,23 @@ The DOT files come from the gallery of Graphviz, in `testdata/zuzu` of iv.
 1. In LR or RL, a record that is one group in braces lies one field under
    another. Graphviz puts the fields side by side. A group inside a group
    is flat. `\l` in a plain record label centers the line.
-2. A record drops an empty field that has no port: `<f0> a| | |2` draws 2
-   fields, and Graphviz draws 4.
-3. `weight=0` counts as 1, because the graph and the transform read 0 as
-   the default weight.
-4. In LR, Graphviz draws a loop above its node. zuzu draws it below.
-5. `label=""` draws the id of the node. Graphviz draws no text.
-6. An edge with a list of colors, such as `color="a:b"`, draws only the
+2. zuzu has no balance step of the ranks. In dot, a node whose edges in
+   and out have the same weight moves to a rank with fewer nodes. So in
+   `a->b->c; x->c[weight=0]`, dot puts x in rank 0, and zuzu in rank 1.
+   The step changes the ranks of other graphs too, Mermaid included.
+3. An edge with a list of colors, such as `color="a:b"`, draws only the
    first color, with no issue. Graphviz draws a line in each color.
-7. `bgcolor` of the graph is an issue. Graphviz fills the page with it.
-8. An edge to a cluster, with `lhead` or `ltail`, whose route is cut at the
+4. `bgcolor` of the graph is an issue. Graphviz fills the page with it. A
+   fixed color does not follow the mode, and the boxes under the labels
+   and the open arrowheads take the background of the theme. It needs a
+   decision: whether `bgcolor` wins over the theme as `WithBackground`
+   does, whether the color of the text follows it, and what the dark mode
+   draws.
+5. An edge to a cluster, with `lhead` or `ltail`, whose route is cut at the
    box of the cluster, puts its end labels back at the first place, with no
    check for overlap (`clipEdge` in `graph/nest.go`).
+6. The ends of a loop sit 2 or 3 pixels off the outline of an ellipse or a
+   circle, because they sit on its bounding box.
 
 
 ### Give a chart of Mermaid the time of the render
@@ -302,20 +296,12 @@ its cause is not known yet.
    - `radiusOffset` and `thetaOffset` of an arc go to Vega, which does not
      have them.
 2. Vega:
-   - `calendar-view` draws its cells in the one-hue ramp of the theme, not
-     in the pink to green of `pinkyellowgreen`, and the years cover "Jan",
-     because the encode of `x` of the labels of its axes is in the report.
-     D35 parts 1 and 4 fix both, as "Do the work of D35" lists.
-   - `wind-vectors` loses the hues of `rainbow`, and its ramp starts at the
-     background of the theme, not at the dark background of the spec. D35
-     parts 2 and 3 fix both.
+   - The years of `calendar-view` cover "Jan", as "Read the properties of
+     an axis that the runtime drops" says.
    - The fit of `autosize` diverges in `flight-passengers`, because the
      title is wider than the plot. Each pass makes the width smaller by the
      same overflow, 500, 354, 208 and 62, and the x axis keeps two labels.
      The loop is in `NewView` in `zuzu.go` and in `render.go`.
-   - `paint` in `encode.go` turns a fill that is an object with no key
-     `gradient` into an empty gradient. vega.js does not draw such a fill
-     as a gradient.
 3. Deneb, both in the Vega-Lite compiler:
    - `calendar-heatmap` draws a strip 5374 pixels wide, not the grid of
      seven years. The band scale `child_x` of the facet `cell` reads the
@@ -333,11 +319,7 @@ its cause is not known yet.
      `x2: {scale, value: 0}`, so the stems are missing. The bar
      `height: {band: 0.5}` with a `yOffset` goes to the rect, not to the
      group. The conditional `opacity` with no default is dropped.
-4. The charts of zuzu on `docs/survey/compare.html`:
-   - `zuzu.endLabel` names a closed line in a facet at one vertex, so the
-     names of the radar pile up. The spec turns it off. D35 part 6 says that
-     a closed line gets no end label.
-5. Mermaid, in `usecase/01-relations`:
+4. Mermaid, in `usecase/01-relations`:
    - The ellipse of CheckCard is outside the boundary Front desk, but
      covers its top border by 3 pixels, and the label «include» touches
      that border. A node that is not in a cluster, in the rank of the nodes
@@ -345,33 +327,28 @@ its cause is not known yet.
    - The back edge from Librarian to Member crosses the long edge from
      Member to Return near Member, because of where the two edges join
      Member. The layout can avoid it.
-6. The originals: `contour-plot`, `density-heatmaps`,
+5. The originals: `contour-plot`, `density-heatmaps`,
    `labeled-scatter-plot` and `word-cloud` need the npm package `canvas`,
    which `test/oracle/package.json` does not install. vega.js does not know
    the projection `airy` of `projections`.
 
 ### Do the work of D35
 
-D35 records the answers of the maintainers of 2026-11-20. These parts need
-code. Change `docs/STYLE.md` first, then the package `theme`, then
-`docs/targets/gen-targets.mjs`, and draw the targets again (D13).
-`docs/STYLE.md` already holds parts 1, 2, 3, 5 and 6.
+D35 records the answers of the maintainers of 2026-11-20. Part 4 is done
+for the axes. An encode of the place of a part of a legend, such as the
+`x` of its labels, still goes in the report. vega.js places the labels and
+the symbols in a group for each entry, and then places the entries from
+their bounds after the encode. The legend of zuzu is one flat group, laid
+out before any encode, in `layout/legend.go`. To apply such an encode, the
+layout of the legend reads the encode, or gives each entry a group of its
+own. No spec of the corpus encodes the place of a part of a legend.
 
-1. A diverging scheme name of Vega takes the diverging ramp of the theme.
-2. A cyclical scheme name of Vega, `rainbow` or `sinebow`, takes a wheel
-   of the ten categorical colors of the scheme.
-3. A ramp starts from the background that the chart draws, which is the
-   background of the spec when it sets one.
-4. An encode of the `x` or the `y` of a part of an axis or a legend applies,
-   as in vega.js, and leaves the report.
-5. The row of a legend wraps at the width of the plot.
-6. `zuzu.endLabel` names no closed line. Then turn the end labels of the
-   radar of the survey back on, and draw its static SVGs again.
-7. The numbers of the bits of a packet diagram draw at 10, not 9
-   (`pkBitFont` in `graph/mermaid/chart_packet.go`).
-8. The node property `algorithm` of Mermaid reads with no issue, as a hint.
-9. A theme in the section of a kind of Mermaid, such as `venn.theme`,
-   applies to that diagram.
+### Read the properties of an axis that the runtime drops
+
+The runtime drops the properties `labelAlign`, `titleX`, `titleY`,
+`titleAlign` and `titleAngle` of an axis with no issue. `vega.Axis` reads
+`LabelAlign` and nothing uses it, and `guideProps` and `styleGuide` ignore
+the others. So the years of `calendar-view` still cover "Jan".
 
 ### Fix the bounds of a text and the place of an axis title
 
@@ -390,8 +367,9 @@ that turn, such as with `labelAngle: 45`.
 A rotated text whose mark holds a glyph that the font lacks, such as ❤,
 also draws a mirrored copy of each text. `dx` and `dy` on a rotated text
 move it on the page, not along the text as in Vega.
-An empty `ellipsis` writes the default "…", because the field of the scene
-item drops an empty value. A text cannot be cut with no mark.
+A text cannot be cut with no mark. vega.js also writes the default "…" for
+an empty `ellipsis`, so such a cut is a feature that Vega lacks. It needs a
+property of zuzu and a decision.
 
 ### Give the look a color of a critical task
 

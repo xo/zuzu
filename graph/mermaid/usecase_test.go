@@ -226,6 +226,11 @@ func TestUsecaseErrors(t *testing.T) {
 		{"text after end", "systemBoundary S\nA\nend foo", false},
 		{"boundary in a boundary", "systemBoundary S\n systemBoundary T\n A\n end\nend", false},
 		{"style of two names", "actor A\nB\nstyle A,B fill:#f00", false},
+		{"style with two semicolons", "actor A\nstyle A fill:#f00;;", false},
+		{"style with a semicolon and no color", "actor A\nstyle A fill:red;", false},
+		{"style with a semicolon", "actor A\nstyle A fill:#f00;", true},
+		{"style with a semicolon and a space", "actor A\nstyle A fill:#f00; ", true},
+		{"class with a semicolon", "actor A\nclassDef c fill:#f00,stroke:#00f;\nclass A c", true},
 		{"variable of CSS", "actor A\nstyle A --my-var:3px", false},
 		{"style of an edge with no id", "actor A\nB\nA --> B\nstyle edge-0 stroke:#f00", false},
 		{"empty stereotype", "A(\"x\") <<>>", false},
@@ -275,6 +280,22 @@ func TestUsecaseErrors(t *testing.T) {
 		case !c.ok && !errors.Is(err, ErrSyntax):
 			t.Errorf("%s: expected an error of the syntax, got %v", c.name, err)
 		}
+	}
+}
+
+func TestUsecaseStyleSemicolon(t *testing.T) {
+	t.Parallel()
+	// Mermaid 12.3 drops the last semicolon of a line of a style or of a
+	// class with a color before the parse.
+	g, report := stateOf(t, "usecase-beta\nactor A\nactor B\nstyle A fill:#f00;\nclassDef c stroke:#00f;\nclass B c")
+	if len(report) != 0 {
+		t.Errorf("expected no issue, got %v", report)
+	}
+	if s := node(t, g, "A").Style; s["fill"] != "#f00" {
+		t.Errorf("expected the fill of the style, got %v", s)
+	}
+	if s := node(t, g, "B").Style; s["stroke"] != "#00f" {
+		t.Errorf("expected the stroke of the class, got %v", s)
 	}
 }
 

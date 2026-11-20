@@ -1,6 +1,7 @@
 package zuzu
 
 import (
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -102,29 +103,131 @@ func TestLogAxisLabels(t *testing.T) {
 }
 
 // TestAxisEncode checks that the encode of an axis sets the text of its
-// labels, and that an encode of a place goes in the report, or is an error
-// in the strict mode.
+// labels.
 func TestAxisEncode(t *testing.T) {
 	t.Parallel()
-	spec := func(props string) string {
-		return `{"width": 200, "height": 100,
-			"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"}],
-			"axes": [{"scale": "x", "orient": "bottom",
-				"encode": {"labels": {"update": {` + props + `}}}}]}`
-	}
-	got, _, err := roleTexts(t, spec(`"text": {"signal": "datum.value + ':00 am'"}`), "axis-label", true)
+	src := `{"width": 200, "height": 100,
+		"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"}],
+		"axes": [{"scale": "x", "orient": "bottom",
+			"encode": {"labels": {"update": {"text": {"signal": "datum.value + ':00 am'"}}}}}]}`
+	got, _, err := roleTexts(t, src, "axis-label", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"1:00 am", "2:00 am", "3:00 am"}; !slices.Equal(got, want) {
 		t.Errorf("the labels are %q, want %q", got, want)
 	}
-	_, report, err := roleTexts(t, spec(`"x": {"value": 5}`), "axis-label", false)
-	if err != nil || len(report) != 1 || !strings.Contains(report[0].Error(), "the encode of x of the labels") {
-		t.Errorf("an encode of x gives the report %v and the error %v", report, err)
+}
+
+// TestAxisEncodePlace checks that an encode of the place of a part of an
+// axis applies in the frame of the group of the axis of Vega, which starts
+// at the edge of the plot area that the axis runs along, moved out by its
+// offset (D35). Before, such an encode went in the report, and the labels
+// of the months of the Vega example calendar-view did not move.
+func TestAxisEncodePlace(t *testing.T) {
+	t.Parallel()
+	items := func(axis, role string) ([]scene.Item, Report) {
+		t.Helper()
+		src := `{"width": 200, "height": 100,
+			"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"},
+				{"name": "y", "type": "linear", "domain": [0, 10], "range": "height"}],
+			"axes": [` + axis + `]}`
+		c, _, err := Parse([]byte(src), WithDialect(Vega), WithStrict(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, report, err := c.Render(t.Context(), WithLocation(time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []scene.Item
+		var walk func(m *scene.Mark)
+		walk = func(m *scene.Mark) {
+			for i := range m.Items {
+				if m.Role == role {
+					out = append(out, m.Items[i])
+				}
+				for j := range m.Items[i].Items {
+					walk(&m.Items[i].Items[j])
+				}
+			}
+		}
+		walk(&s.Root)
+		return out, report
 	}
-	if _, _, err := roleTexts(t, spec(`"x": {"value": 5}`), "axis-label", true); err == nil {
-		t.Errorf("an encode of x in the strict mode gives no error")
+	for _, c := range []struct {
+		name, axis, role string
+		check            func(it scene.Item) bool
+	}{
+		{
+			"the x of the labels of a bottom axis, at the start of each band",
+			`{"scale": "x", "orient": "bottom", "encode": {"labels": {"update": {"x": {"scale": "x", "field": "value", "band": 0, "offset": 3}}}}}`,
+			"axis-label", func(it scene.Item) bool {
+				v, _ := it.Datum.(map[string]any)["value"].(float64)
+				return math.Abs(it.X-((v-1)*200/3+3)) < 1e-9
+			},
+		},
+		{
+			"the y of the labels of a bottom axis, below its edge",
+			`{"scale": "x", "orient": "bottom", "encode": {"labels": {"update": {"y": {"value": 4}}}}}`,
+			"axis-label", func(it scene.Item) bool { return it.Y == 104 },
+		},
+		{
+			"the y of the labels of a top axis with an offset, above its edge",
+			`{"scale": "x", "orient": "top", "offset": 5, "encode": {"labels": {"update": {"y": {"value": -4}}}}}`,
+			"axis-label", func(it scene.Item) bool { return it.Y == -9 },
+		},
+		{
+			"the x of the labels of a right axis, at the right of its edge",
+			`{"scale": "y", "orient": "right", "encode": {"labels": {"update": {"xc": {"value": 6}}}}}`,
+			"axis-label", func(it scene.Item) bool { return it.X == 206 },
+		},
+		{
+			"the x of the title of a left axis",
+			`{"scale": "y", "orient": "left", "title": "Count", "encode": {"title": {"update": {"x": {"value": -30}}}}}`,
+			"axis-title", func(it scene.Item) bool { return it.X == -30 },
+		},
+		{
+			"the y of a line of the grid of a left axis, with both of its ends",
+			`{"scale": "y", "orient": "left", "grid": true, "values": [5], "encode": {"grid": {"update": {"y": {"value": 20}}}}}`,
+			"axis-grid", func(it scene.Item) bool { return it.Y == 20 && it.Y2 == 20 && it.X == 0 && it.X2 == 200 },
+		},
+	} {
+		got, report := items(c.axis, c.role)
+		if len(got) == 0 || len(report) != 0 {
+			t.Errorf("%s: %d items and the report %v", c.name, len(got), report)
+			continue
+		}
+		for _, it := range got {
+			if !c.check(it) {
+				t.Errorf("%s: the item is at %v %v to %v %v", c.name, it.X, it.Y, it.X2, it.Y2)
+			}
+		}
+	}
+}
+
+// TestGuideEncodePlaceReport checks that an encode of the place of the
+// group of an axis, or of a part of a legend, goes in the report, or is an
+// error in the strict mode. The layout of Vega places the group of an axis
+// itself, and the layout of a legend of zuzu does not place its parts as
+// Vega does.
+func TestGuideEncodePlaceReport(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		guides, want string
+	}{
+		{`"axes": [{"scale": "x", "orient": "bottom", "encode": {"axis": {"update": {"x": {"value": 5}}}}}]`, "the encode of x of the axis of an axis"},
+		{`"legends": [{"fill": "x", "encode": {"labels": {"update": {"y": {"value": 5}}}}}]`, "the encode of y of the labels of a legend"},
+	} {
+		src := `{"width": 200, "height": 100,
+			"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"}], ` + c.guides + `}`
+		_, report, err := roleTexts(t, src, "axis-label", false)
+		if err != nil || len(report) != 1 || !strings.Contains(report[0].Error(), c.want) {
+			t.Errorf("%s gives the report %v and the error %v", c.guides, report, err)
+		}
+		if _, _, err := roleTexts(t, src, "axis-label", true); err == nil {
+			t.Errorf("%s in the strict mode gives no error", c.guides)
+		}
 	}
 }
 

@@ -62,7 +62,9 @@ fewer than ten colors gets the rest mixed toward the text color. The
 sequential ramp runs from the background through the first color, so it
 reads in both modes. The background is the one that the chart draws: the
 background of the spec when it sets one, and the background of the mode
-otherwise (D35).
+otherwise (D35). On a dark background the ramp runs on to a lighter color,
+and on a light background to a darker color. The diverging ramp runs from
+the color of a fall through `grid` to the color of a rise.
 
 A Vega spec can name a scheme of Vega, such as `blues`. A sequential name
 takes the sequential ramp, and a diverging name, such as `redblue`, takes

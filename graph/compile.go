@@ -234,7 +234,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	for _, n := range g.Nodes {
 		label := n.Label
-		if label == "" && (n.Width <= 0 || n.Height <= 0) {
+		if label == "" && !n.NoLabel && (n.Width <= 0 || n.Height <= 0) {
 			label = n.ID
 		}
 		r := map[string]any{"key": n.ID, "label": label, "lines": lines(label), "shape": n.Shape}
@@ -341,8 +341,8 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if e.MinLen > 0 {
 			r["minlen"] = float64(e.MinLen)
 		}
-		if e.Weight > 0 {
-			r["weight"] = e.Weight
+		if e.Weight != nil {
+			r["weight"] = *e.Weight
 		}
 		if e.NoConstraint {
 			r["constraint"] = false

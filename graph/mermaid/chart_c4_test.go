@@ -250,6 +250,17 @@ func TestC4Layout(t *testing.T) {
 	if num(rows[0]["y"]) >= num(rows[1]["y"]) {
 		t.Errorf("the boundaries are at %v and %v, not one under the other", rows[0]["y"], rows[1]["y"])
 	}
+	// Mermaid 12.3 does not read c4.c4ShapeInRow and c4.c4BoundaryInRow,
+	// so they are no issue and change nothing (D32).
+	unread := "---\nconfig:\n  c4:\n    c4ShapeInRow: 1\n    c4BoundaryInRow: 1\n---\n"
+	y = tops(c4Rows(t, unread+four, "elements"))
+	if y[0] != y[1] || y[1] == y[2] || y[2] != y[3] {
+		t.Errorf("c4ShapeInRow: the tops %v, not two rows of two", y)
+	}
+	rows = c4Rows(t, unread+two, "boundaries")
+	if num(rows[0]["y"]) != num(rows[1]["y"]) {
+		t.Errorf("c4BoundaryInRow: the boundaries are at %v and %v, not in one row", rows[0]["y"], rows[1]["y"])
+	}
 	// A second statement of an element updates it in its place, and a
 	// second relationship between two ends replaces the first.
 	src := "C4Context\nPerson(a, \"A\")\nSystem(b, \"B\")\nSystem(a, \"New\")\nRel(a, b, \"one\")\nRel(a, b, \"two\")\n"
@@ -364,7 +375,6 @@ func TestC4Issues(t *testing.T) {
 	tests := []struct {
 		src, issue string
 	}{
-		{"---\nconfig:\n  c4:\n    c4ShapeInRow: 2\n---\n" + body, "c4.c4ShapeInRow"},
 		{"---\nconfig:\n  c4:\n    width: wide\n---\n" + body, "c4.width"},
 		{"---\nconfig:\n  wrap: 1\n---\n" + body, "wrap"},
 		{body + "Rel(a, \"b\")\n", "with no label"},

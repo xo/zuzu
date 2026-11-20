@@ -314,12 +314,13 @@ func (s *sequence) text(t string) seqText {
 			break
 		}
 	}
-	t = s.decode(t)
-	if hasMath(t) {
-		s.math = append(s.math, Line{Text: t, N: s.c.line})
+	if d := s.decode(t); hasMath(d) {
+		s.math = append(s.math, Line{Text: d, N: s.c.line})
 	}
+	// The text splits at each <br> before the entity codes are read, so
+	// that `#lt;br#gt;` draws as the text <br>, as in Mermaid.
 	for _, l := range seqBreak.Split(t, -1) {
-		out.lines = append(out.lines, strings.TrimSpace(l))
+		out.lines = append(out.lines, strings.TrimSpace(s.decode(l)))
 	}
 	if len(out.lines) == 1 && out.lines[0] == "" {
 		out.lines = nil

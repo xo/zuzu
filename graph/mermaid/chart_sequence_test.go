@@ -245,6 +245,27 @@ func TestSequenceCreateFirst(t *testing.T) {
 	}
 }
 
+func TestSequenceEntityBreak(t *testing.T) {
+	t.Parallel()
+	// As in Mermaid 12.3, `#lt;br#gt;` draws as the text <br>, and <br>
+	// starts a new line.
+	src := "sequenceDiagram\nA->>B: x #lt;br#gt; y\nA->>B: p<br>q #lt;br/#gt; r\n"
+	items := seqRender(t, src, theme.Light)
+	tests := []struct {
+		text  string
+		lines []any
+	}{
+		{"x <br> y", []any{"x <br> y"}},
+		{"p q <br/> r", []any{"p", "q <br/> r"}},
+	}
+	for _, test := range tests {
+		d := seqFind(t, items, seqText(test.text), "messageLabels")
+		if lines, _ := d["lines"].([]any); !slices.Equal(lines, test.lines) {
+			t.Errorf("expected the lines %q, got %q", test.lines, lines)
+		}
+	}
+}
+
 func TestSequenceDeclareAgain(t *testing.T) {
 	t.Parallel()
 	// As in Mermaid, a participant named again with no alias keeps its

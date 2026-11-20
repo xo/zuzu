@@ -305,6 +305,108 @@ func TestThemes(t *testing.T) {
 	}
 }
 
+// TestSectionThemes reads a theme in the section of each kind, such as
+// venn.theme, with no issue, as Mermaid 12.3 does (D35 part 10). It wins
+// over the theme at the top of the config. A theme in the section of
+// another kind, or in a section that Mermaid does not read, such as
+// classDiagram.theme, stays an issue.
+func TestSectionThemes(t *testing.T) {
+	t.Parallel()
+	bodies := map[string]string{
+		"flowchart LR\n  A --> B\n":                                           "flowchart",
+		"graph LR\n  A --> B\n":                                               "flowchart",
+		"flowchart-elk LR\n  A --> B\n":                                       "flowchart",
+		"stateDiagram-v2\n  A --> B\n":                                        "state",
+		"stateDiagram\n  A --> B\n":                                           "state",
+		"classDiagram\n  A --> B\n":                                           "class",
+		"classDiagram-v2\n  A --> B\n":                                        "class",
+		"erDiagram\n  A ||--o{ B : has\n":                                     "er",
+		"requirementDiagram\n  requirement r {\n    id: 1\n  }\n":             "requirement",
+		"sequenceDiagram\n  A->>B: hi\n":                                      "sequence",
+		"pie\n  \"a\" : 1\n":                                                  "pie",
+		"gantt\n  dateFormat YYYY-MM-DD\n  section S\n  T : 2024-01-01, 1d\n": "gantt",
+		"sankey\nA,B,1\n":                                                     "sankey",
+		"journey\n  section S\n    T: 5: Me\n":                                "journey",
+		"architecture-beta\n  service a(server)[A]\n":                         "architecture",
+		"mindmap\n  root\n":                                                   "mindmap",
+		"wardley-beta\ncomponent A [0.5, 0.5]\n":                              "wardley",
+		"radar-beta\naxis A, B, C\ncurve c{1, 2, 3}\n":                        "radar",
+		"treemap-beta\n\"A\": 1\n":                                            "treemap",
+		"quadrantChart\n  A: [0.5, 0.5]\n":                                    "quadrantChart",
+		"xychart-beta\n  bar [1, 2]\n":                                        "xyChart",
+		"gitGraph\n  commit\n":                                                "gitGraph",
+		"block-beta\n  a b\n":                                                 "block",
+		"timeline\n  2020 : a\n":                                              "timeline",
+		"C4Context\n  Person(a, \"A\")\n":                                     "c4",
+		"ishikawa-beta\n  P\n  A\n":                                           "ishikawa",
+		"cynefin-beta\n  complex \"a\"\n":                                     "cynefin",
+		"info\n":                                                              "info",
+		"kanban\n  a[A]\n    b[B]\n":                                          "kanban",
+		"packet\n  0-3: \"a\"\n":                                              "packet",
+		"railroad-beta\n  a = terminal(\"b\") ;\n":                            "railroad",
+		"railroad-ebnf-beta\n  a = b ;\n":                                     "railroad",
+		"railroad-peg-beta\n  A <- B ;\n":                                     "railroad",
+		"treeView-beta\n  a\n":                                                "treeView",
+		"eventmodeling\n  tf 01 ui A\n":                                       "eventmodeling",
+		"zenuml\n  A->B: hi\n":                                                "zenuml",
+		"venn-beta\n  set A\n":                                                "venn",
+		"swimlane-beta\n  A --> B\n":                                          "swimlane",
+		"agentflow-beta\n  A --> B\n":                                         "agentflow",
+		"usecase-beta\n  actor A\n":                                           "usecase",
+	}
+	for body, section := range bodies {
+		for _, head := range []string{
+			"---\nconfig:\n  " + section + ":\n    theme: forest\n---\n",
+			"---\nconfig:\n  theme: dark\n  " + section + ":\n    theme: forest\n---\n",
+			"%%{init: {'" + section + "': {'theme': 'forest'}}}%%\n",
+		} {
+			src := head + body
+			if err := strictCheck(t, src); err != nil {
+				t.Errorf("%q: %v", src, err)
+				continue
+			}
+			d, err := Read(src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for k, v := range Look(d) {
+				got = append(got, k+":"+string(v))
+			}
+			if want := `zuzu.scheme:"mermaid-forest"`; len(got) != 1 || got[0] != want {
+				t.Errorf("%q: the look %v, want %s", src, got, want)
+			}
+		}
+	}
+	// A theme that Mermaid does not have stays an issue, and the theme at
+	// the top of the config applies, as in Mermaid.
+	src := "---\nconfig:\n  theme: dark\n  venn:\n    theme: sepia\n---\nvenn-beta\n  set A\n"
+	if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
+		t.Errorf("%q: expected an issue, got %v", src, err)
+	}
+	if d, err := Read(src); err != nil {
+		t.Fatal(err)
+	} else if l := Look(d); string(l["zuzu.mode"]) != `"dark"` {
+		t.Errorf("%q: the look %v, want the dark mode", src, l)
+	}
+	for _, src := range []string{
+		"---\nconfig:\n  classDiagram:\n    theme: forest\n---\nclassDiagram\n  A --> B\n",
+		"---\nconfig:\n  xychart:\n    theme: forest\n---\nxychart-beta\n  bar [1, 2]\n",
+		"---\nconfig:\n  pie:\n    theme: forest\n---\nvenn-beta\n  set A\n",
+	} {
+		if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
+			t.Errorf("%q: expected an issue, got %v", src, err)
+		}
+		d, err := Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if l := Look(d); l != nil {
+			t.Errorf("%q: the look %v", src, l)
+		}
+	}
+}
+
 func TestOldHTMLLabels(t *testing.T) {
 	t.Parallel()
 	for src, exp := range map[string]bool{

@@ -156,8 +156,11 @@ func (p *parser) label(v, id, scheme, path string) (string, string, error) {
 // at the right are issues. A face gives the field its weight and its style.
 func (p *parser) htmlRecord(src, scheme, path string) ([]graph.Field, error) {
 	var out []graph.Field
-	for _, part := range splitRecord(src) {
+	parts, _ := splitRecord(src, true)
+	for _, part := range parts {
 		if strings.TrimSpace(part) == "" {
+			// A field with no text is an empty field, as in Graphviz.
+			out = append(out, graph.Field{})
 			continue
 		}
 		l, err := p.html(part, scheme, path)
@@ -257,31 +260,65 @@ func (p *parser) htmlField(lines []html.Line, path string) (graph.Field, error) 
 	return f, nil
 }
 
-// splitRecord splits the label of HTML of a record into the sources of its
-// fields, flat, as record does: a brace or a bar outside a tag ends a
-// field. \{, \} and \| are text.
-func splitRecord(src string) []string {
-	var out []string
+// splitRecord splits the label of a record into the sources of its fields,
+// flat, as Graphviz reads them: a bar ends a field, and a group in braces
+// is a field that holds fields. A field with no text is a field too, so
+// `a| |b` has three fields and `{}` has one. A group puts its fields in
+// the list in order, and the space after it, up to the next bar or brace,
+// is no field. split reports whether a brace or a bar split the label. In
+// a label of HTML, a brace or a bar inside a tag is text, and \{, \} and
+// \| are text.
+func splitRecord(src string, html bool) (fields []string, split bool) {
 	var b strings.Builder
+	// closed says that a group ended the field, so that the field has no
+	// text of its own unless text follows the group.
+	closed := false
+	end := func(always bool) {
+		if always || !closed || strings.TrimSpace(b.String()) != "" {
+			fields = append(fields, b.String())
+		}
+		b.Reset()
+		closed = false
+	}
 	inTag := false
 	for i := 0; i < len(src); i++ {
 		c := src[i]
-		switch {
-		case inTag:
-			inTag = c != '>'
-		case c == '<':
-			inTag = true
-		case c == '\\' && i+1 < len(src) && strings.IndexByte("{}|", src[i+1]) >= 0:
-			i++
-			c = src[i]
-		case c == '{' || c == '}' || c == '|':
-			out = append(out, b.String())
-			b.Reset()
-			continue
+		if html {
+			switch {
+			case inTag:
+				inTag = c != '>'
+				b.WriteByte(c)
+				continue
+			case c == '<':
+				inTag = true
+				b.WriteByte(c)
+				continue
+			case c == '\\' && i+1 < len(src) && strings.IndexByte("{}|", src[i+1]) >= 0:
+				i++
+				b.WriteByte(src[i])
+				continue
+			}
 		}
-		b.WriteByte(c)
+		switch c {
+		case '{':
+			// Text before a group in the same field is a field of its own.
+			if strings.TrimSpace(b.String()) != "" {
+				fields = append(fields, b.String())
+			}
+			b.Reset()
+			closed, split = false, true
+		case '|':
+			end(false)
+			split = true
+		case '}':
+			end(true)
+			closed, split = true, true
+		default:
+			b.WriteByte(c)
+		}
 	}
-	return append(out, b.String())
+	end(false)
+	return fields, split
 }
 
 // wholeGroup reports whether the label of a record is one group in braces,

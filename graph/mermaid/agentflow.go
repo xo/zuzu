@@ -174,7 +174,7 @@ func (f *flowchart) agentHeader(what, rest string) (string, string, string, erro
 		if end < 0 {
 			return "", "", "", fmt.Errorf("line %d: the title of the %s %s has no end bracket: %w", f.line, what, id, ErrSyntax)
 		}
-		title = label(tail[1 : from+end])
+		title = flowLabel(tail[1:from+end], f.wrap.html)
 		tail = tail[from+end+1:]
 	}
 	props := ""
@@ -373,7 +373,7 @@ func (f *flowchart) agentProps(n *graph.Node, body string) error {
 			}
 			n.Shape = s
 		case "label":
-			n.Label = label(v)
+			n.Label = flowLabel(v, f.wrap.html)
 			f.markdown[id] = isMarkdown(v)
 		case "view":
 			// Mermaid collapses only a flow that has ended.
@@ -480,7 +480,7 @@ func (sc *scanner) agentLink(l *link) *link {
 	if m == "" || text == "" {
 		return nil
 	}
-	l.text, l.markdown = label(text), isMarkdown(text)
+	l.text, l.markdown = flowLabel(text, sc.html), isMarkdown(text)
 	l.kind, l.head, l.minlen = "normal", arrow(m[len(m)-1:]), min(len(m)-2, 10)
 	sc.i += i + len(m)
 	return l
@@ -497,7 +497,7 @@ func (sc *scanner) pipeText(l *link) {
 		return
 	}
 	raw := sc.s[sc.i+1 : sc.i+1+end]
-	l.text, l.markdown = label(raw), isMarkdown(raw)
+	l.text, l.markdown = flowLabel(raw, sc.html), isMarkdown(raw)
 	sc.i += end + 2
 }
 

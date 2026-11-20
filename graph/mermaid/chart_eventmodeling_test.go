@@ -265,7 +265,9 @@ func TestEventModelSpec(t *testing.T) {
 	for _, tt := range []struct {
 		file, title, desc string
 	}{
-		{"01-state-change.mmd", "A cart", "Two commands, each with the event that it makes"},
+		// Mermaid 12.3 draws no title of the front matter in an event
+		// model.
+		{"01-state-change.mmd", "", "Two commands, each with the event that it makes"},
 		{"05-grammar.mmd", "The title of the body", "The grammar An event model that uses each part of the grammar"},
 	} {
 		src, err := os.ReadFile(filepath.Join("testdata", "eventmodeling", tt.file))

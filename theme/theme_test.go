@@ -130,6 +130,71 @@ func TestTheSequentialRampRuns(t *testing.T) {
 	}
 }
 
+// TestTheRampStartsFromTheBackground checks that the sequential ramp starts
+// from the background that the theme holds, and runs on to a lighter color
+// on a dark background in the light mode (D35).
+func TestTheRampStartsFromTheBackground(t *testing.T) {
+	t.Parallel()
+	th := New(Light, Zuzu)
+	th.Background = "#111111"
+	base := th.Category[0]
+	if got, want := th.Sequential(0), mix("#111111", base, 0.12); got != want {
+		t.Errorf("the ramp starts at %s, want %s", got, want)
+	}
+	if got, want := th.Sequential(1), mix(base, "#ffffff", 0.85); got != want {
+		t.Errorf("the ramp ends at %s, want %s", got, want)
+	}
+	dark := New(Dark, Zuzu)
+	dark.Background = "#ffffff"
+	if got, want := dark.Sequential(1), mix(dark.Category[0], "#000000", 0.6); got != want {
+		t.Errorf("on a light background, the ramp of the dark mode ends at %s, want %s", got, want)
+	}
+	for _, m := range []Mode{Light, Dark} {
+		th := New(m, Zuzu)
+		if got, want := th.Sequential(0), mix(th.Background, th.Category[0], map[Mode]float64{Light: 0.1, Dark: 0.12}[m]); got != want {
+			t.Errorf("%s: the ramp starts at %s, want %s", m, got, want)
+		}
+	}
+}
+
+// TestTheDivergingRampRuns checks that the diverging ramp runs from the
+// color of a fall through the grid color to the color of a rise.
+func TestTheDivergingRampRuns(t *testing.T) {
+	t.Parallel()
+	for _, m := range []Mode{Light, Dark} {
+		th := New(m, Zuzu)
+		for _, c := range []struct {
+			v    float64
+			want string
+		}{{0, th.Down}, {0.5, th.Grid}, {1, th.Up}, {0.25, mix(th.Down, th.Grid, 0.5)}} {
+			if got := th.Diverging(c.v); got != c.want {
+				t.Errorf("%s: Diverging(%v) = %s, want %s", m, c.v, got, c.want)
+			}
+		}
+	}
+}
+
+// TestTheWheelJoinsTheLastColorToTheFirst checks that the wheel passes
+// each categorical color in order, mixes the colors between them, and ends
+// at the first color (D35).
+func TestTheWheelJoinsTheLastColorToTheFirst(t *testing.T) {
+	t.Parallel()
+	for _, m := range []Mode{Light, Dark} {
+		th := New(m, Harbor)
+		for i, c := range th.Category {
+			if got := th.Cyclical(float64(i) / 10); got != c {
+				t.Errorf("%s: Cyclical(%v) = %s, want the color %d, %s", m, float64(i)/10, got, i, c)
+			}
+		}
+		if got := th.Cyclical(1); got != th.Category[0] {
+			t.Errorf("%s: the wheel ends at %s, want the first color %s", m, got, th.Category[0])
+		}
+		if got, want := th.Cyclical(0.95), mix(th.Category[9], th.Category[0], 0.5); got != want {
+			t.Errorf("%s: between the last and the first color: got %s, want %s", m, got, want)
+		}
+	}
+}
+
 // TestTheEdgesTakeTheColorOfAnEdge checks that the styles of an edge and
 // its arrowheads take the color edge, a guide line the color axis, a band
 // the text color, and a muted node the color muted (D32).

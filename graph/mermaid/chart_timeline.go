@@ -185,6 +185,12 @@ func (t *timeline) statements(lines []Line, i int) (int, error) {
 		switch {
 		case s == "", strings.HasPrefix(s, "#"):
 			return i, nil
+		case s == ":" && t.tail(lines[i]) != "":
+			// The reader trims the spaces after the colon, and Mermaid
+			// reads them: the first ends the colon, and the rest are the
+			// event. With one space, the event has no text, which is an
+			// error, as in Mermaid.
+			s += t.tail(lines[i])
 		case s == ":" && i+1 < len(lines):
 			// The space after the colon is the end of the line, and the
 			// event is the next line.
@@ -224,6 +230,21 @@ func (t *timeline) statements(lines []Line, i int) (int, error) {
 		t.last.events = append(t.last.events, tlText(body[:end]))
 		s = body[end:]
 	}
+}
+
+// tail returns the spaces at the end of a line in the source, which the
+// reader trims. It returns nothing for a line whose comment the reader
+// cut.
+func (t *timeline) tail(l Line) string {
+	raw, ok := t.c.d.raw(l.N)
+	if !ok {
+		return ""
+	}
+	text := strings.TrimRightFunc(raw, unicode.IsSpace)
+	if !strings.HasSuffix(text, l.Text) {
+		return ""
+	}
+	return raw[len(text):]
 }
 
 // tlMask hides the # of each entity of a line, so that it does not start a

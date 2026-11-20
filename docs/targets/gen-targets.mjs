@@ -152,11 +152,17 @@ function theme(mode, scheme = "zuzu") {
   for (let i = cat.length; i < 10; i++) cat = [...cat, d3.interpolateRgb(cat[i % cat.length], m.text)(0.4)];
   const base = cat[0];
   // The sequential ramp runs from the background to the first color and
-  // past it, so that it reads in either mode.
-  const seq = mode === "dark"
+  // past it, so that it reads in either mode: on to a lighter color on a
+  // dark background, and to a darker color on a light one.
+  const seq = d3.hsl(m.bg).l < 0.5
     ? [d3.interpolateRgb(m.bg, base)(0.12), d3.interpolateRgb(m.bg, base)(0.45), base, d3.interpolateRgb(base, "#ffffff")(0.45), d3.interpolateRgb(base, "#ffffff")(0.85)]
     : [d3.interpolateRgb(m.bg, base)(0.1), d3.interpolateRgb(m.bg, base)(0.4), base, d3.interpolateRgb(base, "#000000")(0.35), d3.interpolateRgb(base, "#000000")(0.6)];
-  return { ...m, scheme, cat, seq, up: cat[s.up], down: cat[s.down] };
+  // The diverging ramp runs from the color of a fall through the grid
+  // color to the color of a rise. The wheel of a cyclical scheme runs
+  // through the categorical colors, and the last joins the first.
+  const div = [cat[s.down], m.grid, cat[s.up]];
+  const wheel = [...cat, cat[0]];
+  return { ...m, scheme, cat, seq, div, wheel, up: cat[s.up], down: cat[s.down] };
 }
 const THEMES = { light: theme("light"), dark: theme("dark") };
 const PAD = 24;
@@ -211,13 +217,15 @@ function legendRows(items, width) {
 }
 
 // frame lays out the title, the subtitle, the legend and the source of a
-// chart, and returns the plot area that is left.
+// chart, and returns the plot area that is left. The row of the legend
+// wraps at the width of the plot (D35).
 function frame(w, h, o) {
-  const rows = o.legend ? legendRows(o.legend, w - 2 * PAD) : [];
+  const x0 = PAD + (o.left ?? 40), x1 = w - PAD - (o.right ?? 0);
+  const rows = o.legend ? legendRows(o.legend, x1 - x0) : [];
   const top = (o.subtitle ? 66 : 50) + rows.length * 20 + (rows.length ? 10 : 0);
   return {
     w, h, rows,
-    x0: PAD + (o.left ?? 40), x1: w - PAD - (o.right ?? 0),
+    x0, x1,
     y0: top + (o.top ?? 0), y1: h - (o.source ? 30 : 16) - (o.bottom ?? 24),
     ...o,
   };

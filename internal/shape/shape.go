@@ -17,11 +17,23 @@ import (
 // does not move first continues the path before it with a line. tension is
 // the tension of the item, which Vega gives to cardinal as its tension, to
 // bundle as its beta and to catmull-rom as its alpha. Zero means the default.
+//
+// An open or a closed form of basis, cardinal and catmull-rom draws its own
+// start. An open form draws nothing through fewer than three points. A
+// closed form always moves first and loops back to its start.
 func Curve(interpolate string, pts [][2]float64, move bool, tension float64) (string, bool) {
 	if len(pts) == 0 {
 		return "", true
 	}
 	var b strings.Builder
+	if s, closed, ok := splineOf(interpolate, tension); ok {
+		if closed {
+			s.closed(&b, pts)
+		} else {
+			s.open(&b, pts, move)
+		}
+		return b.String(), true
+	}
 	if move {
 		b.WriteString("M" + pt(pts[0][0], pts[0][1]))
 	} else {
@@ -199,7 +211,7 @@ func cardinal(b *strings.Builder, pts [][2]float64, tension float64) {
 		lines(b, pts)
 		return
 	}
-	k := (1 - tension) / 6
+	seg := cardinalSegment(tension)
 	for i := 0; i+1 < len(pts); i++ {
 		// At an end, d3-shape puts the control point on the end point, which
 		// is what the point beyond the end gives when it is the other point
@@ -211,7 +223,7 @@ func cardinal(b *strings.Builder, pts [][2]float64, tension float64) {
 		if i+2 < len(pts) {
 			p3 = pts[i+2]
 		}
-		cubic(b, p1[0]+k*(p2[0]-p0[0]), p1[1]+k*(p2[1]-p0[1]), p2[0]+k*(p1[0]-p3[0]), p2[1]+k*(p1[1]-p3[1]), p2[0], p2[1])
+		seg(b, p0, p1, p2, p3)
 	}
 }
 
@@ -222,10 +234,47 @@ func catmullRom(b *strings.Builder, pts [][2]float64, alpha float64) {
 		lines(b, pts)
 		return
 	}
+	seg := catmullRomSegment(alpha)
+	for i := 0; i+1 < len(pts); i++ {
+		seg(b, padded(pts, i-1), pts[i], pts[i+1], padded(pts, i+2))
+	}
+}
+
+// segment draws the cubic segment of a spline from p1 to p2, with p0 the
+// point before p1 and p3 the point after p2.
+type segment func(b *strings.Builder, p0, p1, p2, p3 [2]float64)
+
+// basisSegment draws the segment of a uniform cubic B-spline whose
+// control points are p0 to p3. It runs from the knot of p0, p1 and p2 to
+// the knot of p1, p2 and p3, so it does not pass through p1 or p2.
+func basisSegment(b *strings.Builder, _, p1, p2, p3 [2]float64) {
+	cubic(b, (2*p1[0]+p2[0])/3, (2*p1[1]+p2[1])/3, (p1[0]+2*p2[0])/3, (p1[1]+2*p2[1])/3,
+		(p1[0]+4*p2[0]+p3[0])/6, (p1[1]+4*p2[1]+p3[1])/6)
+}
+
+// basisKnot returns the point where the segment of a B-spline with the
+// control points p0, p1 and p2 first starts.
+func basisKnot(p0, p1, p2 [2]float64) [2]float64 {
+	return [2]float64{(p0[0] + 4*p1[0] + p2[0]) / 6, (p0[1] + 4*p1[1] + p2[1]) / 6}
+}
+
+// cardinalSegment returns the segment of a cardinal spline with a tension
+// from 0 to 1. Its tangent at a point is the line between the two points
+// around it, shortened by the tension.
+func cardinalSegment(tension float64) segment {
+	k := (1 - tension) / 6
+	return func(b *strings.Builder, p0, p1, p2, p3 [2]float64) {
+		cubic(b, p1[0]+k*(p2[0]-p0[0]), p1[1]+k*(p2[1]-p0[1]), p2[0]+k*(p1[0]-p3[0]), p2[1]+k*(p1[1]-p3[1]), p2[0], p2[1])
+	}
+}
+
+// catmullRomSegment returns the segment of a Catmull-Rom spline with a
+// parameter alpha. A point that is on the point next to it puts its control
+// point on the end of the segment.
+func catmullRomSegment(alpha float64) segment {
 	const eps = 1e-12
 	dist := func(p, q [2]float64) float64 { return math.Hypot(p[0]-q[0], p[1]-q[1]) }
-	for i := 0; i+1 < len(pts); i++ {
-		p0, p1, p2, p3 := padded(pts, i-1), pts[i], pts[i+1], padded(pts, i+2)
+	return func(b *strings.Builder, p0, p1, p2, p3 [2]float64) {
 		l01a, l12a, l23a := math.Pow(dist(p0, p1), alpha), math.Pow(dist(p1, p2), alpha), math.Pow(dist(p2, p3), alpha)
 		l01, l12, l23 := l01a*l01a, l12a*l12a, l23a*l23a
 		c1, c2 := p1, p2
@@ -238,6 +287,86 @@ func catmullRom(b *strings.Builder, pts [][2]float64, alpha float64) {
 			c2 = [2]float64{(p2[0]*bb + p1[0]*l23 - p3[0]*l12) / m, (p2[1]*bb + p1[1]*l23 - p3[1]*l12) / m}
 		}
 		cubic(b, c1[0], c1[1], c2[0], c2[1], p2[0], p2[1])
+	}
+}
+
+// spline is a curve that draws each segment from a window of four points,
+// in an open and a closed form, as basis, cardinal and catmull-rom do.
+type spline struct {
+	// start returns where the segment of the window p0, p1, p2 starts.
+	start func(p0, p1, p2 [2]float64) [2]float64
+	seg   segment
+}
+
+// splineOf returns the spline of an open or a closed interpolation, and
+// whether it is closed. It returns false for any other interpolation.
+func splineOf(interpolate string, tension float64) (spline, bool, bool) {
+	name, closed := strings.CutSuffix(interpolate, "-closed")
+	if !closed {
+		var open bool
+		if name, open = strings.CutSuffix(interpolate, "-open"); !open {
+			return spline{}, false, false
+		}
+	}
+	second := func(_, p1, _ [2]float64) [2]float64 { return p1 }
+	switch name {
+	case "basis":
+		return spline{start: basisKnot, seg: basisSegment}, closed, true
+	case "cardinal":
+		return spline{start: second, seg: cardinalSegment(tension)}, closed, true
+	case "catmull-rom":
+		alpha := 0.5
+		if tension != 0 {
+			alpha = tension
+		}
+		return spline{start: second, seg: catmullRomSegment(alpha)}, closed, true
+	}
+	return spline{}, false, false
+}
+
+// open draws the open form of a spline, as the open curves of d3-shape
+// draw it. It uses each point only as a neighbor of a segment, so it
+// leaves out the first and the last point. The spline through three points
+// is the single point of the start, which a path that moves first closes.
+func (s spline) open(b *strings.Builder, pts [][2]float64, move bool) {
+	n := len(pts)
+	if n < 3 {
+		return
+	}
+	p := s.start(pts[0], pts[1], pts[2])
+	if move {
+		b.WriteString("M" + pt(p[0], p[1]))
+	} else {
+		b.WriteString("L" + pt(p[0], p[1]))
+	}
+	if n == 3 && move {
+		b.WriteString("Z")
+	}
+	for i := 1; i+2 < n; i++ {
+		s.seg(b, pts[i-1], pts[i], pts[i+1], pts[i+2])
+	}
+}
+
+// closed draws the closed form of a spline, as the closed curves of
+// d3-shape draw it. The points wrap around, so that the path starts at the
+// start of the window of the first three points and loops back to it. Fewer
+// than three points draw a closed polygon through the starts of the
+// windows.
+func (s spline) closed(b *strings.Builder, pts [][2]float64) {
+	n := len(pts)
+	at := func(i int) [2]float64 { return pts[i%n] }
+	p := s.start(at(0), at(1), at(2))
+	b.WriteString("M" + pt(p[0], p[1]))
+	if n < 3 {
+		if n == 2 {
+			p = s.start(at(1), at(2), at(3))
+			b.WriteString("L" + pt(p[0], p[1]))
+		}
+		b.WriteString("Z")
+		return
+	}
+	for i := 1; i <= n; i++ {
+		s.seg(b, at(i-1), at(i), at(i+1), at(i+2))
 	}
 }
 

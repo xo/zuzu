@@ -132,3 +132,39 @@ func TestAreaCenterAndHeight(t *testing.T) {
 		}
 	}
 }
+
+// TestPaintObject makes sure that an object is a gradient only when its key
+// gradient is truthy, as in vega.js. Any other object is the string that
+// JavaScript makes of it, which no renderer reads as a color.
+func TestPaintObject(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name     string
+		v        map[string]any
+		color    string
+		gradient string
+	}{
+		{"no key gradient", map[string]any{"color": "red"}, "[object Object]", ""},
+		{"an empty object", map[string]any{}, "[object Object]", ""},
+		{"an empty gradient", map[string]any{"gradient": ""}, "[object Object]", ""},
+		{"a null gradient", map[string]any{"gradient": nil}, "[object Object]", ""},
+		{"a linear gradient", map[string]any{
+			"gradient": "linear",
+			"stops":    []any{map[string]any{"offset": 0.0, "color": "red"}},
+		}, "", scene.Linear},
+		{"a radial gradient", map[string]any{"gradient": "radial", "stops": []any{}}, "", scene.Radial},
+	} {
+		p := paint(c.v)
+		if p.Color != c.color {
+			t.Errorf("%s: the color is %q, want %q", c.name, p.Color, c.color)
+		}
+		switch {
+		case c.gradient == "" && p.Gradient != nil:
+			t.Errorf("%s: got a gradient %q, want none", c.name, p.Gradient.Type)
+		case c.gradient != "" && p.Gradient == nil:
+			t.Errorf("%s: got no gradient, want %q", c.name, c.gradient)
+		case c.gradient != "" && p.Gradient.Type != c.gradient:
+			t.Errorf("%s: the gradient is %q, want %q", c.name, p.Gradient.Type, c.gradient)
+		}
+	}
+}

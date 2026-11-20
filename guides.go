@@ -170,7 +170,7 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	m := s.rt.style().Axis(ax)
 	// The config and the axis style its parts, over the look of zuzu.
 	styleGuide(&m, s.guideProps(cfg, a.Extra), axisParts)
-	if err := s.guideEncode(&m, a.Encode, axisEncodeParts, path, "an axis"); err != nil {
+	if err := s.guideEncode(&m, a.Encode, axisEncodeParts, axisFrame(ax), path, "an axis"); err != nil {
 		return nil, err
 	}
 	if a.ZIndex != nil {
@@ -470,12 +470,19 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	}
 	lg.Columns = int(math.Max(0, columns))
 	if lg.Direction == "horizontal" {
-		w, _ := s.rt.root.size()
+		// The row wraps at the width of the plot area of the group that
+		// holds the legend (docs/STYLE.md). A group that sets no width
+		// has no plot area of its own, and its row wraps at the width of
+		// the top level.
+		w, _ := s.size()
+		if w <= 0 {
+			w, _ = s.rt.root.size()
+		}
 		lg.Width = w
 	}
 	m := s.rt.style().Legend(lg)
 	styleGuide(&m, s.guideProps(cfg, l.Extra), legendStyleParts)
-	if err := s.guideEncode(&m, l.Encode, legendParts, path, "a legend"); err != nil {
+	if err := s.guideEncode(&m, l.Encode, legendParts, nil, path, "a legend"); err != nil {
 		return nil, err
 	}
 	if l.ZIndex != nil {
@@ -507,10 +514,45 @@ var (
 	}
 )
 
+// placeProps are the properties of an encode that place an item.
+var placeProps = map[string]bool{
+	"x": true, "y": true, "x2": true, "y2": true, "xc": true, "yc": true, "width": true, "height": true,
+}
+
+// guideFrame returns the origin, in the frame of the scene, of the frame in
+// which Vega places the items of a part of a guide, and whether an encode of
+// the place of that part applies.
+type guideFrame func(role string) (x, y float64, ok bool)
+
+// axisFrame is the frame of the parts of an axis. Vega places the group of
+// an axis at the edge of the plot area that the axis runs along, moved out
+// by its offset, and the parts of the axis inside that group. The layout of
+// zuzu places the parts in the frame of the plot area, so the frame of Vega
+// starts at that edge. The layout of Vega sets the place of the group of an
+// axis, so an encode of the place of the group goes in the report.
+func axisFrame(ax *layout.Axis) guideFrame {
+	var x, y float64
+	switch ax.Orient {
+	case "top":
+		y = -ax.Offset
+	case "bottom":
+		y = ax.Cross + ax.Offset
+	case "left":
+		x = -ax.Offset
+	default:
+		x = ax.Cross + ax.Offset
+	}
+	return func(role string) (float64, float64, bool) {
+		return x, y, role != "axis"
+	}
+}
+
 // guideEncode applies the encode of a legend or an axis to its parts, with
-// the datum of each item, which holds its value and its label. The layout
-// places the parts, so an encoding of a place goes in the report.
-func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[string]string, path, kind string) error {
+// the datum of each item, which holds its value and its label. An encode of
+// the place of an item applies in the frame of Vega that frame gives, as in
+// vega.js. A nil frame, or a part whose frame does not apply, puts an
+// encode of a place in the report.
+func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[string]string, frame guideFrame, path, kind string) error {
 	for _, name := range slices.Sorted(maps.Keys(enc)) {
 		el := enc[name]
 		role, ok := parts[name]
@@ -523,12 +565,16 @@ func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[strin
 		if role == "" {
 			continue
 		}
+		var ox, oy float64
+		placed := false
+		if frame != nil {
+			ox, oy, placed = frame(role)
+		}
 		sets := vega.Encode{}
 		for _, set := range slices.Sorted(maps.Keys(el.Sets)) {
 			kept := vega.Props{}
 			for _, k := range slices.Sorted(maps.Keys(el.Sets[set])) {
-				switch k {
-				case "x", "y", "x2", "y2", "xc", "yc", "width", "height":
+				if placeProps[k] && !placed {
 					if err := s.rt.issue(vega.ErrUnsupported, path+"/encode/"+name+"/"+set, "the encode of %s of the %s of %s", k, name, kind); err != nil {
 						return err
 					}
@@ -545,7 +591,15 @@ func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[strin
 				it := &m.Items[i]
 				if m.Role == role && err == nil {
 					st := &itemState{it: it, set: map[string]bool{}}
+					// A rule whose default has one end across an
+					// axis, such as a line of the grid, keeps that end
+					// with the other when an encode moves the other,
+					// as a rule of Vega with no x2 or y2 does.
+					flatX, flatY := it.X2 == it.X, it.Y2 == it.Y
 					err = s.encodeItem(sets, st, it.Datum, "/encode/"+name)
+					if err == nil {
+						placeGuideItem(m.Type, st, ox, oy, flatX, flatY)
+					}
 				}
 				for j := range it.Items {
 					walk(&it.Items[j])
@@ -558,6 +612,45 @@ func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[strin
 		}
 	}
 	return nil
+}
+
+// placeGuideItem moves the place that an encode gave an item of a guide
+// from the frame of Vega, which starts at (ox, oy), to the frame of the
+// scene, and works out the place of the item from it. flatX and flatY say
+// whether a rule had the same x at both ends, or the same y, before the
+// encode.
+func placeGuideItem(typ string, st *itemState, ox, oy float64, flatX, flatY bool) {
+	it := st.it
+	for _, p := range []struct {
+		name string
+		v    *float64
+		o    float64
+	}{{"x", &it.X, ox}, {"x2", &it.X2, ox}, {"xc", &st.xc, ox}, {"y", &it.Y, oy}, {"y2", &it.Y2, oy}, {"yc", &st.yc, oy}} {
+		if st.set[p.name] {
+			*p.v += p.o
+		}
+	}
+	if typ != scene.Rule {
+		geometry(typ, st)
+		return
+	}
+	if st.set["xc"] && !st.set["x"] {
+		it.X = st.xc
+	}
+	if st.set["yc"] && !st.set["y"] {
+		it.Y = st.yc
+	}
+	if flatX && !st.set["x2"] {
+		it.X2 = it.X
+	}
+	if flatY && !st.set["y2"] {
+		it.Y2 = it.Y
+	}
+	for _, f := range []*float64{&it.X, &it.Y, &it.X2, &it.Y2} {
+		if math.IsNaN(*f) || math.IsInf(*f, 0) {
+			*f = 0
+		}
+	}
 }
 
 // buildTitle builds the title of a scope. A title of a group stands beyond

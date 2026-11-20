@@ -197,7 +197,7 @@ The layout follows dot in these steps:
 3. The `weight` of an edge pulls its ends into one line across the
    ranks. A node with edges to several nodes of the rank before it
    lines up with the median of their places, and each edge counts by its
-   weight. `weight=0` counts as 1.
+   weight. An edge of `weight=0` does not pull its ends, as in dot.
 4. A loop and its label take room at the side of their node, so that no
    other node or label covers them.
 5. Edges between the same two nodes spread apart. Straight edges from one
@@ -396,7 +396,10 @@ version that bundles Mermaid 12.3.0.
 | a comment, from `%%` to the end of the line | `%% a comment` |
 | the keyword of the kind, on the first line | `flowchart LR` |
 
-The `title` of the front matter is the title of the diagram. Its
+The `title` of the front matter is the title of the diagram. Mermaid 12.3
+does not draw it in an ishikawa, a kanban, a railroad diagram, a tree
+view, an event model, a C4 diagram, an info diagram and a ZenUML diagram,
+and zuzu does not draw it there either, with no issue. Its
 `description` goes in the description of the Vega spec, which Mermaid
 ignores (D32). Its `config` and each directive merge into one config, and
 a directive wins over the front matter. A setting of the config that a kind
@@ -471,7 +474,7 @@ layouts of Mermaid 12.3, `elk.stress`, `elk.force`, `elk.mrtree`,
 of the config, which holds the settings of ELK, are hints too. So is the
 property `algorithm` of a node, such as `grp@{ algorithm: elk.box }`, which
 picks an ELK layout for one subgraph. zuzu lays the subgraph out in its own
-layered layout, with no issue, whatever the value. Every kind
+layered layout, with no issue, whatever the value (D35 part 9). Every kind
 accepts `layout: dagre`, the default layout of Mermaid, with no issue.
 Another layout, such as `elk.layered` or `tidy-tree`, is an issue. A
 swimlane diagram and a flowchart accept `layout: swimlane`, as "Swimlane
@@ -504,6 +507,22 @@ caller gives with `WithMode`, or a scheme that the caller gives with
 `dark` in its name sets the mode only, so the scheme stays that of the
 caller, or `zuzu`. Each other theme sets the scheme only, so the mode stays
 that of the caller, or light.
+
+A theme in the section of the kind, such as `venn.theme`, selects the look
+of a diagram of that kind, as in Mermaid 12.3 (D35 part 10). It wins over
+the `theme` at the top of the config. The section is the one in which
+Mermaid reads the theme. Its name is the name of the kind in most kinds,
+but `flowchart` in a `graph` and in a `flowchart-elk`, `class` in a class
+diagram, `state` in a state diagram, `er`, `sequence` and `requirement` in
+those kinds, `xyChart` in an XY chart, `c4` in a C4 diagram, and
+`railroad` in each railroad diagram. A theme in another section, such as
+`classDiagram.theme`, is an issue. A mode or a scheme that the caller
+gives still wins.
+
+Mermaid 12.3 sets a theme in the sections of some kinds by default, such
+as `redux-color` in `flowchart` and `venn`. zuzu reads only a theme that
+the source gives, so a diagram with no `theme` draws in the scheme of the
+caller, or `zuzu`.
 
 A theme that Mermaid 12.3.0 does not have, such as `sepia` or `Forest`, is
 an issue. `themeVariables` and `themeCSS` are issues too, except the theme
@@ -683,7 +702,10 @@ not agree, as in `<-- Text ---`, draws as `-->`, as in Mermaid.
 
 The text of a label can hold `<br>` as a new line, an entity such as
 `#quot;` or `#35;`, and a string of markdown in backquotes, which draws as
-plain text without its marks. A text in double quotes, such as a string of
+plain text without its marks. The two characters `\n` start a new line
+too, whatever `htmlLabels` is, as in Mermaid. They are text in a string of
+markdown, and in a label with math of KaTeX when `htmlLabels` is true,
+because Mermaid draws such a label as math. A text in double quotes, such as a string of
 markdown, can run over more lines, and each new line in it starts a new
 line of the label. This holds for a node, a link and the title of a
 subgraph. The value of a property in `A@{ ... }` can be in double quotes or
@@ -1358,6 +1380,11 @@ its classes and its styles, and not their fill. Mermaid draws the figure
 of an actor in the colors of its theme, over a style of the actor. zuzu
 draws the style.
 
+Mermaid drops the last `;` of a line that holds `style` or `classDef`, a
+colon and then a `#`, before it reads the line. So `style A fill:#f00;`
+reads, and so does zuzu. A second `;`, or a `;` in a style with no `#`,
+such as `style A fill:red;`, is an error, as in Mermaid.
+
 zuzu reads these settings of `usecase`:
 
 1. `nodeSpacing`, `rankSpacing` and `diagramPadding`, which zuzu reads as
@@ -1427,7 +1454,9 @@ left to the right when the ranks run down or up, and from the top to the
 bottom when the ranks run across. A node is in the lane of the subgraph at
 the top that holds it. The nodes outside every subgraph go into a lane of
 their own, with no title, before the other lanes, as in Mermaid. A lane
-that holds no node draws nothing.
+that holds no node draws nothing. The two characters `\n` in the title of
+a lane are text, as Mermaid draws them, and in every other label they
+start a new line, as in a flowchart.
 
 A subgraph inside a lane draws as a box around its nodes, with its title.
 Its direction changes nothing, as in Mermaid. Its box can hold a node of
@@ -1510,7 +1539,8 @@ These parts are issues, as in a flowchart: a `theme` that Mermaid does
 not have, the `themeVariables` and the `themeCSS`, which draw in the look
 of zuzu, the other settings of the section `flowchart`, such as
 `minNodeWidth`, the other settings of the section `swimlane`, such as
-`swimlane.theme`, and the target of a link.
+`swimlane.curve`, and the target of a link. A known `swimlane.theme`
+selects the look, as "The theme" says.
 
 ### Links and tooltips
 
@@ -1970,7 +2000,7 @@ Mermaid. A line with an alias gives it a new kind and a new label.
 | `title Text`, `title: Text` | the title |
 | `accTitle: Text`, `accDescr: Text`, `accDescr { ... }` | the description of the Vega spec, the texts joined in order |
 | `%% Text`, `# Text` | nothing, since each is a comment |
-| `#35;`, `#infin;` | the character of the entity code. `#59;` puts a semicolon in a text |
+| `#35;`, `#infin;` | the character of the entity code. `#59;` puts a semicolon in a text, and `#lt;br#gt;` draws the text `<br>`, with no new line |
 
 A semicolon ends a statement. The text of a message, a note or a label can
 start with `wrap:` or `nowrap:`. A text wraps where Mermaid 12.3 wraps it
@@ -2405,7 +2435,10 @@ zuzu reads the statements as the lexer of Mermaid 12.3 reads them:
 4. The name of a section runs up to a colon, and events can follow it on
    its line. An event belongs to the last period of the source, also when
    that period is in an earlier section.
-5. A colon at the end of a line takes the next line as its event.
+5. A colon at the end of a line takes the next line as its event. A colon
+   and one space at the end of a line is an event with no text, which is
+   an error. After a colon and two spaces, the second space is the event,
+   which draws with no text, and the next line is a period.
 6. `<br>` starts a new line in a text, and an entity, such as `#quot;`,
    reads as its character.
 
@@ -2551,8 +2584,10 @@ zuzu reads `c4.c4ShapeMargin`, `c4.c4ShapePadding`, `c4.width`,
 `c4.diagramMarginX`, `c4.diagramMarginY`, `c4.nextLinePaddingX`, and
 `c4.wrap`, which wraps the texts of an element, true by default. `wrap` at
 the top of the config wraps the texts of a boundary when `c4.wrap` is true
-too, as in Mermaid. Each other setting is an issue, and so is
-`c4.c4ShapeInRow`, which Mermaid 12.3 does not read.
+too, as in Mermaid. Mermaid 12.3 does not read `c4.c4ShapeInRow` and
+`c4.c4BoundaryInRow`, so zuzu accepts them with no issue (D32), and
+`UpdateLayoutConfig` sets the numbers of a row. Each other setting is an
+issue.
 
 These are errors, as in Mermaid: a diagram with no statement, a text after
 the keyword, a statement with no `(` right after its keyword or with no
@@ -2578,10 +2613,12 @@ directions, the side of `Node_L` and `Node_R`, a `$sprite`, a tag or a
 a relationship, the sprite and the tags of a boundary, and an update of
 an element or of a relationship that does not exist yet.
 
-zuzu draws a C4 diagram in other ways than Mermaid in four places. A
+Mermaid 12.3 does not draw the `title` of the front matter in a C4
+diagram, and neither does zuzu. The `title` of the diagram draws.
+
+zuzu draws a C4 diagram in other ways than Mermaid in three places. A
 comment after a statement on its line is a comment, and Mermaid reads it
-as an error. The `title` of the front matter draws when the diagram has no
-`title`, and Mermaid does not draw it. A boundary with a fill draws under
+as an error. A boundary with a fill draws under
 its elements, and Mermaid draws it over them. The texts are in the sizes
 of zuzu, so the boxes are smaller than in Mermaid.
 
@@ -2665,6 +2702,9 @@ side, as in Mermaid. A `fontSize` that is not a positive number and a
 padding that is not a number of 0 or more are issues. Each other setting
 is an issue, except `ishikawa.useMaxWidth`, which changes nothing.
 
+Mermaid 12.3 does not draw the `title` of the front matter in an ishikawa
+diagram, and neither does zuzu.
+
 zuzu draws some ishikawa diagrams in another way than Mermaid 12.3.0:
 
 1. The box of a cause can reach right of the start of its bone. Mermaid
@@ -2677,9 +2717,7 @@ zuzu draws some ishikawa diagrams in another way than Mermaid 12.3.0:
    only `ishikawa` and `ishikawa-beta`.
 5. Mermaid counts a tab of an indent as one space, and zuzu as four. The
    causes are the same, unless a source mixes tabs and spaces.
-6. Mermaid does not draw the `title` of the front matter. zuzu draws it,
-   as in the other charts.
-7. Mermaid draws an `&` of a label as `&amp;`. zuzu draws `&`.
+6. Mermaid draws an `&` of a label as `&amp;`. zuzu draws `&`.
 
 The look is the look of zuzu. The head and the box of each cause take a
 tint of the first color of the category scheme, as Mermaid draws them in
@@ -2864,8 +2902,10 @@ nothing for them, so zuzu reads them with no issue (D32). Each other
 setting is an issue, such as `mindmap.padding`, which sets the margin of
 the image of Mermaid.
 
-zuzu draws a kanban in other ways than Mermaid in three places. Mermaid
-does not draw the `title` of the front matter, and zuzu draws it. The
+Mermaid 12.3 does not draw the `title` of the front matter in a kanban,
+and neither does zuzu.
+
+zuzu draws a kanban in other ways than Mermaid in two places. The
 texts are in the sizes of zuzu, so a line of a text can hold a word more
 or less than in Mermaid. Mermaid colors only the first ten columns. zuzu
 colors each column, and the eleventh column takes the first color again.
@@ -3040,7 +3080,10 @@ has effects that a reader does not expect, and zuzu keeps them:
 3. In EBNF, `b? c? ;` reads as `b` and a special `c`, because `? c?` is a
    special sequence.
 4. In ABNF, a `;` with more text after it on its line starts a comment,
-   so `a = b ; c` is a rule with no end.
+   so `a = b ; c` is a rule with no end. A space after the `;` is such a
+   text, so `a = b ; ` with a space at the end is a rule with no end too.
+5. A comment from `%%` to the end of the line can stand where a token
+   can. `%%` in a string or in a comment of the notation is text.
 
 These are errors, as in Mermaid: a part that the notation does not have,
 such as `[a-z]` in PEG, `=/` in ABNF or `'x'` in ABNF, a rule with no `;`,
@@ -3086,8 +3129,8 @@ those sections.
 
 zuzu draws some railroad diagrams in another way than Mermaid 12.3.0:
 
-1. Mermaid draws no title. zuzu draws the `title` of the diagram, or else
-   the `title` of the front matter.
+1. Mermaid draws no title. zuzu draws the `title` of the diagram. Like
+   Mermaid, zuzu does not draw the `title` of the front matter.
 2. Mermaid cleans a text with `<` in it as HTML, and draws `<` as `&lt;`.
    zuzu draws the text as the source gives it, and reads an entity, such as
    `#quot;`.
@@ -3223,7 +3266,8 @@ category scheme with an outline, and an icon takes that color too.
 
 zuzu draws a tree view in another way than Mermaid 12.3.0 in one place.
 Mermaid draws no title, from the front matter or from `title`. zuzu draws
-the title, as in the other kinds.
+the `title` of the diagram, as in the other kinds. Like Mermaid, zuzu does
+not draw the `title` of the front matter.
 
 #### eventmodeling
 
@@ -3325,8 +3369,8 @@ colors of `themeVariables`, such as `emUiFill`.
 zuzu draws an event model in other ways than Mermaid 12.3.0 in five
 places:
 
-1. Mermaid draws no title. zuzu draws the `title` of the source, or the
-   `title` of the front matter when the source has none.
+1. Mermaid draws no title. zuzu draws the `title` of the source. Like
+   Mermaid, zuzu does not draw the `title` of the front matter.
 2. Mermaid puts the text of `accTitle` and `accDescr` in the SVG with the
    keyword, as `accTitle: Text`. zuzu puts the text only in the description.
 3. The first box starts right of the widest label of a swimlane, when that
@@ -3527,10 +3571,9 @@ height that is not a positive number is an issue, and so is a negative
 padding. `venn.useDebugLayout: true`
 draws the grid of the texts, which zuzu does not draw, so it is an issue.
 `venn.look` is a hint, as `look` is. Mermaid 12.3 draws a venn diagram in
-the theme of `venn.theme`, `redux-color` by default. zuzu reads the
-`theme` of the top level only, as "The theme" says. So `venn.theme` is an
-issue, and a venn diagram with no `theme` draws in the scheme of the
-caller, or `zuzu`. The colors `venn1` to `venn8` of `themeVariables` are
+the theme of `venn.theme`, `redux-color` by default. zuzu reads
+`venn.theme` too, as "The theme" says. A venn diagram with no `theme`
+draws in the scheme of the caller, or `zuzu`. The colors `venn1` to `venn8` of `themeVariables` are
 issues, as the other theme variables are.
 
 zuzu draws a venn diagram in other ways than Mermaid in two places.

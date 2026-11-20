@@ -111,10 +111,8 @@ func eventModelChart(c *chart) (map[string]any, bool, error) {
 	if err := m.parse(toks); err != nil {
 		return nil, false, err
 	}
-	title := c.d.Title
-	if m.title != "" {
-		title = m.title
-	}
+	// Mermaid draws no title of the front matter in an event model.
+	title := m.title
 	if len(m.frames) == 0 {
 		return emptyChart(title, ""), false, nil
 	}

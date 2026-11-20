@@ -119,7 +119,8 @@ func TestSwimlaneSettings(t *testing.T) {
 		{"lineHops: arc", "swimlane.lineHops", false},
 		{"look: neo", "", false},
 		{"useMaxWidth: false", "", false},
-		{"theme: redux-color", "swimlane.theme", false},
+		{"theme: redux-color", "", false},
+		{"theme: sepia", "swimlane.theme", false},
 		{"curve: linear", "swimlane.curve", false},
 	} {
 		src := "---\nconfig:\n  swimlane:\n    " + tt.settings + "\n---\nswimlane-beta\n  subgraph A\n    a --> b\n  end"
