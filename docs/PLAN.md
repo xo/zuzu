@@ -1134,3 +1134,8 @@ stays true.
     Sans 3 for the humanist sans, IBM Plex Serif or Source Serif 4 for the
     serif, and Nunito or Quicksand for the rounded sans. Each one must be
     under the Open Font License or a license like it (D16).
+31. Answered on 2026-11-20 by D36: zuzu draws the math of KaTeX in a label
+    of Mermaid with the math layout of okage (okage D78), in STIX Two Math
+    from an optional package that `zuzu.WithMath` adds. It draws each
+    formula as a path in the scene, and reads the fonts with the copy of
+    go-text in okage instead of `github.com/go-text/typesetting`.

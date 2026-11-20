@@ -182,8 +182,10 @@ is item 10 below.
 13. A line of a timeline that ends in `: ` with a space is an error in
     Mermaid, and zuzu reads the next line as its event.
 14. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
-    where Mermaid draws it as math, and draws as its LaTeX source. D35
-    part 13 leaves it so for now, and says what a renderer of math needs.
+    where Mermaid draws it as math, and draws as its LaTeX source. D36
+    draws it with the math layout of okage. The work waits for okage D78
+    and the release of okage that holds the layout. "The order of the work"
+    in D36 lists the steps.
 15. zuzu reads `text: a, b` in the body of a requirement, and Mermaid gives
     an error of the parse at the comma.
 16. A sequence diagram decodes `#lt;br#gt;` into `<br>` and then starts a
