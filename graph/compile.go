@@ -40,8 +40,9 @@ const (
 const ArrowSymbolSize = theme.ArrowLength * theme.ArrowLength
 
 // paintKeys are the keys of a style of a node, an edge or a cluster that
-// a mark encodes, by the name of their field.
-var paintKeys = []string{"fill", "fillOpacity", "stroke", "strokeWidth", "strokeDash"}
+// a mark encodes, by the name of their field. category comes first, so
+// that a fill or a stroke wins over the color of the category.
+var paintKeys = []string{"category", "fill", "fillOpacity", "stroke", "strokeWidth", "strokeDash"}
 
 // textKeys are the keys of a style of a label.
 var textKeys = []string{"textColor", "fontSize", "fontWeight", "fontStyle"}
@@ -227,6 +228,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 	}
 	paints := map[string][]string{}
+	// categories is the number of places of the category scheme that the
+	// nodes and the clusters take (D37).
+	categories := 0
 	add := func(kind, sig string) {
 		if !slices.Contains(paints[kind], sig) {
 			paints[kind] = append(paints[kind], sig)
@@ -279,6 +283,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		link(r, n.Href, n.Tooltip)
 		style(r, n.Style)
+		categories = categoryRow(r, n.Category, categories, false)
 		add("node", signature(r, paintKeys, "_paint"))
 		text := signature(r, textKeys, "_text")
 		add("nodeText", text)
@@ -416,6 +421,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		link(r, c.Href, c.Tooltip)
 		style(r, c.Style)
+		categories = categoryRow(r, c.Category, categories, true)
 		add("cluster", signature(r, paintKeys, "_paint"))
 		add("clusterText", signature(r, textKeys, "_text"))
 		clusters = append(clusters, r)
@@ -471,6 +477,10 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			return
 		}
 		for k := range strings.SplitSeq(sig, ",") {
+			if k == "category" {
+				categoryEncode(enc)
+				continue
+			}
 			name := k
 			if r, ok := rename[k]; ok {
 				name = r
@@ -680,6 +690,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	if g.Description != "" {
 		spec["description"] = g.Description
+	}
+	if g.Background != "" {
+		spec["config"] = map[string]any{theme.ConfigBackground: g.Background}
+	}
+	if scales := categoryScales(categories); scales != nil {
+		spec["scales"] = scales
 	}
 	// The link and the tooltip of the diagram go on the group of the whole
 	// diagram.

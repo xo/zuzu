@@ -178,14 +178,14 @@ the wrong place does not compile.
 | `WithLoader(Loader)` | none | how the data of a `url` is read (D25) |
 | `WithValues(name string, rows []map[string]any)` | none | the rows of a named dataset, given by the program |
 | `WithResultSet(name string, rs ResultSet)` | none | the rows of a named dataset, read from the result of a query |
-| `WithMode(theme.Mode)` | `zuzu.mode` of the spec, then `theme.Light` | the light or the dark mode (D14) |
+| `WithMode(theme.Mode)` | `zuzu.mode` of the spec, then `theme.Light` | the light or the dark mode (D14). A `zuzu.background` of the spec wins over it |
 | `WithScheme(theme.Scheme)` | `zuzu.scheme` of the spec, then `theme.Zuzu` | the color scheme (D14, D15) |
 | `WithLocation(*time.Location)` | `time.Local` | the time zone of time scales and formats (D27) |
 | `WithLocale(format.Locale)` | `format.EnUS` | the locale of numbers and dates (D27) |
 | `WithRandom(func() rand.Source)` | a source seeded from the system | the random numbers of a render (D28) |
 | `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with. Not built yet |
 | `WithSize(width, height float64)` | from the spec | the size of the chart |
-| `WithBackground(color.Color)` | the theme, then the spec | the background over the theme and the spec. An alpha of 0 draws none, and nil keeps the default |
+| `WithBackground(color.Color)` | `zuzu.background` of the spec, then the spec, then the theme | the background over the theme and the spec. An alpha of 0 draws none, and nil keeps the default |
 | `WithScale(float64)` | 1 | the ratio of device pixels to the pixels of the chart in the image of `Image`, such as 2 for a screen of high density. The layout does not change, and the SVG does not change |
 | `WithRenderLogger(*slog.Logger)` | none | where a render logs |
 | `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
@@ -203,6 +203,19 @@ value that zuzu does not have is an issue, even when the caller sets the
 look. It is an error in the strict mode. In the loose mode, it is a line of
 the report, and the render keeps the look of the caller or the default.
 `theme.ConfigMode` and `theme.ConfigScheme` name the two keys.
+
+A third key, `zuzu.background`, is a color of CSS that fills the page
+(D37). The `bgcolor` of a graph of DOT fills it. The color is the
+background of the theme, as a color of `WithBackground` is, so the boxes
+under the labels of a diagram and the open arrowheads take it. The mode
+follows its lightness, so that the text stays readable on it. A color with
+a lightness in HSL below 0.5 draws in the dark mode, and another color in
+the light mode. This mode wins over `WithMode` and over `zuzu.mode`. A
+color with an alpha of 0 draws no background and keeps the mode. A
+background that the caller gives with `WithBackground` wins over
+`zuzu.background`, and the mode is then that of the caller or of
+`zuzu.mode`. The compiler of Vega-Lite passes the key on. A value that is
+not a color is an issue, as above. `theme.ConfigBackground` names the key.
 
 A Go function cannot have two types, so the logger of a render is
 `WithRenderLogger`, and `WithLogger` is the logger of `Parse`.
@@ -578,11 +591,12 @@ type Scheme struct{ /* unexported */ }
 func Lookup(name string) (Scheme, bool)
 func Schemes() []string
 
-// ConfigMode and ConfigScheme are the keys of the config of a spec that
-// ask for a mode and a scheme (D32).
+// ConfigMode, ConfigScheme and ConfigBackground are the keys of the config
+// of a spec that ask for a mode, a scheme and a background (D32, D37).
 const (
-	ConfigMode   = "zuzu.mode"
-	ConfigScheme = "zuzu.scheme"
+	ConfigMode       = "zuzu.mode"
+	ConfigScheme     = "zuzu.scheme"
+	ConfigBackground = "zuzu.background"
 )
 
 // Theme is a mode and a scheme together: every color that a chart uses.

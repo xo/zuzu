@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -304,7 +305,7 @@ func TestUsecaseIssues(t *testing.T) {
 	g, report := stateOf(t, `---
 config:
   usecase:
-    colorScheme: rotate
+    colorScheme: spin
     useMaxWidth: false
     actorFontFamily: Arial-Bold
     curve: basis
@@ -318,7 +319,7 @@ end`)
 		msgs = append(msgs, r.Error())
 	}
 	text := strings.Join(msgs, "\n")
-	for _, want := range []string{"usecase.colorScheme: rotate", "usecase.curve"} {
+	for _, want := range []string{"usecase.colorScheme: spin", "usecase.curve"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("expected an issue about %s, got\n%s", want, text)
 		}
@@ -342,6 +343,119 @@ end`)
 	}
 	if shapes["S"] != graph.ClusterPackage || shapes["R"] != "" {
 		t.Errorf("the shapes of the boundaries %v", shapes)
+	}
+}
+
+// ucCategories writes the category of each actor and use case, then of
+// each system boundary, as id=category.
+func ucCategories(g *graph.Graph) []string {
+	var out []string
+	for _, n := range g.Nodes {
+		out = append(out, n.ID+"="+strconv.Itoa(n.Category))
+	}
+	for _, c := range g.Clusters {
+		out = append(out, c.ID+"="+strconv.Itoa(c.Category))
+	}
+	return out
+}
+
+// TestUsecaseRotate checks that colorScheme rotate gives the actors and
+// then the use cases the colors of the category scheme in turn, and the
+// system boundaries their own turn from the first color, in the order of
+// their first mention, as Mermaid 12.3 gives data-color-id (D37). The
+// notes and the blocks of JSON take no color.
+func TestUsecaseRotate(t *testing.T) {
+	t.Parallel()
+	const body = `usecase-beta
+  B --> U2
+  actor A
+  actor B
+  U1
+  U2("Two")
+  systemBoundary S2
+    U3
+  end
+  systemBoundary S1
+    U4
+  end
+  note for U1 "a note"
+  json J@{ "a": 1 }
+`
+	g, report := stateOf(t, "---\nconfig:\n  usecase:\n    colorScheme: rotate\n---\n"+body)
+	if len(report) != 0 {
+		t.Errorf("expected no issue, got %v", report)
+	}
+	want := []string{"B=1", "A=2", "U2=3", "U1=4", "U3=5", "U4=6", "note-0=0", "J=0", "S2=1", "S1=2"}
+	if got := ucCategories(g); !slices.Equal(got, want) {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+	// A style of a name stays on the node, and wins over the color when
+	// the graph compiles.
+	g, _ = stateOf(t, "---\nconfig:\n  usecase:\n    colorScheme: rotate\n---\nusecase-beta\nactor A\nU\nstyle U fill:#f00")
+	if n := node(t, g, "U"); n.Category != 2 || n.Style["fill"] != "#f00" {
+		t.Errorf("expected the category 2 and the fill of the style, got %d %v", n.Category, n.Style)
+	}
+	// rotate takes effect in a color theme of Mermaid only: redux-color,
+	// the default of a use case diagram, and redux-dark-color.
+	for theme, rotates := range map[string]bool{
+		"":                            true,
+		"  theme: redux-color\n":      true,
+		"  theme: redux-dark-color\n": true,
+		"  theme: default\n":          false,
+		"  theme: forest\n":           false,
+		"  theme: redux\n":            false,
+		"  theme: neo-dark\n":         false,
+		"  theme: sepia\n":            true,
+	} {
+		for _, section := range []bool{false, true} {
+			cfg := theme + "  usecase:\n    colorScheme: rotate\n"
+			if section {
+				cfg = "  usecase:\n    colorScheme: rotate\n  " + theme
+			}
+			if section && theme == "" {
+				continue
+			}
+			g, _ := stateOf(t, "---\nconfig:\n"+cfg+"---\nusecase-beta\nactor A\nU\nsystemBoundary S\nV\nend")
+			if got := node(t, g, "A").Category > 0; got != rotates {
+				t.Errorf("%q: expected the rotation %v, got %v", cfg, rotates, got)
+			}
+			if got := g.Clusters[0].Category > 0; got != rotates {
+				t.Errorf("%q: expected the rotation of the boundary %v, got %v", cfg, rotates, got)
+			}
+		}
+	}
+	// role, the default, draws as before: no element takes a color.
+	for _, src := range []string{
+		"---\nconfig:\n  usecase:\n    colorScheme: role\n---\n" + body,
+		body,
+	} {
+		g, report := stateOf(t, src)
+		if len(report) != 0 {
+			t.Errorf("expected no issue, got %v", report)
+		}
+		for _, c := range ucCategories(g) {
+			if !strings.HasSuffix(c, "=0") {
+				t.Errorf("%q: expected no color, got %s", src, c)
+			}
+		}
+	}
+}
+
+// TestUsecaseRotateCycles checks that each element takes the next place
+// past the ten colors of a scheme. The scale of the colors starts the
+// colors again when the graph compiles.
+func TestUsecaseRotateCycles(t *testing.T) {
+	t.Parallel()
+	var b strings.Builder
+	b.WriteString("---\nconfig:\n  usecase:\n    colorScheme: rotate\n---\nusecase-beta\n")
+	for i := range 12 {
+		b.WriteString("actor A" + strconv.Itoa(i) + "\n")
+	}
+	g, _ := stateOf(t, b.String())
+	for i, n := range g.Nodes {
+		if n.Category != i+1 {
+			t.Errorf("%s: expected the category %d, got %d", n.ID, i+1, n.Category)
+		}
 	}
 }
 

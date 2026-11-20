@@ -1,6 +1,6 @@
 # D14. A theme is a mode and a color scheme, as one Vega config
 
-Status: Decided. Amended by D35.
+Status: Decided. Amended by D35 and D37.
 
 The maintainers asked on 2026-11-10 for a simple way to apply styles, with a
 light and a dark theme from the start, and for color schemes that swap.

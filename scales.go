@@ -657,7 +657,8 @@ func (s *scope) scheme(ref *vega.SchemeRef, typ string, count, n int) []any {
 
 // rampTheme returns the theme of the render with the background that the
 // chart draws, from which a ramp starts (D35). A background that the caller
-// gives is already the background of the theme, and wins. Else it is the
+// gives, or that zuzu.background gives (D37), is already the background of
+// the theme, and wins. Else it is the
 // background of the spec, or of the config of the spec, when either sets
 // an opaque color. A color with some opacity counts as drawn over the
 // background of the theme.

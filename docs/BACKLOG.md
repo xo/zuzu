@@ -130,14 +130,12 @@ and places nodes in another way.
    no text.
 4. The shape `subroutine` is too narrow for a short label, so the label
    covers its two inner lines.
-5. With no theme in the source, Mermaid 12.3 draws a flowchart, a
-   swimlane, an agentflow, a sequence, a class, a state, an ER, a
-   requirement, a use case and a venn diagram in the theme `redux-color`,
-   which it sets in the section of each kind. zuzu applies only a theme
-   that the source gives. Whether zuzu applies those defaults needs a
-   decision.
-6. A subgraph title with a break, such as `subgraph s ["t<br>u"]`, draws
+5. A subgraph title with a break, such as `subgraph s ["t<br>u"]`, draws
    its lines in one text, not on two lines.
+6. In a color theme of Mermaid, a use case diagram colors each system
+   boundary in turn also with `colorScheme: role`. zuzu draws such a
+   boundary as a plain panel. With `rotate`, zuzu turns through the 10
+   categorical colors of its scheme, and Mermaid through 12 colors.
 
 ### Fix what the corpus of mermaid-go-renderer found
 
@@ -175,16 +173,12 @@ is item 9 below.
     `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
     lines. Some of its routes share a line, and the titles of its lanes do
     not turn in a layout LR.
-11. In a use case diagram, `colorScheme: rotate` is an issue. It sets
-    the colors of a palette from the colors of a theme of Mermaid, and the
-    look of zuzu has no such palette. It needs a token of `docs/STYLE.md`
-    first.
-12. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
+11. Math of KaTeX in a label, written as `$$...$$`, is an issue in each kind
     where Mermaid draws it as math, and draws as its LaTeX source. D36
     draws it with the math layout of okage. The work waits for okage D78
     and the release of okage that holds the layout. "The order of the work"
     in D36 lists the steps.
-13. The reader of every kind cuts a `%%` in the middle of a line, also
+12. The reader of every kind cuts a `%%` in the middle of a line, also
     inside single quotes and after a colon of ZenUML, as in `A->B: 50%%
     off`. In Mermaid each lexer cuts a comment by its own rule: a kind of
     jison cuts `%%` where a token can start, a timeline also cuts a single
@@ -193,11 +187,11 @@ is item 9 below.
     `flowchart LR %% c` is an error in mmdc, and `sequenceDiagram%% c`
     draws. Each reader handles its comments itself. The railroad kinds
     already do.
-14. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
+13. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
     the spaces.
-15. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
+14. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
     an issue.
-16. The priority line of a kanban card takes the colors of Mermaid, red,
+15. The priority line of a kanban card takes the colors of Mermaid, red,
     orange, blue and light blue, and not tokens of `docs/STYLE.md`.
 
 
@@ -230,16 +224,10 @@ The DOT files come from the gallery of Graphviz, in `testdata/zuzu` of iv.
    The step changes the ranks of other graphs too, Mermaid included.
 3. An edge with a list of colors, such as `color="a:b"`, draws only the
    first color, with no issue. Graphviz draws a line in each color.
-4. `bgcolor` of the graph is an issue. Graphviz fills the page with it. A
-   fixed color does not follow the mode, and the boxes under the labels
-   and the open arrowheads take the background of the theme. It needs a
-   decision: whether `bgcolor` wins over the theme as `WithBackground`
-   does, whether the color of the text follows it, and what the dark mode
-   draws.
-5. An edge to a cluster, with `lhead` or `ltail`, whose route is cut at the
+4. An edge to a cluster, with `lhead` or `ltail`, whose route is cut at the
    box of the cluster, puts its end labels back at the first place, with no
    check for overlap (`clipEdge` in `graph/nest.go`).
-6. The ends of a loop sit 2 or 3 pixels off the outline of an ellipse or a
+5. The ends of a loop sit 2 or 3 pixels off the outline of an ellipse or a
    circle, because they sit on its bounding box.
 
 
@@ -367,9 +355,6 @@ that turn, such as with `labelAngle: 45`.
 A rotated text whose mark holds a glyph that the font lacks, such as ❤,
 also draws a mirrored copy of each text. `dx` and `dy` on a rotated text
 move it on the page, not along the text as in Vega.
-A text cannot be cut with no mark. vega.js also writes the default "…" for
-an empty `ellipsis`, so such a cut is a feature that Vega lacks. It needs a
-property of zuzu and a decision.
 
 ### Give the look a color of a critical task
 

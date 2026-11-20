@@ -1,6 +1,7 @@
 package dot
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -151,6 +152,54 @@ func TestColorSchemes(t *testing.T) {
 	} {
 		if _, _, err := Parse(src, true); err == nil {
 			t.Errorf("%s: expected an error in the strict mode", src)
+		}
+	}
+}
+
+// TestBackground reads the bgcolor of the graph, which fills the page, as
+// in Graphviz 16 (D37): a name, a color in hex, a color of a colorscheme
+// and of a named scheme, and hue, saturation and value. transparent and
+// none fill nothing. A list of colors and an unknown color are issues.
+func TestBackground(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		attrs, exp string
+	}{
+		{`bgcolor=navy`, "navy"},
+		{`bgcolor="#1e1e2e"`, "#1e1e2e"},
+		{`bgcolor="#ff000080"`, "rgba(255,0,0,0.502)"},
+		{`bgcolor="/blues9/8"`, "#08519c"},
+		{`bgcolor=8; colorscheme=blues9`, "#08519c"},
+		{`graph [colorscheme=blues9, bgcolor=8]`, "#08519c"},
+		{`bgcolor="/x11/green"`, "#00ff00"},
+		{`bgcolor=lightblue4`, "#68838b"},
+		{`bgcolor="0.6 0.5 0.3"`, "rgb(38,54,77)"},
+		{`bgcolor=transparent`, "transparent"},
+		{`bgcolor=none`, "transparent"},
+		{``, ""},
+	}
+	for _, test := range tests {
+		g, report, err := Parse("digraph { "+test.attrs+"; a -> b }", true)
+		if err != nil || len(report) != 0 {
+			t.Fatalf("%s: %v %v", test.attrs, err, report)
+		}
+		if g.Background != test.exp {
+			t.Errorf("%s: expected %q, got %q", test.attrs, test.exp, g.Background)
+		}
+	}
+	// The bgcolor of a cluster fills the cluster, not the page.
+	g, _, err := Parse(`digraph { subgraph cluster_x { bgcolor=navy; a } }`, true)
+	if err != nil || g.Background != "" || g.Clusters[0].Style["fill"] != "navy" {
+		t.Errorf("a cluster: %v %q %v", err, g.Background, g.Clusters[0].Style)
+	}
+	for _, v := range []string{`"red:blue"`, `"red;0.3:blue"`, `nocolor`, `"/blues9/12"`} {
+		src := "digraph { bgcolor=" + v + "; a }"
+		g, report, err := Parse(src, false)
+		if err != nil || len(report) != 1 || report[0].Path != "graph" || !strings.Contains(report[0].Message, "bgcolor") || g.Background != "" {
+			t.Errorf("%s: expected one issue of the bgcolor, got %v %v %q", v, err, report, g.Background)
+		}
+		if _, _, err := Parse(src, true); err == nil {
+			t.Errorf("%s: expected an error in the strict mode", v)
 		}
 	}
 }

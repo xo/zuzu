@@ -187,11 +187,11 @@ func spacing(s *Spec, config any) any {
 // passedConfig are the parts of the config of a spec that the Vega config
 // holds with the same names and meaning: the styles of marks, the guides,
 // the ranges and the background, which the runtime applies, as
-// vega-lite.js passes them on, and the mode and the scheme that a spec
-// asks for (D32).
+// vega-lite.js passes them on, and the mode, the scheme and the background
+// of the theme that a spec asks for (D32, D37).
 var passedConfig = []string{
 	"style", "axis", "axisX", "axisY", "axisTop", "axisBottom", "axisLeft", "axisRight", "axisBand",
-	"legend", "title", "range", "background", theme.ConfigMode, theme.ConfigScheme,
+	"legend", "title", "range", "background", theme.ConfigMode, theme.ConfigScheme, theme.ConfigBackground,
 }
 
 // styleConfig returns the parts of the config of a spec that pass on to the

@@ -162,6 +162,8 @@ func (rt *runtime) render() (*scene.Scene, error) {
 	}
 	switch c, ok := bg.(string); {
 	case rt.opts.hasBackground:
+		// The background of the caller, or else of zuzu.background, wins
+		// over the background of the spec (D37).
 		if rt.opts.background != "transparent" {
 			sc.Background = scene.Paint{Color: rt.opts.background}
 		}

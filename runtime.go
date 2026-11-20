@@ -16,6 +16,7 @@ import (
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
 	"github.com/xo/zuzu/geo"
+	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text"
@@ -92,13 +93,15 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) (*runtime, e
 	if err := rt.look(); err != nil {
 		return nil, err
 	}
-	if o.hasBackground && o.background != "transparent" {
-		rt.theme.Background = o.background
+	// The background of the caller, or else of zuzu.background, is the
+	// background of the theme.
+	if rt.opts.hasBackground && rt.opts.background != "transparent" {
+		rt.theme.Background = rt.opts.background
 	}
 	rt.config = rt.theme.Config()
 	rt.endLabels = map[string]map[string]bool{}
 	for k, raw := range c.spec.Config {
-		if k == theme.ConfigMode || k == theme.ConfigScheme {
+		if k == theme.ConfigMode || k == theme.ConfigScheme || k == theme.ConfigBackground {
 			continue
 		}
 		var v any
@@ -115,7 +118,9 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) (*runtime, e
 // caller. Where the caller sets none, it takes the mode of zuzu.mode and
 // the scheme of zuzu.scheme in the config of the spec, such as the theme
 // of a Mermaid diagram (D32). A value that zuzu does not have is an issue,
-// whether the caller sets the look or not.
+// whether the caller sets the look or not. Last, a background of
+// zuzu.background sets the mode from its lightness, as the background of
+// the caller (D37).
 func (rt *runtime) look() error {
 	o := rt.opts
 	mode, scheme := o.mode, o.scheme
@@ -151,8 +156,42 @@ func (rt *runtime) look() error {
 			scheme = s
 		}
 	}
+	if raw, ok := cfg[theme.ConfigBackground]; ok {
+		bg, err := rt.configBackground(raw)
+		if err != nil {
+			return err
+		}
+		if bg != "" && !o.hasBackground {
+			// The background of the spec counts from here as one that the
+			// caller gives, so that the theme, the scene and the ramps take
+			// it.
+			rt.opts.background, rt.opts.hasBackground = bg, true
+			if c, _ := color.Parse(bg); c.A > 0 {
+				mode = theme.Light
+				if theme.IsDark(color.RGBA{R: c.R, G: c.G, B: c.B, A: 1}.Hex()) {
+					mode = theme.Dark
+				}
+			}
+		}
+	}
 	rt.theme = theme.New(mode, scheme)
 	return nil
+}
+
+// configBackground reads the color of zuzu.background as CSS: #rrggbb when
+// it is opaque, transparent when its alpha is 0, and rgba() between the
+// two. It returns empty, with the issue, for a value that is not a color.
+func (rt *runtime) configBackground(raw jsontext.Value) (string, error) {
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		if c, ok := color.Parse(s); ok {
+			if c.A <= 0 {
+				return "transparent", nil
+			}
+			return c.Hex(), nil
+		}
+	}
+	return "", rt.issue(vega.ErrUnsupported, "config."+theme.ConfigBackground, "the background %s", raw)
 }
 
 // issue handles a feature that zuzu does not support: an error in the

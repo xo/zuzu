@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/xo/zuzu/theme"
 )
 
 func TestCompileFigure(t *testing.T) {
@@ -123,5 +125,22 @@ func TestStyleFontStyle(t *testing.T) {
 	}
 	if d, _ := r["strokeDash"].([]any); len(d) != 4 || d[0] != 5.0 {
 		t.Errorf("expected the dash 5,5,4,0, got %v", r["strokeDash"])
+	}
+}
+
+// TestCompileBackground writes the background of a graph in the config of
+// the spec as zuzu.background (D37), and a graph with no background writes
+// no config.
+func TestCompileBackground(t *testing.T) {
+	t.Parallel()
+	spec, err := Compile(&Graph{Nodes: []*Node{{ID: "a"}}, Background: "#1e1e2e"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := string(spec.Config[theme.ConfigBackground]); v != `"#1e1e2e"` || len(spec.Config) != 1 {
+		t.Errorf("expected the config zuzu.background #1e1e2e, got %v", spec.Config)
+	}
+	if spec, err = Compile(&Graph{Nodes: []*Node{{ID: "a"}}}); err != nil || spec.Config != nil {
+		t.Errorf("expected no config, got %v %v", spec.Config, err)
 	}
 }

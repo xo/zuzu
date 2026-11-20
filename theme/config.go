@@ -3,10 +3,15 @@ package theme
 // The keys of the config of a spec that ask for a look (D32): a mode,
 // light or dark, and a scheme by its name, such as mermaid-forest. A
 // Mermaid diagram fills them from its theme. A mode or a scheme that the
-// caller of a render gives wins over them.
+// caller of a render gives wins over them. ConfigBackground is a color of
+// CSS that fills the page and is the background of the theme, such as the
+// bgcolor of a graph of DOT (D37). The mode follows its lightness, over the
+// mode of the caller and of ConfigMode. A background that the caller gives
+// wins over it.
 const (
-	ConfigMode   = "zuzu.mode"
-	ConfigScheme = "zuzu.scheme"
+	ConfigMode       = "zuzu.mode"
+	ConfigScheme     = "zuzu.scheme"
+	ConfigBackground = "zuzu.background"
 )
 
 // The styles that the compiler of Vega-Lite names for the color of a mark
@@ -139,8 +144,8 @@ func (t Theme) Config() map[string]any {
 			StyleCurve:       map[string]any{"interpolate": "monotone"},
 			// A node is a tint of its color with an outline of 1.25, and an
 			// edge a line of EdgeWidth in the color of an edge (D31, D32).
-			StyleNode:         map[string]any{"fill": c, "fillOpacity": 0.14, "stroke": c, "strokeWidth": 1.25},
-			StyleNodeMuted:    map[string]any{"fill": t.Muted, "fillOpacity": 0.14, "stroke": t.Muted, "strokeWidth": 1.25},
+			StyleNode:         map[string]any{"fill": c, "fillOpacity": NodeTint, "stroke": c, "strokeWidth": NodeOutline},
+			StyleNodeMuted:    map[string]any{"fill": t.Muted, "fillOpacity": NodeTint, "stroke": t.Muted, "strokeWidth": NodeOutline},
 			StyleNodeLabel:    map[string]any{"fill": t.Text, "fontSize": 11.0},
 			StyleEdge:         map[string]any{"stroke": t.Edge, "strokeWidth": EdgeWidth, "strokeCap": "round", "strokeJoin": "round"},
 			StyleArrow:        map[string]any{"fill": t.Edge, "stroke": t.Edge, "strokeWidth": 1.0, "strokeJoin": "round"},

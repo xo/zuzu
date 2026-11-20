@@ -255,7 +255,8 @@ type renderOptions struct {
 	// Plex Sans does not have.
 	fallbacks []*text.Fallback
 	// background is the color of WithBackground as CSS, and hasBackground
-	// says that the option set it.
+	// says that the option set it. Where the caller sets none, the runtime
+	// sets them from zuzu.background in the config of the spec (D37).
 	background    string
 	hasBackground bool
 	// scale is the scale of WithScale, and hasScale says that the option
@@ -334,8 +335,9 @@ func WithRandom(fn func() rand.Source) RenderOption {
 }
 
 // WithBackground sets the background of the chart, over the background of
-// the theme and of the spec. A color with an alpha of 0 draws no
-// background, and nil keeps the background of the theme and of the spec.
+// the theme and of the spec, and over zuzu.background in the config of the
+// spec. A color with an alpha of 0 draws no background, and nil keeps the
+// background of the theme and of the spec.
 // The boxes under the labels of a diagram and the open arrowheads take an
 // opaque color too, so that they match the background.
 func WithBackground(c color.Color) RenderOption {

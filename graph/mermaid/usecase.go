@@ -28,10 +28,12 @@ var ucSettings = []string{
 
 // ucConfig is the config of a use case diagram: the widths in the pixels
 // of Mermaid at which a label wraps and under which a use case does not
-// shrink, and the styles of the fonts of the actors and of the use cases.
+// shrink, the styles of the fonts of the actors and of the use cases, and
+// whether each actor, use case and system boundary takes a color in turn.
 type ucConfig struct {
 	wrap, minWidth         float64
 	actorFont, usecaseFont map[string]string
+	rotate                 bool
 }
 
 // usecaseGraph reads a use case diagram, usecase-beta, into a graph. It
@@ -180,9 +182,15 @@ func ucReadConfig(d *Diagram, is *graph.Issues, g *graph.Graph) (ucConfig, error
 		case "colorScheme":
 			// The default, role, colors the actors and the use cases by
 			// the colors of the theme of Mermaid, which zuzu draws in its
-			// own look. rotate gives each a color of a palette of the
-			// theme.
-			if v != "role" {
+			// own look. rotate gives each actor, use case and system
+			// boundary a color of the palette of the theme in turn. Mermaid
+			// does it only in a color theme, and zuzu does the same, with
+			// the category scheme (D37).
+			switch v {
+			case "role":
+			case "rotate":
+				cfg.rotate = slices.Contains(colorThemes, themeName(d))
+			default:
 				if err := bad(k); err != nil {
 					return cfg, err
 				}
@@ -759,6 +767,17 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 			usecases = append(usecases, s)
 		}
 	}
+	// With rotate, the actors and then the use cases take the colors of
+	// the category scheme in turn, and the system boundaries take them in
+	// turn from the first color again, as in Mermaid (D37).
+	next, nextBoundary := 0, 0
+	category := func(n *int) int {
+		if !cfg.rotate {
+			return 0
+		}
+		*n++
+		return *n
+	}
 	labelOf := func(s *ucState) (string, graph.Font) {
 		t, font := ucText(s.label)
 		if s.stereotype != "" {
@@ -774,7 +793,8 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 		}
 		under(st, fontStyle(font))
 		under(st, cfg.actorFont)
-		n := &graph.Node{ID: s.id, Label: t, Shape: ucRect, Cluster: s.parent, Style: st, Wrap: w.width(wrap, s.label.markdown)}
+		n := &graph.Node{ID: s.id, Label: t, Shape: ucRect, Cluster: s.parent, Style: st, Wrap: w.width(wrap, s.label.markdown),
+			Category: category(&next)}
 		business := s.business != nil && *s.business
 		if s.icon != "" {
 			name := s.icon
@@ -806,7 +826,8 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 			shape = "businessEllipse"
 		}
 		g.Nodes = append(g.Nodes, &graph.Node{ID: s.id, Label: t, Shape: shape, Cluster: s.parent, Style: st,
-			Wrap: w.width(caseWrap, s.label.markdown), MinWidth: scaleWrap(d.Kind, labelUsecase, cfg.minWidth+2*pad)})
+			Wrap: w.width(caseWrap, s.label.markdown), MinWidth: scaleWrap(d.Kind, labelUsecase, cfg.minWidth+2*pad),
+			Category: category(&next)})
 	}
 	for i, n := range m.notes {
 		t, font := ucText(n.label)
@@ -833,7 +854,7 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 			return err
 		}
 		under(st, fontStyle(font))
-		c := &graph.Cluster{ID: id, Label: t, Style: st}
+		c := &graph.Cluster{ID: id, Label: t, Style: st, Category: category(&nextBoundary)}
 		if b.typ == "package" {
 			// A boundary of the type package draws with a tab at its top
 			// left, as a package of UML (D32).

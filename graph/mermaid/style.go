@@ -69,6 +69,41 @@ var themes = []string{
 	"redux", "redux-dark", "redux-color", "redux-dark-color",
 }
 
+// reduxSections are the sections of the config in which the default
+// config of Mermaid 12.3.0 sets the theme redux-color. A diagram of such a
+// kind with no theme in its source draws in that theme (D37).
+var reduxSections = []string{
+	"flowchart", "swimlane", "agentflow", "sequence", "class", "state", "er",
+	"requirement", "usecase", "venn",
+}
+
+// colorThemes are the color themes of Mermaid 12.3.0. Only these themes
+// give the elements of some kinds a color of a palette in turn, such as
+// the actors and the use cases of a use case diagram with colorScheme
+// rotate (D37).
+var colorThemes = []string{"redux-color", "redux-dark-color"}
+
+// themeName returns the theme of Mermaid in which a diagram draws, or
+// empty for none. A theme in the section of the kind, such as venn.theme,
+// wins over the theme at the top of the config, as in Mermaid 12.3 (D35
+// part 10). A diagram whose source has no theme that Mermaid 12.3.0 has
+// takes the theme that Mermaid sets in the section of its kind by
+// default, redux-color in a few kinds (D37).
+func themeName(d *Diagram) string {
+	name, _ := d.Config["theme"].(string)
+	section := themeSection(d.Kind)
+	if sec, ok := d.Config[section].(map[string]any); ok && knownTheme(sec["theme"]) {
+		name, _ = sec["theme"].(string)
+	}
+	if !knownTheme(name) && slices.Contains(reduxSections, section) {
+		name = "redux-color"
+	}
+	if !knownTheme(name) {
+		return ""
+	}
+	return name
+}
+
 // knownTheme reports whether a value of the setting theme names a theme
 // of Mermaid 12.3.0. Any other value stays an issue.
 func knownTheme(v any) bool {
@@ -82,14 +117,13 @@ func knownTheme(v any) bool {
 // theme. The runtime takes each one where the caller of a render sets no
 // mode or no scheme. A theme in the section of the kind, such as
 // venn.theme, wins over the theme at the top of the config, as in Mermaid
-// 12.3 (D35 part 10). Look returns nil for a diagram with no theme or with
-// a theme that Mermaid 12.3.0 does not have.
+// 12.3 (D35 part 10). A diagram whose source has no theme that Mermaid
+// 12.3.0 has takes the theme that Mermaid sets in the section of its kind
+// by default, redux-color in a few kinds (D37). Look returns nil for any
+// other diagram with no such theme.
 func Look(d *Diagram) vega.Config {
-	name, _ := d.Config["theme"].(string)
-	if section, ok := d.Config[themeSection(d.Kind)].(map[string]any); ok && knownTheme(section["theme"]) {
-		name, _ = section["theme"].(string)
-	}
-	if !knownTheme(name) {
+	name := themeName(d)
+	if name == "" {
 		return nil
 	}
 	if strings.Contains(name, "dark") {

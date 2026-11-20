@@ -300,8 +300,10 @@ func TestThemes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l := Look(d); l != nil {
-		t.Errorf("the theme sepia: the look %v", l)
+	// Mermaid skips a theme that it does not have, so a flowchart takes the
+	// theme of its section by default (D37).
+	if l := Look(d); string(l["zuzu.scheme"]) != `"mermaid-redux-color"` {
+		t.Errorf("the theme sepia: the look %v, want the default redux-color", l)
 	}
 }
 
@@ -389,10 +391,13 @@ func TestSectionThemes(t *testing.T) {
 	} else if l := Look(d); string(l["zuzu.mode"]) != `"dark"` {
 		t.Errorf("%q: the look %v, want the dark mode", src, l)
 	}
-	for _, src := range []string{
-		"---\nconfig:\n  classDiagram:\n    theme: forest\n---\nclassDiagram\n  A --> B\n",
-		"---\nconfig:\n  xychart:\n    theme: forest\n---\nxychart-beta\n  bar [1, 2]\n",
-		"---\nconfig:\n  pie:\n    theme: forest\n---\nvenn-beta\n  set A\n",
+	// A theme in another section is an issue and selects nothing. A class
+	// and a venn diagram then take the theme of their section by default
+	// (D37), and an XY chart has none.
+	for src, want := range map[string]string{
+		"---\nconfig:\n  classDiagram:\n    theme: forest\n---\nclassDiagram\n  A --> B\n": `"mermaid-redux-color"`,
+		"---\nconfig:\n  xychart:\n    theme: forest\n---\nxychart-beta\n  bar [1, 2]\n":   "",
+		"---\nconfig:\n  pie:\n    theme: forest\n---\nvenn-beta\n  set A\n":               `"mermaid-redux-color"`,
 	} {
 		if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
 			t.Errorf("%q: expected an issue, got %v", src, err)
@@ -401,8 +406,36 @@ func TestSectionThemes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if l := Look(d); l != nil {
-			t.Errorf("%q: the look %v", src, l)
+		if l := Look(d); string(l["zuzu.scheme"]) != want || len(l) > 1 {
+			t.Errorf("%q: the look %v, want the scheme %s", src, l, want)
+		}
+	}
+}
+
+// TestDefaultSectionThemes checks that a diagram of a kind whose section
+// Mermaid 12.3 gives the theme redux-color by default draws in it when its
+// source has no theme, and that a theme of the source wins (D37).
+func TestDefaultSectionThemes(t *testing.T) {
+	t.Parallel()
+	for src, want := range map[string]string{
+		"flowchart LR\n  A --> B\n":                                     `"mermaid-redux-color"`,
+		"graph LR\n  A --> B\n":                                         `"mermaid-redux-color"`,
+		"sequenceDiagram\n  A->>B: hi\n":                                `"mermaid-redux-color"`,
+		"classDiagram\n  A --> B\n":                                     `"mermaid-redux-color"`,
+		"stateDiagram-v2\n  A --> B\n":                                  `"mermaid-redux-color"`,
+		"erDiagram\n  A ||--o{ B : has\n":                               `"mermaid-redux-color"`,
+		"requirementDiagram\n  requirement r {\n    id: 1\n  }\n":       `"mermaid-redux-color"`,
+		"venn-beta\n  set A\n":                                          `"mermaid-redux-color"`,
+		"pie\n  \"a\" : 1\n":                                            "",
+		"---\nconfig:\n  theme: forest\n---\nflowchart LR\n  A --> B\n": `"mermaid-forest"`,
+		"---\nconfig:\n  theme: neutral\n---\nvenn-beta\n  set A\n":     `"mermaid-neutral"`,
+	} {
+		d, err := Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if l := Look(d); string(l["zuzu.scheme"]) != want {
+			t.Errorf("%q: the look %v, want the scheme %s", src, l, want)
 		}
 	}
 }

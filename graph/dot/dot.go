@@ -736,6 +736,10 @@ func (p *parser) graphAttrs(a map[string]string) error {
 				return err
 			}
 		case "colorscheme":
+		case "bgcolor":
+			if err := p.background(v, a["colorscheme"]); err != nil {
+				return err
+			}
 		case urlAttr, "href", "tooltip":
 			// They are read after the loop, with the label.
 		case "fontname":
@@ -780,6 +784,25 @@ func (p *parser) graphAttrs(a map[string]string) error {
 	var err error
 	p.g.Href, p.g.Tooltip, err = p.link(a, "graph", map[byte]string{'G': p.name, 'L': p.g.Title})
 	return err
+}
+
+// background reads the bgcolor of the graph, which fills the page, as in
+// Graphviz (D37). transparent and none fill nothing. A list of colors, a
+// gradient, and a color that does not read are issues.
+func (p *parser) background(v, scheme string) error {
+	switch {
+	case strings.ContainsAny(v, ":;"):
+		return p.issues.Add("graph", "the bgcolor %s, a list of colors", v)
+	case strings.EqualFold(strings.TrimSpace(v), "none"):
+		p.g.Background = "transparent"
+		return nil
+	}
+	c, ok := graph.ColorIn(v, scheme)
+	if !ok {
+		return p.issues.Add("graph", "the bgcolor %s", v)
+	}
+	p.g.Background = c
+	return nil
 }
 
 // finish sets the label, the shape and the paint of each node from its

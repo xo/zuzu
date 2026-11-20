@@ -35,6 +35,11 @@ The dark mode is not the light mode inverted. Its background has a little
 blue in it, its text is not pure white, and its data colors are lighter, so
 that each color keeps its contrast against the background.
 
+A graph of DOT can set its own background with `bgcolor` (D37). That color
+replaces `bg`, and the mode follows its lightness: a dark `bgcolor` draws
+in the dark mode, and a light one in the light mode. A background that the
+caller gives wins over `bgcolor`.
+
 A reader follows an edge of a diagram at the size of a terminal, across
 the nodes of a large diagram. So `edge` is darker than `muted` in the light
 mode and lighter in the dark mode, about halfway between `muted` and `text`,
@@ -223,6 +228,7 @@ background color, drawn under the fill with `paint-order="stroke"`.
 | hierarchy | a group is a tint of its color with its name at the top left. A leaf is the full color. Corners round by 3 to 6 |
 | link of a sankey | the color of its source at 0.32 opacity |
 | node of a graph | a rounded rectangle with a tint of its color and an outline of 1.25 |
+| use case diagram with `colorScheme: rotate` | each actor, use case and system boundary takes a categorical color in turn, and draws as a node of a graph of that color (D37) |
 | external element of a C4 diagram | a node in `muted`, with the tint and the outline of the other nodes, as Mermaid draws it gray (D32) |
 | edge of a graph | a line of `edgeWidth` in `edge`, with round caps and joins, and an arrowhead in `edge`, as "Edges" says |
 | guide line of a diagram | a line of 1.25 in `axis`, with round caps and joins, such as a lifeline of a sequence diagram or an axis of a radar |

@@ -55,6 +55,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `splines` | curved or straight edges. Another value is an issue |
 | the graph | `layout` | `dot`. Another layout is an issue |
 | the graph | `fontname` | the weight and the style of the title, as below |
+| the graph | `bgcolor` | the background of the page and of the theme, as below |
 | the graph, a node, an edge, a cluster | `colorscheme` | the color scheme of its colors, as below |
 | the graph, a node, an edge, a cluster | `URL`, `href`, `tooltip` | the link and the tooltip, as "Links and tooltips" says |
 | a node | `label` | the label, with `\n`, `\l` and `\r` as new lines and `\N` as the name, or a label of HTML, as below |
@@ -87,6 +88,18 @@ adds the numbered colors, such as `salmon2` and `lightblue4`, `gray0` to
 CSS also has, such as `gray`, `green`, `maroon` or `purple`, keeps its
 color of CSS, as the SVG of Graphviz does. The case of a name does not
 matter.
+
+The `bgcolor` of the graph fills the page, as in Graphviz (D37). It is a
+color in one of the forms above, or a color of a color scheme, as below.
+`transparent` and `none` fill nothing. The color is the background of the
+theme, so the boxes under the labels of the edges and the open arrowheads
+take it. The mode follows its lightness, so that the text stays readable on
+it: a dark `bgcolor` draws in the dark mode, and a light one in the light
+mode, whatever the mode of the caller. The compiled spec carries it in its
+`config` as `zuzu.background`, as [API.md](API.md) says. A background that
+the caller gives with `WithBackground` wins over `bgcolor`. A list of
+colors, such as the gradient `red:blue`, and a color that zuzu cannot read
+are issues, and the page takes the background of the theme.
 
 ### Color schemes
 
@@ -519,10 +532,13 @@ those kinds, `xyChart` in an XY chart, `c4` in a C4 diagram, and
 `classDiagram.theme`, is an issue. A mode or a scheme that the caller
 gives still wins.
 
-Mermaid 12.3 sets a theme in the sections of some kinds by default, such
-as `redux-color` in `flowchart` and `venn`. zuzu reads only a theme that
-the source gives, so a diagram with no `theme` draws in the scheme of the
-caller, or `zuzu`.
+Mermaid 12.3 sets the theme `redux-color` by default in the sections
+`flowchart`, `swimlane`, `agentflow`, `sequence`, `class`, `state`, `er`,
+`requirement`, `usecase` and `venn`. A diagram of such a kind with no
+theme in its source draws in the scheme `mermaid-redux-color`, as in
+Mermaid (D37). A theme that the source gives wins over the default, and a
+mode or a scheme that the caller gives wins over both. A diagram of
+another kind with no theme draws in the scheme of the caller, or `zuzu`.
 
 A theme that Mermaid 12.3.0 does not have, such as `sepia` or `Forest`, is
 an issue. `themeVariables` and `themeCSS` are issues too, except the theme
@@ -1274,7 +1290,8 @@ tint of its color, as in a flowchart, and a flow is a panel with its
 title at the top left. A link and its arrowhead take the color `edge`, and
 a link to a reference is dotted. Mermaid draws an agentflow diagram in
 the theme `redux-color` by default, with a color for each kind of node and
-for each flow. zuzu draws every kind in the color of the scheme.
+for each flow. zuzu takes the scheme `mermaid-redux-color` by default too
+(D37), and draws every kind of node in the color of the scheme.
 
 These parts are issues: a `theme` that Mermaid does not have, the
 `themeVariables`, which draw in the look of zuzu, the other settings of
@@ -1401,11 +1418,31 @@ zuzu reads these settings of `usecase`:
 5. `actorFontFamily` and `usecaseFontFamily`, which give the weight and
    the style that the name of a family holds.
 6. `colorScheme: role`, the default, which draws in the colors of zuzu.
+7. `colorScheme: rotate`, which gives each actor, use case and system
+   boundary a color in turn, as the next paragraphs say.
 
-These parts are issues: `colorScheme: rotate`, which gives each actor and
-each use case a color of a palette of a theme of Mermaid, another setting
-of `usecase`, a `theme` that Mermaid does not have, and
-the `themeVariables`. An icon that does not load draws as a box with a question mark,
+With `colorScheme: rotate`, each actor, use case and system boundary takes
+a color of the category scheme in turn, and draws as a node of that color:
+a tint and an outline (D37). The figure of an actor takes the color too.
+The actors come first, then the use cases, each in the order of its first
+mention, as in Mermaid. The system boundaries take the colors in turn from
+the first color again. A note and a block of JSON take no color. A fill or
+a stroke of a class or a style wins over the color. After the last color
+of the scheme, the colors start again. The category scheme has ten colors
+and the palette of Mermaid has twelve, so the eleventh element takes the
+first color in zuzu and the eleventh color in Mermaid.
+
+Mermaid 12.3.0 gives the colors in turn only in a color theme,
+`redux-color` or `redux-dark-color`. A use case diagram with no theme
+draws in `redux-color`, so `rotate` takes effect there. In any other
+theme, such as `default` or `forest`, Mermaid draws no colors in turn, and
+zuzu does the same, with no issue. In a color theme, Mermaid gives each
+system boundary a color in turn with `role` too. With `role`, zuzu draws
+a system boundary as a panel.
+
+These parts are issues: a value of `colorScheme` other than `role` and
+`rotate`, another setting of `usecase`, a `theme` that Mermaid does not
+have, and the `themeVariables`. An icon that does not load draws as a box with a question mark,
 and it is an issue when the diagram renders.
 
 These are errors, as in Mermaid:
@@ -3572,8 +3609,8 @@ padding. `venn.useDebugLayout: true`
 draws the grid of the texts, which zuzu does not draw, so it is an issue.
 `venn.look` is a hint, as `look` is. Mermaid 12.3 draws a venn diagram in
 the theme of `venn.theme`, `redux-color` by default. zuzu reads
-`venn.theme` too, as "The theme" says. A venn diagram with no `theme`
-draws in the scheme of the caller, or `zuzu`. The colors `venn1` to `venn8` of `themeVariables` are
+`venn.theme` too, as "The theme" says. A venn diagram with no theme
+draws in the scheme `mermaid-redux-color`, as in Mermaid (D37). The colors `venn1` to `venn8` of `themeVariables` are
 issues, as the other theme variables are.
 
 zuzu draws a venn diagram in other ways than Mermaid in two places.

@@ -150,7 +150,12 @@ func TestEdgesTakeTheTokensOfAnEdge(t *testing.T) {
 func TestLinkStyleWinsOverTheEdge(t *testing.T) {
 	t.Parallel()
 	lines, arrows := edgeItems(t, "flowchart LR\n  a --> b --> c\n  linkStyle 1 stroke:#00ff00,stroke-width:4px")
-	th := theme.New(theme.Light, theme.Zuzu)
+	// A flowchart with no theme draws in redux-color, as in Mermaid (D37).
+	scheme, ok := theme.Lookup("mermaid-redux-color")
+	if !ok {
+		t.Fatal("no scheme mermaid-redux-color")
+	}
+	th := theme.New(theme.Light, scheme)
 	if len(lines) != 2 || len(arrows) != 2 {
 		t.Fatalf("%d lines and %d arrowheads, want 2 and 2", len(lines), len(arrows))
 	}

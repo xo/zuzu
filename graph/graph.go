@@ -72,6 +72,11 @@ type Graph struct {
 	// Href and Tooltip are the link and the tooltip of the whole diagram,
 	// or empty (D32).
 	Href, Tooltip string
+	// Background is a color of CSS that fills the page and is the
+	// background of the theme, such as the bgcolor of a graph of DOT, or
+	// empty (D37). Compile writes it in the config of the spec as
+	// zuzu.background.
+	Background string
 }
 
 // Node is a node of a graph.
@@ -132,6 +137,12 @@ type Node struct {
 	// Href is the link of the node and Tooltip its tooltip, or empty
 	// (D32). Its shape and its labels take them.
 	Href, Tooltip string
+	// Category is the place of a color in the category scheme of the
+	// theme, from 1, or 0 for none. The node then draws in that color, a
+	// tint and an outline, and its figure too. A fill or a stroke of Style
+	// wins over it. After the last color of the scheme, the colors start
+	// again (D37).
+	Category int
 }
 
 // Media is the icon or the image of a node (D31).
@@ -250,6 +261,10 @@ type Cluster struct {
 	// Href and Tooltip are the link and the tooltip of the cluster, or
 	// empty (D32). Its box and its title take them.
 	Href, Tooltip string
+	// Category is the place of a color in the category scheme, as
+	// Node.Category. The panel then draws as a node of that color draws: a
+	// tint and an outline.
+	Category int
 	// Shape is the shape of the cluster: empty for a panel, or
 	// ClusterPackage.
 	Shape string

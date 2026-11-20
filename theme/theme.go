@@ -56,6 +56,15 @@ const (
 	ArrowLength = 8.0
 )
 
+// The paint of a node of a diagram, from "Marks" in docs/STYLE.md: a tint
+// of its color and an outline.
+const (
+	// NodeTint is the opacity of the fill of a node, a tint of its color.
+	NodeTint = 0.14
+	// NodeOutline is the width of the outline of a node.
+	NodeOutline = 1.25
+)
+
 // neutrals returns the neutrals of a mode, from docs/STYLE.md.
 func neutrals(m Mode) Neutrals {
 	if m == Dark {
@@ -306,7 +315,7 @@ func (t Theme) Mode() Mode {
 func (t Theme) Sequential(v float64) string {
 	base := t.Category[0]
 	var stops []string
-	if _, _, l := toHSL(parse(t.Background)); l < 0.5 {
+	if IsDark(t.Background) {
 		stops = []string{
 			mix(t.Background, base, 0.12), mix(t.Background, base, 0.45), base,
 			mix(base, "#ffffff", 0.45), mix(base, "#ffffff", 0.85),
@@ -318,6 +327,14 @@ func (t Theme) Sequential(v float64) string {
 		}
 	}
 	return ramp(stops, v)
+}
+
+// IsDark reports whether a background in the form #rrggbb is dark: its
+// lightness in HSL is below 0.5 (D35, D37). A color in another form reads
+// as black, and so as dark.
+func IsDark(background string) bool {
+	_, _, l := toHSL(parse(background))
+	return l < 0.5
 }
 
 // Diverging returns the color at v, from 0 to 1, on the diverging ramp of
