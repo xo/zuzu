@@ -24,7 +24,7 @@ import (
 	"testing/fstest"
 	"unicode"
 
-	gotext "github.com/go-text/typesetting/font"
+	gotext "github.com/xo/okage/typesetting/font"
 	okagesvg "github.com/xo/okage/svg"
 )
 

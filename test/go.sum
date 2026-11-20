@@ -1,8 +1,4 @@
-github.com/go-text/typesetting v0.3.5 h1:XZPUooClHY0Vf/rFyUyuPRNEkawARaFzLMQcXLSEyPk=
-github.com/go-text/typesetting v0.3.5/go.mod h1:XZO1hD+nQVyvVa5IicQk7FsCa4PFQaJ2soWAP1f//68=
-github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc h1:8FGo2It5K75XkavhTiCKExUfVaVDS1feBnLCru5qeoY=
-github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc/go.mod h1:3/62I4La/HBRX9TcTpBj4eipLiwzf+vhI+7whTc9V7o=
-github.com/xo/okage v0.18.1 h1:2ce3DImijE5v9alHe5X9eYcyBNMC3vXQfQRtKyVUPFo=
-github.com/xo/okage v0.18.1/go.mod h1:pte/3aqjk2ElZwxYex0erXC3kT2tqxOwWuIHA8fhKOM=
+github.com/xo/okage v0.19.0 h1:KX9iGNJ7htpTHXobLY64b/gmQgg8sl+TCMlTuZQeAr0=
+github.com/xo/okage v0.19.0/go.mod h1:pte/3aqjk2ElZwxYex0erXC3kT2tqxOwWuIHA8fhKOM=
 golang.org/x/image v0.48.0 h1:1AvuPcuoOTJpA7s4VZ5umrb90T3So0rkB/bSGmxkxik=
 golang.org/x/image v0.48.0/go.mod h1:mmtg64iqJKGqEgy+r13dfybl85tmxUd2lMnmaiSdWYY=
