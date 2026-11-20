@@ -4,8 +4,8 @@ Status: Decided. Amends D16, D32 and D35.
 
 Mermaid 12.3 draws a text between two `$$` in a label, such as `$$x^2$$`,
 as math with KaTeX. Today zuzu draws such a label as its LaTeX source and
-reports an issue (D35 part 13, and item 14 of "Phase 7" in
-`docs/BACKLOG.md`). okage plans a math layout that ivy and zuzu share. Its
+reports an issue (D35 part 13, and the item on the math of KaTeX in "Fix
+what the corpus of mermaid-go-renderer found" in `docs/BACKLOG.md`). okage plans a math layout that ivy and zuzu share. Its
 proposal is okage D78, with open question 32 of okage. This decision says
 how zuzu uses that layout. It waits for okage D78, and zuzu builds nothing
 until okage releases the layout.
@@ -28,13 +28,14 @@ The oracle of Mermaid 12.3 (mmdc, with Chrome) shows these facts:
 
 ## The decision
 
-1. The layout. zuzu lays out each formula with the math layout of okage.
-   zuzu writes no TeX parser and no math layout of its own.
+1. The layout. zuzu lays out each formula with the package
+   `github.com/xo/okage/texmath`, the math layout of okage D78. zuzu
+   writes no TeX parser and no math layout of its own.
 2. The font. The math draws in STIX Two Math, under the SIL Open Font
-   License 1.1, from the package of okage that holds it. A package of zuzu,
-   `text/math`, gives it, and `zuzu.WithMath(math.Font())` adds it to a
-   render, as `zuzu.WithEmoji` adds the emoji font (D32). A program that
-   does not import the package does not hold the font. zuzu checks the
+   License 1.1, from the package `texmath/stixtwomath` of okage. A package
+   of zuzu, `text/math`, gives it, and `zuzu.WithMath(math.Font())` adds
+   it to a render, as `zuzu.WithEmoji` adds the emoji font (D32). A program
+   that does not import the package does not hold the font. zuzu checks the
    license of the font as it checks each bundled font (D16). This amends
    D16.
 3. The labels. zuzu splits a label into runs of text and runs of math in
@@ -53,7 +54,10 @@ The oracle of Mermaid 12.3 (mmdc, with Chrome) shows these facts:
    rule of the formula, at the position of the formula, and its fill is
    the color of the text of the label. The item keeps the LaTeX source in
    its field `text`, which a path does not draw. `scene.Encode` and
-   `scene.Decode` need no change.
+   `scene.Decode` need no change. One path has one fill, so a formula with
+   `\color` or `\textcolor` draws one item for each glyph and each rule,
+   from the path of each item that `texmath` gives (`ItemPath`), each in
+   its own color. Its colors are not lost.
 6. The writers. The SVG writer writes the path, so that a viewer needs no
    math font, and writes the source as the `aria-label` of the path. The
    raster draws the path with okage.
@@ -73,19 +77,24 @@ The oracle of Mermaid 12.3 (mmdc, with Chrome) shows these facts:
    `github.com/go-text/typesetting`. That copy has the functions that zuzu
    uses, and the math layout of okage takes the faces of that copy. A
    program then holds one copy of go-text, not two.
+10. Concurrency. A face of the copy of go-text in okage is not safe for
+    concurrent use (okage D78). zuzu gives each goroutine that lays out
+    math a face of its own, or guards a shared face with a lock. Two
+    renders that run at the same time do not share a face.
 
 ## The order of the work
 
-1. The maintainers of okage decide okage D78. If its API differs from what this decision assumes,
-   zuzu updates this decision first.
+1. The maintainers of okage decided okage D78 on 2026-11-20. Its API
+   holds what this decision assumes. Parts 5 and 10 take its two notes,
+   on `\color` and on concurrency.
 2. zuzu moves to the release of okage that holds the math layout and
    reads its fonts with the copy of go-text in okage. The corpus and the
    oracles give the same output, or the change says why each one differs.
 3. zuzu builds parts 2 to 7, with specs with math in each kind of the
    table, compared with the oracle, and unit tests of the split, the
    measure and the writers.
-4. `docs/DIAGRAMS.md` says what draws, and item 14 of "Phase 7" leaves
-   `docs/BACKLOG.md`.
+4. `docs/DIAGRAMS.md` says what draws, and the item on the math of KaTeX
+   leaves `docs/BACKLOG.md`.
 
 ## The answer
 
