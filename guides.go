@@ -167,9 +167,14 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	if ax.Format, err = s.labelFormat(sc, a.Format, a.FormatType, ax); err != nil {
 		return nil, err
 	}
+	if ax.LabelAlign, err = s.str(a.LabelAlign, configStr(cfg, "labelAlign", "")); err != nil {
+		return nil, err
+	}
+	props := s.guideProps(cfg, a.Extra)
+	axisTitleProps(ax, props)
 	m := s.rt.style().Axis(ax)
 	// The config and the axis style its parts, over the look of zuzu.
-	styleGuide(&m, s.guideProps(cfg, a.Extra), axisParts)
+	styleGuide(&m, props, axisParts)
 	if err := s.guideEncode(&m, a.Encode, axisEncodeParts, axisFrame(ax), path, "an axis"); err != nil {
 		return nil, err
 	}
@@ -177,6 +182,21 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 		m.ZIndex = *a.ZIndex
 	}
 	return &m, nil
+}
+
+// axisTitleProps reads the place, the angle, the align and the baseline of
+// the title of an axis from its properties, the config with the axis over
+// it. A property that is not there keeps the one of the look.
+func axisTitleProps(ax *layout.Axis, props map[string]any) {
+	num := func(k string) *float64 {
+		if f, ok := props[k].(float64); ok && !math.IsNaN(f) && !math.IsInf(f, 0) {
+			return &f
+		}
+		return nil
+	}
+	ax.TitleX, ax.TitleY, ax.TitleAngle = num("titleX"), num("titleY"), num("titleAngle")
+	ax.TitleAlign = configStr(props, "titleAlign", "")
+	ax.TitleBaseline = configStr(props, "titleBaseline", "")
 }
 
 // rangeEnd returns the far end of the range of a scale of positions, or 0

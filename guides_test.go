@@ -282,3 +282,102 @@ func TestRectItemEnds(t *testing.T) {
 		t.Errorf("the text at the end of the rect is %+v, want it at 120, 60", text)
 	}
 }
+
+// TestAxisSpecProps checks that the runtime reads the labelAlign, the
+// titleX, the titleY, the titleAngle, the titleAlign and the titleBaseline
+// of an axis, from the axis or from the config, with the axis over the
+// config, as in Vega. Before, it dropped them, so the year of each row of
+// calendar-view covered the label "Jan".
+func TestAxisSpecProps(t *testing.T) {
+	t.Parallel()
+	items := func(config, axis, role string) []scene.Item {
+		t.Helper()
+		src := `{"width": 200, "height": 100, "config": {` + config + `},
+			"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"},
+				{"name": "y", "type": "linear", "domain": [0, 10], "range": "height"}],
+			"axes": [` + axis + `]}`
+		c, _, err := Parse([]byte(src), WithDialect(Vega), WithStrict(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, report, err := c.Render(t.Context(), WithLocation(time.UTC))
+		if err != nil || len(report) != 0 {
+			t.Fatalf("render: %v, with the report %v", err, report)
+		}
+		var out []scene.Item
+		var walk func(m *scene.Mark)
+		walk = func(m *scene.Mark) {
+			for i := range m.Items {
+				if m.Role == role {
+					out = append(out, m.Items[i])
+				}
+				for j := range m.Items[i].Items {
+					walk(&m.Items[i].Items[j])
+				}
+			}
+		}
+		walk(&s.Root)
+		return out
+	}
+	for _, c := range []struct {
+		name, config, axis, role string
+		check                    func(it scene.Item) bool
+	}{
+		{
+			"the labelAlign of a top axis",
+			``, `{"scale": "x", "orient": "top", "labelAlign": "left"}`,
+			"axis-label", func(it scene.Item) bool { return it.Align == "left" },
+		},
+		{
+			"the labelAlign of a bottom axis over its labelAngle",
+			``, `{"scale": "x", "orient": "bottom", "labelAngle": 45, "labelAlign": "center"}`,
+			"axis-label", func(it scene.Item) bool { return it.Align == "center" && it.Angle == 45 },
+		},
+		{
+			"the labelAlign of the config",
+			`"axisX": {"labelAlign": "right"}`, `{"scale": "x", "orient": "bottom"}`,
+			"axis-label", func(it scene.Item) bool { return it.Align == "right" },
+		},
+		{
+			"the labelAlign of an axis over the config",
+			`"axis": {"labelAlign": "right"}`, `{"scale": "x", "orient": "bottom", "labelAlign": "left"}`,
+			"axis-label", func(it scene.Item) bool { return it.Align == "left" },
+		},
+		{
+			"the title of a left axis as calendar-view places it",
+			``, `{"scale": "y", "orient": "left", "title": {"signal": "2020"}, "titleAngle": 0, "titleAlign": "right", "titleX": -8, "titleY": -2}`,
+			"axis-title", func(it scene.Item) bool {
+				return it.X == -8 && it.Y == -2 && it.Angle == 0 && it.Align == "right" && it.Text[0] == "2020"
+			},
+		},
+		{
+			"the titleY of a bottom axis with an offset, from the origin of the axis",
+			``, `{"scale": "x", "orient": "bottom", "offset": 5, "title": "X", "titleY": 30}`,
+			"axis-title", func(it scene.Item) bool { return it.X == 200 && it.Y == 135 },
+		},
+		{
+			"the titleAngle of a signal and the titleBaseline",
+			``, `{"scale": "y", "orient": "right", "title": "Y", "titleAngle": {"signal": "45 * 2"}, "titleBaseline": "top"}`,
+			"axis-title", func(it scene.Item) bool { return it.Angle == 90 && it.Baseline == "top" },
+		},
+		{
+			"the title of the config of each y axis, as parallel-coordinates places it",
+			`"axisY": {"titleX": -2, "titleY": 110, "titleAngle": 0, "titleAlign": "right", "titleBaseline": "top"}`,
+			`{"scale": "y", "orient": "left", "title": "Y"}`,
+			"axis-title", func(it scene.Item) bool {
+				return it.X == -2 && it.Y == 110 && it.Align == "right" && it.Baseline == "top"
+			},
+		},
+	} {
+		got := items(c.config, c.axis, c.role)
+		if len(got) == 0 {
+			t.Errorf("%s: no items", c.name)
+			continue
+		}
+		for _, it := range got {
+			if !c.check(it) {
+				t.Errorf("%s: the item is at %v, %v, turned %v, aligned %s on %s", c.name, it.X, it.Y, it.Angle, it.Align, it.Baseline)
+			}
+		}
+	}
+}

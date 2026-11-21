@@ -199,10 +199,9 @@ func (s Style) itemBounds(typ string, it *scene.Item) Bounds {
 	case scene.Text:
 		b.union(s.textBounds(it))
 	case scene.Path, scene.Shape:
-		b.add(it.X, it.Y)
-		if it.Path != "" {
-			pathBounds(&b, it)
-		}
+		// The bounds of a path are those of its points, and not its
+		// origin, as Vega bounds it.
+		pathBounds(&b, it)
 	}
 	return b
 }
@@ -277,7 +276,15 @@ func (s Style) textBounds(it *scene.Item) Bounds {
 		// A line longer than its limit is cut to it.
 		w = math.Min(w, it.Limit)
 	}
-	h := size * float64(max(1, len(it.Text)))
+	// The lines are one line height apart, as the writers draw them, so
+	// the text is one size high and one line height more for each line
+	// after the first.
+	lh := it.LineHeight
+	if lh == 0 {
+		lh = size
+	}
+	extra := lh * float64(max(0, len(it.Text)-1))
+	h := size + extra
 	x0 := 0.0
 	switch it.Align {
 	case "center":
@@ -287,6 +294,9 @@ func (s Style) textBounds(it *scene.Item) Bounds {
 	}
 	y0 := -size * 0.8
 	switch it.Baseline {
+	case "", "alphabetic":
+		// On the alphabetic baseline, the last line sits on the baseline.
+		y0 -= extra
 	case "top":
 		y0 = 0
 	case "middle":

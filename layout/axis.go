@@ -43,6 +43,18 @@ type Axis struct {
 	// LabelLimit is the widest that a label draws, in pixels, before it is
 	// cut with an ellipsis, or 0 for no limit.
 	LabelLimit float64
+	// LabelAlign is the align of each label that the spec gives, over the
+	// align of the look, the angle and the flush. It is "" for none.
+	LabelAlign string
+	// TitleX and TitleY place the title from the origin of the axis, as the
+	// spec gives them, or are nil for the place of the look. The origin is
+	// where the line of the axis starts, at the offset of the axis.
+	TitleX, TitleY *float64
+	// TitleAngle turns the title, in degrees, or is nil for no turn.
+	TitleAngle *float64
+	// TitleAlign and TitleBaseline are the align and the baseline of the
+	// title that the spec gives, or "" for those of the look.
+	TitleAlign, TitleBaseline string
 }
 
 // TickCount returns the number of ticks that the axis asks its scale for:
@@ -147,8 +159,11 @@ func (s Style) Axis(a *Axis) scene.Mark {
 			group.Items = append(group.Items, scene.Mark{Type: scene.Rule, Role: "axis-zero", Items: []scene.Item{it}})
 		}
 	}
+	labels := Empty()
 	if a.Labels && len(vals) > 0 {
-		group.Items = append(group.Items, s.axisLabels(a, vals, pos))
+		m := s.axisLabels(a, vals, pos)
+		labels = s.MarkBounds(&m)
+		group.Items = append(group.Items, m)
 	}
 	// The look of zuzu draws a base line along a band axis, and none along
 	// an axis of numbers (docs/STYLE.md).
@@ -169,7 +184,7 @@ func (s Style) Axis(a *Axis) scene.Mark {
 		group.Items = append(group.Items, dom)
 	}
 	if a.Title != "" {
-		group.Items = append(group.Items, s.axisTitle(a))
+		group.Items = append(group.Items, s.axisTitle(a, labels))
 	}
 	return scene.Mark{Type: scene.Group, Role: "axis", Items: []scene.Item{group}}
 }
@@ -202,6 +217,9 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 			turnLabel(&it, a.Orient, a.LabelAngle)
 		} else if a.LabelFlush >= 0 {
 			flush(&it, a, pos[i])
+		}
+		if a.LabelAlign != "" {
+			it.Align = a.LabelAlign
 		}
 		it.Limit = a.LabelLimit
 		it.Datum = map[string]any{"value": v, "label": str}
@@ -281,23 +299,68 @@ func (s Style) dropOverlaps(items []scene.Item) []scene.Item {
 
 // axisTitle draws the title of an axis at the end of the axis, rather than
 // along it: above a vertical axis, and at the right of a horizontal one,
-// below its labels.
-func (s Style) axisTitle(a *Axis) scene.Mark {
+// past the bounds of its labels. The place, the angle, the align and the
+// baseline that the spec gives win over those of the look.
+func (s Style) axisTitle(a *Axis, labels Bounds) scene.Mark {
 	m := scene.Mark{Type: scene.Text, Role: "axis-title"}
 	color := s.Theme.Faint
 	var it scene.Item
 	switch a.Orient {
 	case "bottom":
-		it = s.label(a.Length, a.Cross+a.Offset+LabelPad+LabelSize+6, a.Title, SmallSize, 400, color, "right", "top")
+		y := a.Cross + a.Offset + LabelPad + LabelSize
+		if !labels.IsEmpty() {
+			// Labels that turn reach further from the axis.
+			y = math.Max(y, labels.Y2)
+		}
+		it = s.label(a.Length, y+titleGap, a.Title, SmallSize, 400, color, "right", "top")
 	case "top":
-		it = s.label(a.Length, -a.Offset-LabelPad-LabelSize-6, a.Title, SmallSize, 400, color, "right", "bottom")
+		y := -a.Offset - LabelPad - LabelSize
+		if !labels.IsEmpty() {
+			y = math.Min(y, labels.Y1)
+		}
+		it = s.label(a.Length, y-titleGap, a.Title, SmallSize, 400, color, "right", "bottom")
 	case "left":
 		it = s.label(-a.Offset, -LabelPad-4, a.Title, SmallSize, 400, color, "left", "bottom")
 	default:
 		it = s.label(a.Cross+a.Offset, -LabelPad-4, a.Title, SmallSize, 400, color, "right", "bottom")
 	}
+	x, y := a.origin()
+	if a.TitleX != nil {
+		it.X = x + *a.TitleX
+	}
+	if a.TitleY != nil {
+		it.Y = y + *a.TitleY
+	}
+	if a.TitleAngle != nil {
+		it.Angle = *a.TitleAngle
+	}
+	if a.TitleAlign != "" {
+		it.Align = a.TitleAlign
+	}
+	if a.TitleBaseline != "" {
+		it.Baseline = a.TitleBaseline
+	}
 	m.Items = []scene.Item{it}
 	return m
+}
+
+// titleGap is the space between the labels of a horizontal axis and its
+// title.
+const titleGap = 6
+
+// origin returns where the line of an axis starts, at its offset, in the
+// coordinates of the plot area: the place from which Vega reads the titleX
+// and the titleY of the axis.
+func (a *Axis) origin() (float64, float64) {
+	switch a.Orient {
+	case "bottom":
+		return 0, a.Cross + a.Offset
+	case "top":
+		return 0, -a.Offset
+	case "left":
+		return -a.Offset, 0
+	}
+	return a.Cross + a.Offset, 0
 }
 
 // ptr returns a pointer to a number.

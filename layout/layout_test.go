@@ -200,3 +200,84 @@ func TestLegendThresholds(t *testing.T) {
 		t.Errorf("%d entries, want 2", len(symbols.Items))
 	}
 }
+
+// TestAxisTitleClearsTurnedLabels checks that the title of a bottom axis
+// sits below its labels when they turn, and keeps its place when they do
+// not. Before, the title had a fixed place and covered the turned labels.
+func TestAxisTitleClearsTurnedLabels(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "band", []any{"a long label", "another long label"}, []any{0.0, 200.0})
+	axis := func(angle float64) (Bounds, scene.Item) {
+		m := st.Axis(&Axis{
+			Orient: "bottom", Scale: sc, Length: 200, Cross: 100, Labels: true, BandPosition: 0.5,
+			Title: "Name", LabelAngle: angle, Format: expr.String,
+		})
+		return st.MarkBounds(find(m, "axis-label")), find(m, "axis-title").Items[0]
+	}
+	if _, title := axis(0); title.Y != 100+LabelPad+LabelSize+titleGap {
+		t.Errorf("the title of labels that do not turn is at y %v, want %d", title.Y, 100+LabelPad+LabelSize+titleGap)
+	}
+	labels, title := axis(90)
+	if labels.Y2 < 150 || title.Y != labels.Y2+titleGap {
+		t.Errorf("the title of turned labels that end at y %v is at y %v, want %v", labels.Y2, title.Y, labels.Y2+titleGap)
+	}
+}
+
+// TestAxisSpecPlace checks that the align of the labels, and the place, the
+// angle, the align and the baseline of the title, that the spec gives win
+// over those of the look. titleX and titleY start at the origin of the
+// axis, which an offset moves, as in Vega.
+func TestAxisSpecPlace(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "linear", []any{0.0, 10.0}, []any{100.0, 0.0})
+	x, y, angle := -8.0, -2.0, 0.0
+	m := st.Axis(&Axis{
+		Orient: "left", Scale: sc, Length: 100, Cross: 200, Labels: true, Offset: 10,
+		Title: "Year", Format: expr.String, LabelFlush: 1, LabelAlign: "center",
+		TitleX: &x, TitleY: &y, TitleAngle: &angle, TitleAlign: "right", TitleBaseline: "top",
+	})
+	for _, it := range find(m, "axis-label").Items {
+		if it.Align != "center" {
+			t.Errorf("a label is aligned %s, want center", it.Align)
+		}
+	}
+	if it := find(m, "axis-title").Items[0]; it.X != -18 || it.Y != -2 || it.Angle != 0 || it.Align != "right" || it.Baseline != "top" {
+		t.Errorf("the title is at %v, %v, turned %v, aligned %s on %s, want -18, -2, 0, right on top", it.X, it.Y, it.Angle, it.Align, it.Baseline)
+	}
+	// A bottom axis keeps the x of the look when the spec gives only a y.
+	y = 30
+	m = st.Axis(&Axis{Orient: "bottom", Scale: sc, Length: 100, Cross: 50, Labels: true, Title: "Value", Format: expr.String, TitleY: &y})
+	if it := find(m, "axis-title").Items[0]; it.X != 100 || it.Y != 80 || it.Align != "right" {
+		t.Errorf("the title is at %v, %v, aligned %s, want 100, 80, right", it.X, it.Y, it.Align)
+	}
+}
+
+// TestPathAndTextBounds checks that the bounds of a path are those of its
+// points, without its origin, and that the bounds of a text of several
+// lines take its line height, as the writers draw it.
+func TestPathAndTextBounds(t *testing.T) {
+	t.Parallel()
+	st := style()
+	path := scene.Item{X: 10, Y: 20, Path: "M50,50L60,60"}
+	if b := st.ItemBounds(scene.Path, &path); b != (Bounds{60, 70, 70, 80}) {
+		t.Errorf("path bounds = %+v, want 60 to 70 and 70 to 80", b)
+	}
+	for _, c := range []struct {
+		baseline string
+		y1, y2   float64
+	}{
+		// Three lines of 10 pixels, 20 apart, are 50 high.
+		{"top", 0, 50},
+		{"middle", -25, 25},
+		{"bottom", -50, 0},
+		// The last line sits on the alphabetic baseline.
+		{"alphabetic", -48, 2},
+	} {
+		it := scene.Item{Text: scene.Lines{"a", "b", "c"}, FontSize: 10, LineHeight: 20, Baseline: c.baseline}
+		if b := st.ItemBounds(scene.Text, &it); math.Abs(b.Y1-c.y1) > 1e-9 || math.Abs(b.Y2-c.y2) > 1e-9 {
+			t.Errorf("the bounds of a text on %s span y %v to %v, want %v to %v", c.baseline, b.Y1, b.Y2, c.y1, c.y2)
+		}
+	}
+}
