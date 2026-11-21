@@ -16,6 +16,7 @@ import (
 	"github.com/xo/zuzu/icons/k8s"
 	"github.com/xo/zuzu/icons/mdi"
 	"github.com/xo/zuzu/text/emoji"
+	"github.com/xo/zuzu/text/math"
 	"github.com/xo/zuzu/theme"
 )
 
@@ -99,9 +100,9 @@ func parse(src []byte, d zuzu.Dialect) (chart *zuzu.Chart, report zuzu.Report, e
 			err = fmt.Errorf("zuzu panicked in Parse: %v", r)
 		}
 	}()
-	// The font of the emoji goes to Parse too, so that a kind of Mermaid
-	// that lays out when it compiles measures an emoji with it (D38).
-	return zuzu.Parse(src, zuzu.WithDialect(d), zuzu.WithEmoji(emoji.Font()))
+	// The fonts of the math and of the emoji go to Parse, so that a kind of
+	// Mermaid that lays out when it compiles measures them (D36, D38).
+	return zuzu.Parse(src, zuzu.WithDialect(d), zuzu.WithMath(math.Font()), zuzu.WithEmoji(emoji.Font()))
 }
 
 // render writes the SVG of a chart, and turns a panic into an error.

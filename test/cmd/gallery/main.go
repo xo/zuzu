@@ -25,6 +25,7 @@ import (
 
 	"github.com/xo/zuzu"
 	"github.com/xo/zuzu/test/conform"
+	"github.com/xo/zuzu/text/math"
 	"github.com/xo/zuzu/theme"
 )
 
@@ -88,7 +89,7 @@ func run(ctx context.Context, dir, out, only string, dark bool, limit int, pngs,
 		name := strings.NewReplacer("/", "_", ".json", ".svg").Replace(ref.Spec)
 		var caption strings.Builder
 		caption.WriteString(html.EscapeString(ref.Spec))
-		chart, _, err := zuzu.Parse(src, zuzu.WithDialect(dialect))
+		chart, _, err := zuzu.Parse(src, zuzu.WithDialect(dialect), zuzu.WithMath(math.Font()))
 		if err == nil {
 			var b bytes.Buffer
 			var report zuzu.Report

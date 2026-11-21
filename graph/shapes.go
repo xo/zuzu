@@ -26,7 +26,7 @@ var shapes = map[string]string{
 	"stadium": "stadium", "pill": "stadium", "terminal": "stadium",
 	"subroutine": "subroutine", "subproc": "subroutine", "fr-rect": "subroutine", "framed-rectangle": "subroutine", "subprocess": "subroutine",
 	"cylinder": "cylinder", "cyl": "cylinder", "database": "cylinder", "db": "cylinder",
-	"circle": "circle", "circ": "circle", "sm-circ": "circle", "small-circle": "circle",
+	"circle": "circle", "circ": "circle", "sm-circ": "circle", "small-circle": "circle", "start": "circle",
 	"doublecircle": "doublecircle", "dbl-circ": "doublecircle", "double-circle": "doublecircle",
 	"ellipse": "ellipse", "oval": "ellipse",
 	"diamond": "diamond", "diam": "diamond", "decision": "diamond", "rhombus": "diamond", "question": "diamond", "choice": "diamond",
@@ -40,7 +40,7 @@ var shapes = map[string]string{
 	"invtriangle": "invtriangle", "flip-tri": "invtriangle", "flipped-triangle": "invtriangle", "manual-file": "invtriangle",
 	"octagon": "octagon", "pentagon": "pentagon", "house": "house", "invhouse": "invhouse",
 	"note": "note", "doc": "doc", "document": "doc", "folder": "folder", "tab": "folder", "directory": "folder",
-	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point", "start": "point", "anchor": "point",
+	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point", "anchor": "point",
 	"bullseye": "bullseye", "bar": "bar",
 	"plaintext": "none", "plain": "none", "none": "none", "text": "none", "underline": "none",
 	// The shapes of DOT with lines across their corners.

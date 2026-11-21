@@ -197,8 +197,9 @@ func TestNamedShapes(t *testing.T) {
 func TestSmallCircles(t *testing.T) {
 	t.Parallel()
 	// f-circ, junction, sm-circ and start draw as circles of 14 pixels
-	// with no text, as in Mermaid. A junction and the start are filled. A
-	// label that the source gives does not draw, and it is no issue.
+	// with no text, as in Mermaid. An f-circ and a junction are filled, and
+	// sm-circ and start are open. A label that the source gives does not
+	// draw, and it is no issue (D38 part 1).
 	src := `flowchart LR
   a@{ shape: f-circ, label: "A" }
   b@{ shape: junction, label: "B" }
@@ -223,7 +224,7 @@ func TestSmallCircles(t *testing.T) {
 		kind, _ := graph.ShapeOf(n.Shape)
 		got = append(got, fmt.Sprintf("%s %s %q %vx%v %q", n.ID, kind, n.Label, n.Width, n.Height, n.Style["fillOpacity"]))
 	}
-	want := `a point "" 14x14 "1"|b point "" 14x14 "1"|c circle "" 14x14 ""|d point "" 14x14 "1"|` +
+	want := `a point "" 14x14 "1"|b point "" 14x14 "1"|c circle "" 14x14 ""|d circle "" 14x14 ""|` +
 		`e point "" 14x14 "1"|f circle "" 14x14 ""`
 	if s := strings.Join(got, "|"); s != want {
 		t.Errorf("got  %s\nwant %s", s, want)
