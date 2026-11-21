@@ -1237,6 +1237,9 @@ func (f *flowchart) finish() error {
 	if err := f.collapse(); err != nil {
 		return err
 	}
+	if f.af == nil {
+		f.clusterStyles()
+	}
 	if err := f.subgraphEdges(); err != nil {
 		return err
 	}
@@ -1249,6 +1252,20 @@ func (f *flowchart) finish() error {
 	}
 	f.g.Description = describe(f.d, f.acc...)
 	return nil
+}
+
+// clusterStyles gives each subgraph the style of each class on its id, then
+// the style of each statement style on its id, as Mermaid 12.3 does. The
+// box takes the fill and the stroke, and the title takes the color and the
+// font. The class default is on the nodes only. An agentflow diagram draws
+// its flows with no style, as Mermaid does.
+func (f *flowchart) clusterStyles() {
+	for _, c := range f.g.Clusters {
+		for _, name := range f.nodeClasses[c.ID] {
+			maps.Copy(c.Style, f.classes[name])
+		}
+		maps.Copy(c.Style, f.nodeStyles[c.ID])
+	}
 }
 
 // nodeAnimation reports the style animation of each class on a node or a

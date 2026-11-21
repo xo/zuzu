@@ -3,6 +3,8 @@ package mermaid
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -580,6 +582,76 @@ func TestStyles(t *testing.T) {
 	d, _ = Read("flowchart LR\nA\nstyle A font-style:wavy")
 	if _, _, err := Graph(d, true); err == nil {
 		t.Error("expected an error for the font-style wavy in the strict mode")
+	}
+}
+
+func TestSubgraphStyle(t *testing.T) {
+	t.Parallel()
+	// As in Mermaid 12.3, a style and a class on the id of a subgraph
+	// style the subgraph. The style wins over the class, in any order,
+	// and the class default is on the nodes only. A class before the
+	// subgraph names nothing.
+	src := `flowchart LR
+  classDef default fill:#cff
+  classDef hot fill:#f96,stroke:#933,color:#300,font-weight:bold
+  class early hot
+  subgraph sub [Styled]
+    a --> b
+  end
+  subgraph cls [With a class]
+    c
+  end
+  subgraph early [Early]
+    d
+  end
+  style sub fill:#fee,stroke:#c00,stroke-width:3px,stroke-dasharray:5 5,color:#900,font-size:14px
+  style cls stroke:#00f
+  class sub,cls hot`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("expected no issues, got %v", report)
+	}
+	var ids []string
+	for _, n := range g.Nodes {
+		ids = append(ids, n.ID)
+	}
+	if s := strings.Join(ids, ","); s != "a,b,c,d" {
+		t.Errorf("expected the nodes a, b, c and d, got %s", s)
+	}
+	styles := map[string]string{}
+	for _, c := range g.Clusters {
+		var parts []string
+		for _, k := range slices.Sorted(maps.Keys(c.Style)) {
+			parts = append(parts, k+"="+c.Style[k])
+		}
+		styles[c.ID] = strings.Join(parts, " ")
+	}
+	for id, want := range map[string]string{
+		"sub":   "color=#900 fill=#fee fillOpacity=1 fontSize=14 fontWeight=bold stroke=#c00 strokeDash=5,5 strokeWidth=3",
+		"cls":   "color=#300 fill=#f96 fillOpacity=1 fontWeight=bold stroke=#00f",
+		"early": "",
+	} {
+		if styles[id] != want {
+			t.Errorf("subgraph %s: expected the style %q, got %q", id, want, styles[id])
+		}
+	}
+	// Mermaid draws a flow of an agentflow diagram with no style.
+	d, err = Read("agentflow-beta TB\n  flow s[Flow]\n    a --> b\n  end\n  style s fill:#f00\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g, _, err = Graph(d, true); err != nil {
+		t.Fatal(err)
+	}
+	if len(g.Clusters) != 1 || len(g.Clusters[0].Style) != 0 {
+		t.Errorf("expected a flow with no style, got %v", g.Clusters)
 	}
 }
 

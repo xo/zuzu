@@ -1,6 +1,7 @@
 package dataflow
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"strings"
@@ -475,8 +476,11 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		if d, ok := r["direction"].(string); ok {
 			c.Direction = d
 		}
-		tw, th := measureAt(fields["label"].Get(r), sizeOf(r, "fontSize"), "600")
-		ml, err := maths.of(fields["label"].Get(r), sizeOf(r, "fontSize"), "600")
+		// A title is in the weight 600, unless a style of the source
+		// sets its weight.
+		weight := cmp.Or(weightOf(r), "600")
+		tw, th := measureAt(fields["label"].Get(r), sizeOf(r, "fontSize"), weight)
+		ml, err := maths.of(fields["label"].Get(r), sizeOf(r, "fontSize"), weight)
 		if err != nil {
 			return nil, fmt.Errorf("the title of cluster %s: %w", c.ID, err)
 		}
@@ -603,7 +607,7 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		out = append(out, o)
 		if ml, ok := clusterMaths[i]; ok && cp.Width > 0 {
 			// The text of the title draws nothing, and the math draws it.
-			o["label"] = ""
+			o["label"], o["lines"] = "", []any{}
 			out = append(out, ml.rows(mathBase(r, "textColor"), "cluster", cp.TitleX, cp.TitleY, true, true)...)
 		}
 		if h, ok := clusterHTMLs[i]; ok && cp.Width > 0 {

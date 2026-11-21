@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -166,6 +167,59 @@ func TestDiagrams(t *testing.T) {
 			if !strings.Contains(s, want) {
 				t.Errorf("%q: the SVG has no %s", src, want)
 			}
+		}
+	}
+}
+
+func TestSubgraphTitle(t *testing.T) {
+	t.Parallel()
+	// Each line of the title of a subgraph draws on its own line, as in
+	// Mermaid 12.3, and the title takes the space of its lines.
+	box := regexp.MustCompile(`<rect x="0" y="0" width="[\d.]+" height="([\d.]+)"`)
+	heights := map[string]float64{}
+	for _, title := range []string{"t", "t<br>u"} {
+		s, report, err := svgOf(t, "flowchart TB\n  subgraph s [\""+title+"\"]\n    a\n  end", true)
+		if err != nil {
+			t.Fatalf("%q: %v (%v)", title, err, report)
+		}
+		m := box.FindStringSubmatch(s)
+		if m == nil {
+			t.Fatalf("%q: the SVG has no box of the subgraph", title)
+		}
+		heights[title], _ = strconv.ParseFloat(m[1], 64)
+		if title == "t" {
+			continue
+		}
+		if !strings.Contains(s, `<tspan x="0" dy="0">t</tspan><tspan x="0" dy="11">u</tspan>`) {
+			t.Errorf("%q: the title does not draw on two lines", title)
+		}
+	}
+	if d := heights["t<br>u"] - heights["t"]; d != 11 {
+		t.Errorf("expected the title of two lines to be 11 higher, got %g", d)
+	}
+	// A style and a class on the id of a subgraph style its box and its
+	// title.
+	s, report, err := svgOf(t, `flowchart LR
+  classDef hot fill:#f96,color:#300
+  subgraph sub [Styled]
+    a
+  end
+  subgraph cls [Classed]
+    b
+  end
+  style sub fill:#fee,stroke:#c00,stroke-width:3px,stroke-dasharray:5 5,color:#900
+  class cls hot`, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{
+		`fill="#fee" stroke="#c00" stroke-width="3" stroke-dasharray="5 5" fill-opacity="1"`,
+		`fill="#900">Styled<`,
+		`fill="#f96" stroke="#cfd5de" stroke-width="1" fill-opacity="1"`,
+		`fill="#300">Classed<`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the SVG has no %s", want)
 		}
 	}
 }

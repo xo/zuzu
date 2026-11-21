@@ -407,7 +407,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	packages := false
 	for _, c := range g.Clusters {
-		r := map[string]any{"key": c.ID, "label": c.Label, "parent": nil}
+		r := map[string]any{"key": c.ID, "label": c.Label, "lines": lines(c.Label), "parent": nil}
 		if c.Shape == ClusterPackage {
 			r["shape"], packages = ClusterPackage, true
 		}
@@ -418,7 +418,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			r["direction"] = c.Direction
 		}
 		if c.HTML != "" {
-			r["html"], r["label"] = c.HTML, ""
+			r["html"], r["label"], r["lines"] = c.HTML, "", []any{}
 			html = true
 		}
 		link(r, c.Href, c.Tooltip)
@@ -537,7 +537,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	for _, sig := range paints["clusterText"] {
 		marks = append(marks, mark("text", "layoutClusters", "_text", sig, []string{StyleClusterTitle}, map[string]any{
-			"x": field("titleX"), "y": field("titleY"), "text": field("label"), "align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "top"},
+			"x": field("titleX"), "y": field("titleY"), "text": field("lines"), "align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "top"},
 		}, map[string]string{"textColor": "fill"}))
 	}
 	for _, sig := range paints["edge"] {

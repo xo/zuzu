@@ -1,0 +1,12 @@
+flowchart LR
+  classDef default fill:#cff
+  classDef hot fill:#f96,stroke:#933,color:#300
+  subgraph sub [Styled]
+    a --> b
+  end
+  subgraph cls [With a class]
+    c --> d
+  end
+  b --> c
+  style sub fill:#fee,stroke:#c00,stroke-width:3px,stroke-dasharray:5 5,color:#900
+  class cls hot
