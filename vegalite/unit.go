@@ -1104,10 +1104,12 @@ func producedFields(ts []Transform) map[string]bool {
 }
 
 // axisKeys and legendKeys are the properties of an axis and of a legend of
-// a channel that the compiler reads.
+// a channel that the compiler reads. An axis also passes on each key of
+// passedAxisKey.
 var (
 	axisKeys = []string{"title", "grid", "orient", "format", "formatType", "labelAngle", "labelAlign", "labelOverlap",
-		"tickCount", "values", "domain", "labels", "ticks", "offset"}
+		"tickCount", "values", "domain", "labels", "ticks", "offset", "labelBaseline", "labelPadding", "bandPosition",
+		"zindex", "labelExpr"}
 	legendKeys = []string{"title", "orient", "direction", "format", "type", "values", "symbolType", "columns"}
 )
 
@@ -1126,7 +1128,13 @@ func guideKeys(c *compiler, path, name string, d *channelDef) error {
 		return nil
 	}
 	for _, k := range slices.Sorted(maps.Keys(m)) {
-		if !slices.Contains(keys, k) {
+		read := slices.Contains(keys, k)
+		if kind == "an axis" && valueAxisKey(k) {
+			// A condition of Vega-Lite on a property, such as the
+			// gridDash of each tick, does not pass on.
+			_, read = guideValue(m[k])
+		}
+		if !read {
 			if err := c.issue(path, "the property %s of %s", k, kind); err != nil {
 				return err
 			}

@@ -281,3 +281,26 @@ func TestPathAndTextBounds(t *testing.T) {
 		}
 	}
 }
+
+// TestAxisAnchorOfReversedRange checks that a titleAnchor names a point of
+// the range of the scale, so that the start of a reversed range is at its
+// right, and that the title keeps the align of the anchor, as in Vega. A
+// labelPadding of the spec wins over LabelPad.
+func TestAxisAnchorOfReversedRange(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "linear", []any{0.0, 10.0}, []any{200.0, 0.0})
+	pad := 3.0
+	m := st.Axis(&Axis{
+		Orient: "bottom", Scale: sc, Length: 200, Cross: 100, Labels: true, Title: "X",
+		Format: expr.String, TitleAnchor: "start", LabelPadding: &pad, LabelOffset: 2,
+	})
+	if it := find(m, "axis-title").Items[0]; it.X != 200 || it.Align != "left" {
+		t.Errorf("the title is at x %v, aligned %s, want 200, left", it.X, it.Align)
+	}
+	for _, it := range find(m, "axis-label").Items {
+		if it.Y != 103 {
+			t.Errorf("a label is at y %v, want 103", it.Y)
+		}
+	}
+}

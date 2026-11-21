@@ -170,8 +170,14 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	if ax.LabelAlign, err = s.str(a.LabelAlign, configStr(cfg, "labelAlign", "")); err != nil {
 		return nil, err
 	}
+	if ax.LabelBaseline, err = s.str(a.LabelBase, configStr(cfg, "labelBaseline", "")); err != nil {
+		return nil, err
+	}
 	props := s.guideProps(cfg, a.Extra)
-	axisTitleProps(ax, props)
+	if err := s.labelPadding(ax, a, cfg, props); err != nil {
+		return nil, err
+	}
+	axisProps(ax, props)
 	m := s.rt.style().Axis(ax)
 	// The config and the axis style its parts, over the look of zuzu.
 	styleGuide(&m, props, axisParts)
@@ -184,19 +190,71 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	return &m, nil
 }
 
-// axisTitleProps reads the place, the angle, the align and the baseline of
-// the title of an axis from its properties, the config with the axis over
-// it. A property that is not there keeps the one of the look.
-func axisTitleProps(ax *layout.Axis, props map[string]any) {
+// labelPadding reads the distance between the labels of an axis and its
+// line. Vega puts a label past the end of its tick, by labelPadding, and a
+// tick is tickSize long, or not there when the axis hides its ticks. The
+// look of zuzu draws no ticks, so the distance of the look holds unless the
+// axis or its config gives a labelPadding or a tickSize. Then the label
+// keeps the distance of Vega, with the defaults of Vega: 2 and 5.
+func (s *scope) labelPadding(ax *layout.Axis, a *vega.Axis, cfg, props map[string]any) error {
+	_, cfgPad := cfg["labelPadding"]
+	size, hasSize := propNum(props, "tickSize")
+	if a.LabelPadding.IsZero() && !cfgPad && !hasSize {
+		return nil
+	}
+	pad, err := s.num(a.LabelPadding, configNum(cfg, "labelPadding", 2))
+	if err != nil {
+		return err
+	}
+	cfgTicks, ok := cfg["ticks"].(bool)
+	if !ok {
+		cfgTicks = true
+	}
+	ticks, err := s.boolean(a.Ticks, cfgTicks)
+	if err != nil {
+		return err
+	}
+	if !hasSize {
+		size = 5
+	}
+	if ticks {
+		pad += size
+	}
+	ax.LabelPadding = &pad
+	return nil
+}
+
+// propNum returns a property of a guide that is a finite number, and
+// whether the guide has it.
+func propNum(props map[string]any, key string) (float64, bool) {
+	f, ok := props[key].(float64)
+	if !ok || math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	return f, true
+}
+
+// axisProps reads the place, the angle, the align, the baseline, the
+// anchor and the padding of the title of an axis, and the offset of its
+// labels, from its properties, the config with the axis over it. A property
+// that is not there keeps the one of the look.
+func axisProps(ax *layout.Axis, props map[string]any) {
 	num := func(k string) *float64 {
-		if f, ok := props[k].(float64); ok && !math.IsNaN(f) && !math.IsInf(f, 0) {
+		if f, ok := propNum(props, k); ok {
 			return &f
 		}
 		return nil
 	}
 	ax.TitleX, ax.TitleY, ax.TitleAngle = num("titleX"), num("titleY"), num("titleAngle")
+	ax.TitlePadding = num("titlePadding")
 	ax.TitleAlign = configStr(props, "titleAlign", "")
 	ax.TitleBaseline = configStr(props, "titleBaseline", "")
+	// A titleAnchor of null, or of no known value, leaves the place to the
+	// look.
+	if anchor := configStr(props, "titleAnchor", ""); anchor == "start" || anchor == "middle" || anchor == "end" {
+		ax.TitleAnchor = anchor
+	}
+	ax.LabelOffset, _ = propNum(props, "labelOffset")
 }
 
 // rangeEnd returns the far end of the range of a scale of positions, or 0

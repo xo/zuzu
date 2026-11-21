@@ -34,7 +34,8 @@ type Axis struct {
 	Overlap bool
 	// Offset moves the axis away from the plot area.
 	Offset float64
-	// BandPosition is where in a band a tick sits, from 0 to 1.
+	// BandPosition is where in a band a grid line sits, from 0 to 1. A
+	// label stays in the middle of its band.
 	BandPosition float64
 	// LabelFlush is the distance from an end of the axis within which a
 	// label aligns flush with that end, so that it stays inside the axis,
@@ -55,6 +56,22 @@ type Axis struct {
 	// TitleAlign and TitleBaseline are the align and the baseline of the
 	// title that the spec gives, or "" for those of the look.
 	TitleAlign, TitleBaseline string
+	// LabelPadding is the distance between the labels and the line of the
+	// axis that the spec gives, or nil for LabelPad of the look. It can be
+	// below 0, which puts the labels inside the plot area.
+	LabelPadding *float64
+	// LabelOffset moves each label along the axis, in pixels.
+	LabelOffset float64
+	// LabelBaseline is the baseline of each label that the spec gives, over
+	// the baseline of the look, the angle and the flush. It is "" for none.
+	LabelBaseline string
+	// TitleAnchor is start, middle or end: the point of the range of the
+	// scale at which the title sits, as the spec gives it. It is "" for the
+	// place of the look.
+	TitleAnchor string
+	// TitlePadding is the space between the labels and the title that the
+	// spec gives, or nil for the space of the look.
+	TitlePadding *float64
 }
 
 // TickCount returns the number of ticks that the axis asks its scale for:
@@ -74,6 +91,15 @@ func (a *Axis) TickCount() float64 {
 		count = math.Min(count, MaxLabels)
 	}
 	return count
+}
+
+// labelPad returns the distance between the labels and the line of the
+// axis: the one that the spec gives, or LabelPad.
+func (a *Axis) labelPad() float64 {
+	if a.LabelPadding != nil {
+		return *a.LabelPadding
+	}
+	return LabelPad
 }
 
 // vertical reports whether the axis runs up and down.
@@ -194,6 +220,10 @@ func (s Style) Axis(a *Axis) scene.Mark {
 func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 	m := scene.Mark{Type: scene.Text, Role: "axis-label"}
 	color := s.Theme.Muted
+	pad := a.labelPad()
+	// A label stays in the middle of its band, where the bandPosition of
+	// the axis puts its tick and its grid line, as in Vega.
+	shift := a.Scale.Bandwidth()*(0.5-a.BandPosition) + a.LabelOffset
 	for i, v := range vals {
 		str := a.Format(v)
 		if str == "" {
@@ -202,15 +232,16 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 			continue
 		}
 		var it scene.Item
+		at := pos[i] + shift
 		switch a.Orient {
 		case "bottom":
-			it = s.label(pos[i], a.Cross+a.Offset+LabelPad, str, LabelSize, 400, color, "center", "top")
+			it = s.label(at, a.Cross+a.Offset+pad, str, LabelSize, 400, color, "center", "top")
 		case "top":
-			it = s.label(pos[i], -a.Offset-LabelPad, str, LabelSize, 400, color, "center", "bottom")
+			it = s.label(at, -a.Offset-pad, str, LabelSize, 400, color, "center", "bottom")
 		case "left":
-			it = s.label(-a.Offset-LabelPad, pos[i], str, LabelSize, 400, color, "right", "middle")
+			it = s.label(-a.Offset-pad, at, str, LabelSize, 400, color, "right", "middle")
 		default:
-			it = s.label(a.Cross+a.Offset+LabelPad, pos[i], str, LabelSize, 400, color, "left", "middle")
+			it = s.label(a.Cross+a.Offset+pad, at, str, LabelSize, 400, color, "left", "middle")
 		}
 		if a.LabelAngle != 0 {
 			it.Angle = a.LabelAngle
@@ -220,6 +251,9 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 		}
 		if a.LabelAlign != "" {
 			it.Align = a.LabelAlign
+		}
+		if a.LabelBaseline != "" {
+			it.Baseline = a.LabelBaseline
 		}
 		it.Limit = a.LabelLimit
 		it.Datum = map[string]any{"value": v, "label": str}
@@ -299,30 +333,28 @@ func (s Style) dropOverlaps(items []scene.Item) []scene.Item {
 
 // axisTitle draws the title of an axis at the end of the axis, rather than
 // along it: above a vertical axis, and at the right of a horizontal one,
-// past the bounds of its labels. The place, the angle, the align and the
+// past the bounds of its labels. A titleAnchor of the spec moves the title
+// to that point of the range, and the place, the angle, the align and the
 // baseline that the spec gives win over those of the look.
 func (s Style) axisTitle(a *Axis, labels Bounds) scene.Mark {
 	m := scene.Mark{Type: scene.Text, Role: "axis-title"}
 	color := s.Theme.Faint
+	gap := float64(titleGap)
+	if a.TitlePadding != nil {
+		gap = *a.TitlePadding
+	}
 	var it scene.Item
-	switch a.Orient {
-	case "bottom":
-		y := a.Cross + a.Offset + LabelPad + LabelSize
-		if !labels.IsEmpty() {
-			// Labels that turn reach further from the axis.
-			y = math.Max(y, labels.Y2)
-		}
-		it = s.label(a.Length, y+titleGap, a.Title, SmallSize, 400, color, "right", "top")
-	case "top":
-		y := -a.Offset - LabelPad - LabelSize
-		if !labels.IsEmpty() {
-			y = math.Min(y, labels.Y1)
-		}
-		it = s.label(a.Length, y-titleGap, a.Title, SmallSize, 400, color, "right", "bottom")
-	case "left":
-		it = s.label(-a.Offset, -LabelPad-4, a.Title, SmallSize, 400, color, "left", "bottom")
+	switch {
+	case a.TitleAnchor != "":
+		it = s.anchoredTitle(a, labels, gap)
+	case a.Orient == "bottom":
+		it = s.label(a.Length, a.titleCross(labels)+gap, a.Title, SmallSize, 400, color, "right", "top")
+	case a.Orient == "top":
+		it = s.label(a.Length, a.titleCross(labels)-gap, a.Title, SmallSize, 400, color, "right", "bottom")
+	case a.Orient == "left":
+		it = s.label(-a.Offset, a.topTitle(labels), a.Title, SmallSize, 400, color, "left", "bottom")
 	default:
-		it = s.label(a.Cross+a.Offset, -LabelPad-4, a.Title, SmallSize, 400, color, "right", "bottom")
+		it = s.label(a.Cross+a.Offset, a.topTitle(labels), a.Title, SmallSize, 400, color, "right", "bottom")
 	}
 	x, y := a.origin()
 	if a.TitleX != nil {
@@ -342,6 +374,92 @@ func (s Style) axisTitle(a *Axis, labels Bounds) scene.Mark {
 	}
 	m.Items = []scene.Item{it}
 	return m
+}
+
+// anchoredTitle draws the title of an axis at the start, the middle or the
+// end of the range of its scale, aligned left, center or right, as Vega
+// places a title with a titleAnchor. The title of a horizontal axis sits
+// past the labels, as in the look. The title of a vertical axis turns, as
+// in Vega, and sits past the labels, because the look has no place for it
+// along the axis.
+func (s Style) anchoredTitle(a *Axis, labels Bounds, gap float64) scene.Item {
+	r0, r1 := a.rangeEnds()
+	at, align := r1, "right"
+	switch a.TitleAnchor {
+	case "start":
+		at, align = r0, "left"
+	case "middle":
+		at, align = (r0+r1)/2, "center"
+	}
+	color := s.Theme.Faint
+	switch a.Orient {
+	case "bottom":
+		return s.label(at, a.titleCross(labels)+gap, a.Title, SmallSize, 400, color, align, "top")
+	case "top":
+		return s.label(at, a.titleCross(labels)-gap, a.Title, SmallSize, 400, color, align, "bottom")
+	case "left":
+		x := -a.Offset
+		if !labels.IsEmpty() {
+			x = math.Min(x, labels.X1)
+		}
+		it := s.label(x-gap, at, a.Title, SmallSize, 400, color, align, "bottom")
+		it.Angle = -90
+		return it
+	}
+	x := a.Cross + a.Offset
+	if !labels.IsEmpty() {
+		x = math.Max(x, labels.X2)
+	}
+	it := s.label(x+gap, at, a.Title, SmallSize, 400, color, align, "bottom")
+	it.Angle = 90
+	return it
+}
+
+// titleCross returns the y of the edge of the labels of a horizontal axis
+// away from the plot area, from which its title keeps its space.
+func (a *Axis) titleCross(labels Bounds) float64 {
+	if a.Orient == "top" {
+		y := -a.Offset - a.labelPad() - LabelSize
+		if !labels.IsEmpty() {
+			y = math.Min(y, labels.Y1)
+		}
+		return y
+	}
+	y := a.Cross + a.Offset + a.labelPad() + LabelSize
+	if !labels.IsEmpty() {
+		// Labels that turn reach further from the axis.
+		y = math.Max(y, labels.Y2)
+	}
+	return y
+}
+
+// topTitle returns the y of the title of a vertical axis, which sits above
+// the axis. A titlePadding of the spec keeps that space from the top of the
+// labels.
+func (a *Axis) topTitle(labels Bounds) float64 {
+	if a.TitlePadding == nil {
+		return -LabelPad - 4
+	}
+	y := 0.0
+	if !labels.IsEmpty() {
+		y = math.Min(y, labels.Y1)
+	}
+	return y - *a.TitlePadding
+}
+
+// rangeEnds returns the start and the end of the range of the scale of an
+// axis, in pixels, or 0 and the length of the axis for a range that is not
+// of numbers.
+func (a *Axis) rangeEnds() (float64, float64) {
+	r := a.Scale.Range()
+	if len(r) >= 2 {
+		lo, ok1 := r[0].(float64)
+		hi, ok2 := r[len(r)-1].(float64)
+		if ok1 && ok2 && !math.IsNaN(lo) && !math.IsNaN(hi) && !math.IsInf(lo, 0) && !math.IsInf(hi, 0) {
+			return lo, hi
+		}
+	}
+	return 0, a.Length
 }
 
 // titleGap is the space between the labels of a horizontal axis and its

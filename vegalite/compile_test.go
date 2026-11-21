@@ -1,8 +1,10 @@
 package vegalite
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/xo/zuzu/vega"
@@ -185,5 +187,86 @@ func TestCompileComposite(t *testing.T) {
 	}`)
 	if _, _, marks := names(e); !slices.Equal(marks, []string{"layer_0_marks:rect", "layer_1_marks:rect", "layer_2_marks:rule"}) {
 		t.Errorf("errorbar marks = %v, want two ticks and a rule", marks)
+	}
+}
+
+// TestCompileAxisProps checks that the axis of a channel passes on the
+// properties that place its labels and its title, and those that style its
+// parts, as vega-lite.js does: the grid ones to the axis of the grid, and
+// zindex and bandPosition to both axes. Before, each was an issue, so the
+// labels of bar_axis_space_saving ran into the plot. A condition on a
+// property stays an issue.
+func TestCompileAxisProps(t *testing.T) {
+	t.Parallel()
+	s := compile(t, `{
+		"data": {"values": [{"a": "A", "b": 28}]},
+		"mark": "bar",
+		"encoding": {
+			"y": {"field": "a", "type": "nominal", "axis": {
+				"grid": true, "bandPosition": 0, "zindex": 1, "labelAlign": "left",
+				"labelBaseline": "middle", "labelPadding": -5, "labelOffset": -15,
+				"labelExpr": "upper(datum.label)", "labelFontSize": 12, "labelFontWeight": "bold",
+				"titleX": 5, "titleY": -5, "titleAngle": 0, "titleAlign": "left", "titleBaseline": "bottom",
+				"titleAnchor": "start", "titleFontSize": 9, "tickSize": 4, "domainWidth": 2,
+				"gridColor": "red", "gridDash": [2, 2], "titlePadding": {"expr": "1 + 2"}
+			}},
+			"x": {"field": "b", "type": "quantitative"}
+		}
+	}`)
+	var grid, main *vega.Axis
+	for i := range s.Axes {
+		if a := &s.Axes[i]; a.Scale == "y" && a.Grid != nil && *a.Grid {
+			grid = a
+		} else if a.Scale == "y" {
+			main = a
+		}
+	}
+	if grid == nil || main == nil {
+		t.Fatalf("axes = %+v, want a grid and a main axis of y", s.Axes)
+	}
+	str := func(v any) string {
+		t.Helper()
+		b, err := json.Marshal(v, json.Deterministic(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	var m map[string]jsontext.Value
+	if err := json.Unmarshal([]byte(str(main)), &m); err != nil {
+		t.Fatal(err)
+	}
+	for k, want := range map[string]string{
+		"labelBaseline": `"middle"`, "labelPadding": `-5`, "bandPosition": `0`, "zindex": `1`,
+		"labelOffset": `-15`, "labelFontSize": `12`, "labelFontWeight": `"bold"`, "titleX": `5`, "titleY": `-5`,
+		"titleAngle": `0`, "titleAlign": `"left"`, "titleBaseline": `"bottom"`, "titleAnchor": `"start"`,
+		"titlePadding": `{"signal":"1 + 2"}`, "titleFontSize": `9`, "tickSize": `4`, "domainWidth": `2`,
+	} {
+		if got := string(m[k]); got != want {
+			t.Errorf("the %s of the axis = %s, want %s", k, got, want)
+		}
+	}
+	if _, ok := m["gridColor"]; ok {
+		t.Error("the axis of the labels has the gridColor, want it on the axis of the grid only")
+	}
+	if got := str(grid); !strings.Contains(got, `"gridColor":"red"`) || !strings.Contains(got, `"gridDash":[2,2]`) ||
+		!strings.Contains(got, `"zindex":1`) || !strings.Contains(got, `"bandPosition":0`) {
+		t.Errorf("the axis of the grid = %s, want its gridColor, gridDash, zindex and bandPosition", got)
+	}
+	if got := str(main.Encode); got != `{"labels":{"update":{"text":{"signal":"upper(datum.label)"}}}}` {
+		t.Errorf("the encode of the axis = %s, want the labelExpr as the text of the labels", got)
+	}
+	cond, err := Parse([]byte(`{
+		"data": {"values": [{"b": 28}]},
+		"mark": "point",
+		"encoding": {"x": {"field": "b", "type": "quantitative", "axis": {
+			"gridDash": {"condition": {"test": "datum.value > 0", "value": [2, 2]}, "value": []}
+		}}}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Compile(cond, WithStrict(true)); err == nil {
+		t.Error("strict Compile of a condition on the gridDash of an axis succeeded, want an issue")
 	}
 }

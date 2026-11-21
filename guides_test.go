@@ -283,6 +283,39 @@ func TestRectItemEnds(t *testing.T) {
 	}
 }
 
+// axisItems renders an axis of a band scale x of 200 pixels, or of a linear
+// scale y of 100 pixels, with a config, and returns the items of a role of
+// the axis.
+func axisItems(t *testing.T, config, axis, role string) []scene.Item {
+	t.Helper()
+	src := `{"width": 200, "height": 100, "config": {` + config + `},
+		"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"},
+			{"name": "y", "type": "linear", "domain": [0, 10], "range": "height"}],
+		"axes": [` + axis + `]}`
+	c, _, err := Parse([]byte(src), WithDialect(Vega), WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, report, err := c.Render(t.Context(), WithLocation(time.UTC))
+	if err != nil || len(report) != 0 {
+		t.Fatalf("render: %v, with the report %v", err, report)
+	}
+	var out []scene.Item
+	var walk func(m *scene.Mark)
+	walk = func(m *scene.Mark) {
+		for i := range m.Items {
+			if m.Role == role {
+				out = append(out, m.Items[i])
+			}
+			for j := range m.Items[i].Items {
+				walk(&m.Items[i].Items[j])
+			}
+		}
+	}
+	walk(&s.Root)
+	return out
+}
+
 // TestAxisSpecProps checks that the runtime reads the labelAlign, the
 // titleX, the titleY, the titleAngle, the titleAlign and the titleBaseline
 // of an axis, from the axis or from the config, with the axis over the
@@ -292,32 +325,7 @@ func TestAxisSpecProps(t *testing.T) {
 	t.Parallel()
 	items := func(config, axis, role string) []scene.Item {
 		t.Helper()
-		src := `{"width": 200, "height": 100, "config": {` + config + `},
-			"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"},
-				{"name": "y", "type": "linear", "domain": [0, 10], "range": "height"}],
-			"axes": [` + axis + `]}`
-		c, _, err := Parse([]byte(src), WithDialect(Vega), WithStrict(true))
-		if err != nil {
-			t.Fatal(err)
-		}
-		s, report, err := c.Render(t.Context(), WithLocation(time.UTC))
-		if err != nil || len(report) != 0 {
-			t.Fatalf("render: %v, with the report %v", err, report)
-		}
-		var out []scene.Item
-		var walk func(m *scene.Mark)
-		walk = func(m *scene.Mark) {
-			for i := range m.Items {
-				if m.Role == role {
-					out = append(out, m.Items[i])
-				}
-				for j := range m.Items[i].Items {
-					walk(&m.Items[i].Items[j])
-				}
-			}
-		}
-		walk(&s.Root)
-		return out
+		return axisItems(t, config, axis, role)
 	}
 	for _, c := range []struct {
 		name, config, axis, role string
@@ -379,5 +387,123 @@ func TestAxisSpecProps(t *testing.T) {
 				t.Errorf("%s: the item is at %v, %v, turned %v, aligned %s on %s", c.name, it.X, it.Y, it.Angle, it.Align, it.Baseline)
 			}
 		}
+	}
+}
+
+// TestAxisLabelAndTitlePlace checks that the runtime reads the
+// labelPadding, the labelOffset, the labelBaseline, the titleAnchor and the
+// titlePadding of an axis, and its tickSize and ticks for the distance of
+// its labels, from the axis or from the config, as vega.js places them.
+// Before, it dropped them with no issue, so the labels of
+// bar_axis_space_saving ran into the plot.
+func TestAxisLabelAndTitlePlace(t *testing.T) {
+	t.Parallel()
+	// inBand reports whether a label sits at the middle of a band of x,
+	// moved along the axis by off.
+	inBand := func(x, off float64) bool {
+		f := (x-off)/(200.0/3) - 0.5
+		return math.Abs(f-math.Round(f)) < 1e-9
+	}
+	for _, c := range []struct {
+		name, config, axis, role string
+		check                    func(it scene.Item) bool
+	}{
+		{
+			"the labelPadding past a tick of the default size",
+			``, `{"scale": "y", "orient": "left", "labelPadding": 10}`,
+			"axis-label", func(it scene.Item) bool { return it.X == -15 && it.Align == "right" },
+		},
+		{
+			"the labelPadding of an axis with no ticks",
+			``, `{"scale": "y", "orient": "left", "labelPadding": 10, "ticks": false}`,
+			"axis-label", func(it scene.Item) bool { return it.X == -10 },
+		},
+		{
+			"the tickSize of the config, past which a label keeps the padding of Vega",
+			`"axisY": {"tickSize": 12}`, `{"scale": "y", "orient": "left"}`,
+			"axis-label", func(it scene.Item) bool { return it.X == -14 },
+		},
+		{
+			"a labelPadding below 0, which puts the labels inside the plot",
+			`"axis": {"ticks": false}`, `{"scale": "x", "orient": "bottom", "labelPadding": -5}`,
+			"axis-label", func(it scene.Item) bool { return it.Y == 95 && inBand(it.X, 0) },
+		},
+		{
+			"the labelOffset and the labelBaseline",
+			``, `{"scale": "x", "orient": "bottom", "labelOffset": 7, "labelBaseline": "bottom"}`,
+			"axis-label", func(it scene.Item) bool { return it.Baseline == "bottom" && inBand(it.X, 7) },
+		},
+		{
+			"the labelBaseline of the config",
+			`"axisLeft": {"labelBaseline": "top"}`, `{"scale": "y", "orient": "left"}`,
+			"axis-label", func(it scene.Item) bool { return it.Baseline == "top" },
+		},
+		{
+			"a label in the middle of its band at a bandPosition of 0",
+			``, `{"scale": "x", "orient": "bottom", "bandPosition": 0}`,
+			"axis-label", func(it scene.Item) bool { return inBand(it.X, 0) },
+		},
+		{
+			"the titleAnchor start of a bottom axis",
+			``, `{"scale": "x", "orient": "bottom", "title": "X", "titleAnchor": "start"}`,
+			"axis-title", func(it scene.Item) bool { return it.X == 0 && it.Align == "left" && it.Angle == 0 },
+		},
+		{
+			"the titleAnchor middle of a bottom axis",
+			``, `{"scale": "x", "orient": "bottom", "title": "X", "titleAnchor": "middle"}`,
+			"axis-title", func(it scene.Item) bool { return it.X == 100 && it.Align == "center" },
+		},
+		{
+			"the titleAnchor end of a left axis, at the end of the range, turned as in Vega",
+			``, `{"scale": "y", "orient": "left", "title": "Y", "titleAnchor": "end"}`,
+			"axis-title", func(it scene.Item) bool {
+				return it.Y == 0 && it.X < -8 && it.Angle == -90 && it.Align == "right" && it.Baseline == "bottom"
+			},
+		},
+		{
+			"the titleAnchor start of the config of a right axis",
+			`"axisY": {"titleAnchor": "start"}`, `{"scale": "y", "orient": "right", "title": "Y"}`,
+			"axis-title", func(it scene.Item) bool { return it.Y == 100 && it.Angle == 90 && it.Align == "left" },
+		},
+		{
+			"the titleAnchor end of flight-passengers, with its titleX and titleAngle",
+			``, `{"scale": "y", "orient": "left", "title": "Y", "titleAnchor": "end", "titleX": 1, "titleAngle": 0,
+				"titleAlign": "left", "titleBaseline": "middle"}`,
+			"axis-title", func(it scene.Item) bool {
+				return it.X == 1 && it.Y == 0 && it.Angle == 0 && it.Align == "left" && it.Baseline == "middle"
+			},
+		},
+		{
+			"a titleAnchor of null, which keeps the place of the look",
+			``, `{"scale": "y", "orient": "left", "title": "Y", "titleAnchor": null}`,
+			"axis-title", func(it scene.Item) bool { return it.X == 0 && it.Y < 0 && it.Angle == 0 && it.Align == "left" },
+		},
+	} {
+		got := axisItems(t, c.config, c.axis, c.role)
+		if len(got) == 0 {
+			t.Errorf("%s: no items", c.name)
+			continue
+		}
+		for _, it := range got {
+			if !c.check(it) {
+				t.Errorf("%s: the item is at %v, %v, turned %v, aligned %s on %s", c.name, it.X, it.Y, it.Angle, it.Align, it.Baseline)
+			}
+		}
+	}
+	// A titlePadding is the space between the labels and the title.
+	title := func(axis string) scene.Item {
+		t.Helper()
+		return axisItems(t, ``, axis, "axis-title")[0]
+	}
+	look := title(`{"scale": "x", "orient": "bottom", "title": "X"}`)
+	padded := title(`{"scale": "x", "orient": "bottom", "title": "X", "titlePadding": 20}`)
+	if padded.Y-look.Y != 14 {
+		t.Errorf("the title with a titlePadding of 20 is at y %v, want 14 below the title of the look at %v", padded.Y, look.Y)
+	}
+	labels := axisItems(t, ``, `{"scale": "y", "orient": "left"}`, "axis-label")
+	near := title(`{"scale": "y", "orient": "left", "title": "Y", "titleAnchor": "middle", "titlePadding": 0}`)
+	far := title(`{"scale": "y", "orient": "left", "title": "Y", "titleAnchor": "middle", "titlePadding": 10}`)
+	if near.X-far.X != 10 || near.Y != 50 || near.X >= labels[0].X {
+		t.Errorf("the turned titles are at %v and %v, %v, want 10 apart at y 50, left of the labels at %v", near.X, far.X, near.Y, labels[0].X)
 	}
 }

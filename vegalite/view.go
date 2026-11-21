@@ -1081,7 +1081,22 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 			main.FormatType = lit("utc")
 		}
 	}
-	for k, x := range s.guide {
+	// The keys go in order, so that a labelBaseline of the spec wins over
+	// the one that a labelAngle of 0 sets.
+	for _, k := range slices.Sorted(maps.Keys(s.guide)) {
+		x := s.guide[k]
+		if passedAxisKey(k) {
+			if v, ok := guideValue(x); ok {
+				if strings.HasPrefix(k, "grid") {
+					if grid != nil {
+						setExtra(grid, k, v)
+					}
+				} else {
+					setExtra(&main, k, v)
+				}
+			}
+			continue
+		}
 		switch k {
 		case "orient":
 			main.Orient = lit(x)
@@ -1126,9 +1141,103 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 			}
 		case "offset":
 			main.Offset = lit(x)
+		case "labelBaseline":
+			if v, ok := guideValue(x); ok {
+				main.LabelBase = v
+			}
+		case "labelPadding":
+			if v, ok := guideValue(x); ok {
+				main.LabelPadding = v
+			}
+		case "bandPosition":
+			if v, ok := guideValue(x); ok {
+				main.BandPosition = v
+				if grid != nil {
+					grid.BandPosition = v
+				}
+			}
+		case "zindex":
+			if f, ok := x.(float64); ok {
+				z := int(f)
+				main.ZIndex = &z
+				if grid != nil {
+					grid.ZIndex = &z
+				}
+			}
+		case "labelExpr":
+			if e, ok := x.(string); ok {
+				text := vega.Production{{Signal: e}}
+				main.Encode = vega.GuideEncode{"labels": {Sets: vega.Encode{"update": vega.Props{"text": text}}}}
+			}
 		}
 	}
 	return grid, main
+}
+
+// axisStyleKeys are the properties of an axis of Vega-Lite that style a
+// part of the axis, which Vega reads with the same name and meaning: the
+// text of the labels and of the title, and the lines of the grid and of the
+// domain. The other keys of passedAxisKey place the labels and the title.
+var axisStyleKeys = map[string][]string{
+	"label": textStyleEnds, "title": textStyleEnds, "grid": lineStyleEnds, "domain": lineStyleEnds,
+}
+
+// textStyleEnds and lineStyleEnds are the ends of the names of the
+// properties that style a text and a line, such as Color in labelColor.
+var (
+	textStyleEnds = []string{"Color", "Font", "FontSize", "FontStyle", "FontWeight", "Opacity"}
+	lineStyleEnds = []string{"Cap", "Color", "Dash", "Opacity", "Width"}
+)
+
+// passedAxisKey reports whether a property of the axis of a channel passes
+// to the Vega axis as it is: a property of the style of a part, or of the
+// place of the labels or the title.
+func passedAxisKey(k string) bool {
+	switch k {
+	case "labelOffset", "titleAnchor", "titlePadding", "titleX", "titleY", "titleAngle", "titleAlign",
+		"titleBaseline", "tickSize":
+		return true
+	}
+	for prefix, ends := range axisStyleKeys {
+		if end, ok := strings.CutPrefix(k, prefix); ok && slices.Contains(ends, end) {
+			return true
+		}
+	}
+	return false
+}
+
+// valueAxisKey reports whether a property of the axis of a channel passes
+// to the Vega axis only as a value, which guideValue reads.
+func valueAxisKey(k string) bool {
+	return passedAxisKey(k) || k == "labelBaseline" || k == "labelPadding" || k == "bandPosition"
+}
+
+// guideValue returns the value of a property of a guide as a value of
+// Vega: a literal, or a signal for an expression of Vega-Lite, such as
+// {"expr": "width / 2"}. A condition, or any other object, is not a value
+// that the compiler passes on.
+func guideValue(x any) (vega.Value, bool) {
+	m, ok := x.(map[string]any)
+	if !ok {
+		return lit(x), true
+	}
+	if e, ok := m["expr"].(string); ok && len(m) == 1 {
+		return vega.Value{Signal: e}, true
+	}
+	return vega.Value{}, false
+}
+
+// setExtra sets a property of a Vega axis that it holds with no field of
+// its own.
+func setExtra(a *vega.Axis, k string, v vega.Value) {
+	if a.Extra == nil {
+		a.Extra = vega.Extra{}
+	}
+	if v.Signal != "" {
+		a.Extra[k] = lit(map[string]string{"signal": v.Signal}).JSON
+		return
+	}
+	a.Extra[k] = v.JSON
 }
 
 // discretizing reports whether a scale type maps a continuous domain to
