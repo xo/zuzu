@@ -821,6 +821,7 @@ zuzu reads these settings of the section `flowchart` of the config:
 | --- | --- | --- |
 | `curve` | `basis` | draws the links with the curve of Vega of that name |
 | `wrappingWidth` | 120 | wraps the label of a node, as "Labels that wrap" says |
+| `minNodeWidth` | 120 | makes the box of the label of a node at least this wide, as "The least width of a node" says |
 | `htmlLabels` | true | the old form of `htmlLabels`, as "Labels that wrap" says |
 | `nodeSpacing` | 50 | sets the space between two nodes of a rank to 24/50 of it |
 | `rankSpacing` | 50 | sets the space between two ranks to 40/50 of it |
@@ -848,7 +849,7 @@ the subgraph that holds it, as the subgraphs above say. With
 These parts are issues: the target of a link, as "Links and tooltips"
 says, a statement that starts with `callback` or `href`, a `theme` that Mermaid does not have and the `themeVariables`,
 which draw in the look of zuzu, the other settings of the section `flowchart`, such as
-`minNodeWidth`, and any other style, such as `animation` on a node.
+`padding`, and any other style, such as `animation` on a node.
 
 ### Icons and images
 
@@ -968,9 +969,9 @@ they change nothing and are no issue.
 
 These parts are issues: `scale`, a floating note with no state,
 such as `note "text" as N1`, the settings of the section `state` of
-the config other than `wrappingWidth`, `nodeSpacing` and `rankSpacing`, a
-`theme` that Mermaid does not have, the `themeVariables`, and a style that
-a flowchart does not read.
+the config other than `wrappingWidth`, `minNodeWidth`, `nodeSpacing` and
+`rankSpacing`, a `theme` that Mermaid does not have, the `themeVariables`,
+and a style that a flowchart does not read.
 
 ### Class diagram
 
@@ -1304,7 +1305,7 @@ zuzu reads these settings of the section `agentflow` of the config:
 | Setting | Default of Mermaid | What zuzu does |
 | --- | --- | --- |
 | `wrappingWidth` | 120 | wraps the label of a node, as "Labels that wrap" says |
-| `minNodeWidth` | 120 | makes a node at least as wide as a label of this width, scaled by 11/14, and its padding. A diamond and a collapsed flow fit their label |
+| `minNodeWidth` | 120 | makes the box of the label of a node at least this wide, as "The least width of a node" says. A collapsed flow fits its label |
 | `nodeSpacing` | 50 | sets the space between two nodes of a rank to 24/50 of it |
 | `rankSpacing` | 50 | sets the space between two ranks to 40/50 of it |
 | `diagramPadding` | 8 | sets the space around the diagram to it |
@@ -1603,8 +1604,8 @@ when `ignoreCrossLaneEdges` is false.
 These parts are issues, as in a flowchart: a `theme` that Mermaid does
 not have, the `themeVariables` and the `themeCSS`, which draw in the look
 of zuzu, the other settings of the section `flowchart`, such as
-`minNodeWidth`, the other settings of the section `swimlane`, such as
-`swimlane.curve`, and the target of a link. A known `swimlane.theme`
+`padding`, the other settings of the section `swimlane`, such as
+`swimlane.curve` and `swimlane.minNodeWidth`, and the target of a link. A known `swimlane.theme`
 selects the look, as "The theme" says.
 
 ### Links and tooltips
@@ -1709,9 +1710,40 @@ wraps at 11/12 of `usecase.wrappingWidth`, and an actor at 11/14. A
 venn diagram draws a text at 20 pixels, so a text wraps at 11/20 of the
 width of its cell, as "venn-beta" says. The
 ratio of each kind and of each such label is in `mermaidSizes`, in
-`graph/mermaid/style.go`. A node of zuzu fits its widest line. Mermaid
-makes the box of a label that wraps as wide as the width. DOT does not
-wrap a label.
+`graph/mermaid/style.go`. A node of zuzu fits its widest line, and the
+least width of a node of the next section. Mermaid makes the box of a
+label that wraps as wide as the width. DOT does not wrap a label.
+
+### The least width of a node
+
+Mermaid 12.3 makes the box of the label of a node at least
+`minNodeWidth` wide, 120 pixels by default, and the shape grows around
+the box. A narrower label takes the middle of the box. So a node with a
+short label is as wide as a node with a label that wraps at the default
+width. zuzu does the same, and scales the width by 11/14, as a width that
+wraps a label: 120 pixels of Mermaid are about 94 pixels of zuzu. A
+rectangle then is about 110 pixels wide, with its padding of 8 on each
+side. A diamond takes the box and is as high as it is wide.
+
+| Kind | Setting | The nodes that take it |
+| --- | --- | --- |
+| flowchart, swimlane diagram | `flowchart.minNodeWidth` | each node with a label |
+| agentflow diagram | `agentflow.minNodeWidth` | each node with a label |
+| state diagram | `state.minNodeWidth` | a state with a label or one description, and a note |
+| use case diagram | `usecase.minNodeWidth` | a use case and a note, as "Use case diagram" says |
+
+A circle and a double circle fit their label, as in Mermaid. So do a node
+with no label, a node of a size of its own, such as a small circle, a
+fork or the start of a state diagram, a collapsed subgraph, a node with an
+icon or an image, a state with more than one description, and a class. An
+icon in the line of a label, such as `fa:fa-gear`, is a part of the box.
+A class diagram, an entity relationship diagram and a requirement diagram
+do not read the setting, as in Mermaid. A swimlane diagram reads it in
+the section `flowchart`, and `swimlane.minNodeWidth` is an issue.
+
+The setting can be in the front matter or in a directive, as each
+setting can. 0 turns it off, and each node fits its label. A value that
+is not a number of 0 or more is an issue, and the width keeps its default.
 
 ### Charts
 
@@ -1828,8 +1860,8 @@ categories, which is at the left of a horizontal chart.
 
 These settings are issues, because the look of zuzu has no place for them.
 An axis has no ticks, so `tickLength` and `tickWidth` are issues. The
-labels of an axis are 8 pixels from the plot, and the title of an axis is
-at its end, so `labelPadding` and `titlePadding` of an axis are issues. An
+compile of an xychart does not pass `labelPadding` and `titlePadding` of
+an axis to Vega yet, though the runtime reads them, so they are issues. An
 axis of numbers has no axis line, so `axisLineWidth` on it is an issue.
 `width` and `height` give the size of the plot, so
 `plotReservedSpacePercent` is an issue.

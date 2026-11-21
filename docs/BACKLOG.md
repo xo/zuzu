@@ -124,19 +124,16 @@ and places nodes in another way.
    boundary in turn also with `colorScheme: role`. zuzu draws such a
    boundary as a plain panel. With `rotate`, zuzu turns through the 10
    categorical colors of its scheme, and Mermaid through 12 colors.
-4. `cross-circ` draws as a circle of 40. Mermaid 12.3 draws it as a circle
-   of 60.
-5. The dot in `fr-circ` is about 4 pixels wide. Mermaid 12.3 draws it 5
-   pixels wide.
 
 ### Fix what the corpus of mermaid-go-renderer found
 
 The corpus of `github.com/bvolpato/mermaid-go-renderer` at commit 9af8f11
 holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
-zuzu drew 2808 of them, and 2732 with no issue. Of the 3 that it does not
+zuzu drew 2808 of them, and 2732 with no issue. Of the 3 that it did not
 draw, one is an example of the documents of Mermaid whose kind is `...`,
-one ends in a link with no node, which mmdc does not draw either, and one
-is item 8 below.
+and one ends in a link with no node, which mmdc does not draw either. The
+third, a gantt with `dateFormat ss` and a start of `0`, draws since
+2026-11-22.
 
 1. A flowchart does not read properties after brackets, as
    `a["A"]@{ shape: cyl }`, and it reads `@{ ... }` over more lines with
@@ -146,35 +143,27 @@ is item 8 below.
    names it.
 3. In a layout LR with subgraphs inside subgraphs, the title of an outer
    subgraph covers the border of an inner one.
-4. A `classDef` of a treemap splits at `\,`. Mermaid reads it as a comma of
-   a value, as in a flowchart.
-5. A state or a class diagram reports `flowchart.nodeSpacing`, which
-   Mermaid reads there.
-6. In an ER diagram, a text where only a part is bold or italic, such as
+4. In an ER diagram, a text where only a part is bold or italic, such as
    `*first*Name`, draws plain. A line draws in one font.
-7. An outlined label of a sankey stays inside the chart, where Mermaid
+5. An outlined label of a sankey stays inside the chart, where Mermaid
    draws it past the left edge.
-8. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
-   reads `0` as the `Date` of JavaScript reads it, as a date in 2000. zuzu
-   does not read a number alone as a date. With `WithNow`, the end then
-   takes the day of the render, as in Mermaid.
-9. A swimlane diagram does not do `optimizeRanksByCrossings` with
+6. A swimlane diagram does not do `optimizeRanksByCrossings` with
    `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
    lines. Some of its routes share a line, and the titles of its lanes do
    not turn in a layout LR.
-10. The reader of every kind cuts a `%%` in the middle of a line, also
-    inside single quotes and after a colon of ZenUML, as in `A->B: 50%%
-    off`. In Mermaid each lexer cuts a comment by its own rule: a kind of
-    jison cuts `%%` where a token can start, a timeline also cuts a single
-    `%`, a kind of langium has a hidden token for `%%`, and a text token,
-    such as a message of a sequence or a string, keeps `%%` as text. So
-    `flowchart LR %% c` is an error in mmdc, and `sequenceDiagram%% c`
-    draws. Each reader handles its comments itself. The railroad kinds
-    already do.
-11. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
-    the spaces.
-12. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
-    an issue.
+7. The reader of every kind cuts a `%%` in the middle of a line, also
+   inside single quotes and after a colon of ZenUML, as in `A->B: 50%%
+   off`. In Mermaid each lexer cuts a comment by its own rule: a kind of
+   jison cuts `%%` where a token can start, a timeline also cuts a single
+   `%`, a kind of langium has a hidden token for `%%`, and a text token,
+   such as a message of a sequence or a string, keeps `%%` as text. So
+   `flowchart LR %% c` is an error in mmdc, and `sequenceDiagram%% c`
+   draws. Each reader handles its comments itself. The railroad kinds
+   already do.
+8. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
+   the spaces.
+9. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
+   an issue.
 
 
 ### Draw the math of KaTeX as Mermaid does
@@ -196,23 +185,32 @@ differ from Mermaid 12.3:
 
 ### Draw more of Mermaid
 
-1. `flowchart.minNodeWidth`, 120 by default in Mermaid 12.3.0, is not read,
-   so a node with a short label is narrower than in Mermaid.
-2. The title of a subgraph that is wider than its nodes draws past the box
+1. The title of a subgraph that is wider than its nodes draws past the box
    of the subgraph. Mermaid makes the box wider. Only a subgraph that lays
    out on its own, in `graph/nest.go`, reads the width of its title.
-3. A chart of `xyChart` reports `tickLength`, `tickWidth`, `labelPadding`
+2. A chart of `xyChart` reports `tickLength`, `tickWidth`, `labelPadding`
    and `titlePadding` of an axis, the width of the line of an axis of
    numbers, and `plotReservedSpacePercent`. The look of zuzu has no ticks
-   and no line on an axis of numbers, and the runtime has no padding of the
-   labels or of the title of an axis.
-4. The title of a gantt with sections starts at the names of the tasks, to
+   and no line on an axis of numbers. The compile of `xyChart` does not
+   pass `labelPadding` and `titlePadding` to the axis yet, though the
+   runtime reads them.
+3. The title of a gantt with sections starts at the names of the tasks, to
    the right of the names of the sections, because a title takes the bounds
    of the axes.
-5. In a `flowchart LR` with two subgraphs that no edge links, the box of the
+4. In a `flowchart LR` with two subgraphs that no edge links, the box of the
    second subgraph covers the box of the first by 3 pixels.
-6. Outside the time axis, Mermaid draws the marker of today of a gantt in
+5. Outside the time axis, Mermaid draws the marker of today of a gantt in
    the margin or past the edge of the image. zuzu draws no marker there.
+6. A task of a gantt that ends before it starts draws a bar from its end to
+   its start, and its start makes the time axis longer. Mermaid draws no bar
+   for it, and its axis runs from the first start to the last end. When
+   every task ends before the first start, zuzu runs the axis backward, as
+   Mermaid does. In the mode `compact`, the names of the tasks then do not
+   take the backward axis into account.
+7. A label with a word that is wider than `minNodeWidth` in the font of
+   mmdc can be narrower than the least width in zuzu, because zuzu measures
+   it with IBM Plex Sans. The node then takes the least width in zuzu, and
+   in Mermaid it is as wide as its label.
 
 ### Draw more of DOT
 
@@ -238,16 +236,17 @@ The compilers of the charts work around each of these:
 
 1. `y2: {datum}` is dropped, and `y2: {field}` beside a datum `y` takes the
    value of `y`.
-2. An axis has no `labelExpr` and no `titlePadding`. They are issues.
-3. An unfilled point draws with a stroke in the color of the background.
-4. A rule of Vega-Lite with one item takes the look of a reference, and its
+2. An unfilled point draws with a stroke in the color of the background.
+3. A rule of Vega-Lite with one item takes the look of a reference, and its
    label writes a time as a number.
-5. `x2: {"value": "width"}` is dropped with no issue, and the rect does not
+4. `x2: {"value": "width"}` is dropped with no issue, and the rect does not
    draw.
-6. The axis of an encoding reports `zindex`, `labelFontSize`,
-   `labelPadding`, `titleFontSize`, `titlePadding`, `tickSize`, `tickWidth`
-   and `domainWidth`. `config.axisX` and `config.axisY` apply some of them.
-7. The channel `href` is read and dropped with no issue, and a field of
+5. The axis of an encoding reports `tickWidth`, because the look of zuzu
+   draws no ticks. It also reports a condition on a property, such as a
+   `gridColor` or a `gridDash` that changes with the value of the tick,
+   because the compiler does not turn a condition into an encode of the
+   axis.
+6. The channel `href` is read and dropped with no issue, and a field of
    the channel `tooltip` only joins the aggregate. Neither becomes an
    encoding of Vega, though the scene now carries both.
 
@@ -259,9 +258,6 @@ diagrams with its original renderer and with zuzu, side by side. On
 its cause is not known yet.
 
 1. Vega-Lite:
-   - A text mark gets no `align`, so it draws from the left. vega-lite.js
-     writes `align: center` on 36 of the 42 text marks of the references,
-     and the labels inside the bars of `waterfall_chart` are cut.
    - The title of the y axis of `waterfall_chart` names each field, not the
      title "Amount" of the spec.
    - `mark.width` and `mark.height` are dropped with no issue on a mark that
@@ -274,10 +270,12 @@ its cause is not known yet.
      with no issue.
    - `rangeMin` and `rangeMax` are dropped with no issue on a range that is
      not two values, such as a step or a named range.
-   - The text of `arc_radial_histogram` has no `baseline: middle`, which
-     vega-lite.js sets.
    - `radiusOffset` and `thetaOffset` of an arc go to Vega, which does not
      have them.
+   - The compiler drops `config.text` and `config.mark`, except their
+     `align` and `baseline`, which it writes on the mark. vega-lite.js moves
+     `config.text` into `config.style.text`. So the `dx` and `dy` of the
+     config of `layer_line_co2_concentration` are lost, with no issue.
 2. Vega:
    - The years of `calendar-view` cover "Jan", as "Read the properties of
      an axis that the runtime drops" says.
@@ -326,20 +324,16 @@ out before any encode, in `layout/legend.go`. To apply such an encode, the
 layout of the legend reads the encode, or gives each entry a group of its
 own. No spec of the corpus encodes the place of a part of a legend.
 
-### Read the other properties of an axis
+### Write an infinite number as vega.js does
 
-The runtime drops the properties `labelPadding`, `labelOffset`,
-`labelBaseline`, `titleAnchor` and `titlePadding` of an axis with no
-issue. `vega.Axis` reads `LabelBase`, and nothing uses it. So the labels
-of `bar_axis_space_saving` take `labelAlign: "left"` but not
-`labelPadding: -5`, and they run into the plot.
+`format(1000/0, 'd')` writes `+Inf`, and vega.js writes `∞`. So
+`histogram_nonlinear` shows `+Inf` on its x axis.
 
-### Compile the place of an axis title from Vega-Lite
+### Read the band position of an axis from its config
 
-The compiler of Vega-Lite reports the properties `titleX`, `titleY`,
-`titleAngle`, `titleAlign` and `titleBaseline` of the axis of a channel,
-and does not pass them to the Vega axis (`axisKeys` in
-`vegalite/unit.go`). The runtime reads them.
+The runtime does not read `bandPosition` from `config.axisBand`. The specs
+`box-plot`, `violin-plot`, `error-bars` and `budget-forecasts` set it
+there.
 
 ### Draw a text of more lines as vega.js draws it
 
