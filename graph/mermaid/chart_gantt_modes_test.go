@@ -10,6 +10,7 @@ import (
 
 	"github.com/xo/zuzu"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/theme"
 )
 
 func TestGanttCompact(t *testing.T) {
@@ -119,5 +120,48 @@ func TestGanttLong(t *testing.T) {
 		return it.datum["task"] == nil && it.datum["y0"] == nil && it.datum["start"] != nil
 	}); n != 0 {
 		t.Errorf("%d bands of excluded days draw", n)
+	}
+}
+
+func TestGanttCritColor(t *testing.T) {
+	t.Parallel()
+	const src = "gantt\ndateFormat YYYY-MM-DD\nsection A\nPlan : 2024-01-01, 3d\n" +
+		"Build : crit, 2024-01-04, 4d\nShip : crit, milestone, 2024-01-08, 0d\n"
+	const redux = "%%{init: {\"theme\": \"redux-color\"}}%%\n" + src
+	reduxColor, ok := theme.Lookup("mermaid-redux-color")
+	if !ok {
+		t.Fatal("no scheme mermaid-redux-color")
+	}
+	dark := zuzu.WithMode(theme.Dark)
+	// A critical task, a bar or a milestone, has an outline in the color
+	// of a fall of the scheme, in the mode of the render (D38).
+	for _, tc := range []struct {
+		name, src string
+		opts      []zuzu.RenderOption
+		want      string
+	}{
+		{"light", src, nil, theme.New(theme.Light, theme.Zuzu).Down},
+		{"dark", src, []zuzu.RenderOption{dark}, theme.New(theme.Dark, theme.Zuzu).Down},
+		{"harbor", src, []zuzu.RenderOption{zuzu.WithScheme(theme.Harbor)}, theme.New(theme.Light, theme.Harbor).Down},
+		{"redux-color", redux, nil, theme.New(theme.Light, reduxColor).Down},
+		{"redux-color dark", redux, []zuzu.RenderOption{dark}, theme.New(theme.Dark, reduxColor).Down},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			items, report, err := drawDiagram(t, tc.src, true, tc.opts...)
+			if err != nil || len(report) != 0 {
+				t.Fatalf("the report %v and the error %v", report, err)
+			}
+			got := map[string]string{}
+			for _, it := range items {
+				task, _ := it.datum["task"].(string)
+				if task != "" && it.item.StrokeWidth != nil && *it.item.StrokeWidth == 2 {
+					got[task] = it.item.Stroke.Color
+				}
+			}
+			if len(got) != 2 || got["Build"] != tc.want || got["Ship"] != tc.want {
+				t.Errorf("expected the outlines of Build and Ship in %s, got %v", tc.want, got)
+			}
+		})
 	}
 }

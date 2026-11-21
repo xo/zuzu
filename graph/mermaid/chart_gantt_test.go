@@ -137,7 +137,7 @@ func TestGanttChart(t *testing.T) {
 		t.Errorf("expected Vega-Lite and no report, got %v and %v", lite, report)
 	}
 	s := string(b)
-	for _, want := range []string{`"text":"Tags in sections"`, `"2024-02-01T00:00:00.000"`, `"shape":"diamond"`, `"stroke":"` + ganttCrit + `"`} {
+	for _, want := range []string{`"text":"Tags in sections"`, `"2024-02-01T00:00:00.000"`, `"shape":"diamond"`, `"range":"diverging"`} {
 		if !strings.Contains(s, want) {
 			t.Errorf("the spec has no %s", want)
 		}

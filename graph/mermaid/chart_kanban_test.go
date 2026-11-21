@@ -9,13 +9,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xo/zuzu"
 	"github.com/xo/zuzu/graph/mermaid"
 	"github.com/xo/zuzu/text"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
 // kbWantCard is a card that a fixture of a kanban draws: its text, its
-// ticket, its assignee, the color of its priority and its link.
+// ticket, its assignee, its priority with a line and its link.
 type kbWantCard struct {
 	label, ticket, assigned, priority, href string
 }
@@ -37,14 +39,14 @@ func TestKanbanFixtures(t *testing.T) {
 		},
 		"02-metadata.mmd": {
 			{"Todo", []kbWantCard{
-				{"Create parsing tests", "MC-2038", "K.Sveidqvist", "orange", "https://tickets.example.com/browse/MC-2038"},
-				{label: "Last item", assigned: "knsv", priority: "lightblue"},
+				{"Create parsing tests", "MC-2038", "K.Sveidqvist", "High", "https://tickets.example.com/browse/MC-2038"},
+				{label: "Last item", assigned: "knsv", priority: "Very Low"},
 				{label: "Plain card"},
 			}},
 			{"Done", []kbWantCard{
-				{"Update DB function", "MC-2037", "knsv", "red", "https://tickets.example.com/browse/MC-2037"},
+				{"Update DB function", "MC-2037", "knsv", "Very High", "https://tickets.example.com/browse/MC-2037"},
 				{label: "Medium card"},
-				{label: "Low card", priority: "blue"},
+				{label: "Low card", priority: "Low"},
 			}},
 		},
 		"03-wrap.mmd": {
@@ -82,15 +84,16 @@ func TestKanbanFixtures(t *testing.T) {
 			if err != nil || len(report) != 0 {
 				t.Fatalf("the report %v and the error %v", report, err)
 			}
-			checkKanban(t, items, want)
+			checkKanban(t, items, want, theme.New(theme.Light, theme.Zuzu))
 		})
 	}
 }
 
-// checkKanban checks the columns and the cards of a kanban that drew:
-// their texts, their order, their colors, and that each card is inside its
-// column and under the card before it.
-func checkKanban(t *testing.T, items []drawnItem, want []kbWantColumn) {
+// checkKanban checks the columns and the cards of a kanban that drew in a
+// theme: their texts, their order, their colors, the colors of the lines of
+// priority, and that each card is inside its column and under the card
+// before it.
+func checkKanban(t *testing.T, items []drawnItem, want []kbWantColumn, th theme.Theme) {
 	t.Helper()
 	columns, colColors := boxesByID(t, items, "columns")
 	columnLabels := labelsByID(t, items, "columnLabels")
@@ -109,7 +112,11 @@ func checkKanban(t *testing.T, items []drawnItem, want []kbWantColumn) {
 		assignees[datumID(it)] = it.text
 	}
 	for _, it := range drawnOf(items, "priorities") {
-		priorities[datumID(it)] = it.item.Stroke.Color
+		opacity := 1.0
+		if it.item.StrokeOpacity != nil {
+			opacity = *it.item.StrokeOpacity
+		}
+		priorities[datumID(it)] = it.item.Stroke.Color + " at " + strconv.FormatFloat(opacity, 'g', -1, 64)
 	}
 	if len(columns) != len(want) {
 		t.Fatalf("expected %d columns, got %d", len(want), len(columns))
@@ -147,8 +154,8 @@ func checkKanban(t *testing.T, items []drawnItem, want []kbWantColumn) {
 				t.Errorf("%s: expected the ticket %q, the assignee %q and the link %q, got %q, %q and %q",
 					cid, w.ticket, w.assigned, w.href, tickets[cid], assignees[cid], hrefs[cid])
 			}
-			if priorities[cid] != w.priority {
-				t.Errorf("%s: expected the priority %q, got %q", cid, w.priority, priorities[cid])
+			if want := kbPaint(th, w.priority); priorities[cid] != want {
+				t.Errorf("%s: expected the line of the priority %q in %q, got %q", cid, w.priority, want, priorities[cid])
 			}
 			if cardColors[cid] != colColors[id] {
 				t.Errorf("%s: expected the color of its column %s, got %s", cid, colColors[id], cardColors[cid])
@@ -167,6 +174,25 @@ func checkKanban(t *testing.T, items []drawnItem, want []kbWantColumn) {
 	}
 }
 
+// kbPaint returns the color and the opacity of the line of a priority of
+// a card in a theme, or empty for no line. Very High takes the color of a
+// fall of the scheme, and High a tint of it. Low takes the first
+// categorical color, and Very Low a tint of it (D38). A tint is the color
+// at 0.32, the opacity of a link of a sankey.
+func kbPaint(th theme.Theme, priority string) string {
+	switch priority {
+	case "Very High":
+		return th.Down + " at 1"
+	case "High":
+		return th.Down + " at 0.32"
+	case "Low":
+		return th.Category[0] + " at 1"
+	case "Very Low":
+		return th.Category[0] + " at 0.32"
+	}
+	return ""
+}
+
 // countPriorities returns the number of cards of a kanban with a line of
 // priority.
 func countPriorities(want []kbWantColumn) int {
@@ -179,6 +205,55 @@ func countPriorities(want []kbWantColumn) int {
 		}
 	}
 	return n
+}
+
+func TestKanbanPriorityColors(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile(filepath.Join("testdata", "kanban", "02-metadata.mmd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	// The source sets the theme of Mermaid at the top of its config.
+	redux := strings.Replace(src, "config:\n", "config:\n  theme: redux-color\n", 1)
+	reduxColor, ok := theme.Lookup("mermaid-redux-color")
+	if !ok {
+		t.Fatal("no scheme mermaid-redux-color")
+	}
+	want := []kbWantColumn{
+		{"Todo", []kbWantCard{
+			{"Create parsing tests", "MC-2038", "K.Sveidqvist", "High", "https://tickets.example.com/browse/MC-2038"},
+			{label: "Last item", assigned: "knsv", priority: "Very Low"},
+			{label: "Plain card"},
+		}},
+		{"Done", []kbWantCard{
+			{"Update DB function", "MC-2037", "knsv", "Very High", "https://tickets.example.com/browse/MC-2037"},
+			{label: "Medium card"},
+			{label: "Low card", priority: "Low"},
+		}},
+	}
+	dark := zuzu.WithMode(theme.Dark)
+	// The lines of priority take the colors of the scheme and of the mode
+	// of the render (D38).
+	for _, tc := range []struct {
+		name, src string
+		opts      []zuzu.RenderOption
+		theme     theme.Theme
+	}{
+		{"dark", src, []zuzu.RenderOption{dark}, theme.New(theme.Dark, theme.Zuzu)},
+		{"harbor", src, []zuzu.RenderOption{zuzu.WithScheme(theme.Harbor)}, theme.New(theme.Light, theme.Harbor)},
+		{"redux-color", redux, nil, theme.New(theme.Light, reduxColor)},
+		{"redux-color dark", redux, []zuzu.RenderOption{dark}, theme.New(theme.Dark, reduxColor)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			items, report, err := drawDiagram(t, tc.src, true, tc.opts...)
+			if err != nil || len(report) != 0 {
+				t.Fatalf("the report %v and the error %v", report, err)
+			}
+			checkKanban(t, items, want, tc.theme)
+		})
+	}
 }
 
 func TestKanbanWrap(t *testing.T) {

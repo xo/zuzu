@@ -8,6 +8,22 @@ import (
 	"github.com/xo/zuzu/text"
 )
 
+// The tones of a line of priority of a card, which are also the names of
+// the scales that give their colors: the color of a fall of the scheme,
+// and the first categorical color (D38).
+const (
+	kbFall  = "fall"
+	kbFirst = "first"
+)
+
+// kbTint is the opacity of a line of priority that is a tint of its color
+// (D38). A tint in the look is the color at an opacity over what is under
+// it. A line takes the opacity of a link of a sankey in docs/STYLE.md, the
+// tint that the look draws on a line. The tint of a node, at 0.14, is for
+// an area. A line of 3 pixels at that opacity is too faint to see on a
+// card.
+const kbTint = 0.32
+
 // The sizes of a kanban in the pixels of Mermaid 12.3, which scaleWrap
 // turns into the pixels of zuzu at 11/16, because Mermaid draws the labels
 // of a kanban at 16 pixels (D32). A column is kanban.sectionWidth wide, and
@@ -136,9 +152,16 @@ func (l *kbLayout) card(n *kbNode, id, key string, x, y, w float64) float64 {
 			"id": id, "x": x + w - kbCardPadX, "y": my, "text": n.assigned,
 		})
 	}
-	if color, ok := kbPriorities[n.priority]; ok {
+	if p, ok := kbPriorities[n.priority]; ok {
+		tone, opacity := kbFirst, 1.0
+		if p.fall {
+			tone = kbFall
+		}
+		if p.tint {
+			opacity = kbTint
+		}
 		l.rows["priorities"] = append(l.rows["priorities"], map[string]any{
-			"id": id, "priority": n.priority, "color": color, "x": x + 2.5, "y": y + 3, "y2": y + h - 3,
+			"id": id, "priority": n.priority, "tone": tone, "opacity": opacity, "x": x + 2.5, "y": y + 3, "y2": y + h - 3,
 		})
 	}
 	return h
@@ -192,7 +215,11 @@ func (l *kbLayout) spec() map[string]any {
 	}))
 	mark("rule", "priorities", graph.StyleEdge, map[string]any{
 		"x": field("x"), "y": field("y"), "x2": field("x"), "y2": field("y2"),
-		"stroke": field("color"), "strokeWidth": value(3), "strokeCap": value("round"),
+		"stroke": []any{
+			map[string]any{"test": "datum.tone === " + quoteJS(kbFall), "scale": kbFall, "value": kbFall},
+			map[string]any{"scale": kbFirst, "value": kbFirst},
+		},
+		"strokeOpacity": field("opacity"), "strokeWidth": value(3), "strokeCap": value("round"),
 	})
 	mark("text", "cardLabels", graph.StyleNodeLabel, map[string]any{
 		"x": field("x"), "y": field("y"), "text": field("text"),
@@ -220,13 +247,24 @@ func (l *kbLayout) spec() map[string]any {
 	for i := range domain {
 		domain[i] = strconv.Itoa(i)
 	}
+	scales := []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}}
+	if len(l.rows["priorities"]) > 0 {
+		// The compile does not know the mode or the scheme, so a line of
+		// priority takes its color through a scale of one value, which the
+		// render fills from its theme. The first color of the named range
+		// diverging is the color of a fall, and the first color of the
+		// named range category is the first categorical color (D38).
+		scales = append(scales,
+			map[string]any{"name": kbFall, "type": "ordinal", "domain": []any{kbFall}, "range": "diverging"},
+			map[string]any{"name": kbFirst, "type": "ordinal", "domain": []any{kbFirst}, "range": "category"})
+	}
 	return map[string]any{
 		"width":    math.Ceil(l.w),
 		"height":   math.Ceil(l.h),
 		"autosize": "pad",
 		"padding":  8,
 		"data":     data,
-		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}},
+		"scales":   scales,
 		"marks":    marks,
 	}
 }

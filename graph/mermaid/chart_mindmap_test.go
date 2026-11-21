@@ -22,18 +22,21 @@ import (
 	"github.com/xo/zuzu/vega"
 )
 
-// drawDiagram renders a source of Mermaid with the bundled packs of icons,
-// and returns the items of its scene, with the name of the mark of each,
-// and the report.
-func drawDiagram(t *testing.T, src string, strict bool) ([]drawnItem, zuzu.Report, error) {
+// drawDiagram renders a source of Mermaid with the bundled packs of icons
+// and the options, and returns the items of its scene, with the name of
+// the mark of each, and the report.
+func drawDiagram(t *testing.T, src string, strict bool, opts ...zuzu.RenderOption) ([]drawnItem, zuzu.Report, error) {
 	t.Helper()
 	c, report, err := zuzu.Parse([]byte(src), zuzu.WithStrict(strict))
 	if err != nil {
 		return nil, report, err
 	}
-	s, more, err := c.Render(context.Background(), zuzu.WithLocation(time.UTC),
+	opts = append([]zuzu.RenderOption{
+		zuzu.WithLocation(time.UTC),
 		zuzu.WithIcons("fa", fa.Pack()), zuzu.WithIcons("mdi", mdi.Pack()),
-		zuzu.WithIcons("carbon", carbon.Pack()), zuzu.WithIcons("k8s", k8s.Pack()))
+		zuzu.WithIcons("carbon", carbon.Pack()), zuzu.WithIcons("k8s", k8s.Pack()),
+	}, opts...)
+	s, more, err := c.Render(context.Background(), opts...)
 	report = append(report, more...)
 	if err != nil {
 		return nil, report, err

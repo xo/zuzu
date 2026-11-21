@@ -13,8 +13,6 @@ import (
 
 // The look of a gantt.
 const (
-	// ganttCrit is the color of the outline of a critical task.
-	ganttCrit = "#e5484d"
 	// ganttExcluded is the color of an excluded day.
 	ganttExcluded = "#98a2b3"
 	// ganttBandYears is the most whole years that a gantt with bands of
@@ -239,7 +237,11 @@ func (g *gantt) spec() (map[string]any, error) {
 			}
 		}
 		if len(bars) > 0 {
-			layers = append(layers, bar(bars, map[string]any{"fillOpacity": 0, "stroke": ganttCrit, "strokeWidth": 2}))
+			outline := bar(bars, map[string]any{"fillOpacity": 0, "strokeWidth": 2})
+			if enc, ok := outline["encoding"].(map[string]any); ok {
+				enc["stroke"] = ganttCrit()
+			}
+			layers = append(layers, outline)
 		}
 		crit = points
 	}
@@ -255,9 +257,9 @@ func (g *gantt) spec() (map[string]any, error) {
 	if len(crit) > 0 {
 		layers = append(layers, map[string]any{
 			"data": ganttData(crit, "at"),
-			"mark": map[string]any{"type": "point", "shape": "diamond", "filled": false, "size": 180, "stroke": ganttCrit, "strokeWidth": 2},
+			"mark": map[string]any{"type": "point", "shape": "diamond", "filled": false, "size": 180, "strokeWidth": 2},
 			"encoding": map[string]any{
-				"x": xOf("at"), "y": y,
+				"x": xOf("at"), "y": y, "stroke": ganttCrit(),
 			},
 		})
 	}
@@ -299,6 +301,18 @@ func (g *gantt) spec() (map[string]any, error) {
 		spec["description"] = desc
 	}
 	return spec, nil
+}
+
+// ganttCrit returns the encoding of the outline of a critical task. A
+// critical task takes the color of a fall of the scheme (D38). The
+// compile does not know the mode or the scheme, so the outline takes its
+// color through a scale with the named range diverging, whose first color
+// is the color of a fall. The render fills the range from its theme.
+func ganttCrit() map[string]any {
+	return map[string]any{
+		"datum": "critical", "type": "nominal", "legend": nil,
+		"scale": map[string]any{"domain": []any{"critical"}, "range": "diverging"},
+	}
 }
 
 // ganttLane is a row of a gantt: its key on the axis, and its section.

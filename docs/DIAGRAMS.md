@@ -2922,9 +2922,11 @@ zuzu lays out a kanban in Go with the sizes of Mermaid 12.3, scaled by
 3. The ticket of a card is at its bottom left, and the assignee at its
    bottom right, under the text.
 4. A card with the priority `Very High`, `High`, `Low` or `Very Low` has a
-   line at its left in the color of Mermaid: red, orange, blue or light
-   blue. Mermaid draws no line for `Medium` or another value, and neither
-   does zuzu.
+   line at its left, which Mermaid draws red, orange, blue or light blue.
+   zuzu draws `Very High` in the color of a fall of the scheme, and `High`
+   in a tint of it. `Low` takes the first categorical color, and `Very Low`
+   a tint of it (D38). Mermaid draws no line for `Medium` or another value,
+   and neither does zuzu.
 
 With `kanban.ticketBaseUrl`, the ticket of a card is a link (D32): the URL
 with the ticket in place of `#TICKET#`. Mermaid opens the link in another

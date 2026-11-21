@@ -53,14 +53,23 @@ var (
 	kbEnds   = []string{"))", ")", "]", "}}", "(-", "-)", "((", "("}
 )
 
-// kbPriorities are the colors of the line that Mermaid draws at the left of
-// a card by its priority. Mermaid draws no line for Medium or for another
-// value.
-var kbPriorities = map[string]string{
-	"Very High": "red",
-	"High":      "orange",
-	"Low":       "blue",
-	"Very Low":  "lightblue",
+// kbPriority is the color of the line that zuzu draws at the left of a
+// card by its priority: the color of a fall of the scheme, or the first
+// categorical color, and whether the line is a tint of that color (D38).
+type kbPriority struct {
+	fall, tint bool
+}
+
+// kbPriorities are the priorities for which Mermaid draws a line at the
+// left of a card, in red, orange, blue and light blue. Very High takes the
+// color of a fall, and High a tint of it. Low takes the first categorical
+// color, and Very Low a tint of it (D38). Mermaid draws no line for Medium
+// or for another value.
+var kbPriorities = map[string]kbPriority{
+	"Very High": {fall: true},
+	"High":      {fall: true, tint: true},
+	"Low":       {},
+	"Very Low":  {tint: true},
 }
 
 // kanbanChart compiles a kanban: its columns from left to right, each with
