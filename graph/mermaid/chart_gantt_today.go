@@ -27,9 +27,9 @@ func ganttToday(now time.Time) time.Time {
 // draws it (D38). The time axis runs from lo to hi. Outside the axis,
 // Mermaid draws the marker in the margin or past the edge of the image.
 // zuzu draws no marker there, so that the marker does not stretch the
-// axis. The rule draws as an edge of a diagram, in the tokens edge and
-// edgeWidth of docs/STYLE.md, so that it reads over the bars of every
-// section. The style of todayMarker goes over it.
+// axis. The rule draws in the width of an edge of a diagram, edgeWidth of
+// docs/STYLE.md, and in the color of a fall of the scheme, as Mermaid
+// draws it red. The style of todayMarker goes over it.
 func (g *gantt) todayLayer(lo, hi time.Time, x map[string]any) (map[string]any, error) {
 	if g.c.d.Now.IsZero() || g.todayMarker == "off" {
 		return nil, nil
@@ -45,10 +45,16 @@ func (g *gantt) todayLayer(lo, hi time.Time, x map[string]any) (map[string]any, 
 	// writes its value as a number. The marker draws twice, so that the
 	// mark has more than one item.
 	at := map[string]any{"at": g.today.Format(ganttLayout)}
+	enc := map[string]any{"x": x}
+	// An encoding wins over the mark, so a stroke of todayMarker takes the
+	// place of the color of a fall.
+	if _, ok := mark["stroke"]; !ok {
+		enc["stroke"] = ganttFall()
+	}
 	return map[string]any{
 		"data":     ganttData([]any{at, at}, "at"),
 		"mark":     mark,
-		"encoding": map[string]any{"x": x},
+		"encoding": enc,
 	}, nil
 }
 

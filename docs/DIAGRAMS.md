@@ -1875,7 +1875,8 @@ with no task draws nothing but its title, as in Mermaid.
 
 zuzu has no clock of its own. The time of the render comes from
 `zuzu.WithNow`, an option of `Parse` (D38). With the time, a gantt draws
-the marker of today as a line across the chart, in the color of an edge.
+the marker of today as a line across the chart, in the color of a fall of
+the scheme, as Mermaid draws it red.
 `todayMarker off` draws no marker, and another value of `todayMarker` is
 the style of the line, as `stroke:#0f0,stroke-width:4px`, as in Mermaid. A
 style that a line cannot draw, such as `fill`, changes nothing, and a style

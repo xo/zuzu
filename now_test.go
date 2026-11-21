@@ -10,6 +10,7 @@ import (
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text/emoji"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -55,6 +56,9 @@ func TestNowGantt(t *testing.T) {
 	// The marker is at the wall clock that the time has in its own zone.
 	const at = `"2024-03-15T10:20:30.000"`
 	now := []Option{WithNow(testNow)}
+	// With no stroke of todayMarker, the marker takes the color of a fall
+	// of the scheme (D38).
+	fall := theme.New(theme.Light, theme.Zuzu).Down
 	tests := []struct {
 		name, src string
 		opts      []Option
@@ -64,10 +68,10 @@ func TestNowGantt(t *testing.T) {
 		issue     string
 	}{
 		{"no time", ganttNowSrc, nil, false, "", 0, ""},
-		{"time", ganttNowSrc, now, true, "", 1.5, ""},
+		{"time", ganttNowSrc, now, true, fall, 1.5, ""},
 		{"off", ganttNowSrc + "todayMarker off\n", now, false, "", 0, ""},
 		{"style", ganttNowSrc + "todayMarker stroke:#00ff00,stroke-width:5px,fill:red\n", now, true, "#00ff00", 5, ""},
-		{"unknown style", ganttNowSrc + "todayMarker stroke-linejoin:round\n", now, true, "", 1.5, "stroke-linejoin"},
+		{"unknown style", ganttNowSrc + "todayMarker stroke-linejoin:round\n", now, true, fall, 1.5, "stroke-linejoin"},
 		{"style with no time", ganttNowSrc + "todayMarker stroke:#00ff00\n", nil, false, "", 0, "WithNow"},
 		{"outside the axis", "gantt\ndateFormat YYYY-MM-DD\na : 2023-01-01, 3d\n", now, false, "", 0, ""},
 	}

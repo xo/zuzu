@@ -241,7 +241,7 @@ func (g *gantt) spec() (map[string]any, error) {
 		if len(bars) > 0 {
 			outline := bar(bars, map[string]any{"fillOpacity": 0, "strokeWidth": 2})
 			if enc, ok := outline["encoding"].(map[string]any); ok {
-				enc["stroke"] = ganttCrit()
+				enc["stroke"] = ganttFall()
 			}
 			layers = append(layers, outline)
 		}
@@ -261,7 +261,7 @@ func (g *gantt) spec() (map[string]any, error) {
 			"data": ganttData(crit, "at"),
 			"mark": map[string]any{"type": "point", "shape": "diamond", "filled": false, "size": 180, "strokeWidth": 2},
 			"encoding": map[string]any{
-				"x": xOf("at"), "y": y, "stroke": ganttCrit(),
+				"x": xOf("at"), "y": y, "stroke": ganttFall(),
 			},
 		})
 	}
@@ -312,15 +312,17 @@ func (g *gantt) spec() (map[string]any, error) {
 	return spec, nil
 }
 
-// ganttCrit returns the encoding of the outline of a critical task. A
-// critical task takes the color of a fall of the scheme (D38). The
-// compile does not know the mode or the scheme, so the outline takes its
-// color through a scale with the named range diverging, whose first color
-// is the color of a fall. The render fills the range from its theme.
-func ganttCrit() map[string]any {
+// ganttFall returns the encoding of a stroke in the color of a fall of the
+// scheme: the outline of a critical task and the marker of today (D38).
+// The compile does not know the mode or the scheme, so the stroke takes
+// its color through a scale with the named range diverging, whose first
+// color is the color of a fall. The render fills the range from its theme.
+// Each layer gives the same datum, so that the layers share one scale of
+// one color.
+func ganttFall() map[string]any {
 	return map[string]any{
-		"datum": "critical", "type": "nominal", "legend": nil,
-		"scale": map[string]any{"domain": []any{"critical"}, "range": "diverging"},
+		"datum": "fall", "type": "nominal", "legend": nil,
+		"scale": map[string]any{"domain": []any{"fall"}, "range": "diverging"},
 	}
 }
 
