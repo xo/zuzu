@@ -103,6 +103,20 @@ func TestClipPolygon(t *testing.T) {
 	}
 }
 
+func TestSubroutineFitsLabel(t *testing.T) {
+	t.Parallel()
+	// The label of a subroutine, with its padding, sits between the two
+	// inner lines, also when the label is short.
+	for _, tw := range []float64{6, 20, 80} {
+		pad := 8.0
+		w, _ := NodeSize("subroutine", tw, 14, pad)
+		box, _ := NodeSize("rect", tw, 14, pad)
+		if inner := w - 2*subroutineFrame; inner < tw+2*pad || inner < box {
+			t.Errorf("a label %v wide has %v between the inner lines, want at least %v", tw, inner, math.Max(tw+2*pad, box))
+		}
+	}
+}
+
 func TestStrokeHoldsNoArea(t *testing.T) {
 	t.Parallel()
 	got := stroke([2]float64{0, 0}, [2]float64{10, 0}, [2]float64{10, 5})

@@ -361,6 +361,41 @@ func TestLayLoopSide(t *testing.T) {
 	}
 }
 
+func TestLayLoopOutline(t *testing.T) {
+	t.Parallel()
+	// The ends of a loop sit on the outline of an ellipse or a circle, not
+	// on the box around it, and on the box of a box.
+	in := LayoutInput{
+		Nodes: []LayoutNode{
+			{ID: "a", Width: 68, Height: 36, Shape: "ellipse"},
+			{ID: "b", Width: 40, Height: 40, Shape: "circle"},
+			{ID: "c", Width: 60, Height: 30, Shape: "box"},
+		},
+		Edges: []LayoutEdge{{Source: "a", Target: "a"}, {Source: "b", Target: "b"}, {Source: "c", Target: "c"}, {Source: "a", Target: "b"}, {Source: "b", Target: "c"}},
+	}
+	for _, dir := range []string{TB, BT, LR, RL} {
+		in.Direction = dir
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range 3 {
+			n, e := l.Nodes[i], l.Edges[i]
+			for _, p := range [][2]float64{{e.StartX, e.StartY}, {e.EndX, e.EndY}, e.Points[0], e.Points[3]} {
+				dx, dy := (p[0]-n.X)/(n.Width/2), (p[1]-n.Y)/(n.Height/2)
+				d := math.Hypot(dx, dy)
+				if in.Nodes[i].Shape == "box" {
+					d = math.Max(math.Abs(dx), math.Abs(dy))
+				}
+				if math.Abs(d-1) > 0.01 {
+					t.Errorf("%s: the loop of %s ends at %v, at %v of the way out to the outline", dir, in.Nodes[i].ID, p, d)
+				}
+			}
+		}
+		checkRules(t, dir, in, l)
+	}
+}
+
 func TestLayLoopRoom(t *testing.T) {
 	t.Parallel()
 	// The loop of a and its label take room at the right of a, so the label

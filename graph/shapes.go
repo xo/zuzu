@@ -14,6 +14,10 @@ const (
 	mcircle  = "Mcircle"
 )
 
+// subroutineFrame is the width of the frame on each side of a subroutine,
+// between its outline and its inner line.
+const subroutineFrame = 8
+
 // shapes are the shapes of a node that zuzu draws, by their names in DOT
 // and in Mermaid. A name maps to the shape that draws it.
 var shapes = map[string]string{
@@ -22,7 +26,7 @@ var shapes = map[string]string{
 	"stadium": "stadium", "pill": "stadium", "terminal": "stadium",
 	"subroutine": "subroutine", "subproc": "subroutine", "fr-rect": "subroutine", "framed-rectangle": "subroutine", "subprocess": "subroutine",
 	"cylinder": "cylinder", "cyl": "cylinder", "database": "cylinder", "db": "cylinder",
-	"circle": "circle", "circ": "circle", "sm-circ": "circle", "small-circle": "circle", "start": "circle",
+	"circle": "circle", "circ": "circle", "sm-circ": "circle", "small-circle": "circle",
 	"doublecircle": "doublecircle", "dbl-circ": "doublecircle", "double-circle": "doublecircle",
 	"ellipse": "ellipse", "oval": "ellipse",
 	"diamond": "diamond", "diam": "diamond", "decision": "diamond", "rhombus": "diamond", "question": "diamond", "choice": "diamond",
@@ -36,7 +40,7 @@ var shapes = map[string]string{
 	"invtriangle": "invtriangle", "flip-tri": "invtriangle", "flipped-triangle": "invtriangle", "manual-file": "invtriangle",
 	"octagon": "octagon", "pentagon": "pentagon", "house": "house", "invhouse": "invhouse",
 	"note": "note", "doc": "doc", "document": "doc", "folder": "folder", "tab": "folder", "directory": "folder",
-	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point", "anchor": "point",
+	"point": "point", "f-circ": "point", "filled-circle": "point", "junction": "point", "start": "point", "anchor": "point",
 	"bullseye": "bullseye", "bar": "bar",
 	"plaintext": "none", "plain": "none", "none": "none", "text": "none", "underline": "none",
 	// The shapes of DOT with lines across their corners.
@@ -120,6 +124,11 @@ func NodeSize(kind string, tw, th, pad float64) (float64, float64) {
 		return w + h/2, h
 	case "triangle", "invtriangle", "pentagon", "house", "invhouse":
 		return w * 1.5, h * 1.5
+	case "subroutine":
+		// A frame of 8 pixels on each side, outside the space of the
+		// label, so that the label sits between the two inner lines, as
+		// in Mermaid.
+		return w + 2*subroutineFrame, h
 	case "cylinder":
 		return w, h + 12
 	case "doc":
@@ -210,7 +219,7 @@ func shapePath(kind string, w, h float64) string {
 			"H" + num(-x+r) + "A" + num(r) + "," + num(r) + " 0 0,1 " + num(-x+r) + "," + num(-y) + "Z"
 	case "subroutine":
 		return poly([2]float64{-x, -y}, [2]float64{x, -y}, [2]float64{x, y}, [2]float64{-x, y}) +
-			"M" + num(-x+8) + "," + num(-y) + "V" + num(y) + "M" + num(x-8) + "," + num(-y) + "V" + num(y)
+			"M" + num(-x+subroutineFrame) + "," + num(-y) + "V" + num(y) + "M" + num(x-subroutineFrame) + "," + num(-y) + "V" + num(y)
 	case "cylinder":
 		ry := math.Min(h*0.12, 10)
 		return "M" + num(-x) + "," + num(-y+ry) + "A" + num(x) + "," + num(ry) + " 0 0,1 " + num(x) + "," + num(-y+ry) +

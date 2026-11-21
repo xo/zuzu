@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/xo/zuzu/graph"
 )
 
 // edges writes the edges of a flowchart as source>target:label:head:tail:
@@ -187,6 +189,42 @@ func TestNamedShapes(t *testing.T) {
 	// up.
 	want := `a lined-document "Doc" 0x0|b comment "Note" 0x0|c braces "c" 0x0|d fork "" 10x70|e hourglass "" 30x30|f fr-circ "" 14x14|` +
 		`h choice "" 28x28|i anchor "" 2x2`
+	if s := strings.Join(got, "|"); s != want {
+		t.Errorf("got  %s\nwant %s", s, want)
+	}
+}
+
+func TestSmallCircles(t *testing.T) {
+	t.Parallel()
+	// f-circ, junction, sm-circ and start draw as circles of 14 pixels
+	// with no text, as in Mermaid. A junction and the start are filled. A
+	// label that the source gives does not draw, and it is no issue.
+	src := `flowchart LR
+  a@{ shape: f-circ, label: "A" }
+  b@{ shape: junction, label: "B" }
+  c@{ shape: sm-circ, label: "C" }
+  d@{ shape: start, label: "D" }
+  e@{ shape: filled-circle }
+  f@{ shape: small-circle }
+  a --> b --> c --> d --> e --> f`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("expected no issues, got %v", report)
+	}
+	var got []string
+	for _, n := range g.Nodes {
+		kind, _ := graph.ShapeOf(n.Shape)
+		got = append(got, fmt.Sprintf("%s %s %q %vx%v %q", n.ID, kind, n.Label, n.Width, n.Height, n.Style["fillOpacity"]))
+	}
+	want := `a point "" 14x14 "1"|b point "" 14x14 "1"|c circle "" 14x14 ""|d point "" 14x14 "1"|` +
+		`e point "" 14x14 "1"|f circle "" 14x14 ""`
 	if s := strings.Join(got, "|"); s != want {
 		t.Errorf("got  %s\nwant %s", s, want)
 	}

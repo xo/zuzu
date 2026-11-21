@@ -687,7 +687,7 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 		na, nb := out.Nodes[a], out.Nodes[b]
 		ep := &out.Edges[i]
 		if a == b {
-			l.loop(ep, na, e)
+			l.loop(ep, na, in.Nodes[a].Shape, e)
 			continue
 		}
 		var pts [][2]float64
@@ -838,19 +838,26 @@ func border(n NodePlace, kind string, from, to [2]float64) [2]float64 {
 
 // loop routes an edge from a node to itself, on the side of the node
 // across the ranks: at its right, or above it when the ranks run across,
-// as in dot.
-func (l *layout) loop(ep *EdgePlace, n NodePlace, e LayoutEdge) {
+// as in dot. Its ends sit on the outline of the shape, not on the box
+// around it.
+func (l *layout) loop(ep *EdgePlace, n NodePlace, kind string, e LayoutEdge) {
 	r := 18 + e.LabelWidth/4
+	// out returns the point where a line from a point inside the node out
+	// to a point on its box meets the outline.
+	out := func(from, to [2]float64) (float64, float64) {
+		p := border(n, kind, from, to)
+		return p[0], p[1]
+	}
 	if l.in.Direction == LR || l.in.Direction == RL {
-		x0, y0 := n.X-n.Width/4, n.Y-n.Height/2
-		x1, y1 := n.X+n.Width/4, n.Y-n.Height/2
+		x0, y0 := out([2]float64{n.X - n.Width/4, n.Y}, [2]float64{n.X - n.Width/4, n.Y - n.Height/2})
+		x1, y1 := out([2]float64{n.X + n.Width/4, n.Y}, [2]float64{n.X + n.Width/4, n.Y - n.Height/2})
 		ep.Points = [][2]float64{{x0, y0}, {x0 - r/2, y0 - r}, {x1 + r/2, y1 - r}, {x1, y1}}
 		ep.EndX, ep.EndY, ep.EndAngle = x1, y1, 90+25
 		ep.StartX, ep.StartY, ep.StartAngle = x0, y0, 90-25
 		ep.LabelX, ep.LabelY = n.X, y0-r*1.3-e.LabelHeight/2
 	} else {
-		x0, y0 := n.X+n.Width/2, n.Y-n.Height/4
-		x1, y1 := n.X+n.Width/2, n.Y+n.Height/4
+		x0, y0 := out([2]float64{n.X, n.Y - n.Height/4}, [2]float64{n.X + n.Width/2, n.Y - n.Height/4})
+		x1, y1 := out([2]float64{n.X, n.Y + n.Height/4}, [2]float64{n.X + n.Width/2, n.Y + n.Height/4})
 		ep.Points = [][2]float64{{x0, y0}, {x0 + r, y0 - r/2}, {x1 + r, y1 + r/2}, {x1, y1}}
 		ep.EndX, ep.EndY, ep.EndAngle = x1, y1, 180-25
 		ep.StartX, ep.StartY, ep.StartAngle = x0, y0, 180+25

@@ -993,14 +993,18 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 
 // bare gives a node of a shape that draws no text, as Mermaid does, its
 // size and no label: a fork or a join, a bar across the ranks, an
-// hourglass, a bolt, a crossed circle, a framed circle, a choice and an
-// anchor.
+// hourglass, a bolt, a crossed circle, a framed circle, a small circle, a
+// filled circle, a choice and an anchor. Mermaid draws no label on such a
+// node either, so a label that the source gives is no issue.
 func (f *flowchart) bare(n *graph.Node) {
 	kind, _ := graph.ShapeOf(n.Shape)
-	// A choice is a diamond and an anchor is a point by their shape, but
-	// each has a size of its own.
-	if n.Shape == "choice" || n.Shape == "anchor" {
+	// A choice is a diamond, an anchor is a point and a small circle is a
+	// circle by their shape, but each has a size of its own.
+	switch n.Shape {
+	case "choice", "anchor":
 		kind = n.Shape
+	case "sm-circ", "small-circle":
+		kind = "sm-circ"
 	}
 	var w, h float64
 	switch kind {
@@ -1010,6 +1014,13 @@ func (f *flowchart) bare(n *graph.Node) {
 	case "anchor":
 		// A dot in the color of the node, where edges meet.
 		w, h = 2, 2
+		n.Style["fillOpacity"] = "1"
+	case "sm-circ":
+		// An open circle of 14 pixels, as Mermaid draws it.
+		w, h = 14, 14
+	case "point":
+		// A filled circle of 14 pixels: a junction or the start.
+		w, h = 14, 14
 		n.Style["fillOpacity"] = "1"
 	case "bar":
 		w, h = 70, 10
