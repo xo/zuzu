@@ -225,6 +225,53 @@ func TestScope(t *testing.T) {
 	}
 }
 
+// TestNow checks that now() gives the time of the scope, and 0 when the
+// scope has none, and that Calls finds a call of now in any branch (D38).
+func TestNow(t *testing.T) {
+	t.Parallel()
+	p, err := Compile("now()")
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2024, 3, 15, 10, 20, 30, 400e6, time.UTC)
+	for _, test := range []struct {
+		s    *Scope
+		want float64
+	}{
+		{nil, 0},
+		{&Scope{}, 0},
+		{&Scope{Now: at}, float64(at.UnixMilli())},
+	} {
+		if got, err := p.Eval(test.s); err != nil || got != test.want {
+			t.Errorf("now() in %+v = %v, %v, want %v", test.s, got, err, test.want)
+		}
+	}
+	for src, want := range map[string]bool{
+		"now()":                       true,
+		"datum.a > 1 ? 0 : now() - 1": true,
+		"[1, {k: timeFormat(now())}]": true,
+		"datum.now + nowish(1)":       false,
+		"random() + utcyear(datum.t)": false,
+	} {
+		// nowish is not built in, so the expressions parse with no check
+		// of their functions.
+		p := &Program{src: src, root: mustParse(t, src)}
+		if got := p.Calls("now"); got != want {
+			t.Errorf("%q calls now: %t, want %t", src, got, want)
+		}
+	}
+}
+
+// mustParse parses an expression with no check of its functions.
+func mustParse(t *testing.T, src string) node {
+	t.Helper()
+	n, err := parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
 func TestRegExpLiteralErrors(t *testing.T) {
 	t.Parallel()
 	for _, src := range []string{"test(/abc, 'a')", "test(/a(/, 'a')", "test(/a/q, 'a')"} {

@@ -80,7 +80,7 @@ type cyLayout struct {
 func newCynefinLayout(y *cynefin) *cyLayout {
 	w, h := y.cfg.width, y.cfg.height
 	l := &cyLayout{
-		y: y, m: text.NewEstimate(), rows: map[string][]any{}, w: w, h: h,
+		y: y, m: y.c.d.estimate(), rows: map[string][]any{}, w: w, h: h,
 		cx: map[string]float64{
 			cyComplex: w / 4, cyComplicated: w * 3 / 4, cyChaotic: w / 4, cyClear: w * 3 / 4, cyConfusion: w / 2,
 		},

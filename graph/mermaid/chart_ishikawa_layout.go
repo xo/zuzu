@@ -97,7 +97,7 @@ type ishEntry struct {
 // overlap.
 func newIshLayout(k *ishikawa) *ishLayout {
 	l := &ishLayout{
-		k: k, m: text.NewEstimate(), rows: map[string][]any{},
+		k: k, m: k.c.d.estimate(), rows: map[string][]any{},
 		minX: math.Inf(1), minY: math.Inf(1), maxX: math.Inf(-1), maxY: math.Inf(-1),
 	}
 	causes := k.root.kids

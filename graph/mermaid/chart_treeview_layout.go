@@ -62,7 +62,7 @@ func newTreeViewLayout(t *treeView) *tvLayout {
 	k := func(v float64) float64 { return scaleWrap(treeViewKind, "", v) }
 	size := wrapSize * t.labelSize / 16
 	l := &tvLayout{
-		t: t, m: text.NewEstimate(),
+		t: t, m: t.c.d.estimate(),
 		font:   text.Font{Family: text.Family, Size: size, Weight: 400},
 		indent: k(t.rowIndent), padX: k(t.padX), rowY: map[*tvNode]float64{},
 	}

@@ -115,7 +115,7 @@ type emLayout struct {
 // from the frames that it names, or from the last frame of another
 // swimlane.
 func newEMLayout(m *eventModel) *emLayout {
-	l := &emLayout{m: m, meas: text.NewEstimate(), lanes: map[int]*emLane{}}
+	l := &emLayout{m: m, meas: m.c.d.estimate(), lanes: map[int]*emLane{}}
 	// The first box starts at 250 pixels of Mermaid, or right of the
 	// widest label of a swimlane when it is wider.
 	start := emPx(emStartX)

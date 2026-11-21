@@ -1859,10 +1859,21 @@ starts it at the end of the task before it. It names its end as a date, as
 a duration such as `3d`, `12h` or `1.5w`, or as `until a b`. The tags are
 `done`, `active`, `crit`, `milestone` and `vert`. zuzu works out the start
 and the end of each task in Go, and a test compares them with mermaid.js.
-A cycle of `after` and `until` is an error. `click`, and `todayMarker`
-with a value other than `off`, are issues. A render has no time of its own, so zuzu draws no
-marker of today. A gantt with no task draws nothing but
-its title, as in Mermaid.
+A cycle of `after` and `until` is an error. `click` is an issue. A gantt
+with no task draws nothing but its title, as in Mermaid.
+
+zuzu has no clock of its own. The time of the render comes from
+`zuzu.WithNow`, an option of `Parse` (D38). With the time, a gantt draws
+the marker of today as a line across the chart, in the color of an edge.
+`todayMarker off` draws no marker, and another value of `todayMarker` is
+the style of the line, as `stroke:#0f0,stroke-width:4px`, as in Mermaid. A
+style that a line cannot draw, such as `fill`, changes nothing, and a style
+that zuzu does not read is an issue. zuzu draws no marker when the time is
+outside the time axis. A date of `dateFormat` that has no day, such as
+`HH:mm`, takes the day of the time. The day and the hour are those that
+the time has in its own time zone. Without the time, zuzu draws no marker,
+a `todayMarker` other than `off` is an issue, and a date with no day takes
+the day 1970-01-01 (D31).
 
 zuzu reads these settings of `gantt`, and `displayMode` at the top level
 of the front matter and of the config too:
@@ -3715,10 +3726,13 @@ color.
 
 The charts of Mermaid that lay out their text when they compile, such as
 a sequence diagram, a pie, a gantt, a journey, a mindmap, a treemap and
-an architecture diagram, measure an emoji as nothing, because the font
-comes with the render. Their labels with an emoji can be too narrow for
-the emoji. The graphs of DOT and of Mermaid lay out when they render, and
-measure an emoji with the font.
+an architecture diagram, measure an emoji with the font of
+`zuzu.WithEmoji` of `Parse` (D38). The chart keeps the font, and a render
+that gives no font of its own draws with it. Without the font at `Parse`,
+such a chart measures an emoji as nothing, and its labels with an emoji
+can be too narrow for the emoji. The graphs of DOT and of Mermaid lay out
+when they render, and measure an emoji with the font of the render, or
+else with the font of `Parse`.
 
 ## The look
 

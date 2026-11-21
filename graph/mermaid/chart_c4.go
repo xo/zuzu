@@ -196,7 +196,7 @@ func c4Chart(c *chart) (map[string]any, bool, error) {
 		c: c, byAlias: map[string]*c4Elem{}, boundBy: map[string]*c4Boundary{},
 		current: c4Global, shapeInRow: 4, boundaryInRow: 2,
 		margin: 50, pad: 20, width: 216, marginX: 50, marginY: 10,
-		c4wrap: true, m: text.NewEstimate(),
+		c4wrap: true, m: c.d.estimate(),
 	}
 	if err := p.settings(); err != nil {
 		return nil, false, err

@@ -151,7 +151,7 @@ func pieChart(c *chart) (map[string]any, bool, error) {
 	rows := make([]any, 0, len(parts))
 	domain := make([]any, 0, len(parts))
 	var outside []*pieLabel
-	measure := text.NewEstimate()
+	measure := c.d.estimate()
 	var cum float64
 	for i, s := range parts {
 		name := s.label

@@ -58,6 +58,10 @@ const (
 	// render has, in the strict mode. In the loose mode, the character
 	// draws nothing and the report names it once (D32).
 	ErrNoGlyph Error = "no font has the character"
+	// ErrNoNow is the error of an expression that calls now() when the
+	// parse has no WithNow, in the strict mode. In the loose mode, now()
+	// gives 0 and the report names the expression once (D38).
+	ErrNoNow Error = "no time of the render"
 )
 
 // Report lists what zuzu did not draw in the loose mode, and what it warns
@@ -80,7 +84,23 @@ const (
 )
 
 // Option is a setting of Parse.
-type Option func(*options)
+type Option interface {
+	applyParse(o *options)
+}
+
+// parseFunc is an Option that is a function.
+type parseFunc func(*options)
+
+// applyParse satisfies Option.
+func (f parseFunc) applyParse(o *options) {
+	f(o)
+}
+
+// SharedOption is a setting of both Parse and a render, such as WithEmoji.
+type SharedOption interface {
+	Option
+	RenderOption
+}
 
 // options are the settings of Parse.
 type options struct {
@@ -89,29 +109,35 @@ type options struct {
 	funcs   map[string]expr.Func
 	logger  *slog.Logger
 	math    *text.MathFont
+	// emoji holds the fonts of WithEmoji, which a kind of Mermaid that
+	// lays out when it compiles measures an emoji with, and which a render
+	// with no font of its own draws with (D38).
+	emoji []*text.Fallback
+	// now is the time of WithNow, or the zero time.
+	now time.Time
 }
 
 // WithDialect sets the dialect of a spec that has no $schema.
 func WithDialect(d Dialect) Option {
-	return func(o *options) { o.dialect = d }
+	return parseFunc(func(o *options) { o.dialect = d })
 }
 
 // WithStrict sets the feature mode (D26). In the strict mode, a feature
 // that zuzu does not support is an error. In the loose mode, the default,
 // zuzu skips it and names it in the report.
 func WithStrict(strict bool) Option {
-	return func(o *options) { o.strict = strict }
+	return parseFunc(func(o *options) { o.strict = strict })
 }
 
 // WithFunction adds a Go function that an expression can call by name. It
 // takes the place of a built in function of the same name.
 func WithFunction(name string, fn expr.Func) Option {
-	return func(o *options) {
+	return parseFunc(func(o *options) {
 		if o.funcs == nil {
 			o.funcs = map[string]expr.Func{}
 		}
 		o.funcs[name] = fn
-	}
+	})
 }
 
 // WithMath gives a parse a font of math, so that the math of KaTeX in a
@@ -126,12 +152,30 @@ func WithFunction(name string, fn expr.Func) Option {
 // and the report names it. A program that does not import text/math does
 // not hold the font.
 func WithMath(f *text.MathFont) Option {
-	return func(o *options) { o.math = f }
+	return parseFunc(func(o *options) { o.math = f })
+}
+
+// WithNow gives a parse the time of the render (D38). A gantt of Mermaid
+// with the time draws the marker of today, and a date of its dateFormat
+// that has no day, such as HH:mm, takes the day of the time, as in Mermaid.
+// The gantt takes the day and the hour that the time has in its own time
+// zone. The function now() of an expression gives the time, in
+// milliseconds since 1970.
+//
+// It is an option of Parse, because a gantt lays out when it compiles. The
+// chart keeps the time, and each render of it uses the time. Without the
+// time, a gantt draws no marker and puts a date with no day on 1970-01-01,
+// and now() gives 0, so that the same spec gives the same bytes. The report
+// names each expression that calls now() with no time, and in the strict
+// mode such a call is an error that wraps ErrNoNow. The zero time is no
+// time.
+func WithNow(t time.Time) Option {
+	return parseFunc(func(o *options) { o.now = t })
 }
 
 // WithLogger sets where zuzu logs.
 func WithLogger(l *slog.Logger) Option {
-	return func(o *options) { o.logger = l }
+	return parseFunc(func(o *options) { o.logger = l })
 }
 
 // Chart is a parsed spec. It does not change after Parse, so it is safe for
@@ -151,7 +195,7 @@ type Chart struct {
 func Parse(src []byte, opts ...Option) (*Chart, Report, error) {
 	var o options
 	for _, opt := range opts {
-		opt(&o)
+		opt.applyParse(&o)
 	}
 	d := o.dialect
 	if d == DOT || d == Mermaid {
@@ -198,7 +242,7 @@ func Parse(src []byte, opts ...Option) (*Chart, Report, error) {
 func FromVega(spec *vega.Spec, opts ...Option) (*Chart, Report, error) {
 	var o options
 	for _, opt := range opts {
-		opt(&o)
+		opt.applyParse(&o)
 	}
 	b, err := vega.Write(spec)
 	if err != nil {
@@ -217,7 +261,7 @@ func FromVega(spec *vega.Spec, opts ...Option) (*Chart, Report, error) {
 func FromVegaLite(spec *vegalite.Spec, opts ...Option) (*Chart, Report, error) {
 	var o options
 	for _, opt := range opts {
-		opt(&o)
+		opt.applyParse(&o)
 	}
 	v, report, err := vegalite.Compile(spec, vegalite.WithStrict(o.strict))
 	if err != nil {
@@ -245,7 +289,17 @@ func (c *Chart) Spec() *vega.Spec {
 }
 
 // RenderOption is a setting of a render.
-type RenderOption func(*renderOptions)
+type RenderOption interface {
+	applyRender(o *renderOptions)
+}
+
+// renderFunc is a RenderOption that is a function.
+type renderFunc func(*renderOptions)
+
+// applyRender satisfies RenderOption.
+func (f renderFunc) applyRender(o *renderOptions) {
+	f(o)
+}
 
 // renderOptions are the settings of a render.
 type renderOptions struct {
@@ -288,66 +342,66 @@ type renderOptions struct {
 // has a viewBox, so a viewer scales it, and the scale does not change it.
 // A scale that is not more than zero, or not finite, is an error of Image.
 func WithScale(scale float64) RenderOption {
-	return func(o *renderOptions) { o.scale, o.hasScale = scale, true }
+	return renderFunc(func(o *renderOptions) { o.scale, o.hasScale = scale, true })
 }
 
 // WithLoader sets how the data of a url is read (D25).
 func WithLoader(l Loader) RenderOption {
-	return func(o *renderOptions) { o.loader = l }
+	return renderFunc(func(o *renderOptions) { o.loader = l })
 }
 
 // WithValues gives the rows of a named dataset. They take the place of the
 // values or the url of the dataset in the spec, and its transforms still
 // run.
 func WithValues(name string, rows []map[string]any) RenderOption {
-	return func(o *renderOptions) {
+	return renderFunc(func(o *renderOptions) {
 		if o.values == nil {
 			o.values = map[string][]dataflow.Row{}
 		}
 		o.values[name] = rows
-	}
+	})
 }
 
 // WithResultSet gives the rows of a named dataset, read from the result of
 // a query. zuzu reads it once, and the caller closes it.
 func WithResultSet(name string, rs ResultSet) RenderOption {
-	return func(o *renderOptions) {
+	return renderFunc(func(o *renderOptions) {
 		if o.resultSets == nil {
 			o.resultSets = map[string]ResultSet{}
 		}
 		o.resultSets[name] = rs
-	}
+	})
 }
 
 // WithMode sets the light or the dark mode (D14). It wins over the mode
 // that the spec asks for with zuzu.mode in its config, such as the dark
 // theme of a Mermaid diagram (D32).
 func WithMode(m theme.Mode) RenderOption {
-	return func(o *renderOptions) { o.mode, o.hasMode = m, true }
+	return renderFunc(func(o *renderOptions) { o.mode, o.hasMode = m, true })
 }
 
 // WithScheme sets the color scheme (D14). It wins over the scheme that the
 // spec asks for with zuzu.scheme in its config, such as the forest theme
 // of a Mermaid diagram (D32).
 func WithScheme(s theme.Scheme) RenderOption {
-	return func(o *renderOptions) { o.scheme, o.hasScheme = s, true }
+	return renderFunc(func(o *renderOptions) { o.scheme, o.hasScheme = s, true })
 }
 
 // WithLocation sets the time zone of local time (D27). The default is the
 // zone of the system.
 func WithLocation(loc *time.Location) RenderOption {
-	return func(o *renderOptions) { o.loc = loc }
+	return renderFunc(func(o *renderOptions) { o.loc = loc })
 }
 
 // WithLocale sets the locale of numbers and dates (D27).
 func WithLocale(l format.Locale) RenderOption {
-	return func(o *renderOptions) { o.locale = &l }
+	return renderFunc(func(o *renderOptions) { o.locale = &l })
 }
 
 // WithRandom sets the function that makes the source of random numbers of
 // a render (D28). Each render calls it once.
 func WithRandom(fn func() rand.Source) RenderOption {
-	return func(o *renderOptions) { o.random = fn }
+	return renderFunc(func(o *renderOptions) { o.random = fn })
 }
 
 // WithBackground sets the background of the chart, over the background of
@@ -357,13 +411,13 @@ func WithRandom(fn func() rand.Source) RenderOption {
 // The boxes under the labels of a diagram and the open arrowheads take an
 // opaque color too, so that they match the background.
 func WithBackground(c color.Color) RenderOption {
-	return func(o *renderOptions) {
+	return renderFunc(func(o *renderOptions) {
 		if c == nil {
 			o.background, o.hasBackground = "", false
 			return
 		}
 		o.background, o.hasBackground = cssColor(c), true
-	}
+	})
 }
 
 // cssColor writes a color as #rrggbb when it is opaque, as transparent
@@ -381,12 +435,12 @@ func cssColor(c color.Color) string {
 
 // WithSize sets the size of the chart, in place of its width and height.
 func WithSize(width, height float64) RenderOption {
-	return func(o *renderOptions) { o.width, o.height = width, height }
+	return renderFunc(func(o *renderOptions) { o.width, o.height = width, height })
 }
 
 // WithRenderLogger sets where a render logs.
 func WithRenderLogger(l *slog.Logger) RenderOption {
-	return func(o *renderOptions) { o.logger = l }
+	return renderFunc(func(o *renderOptions) { o.logger = l })
 }
 
 // View holds the state of one render. It is not safe for concurrent use.
@@ -507,7 +561,7 @@ func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, R
 	}
 	var o renderOptions
 	for _, opt := range opts {
-		opt(&o)
+		opt.applyRender(&o)
 	}
 	ropts := []raster.Option{}
 	if o.hasScale {
@@ -517,10 +571,11 @@ func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, R
 		okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
 		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family),
 	}
-	for _, f := range o.fallbacks {
+	fallbacks := c.fallbacks(&o)
+	for _, f := range fallbacks {
 		fopts = append(fopts, okagesvg.WithFontFile(f.Data()))
 	}
-	ropts = append(ropts, raster.WithRenderer(okagesvg.New(fopts...)), raster.WithFallbacks(o.fallbacks...))
+	ropts = append(ropts, raster.WithRenderer(okagesvg.New(fopts...)), raster.WithFallbacks(fallbacks...))
 	img, err := raster.Draw(s, ropts...)
 	if err != nil {
 		return nil, report, fmt.Errorf("drawing the image: %w", err)

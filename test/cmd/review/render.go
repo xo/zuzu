@@ -99,7 +99,9 @@ func parse(src []byte, d zuzu.Dialect) (chart *zuzu.Chart, report zuzu.Report, e
 			err = fmt.Errorf("zuzu panicked in Parse: %v", r)
 		}
 	}()
-	return zuzu.Parse(src, zuzu.WithDialect(d))
+	// The font of the emoji goes to Parse too, so that a kind of Mermaid
+	// that lays out when it compiles measures an emoji with it (D38).
+	return zuzu.Parse(src, zuzu.WithDialect(d), zuzu.WithEmoji(emoji.Font()))
 }
 
 // render writes the SVG of a chart, and turns a panic into an error.

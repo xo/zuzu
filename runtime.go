@@ -72,9 +72,9 @@ type runtime struct {
 func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) (*runtime, error) {
 	o := renderOptions{scheme: theme.Zuzu}
 	for _, opt := range opts {
-		opt(&o)
+		opt.applyRender(&o)
 	}
-	rt := &runtime{ctx: ctx, chart: c, opts: o, progs: map[string]*expr.Program{}, measure: text.NewEstimate(o.fallbacks...)}
+	rt := &runtime{ctx: ctx, chart: c, opts: o, progs: map[string]*expr.Program{}, measure: text.NewEstimate(c.fallbacks(&o)...)}
 	rt.measure.SetMath(c.opts.math)
 	rt.report = append(rt.report, c.report...)
 	rt.loc = o.loc
@@ -224,8 +224,25 @@ func (rt *runtime) compile(src string) (*expr.Program, error) {
 		}
 		return nil, err
 	}
+	if err := rt.checkNow(p); err != nil {
+		return nil, err
+	}
 	rt.progs[src] = p
 	return p, nil
+}
+
+// checkNow reports an expression that calls now() when the parse has no
+// time of the render, and so now() gives 0 (D38). The runtime compiles an
+// expression once, so the report names it once. A function now that the
+// caller gives takes the place of the built in one, and needs no time.
+func (rt *runtime) checkNow(p *expr.Program) error {
+	if !rt.chart.opts.now.IsZero() || !p.Calls("now") {
+		return nil
+	}
+	if _, ok := rt.chart.opts.funcs["now"]; ok {
+		return nil
+	}
+	return rt.issue(ErrNoNow, "", "the expression %q calls now() with no time of the render, which zuzu.WithNow gives, so now() gives 0", p.String())
 }
 
 // state is how far the work on a signal, a dataset or a scale has gone.
@@ -470,7 +487,7 @@ func (s *scope) exprScope(datum any) *expr.Scope {
 	}
 	return &expr.Scope{
 		Datum: datum, Parent: parent, Signals: s, Functions: s.funcs,
-		Location: s.rt.loc, Rand: s.rt.rand, Locale: s.rt.locale,
+		Location: s.rt.loc, Rand: s.rt.rand, Locale: s.rt.locale, Now: s.rt.chart.opts.now,
 	}
 }
 

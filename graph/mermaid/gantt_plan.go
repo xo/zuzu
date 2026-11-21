@@ -31,6 +31,11 @@ type gantt struct {
 	excludes, includes []string
 	// weekend is the first day of the weekend: Saturday, or Friday.
 	weekend time.Weekday
+	// todayMarker is the value of todayMarker: empty for the marker of
+	// today in its own look, off for no marker, or else the style of the
+	// marker. todayLine is the number of its line.
+	todayMarker string
+	todayLine   int
 	// compact packs the tasks of each section into as few rows as their
 	// times allow. sectionStyles is the number of colors that the sections
 	// take in turn, or 0 for a color of each section. rightPadding is the
@@ -118,8 +123,11 @@ func readGantt(c *chart, today time.Time, loc *time.Location) (*gantt, error) {
 		case "includes":
 			g.includes = append(g.includes, ganttList(rest)...)
 		case "todaymarker":
-			if !strings.EqualFold(rest, "off") {
-				err = c.add("todayMarker needs the time of the render, so zuzu draws no marker")
+			// Mermaid draws no marker for off, and puts any other value on
+			// the marker as its style.
+			g.todayMarker, g.todayLine = rest, l.N
+			if rest != "off" && c.d.Now.IsZero() {
+				err = c.add("todayMarker needs the time of the render, which zuzu.WithNow gives, so zuzu draws no marker")
 			}
 		case "weekday":
 			g.weekday = strings.ToLower(rest)

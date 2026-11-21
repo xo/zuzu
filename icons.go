@@ -62,17 +62,17 @@ func FSIconLoader(fsys fs.FS) IconLoader {
 // the prefix of the pack, as Mermaid does (D31). A diagram names an icon of
 // the pack as name:icon.
 func WithIcons(name string, p *icon.Pack) RenderOption {
-	return func(o *renderOptions) {
+	return renderFunc(func(o *renderOptions) {
 		if o.icons == nil {
 			o.icons = map[string]*icon.Pack{}
 		}
 		o.icons[name] = p
-	}
+	})
 }
 
 // WithIconLoader sets how a render loads the icons that no pack holds.
 func WithIconLoader(l IconLoader) RenderOption {
-	return func(o *renderOptions) { o.iconLoader = l }
+	return renderFunc(func(o *renderOptions) { o.iconLoader = l })
 }
 
 // iconEntry is an icon of a render, or the error that loading it gave.

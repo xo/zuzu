@@ -68,7 +68,7 @@ type kbLayout struct {
 // start under the tallest name, as in Mermaid, and each column is as tall
 // as its cards.
 func newKanbanLayout(k *kanban) *kbLayout {
-	l := &kbLayout{k: k, m: text.NewEstimate(), rows: map[string][]any{}}
+	l := &kbLayout{k: k, m: k.c.d.estimate(), rows: map[string][]any{}}
 	colW := scaleWrap("kanban", "", k.width)
 	cardW := scaleWrap("kanban", "", k.width-kbCardLess)
 	inset := (colW - cardW) / 2

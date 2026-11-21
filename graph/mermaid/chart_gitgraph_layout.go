@@ -65,7 +65,7 @@ var (
 // newGitLayout lays out a git graph.
 func newGitLayout(g *gitGraph) *gitLayout {
 	l := &gitLayout{
-		g: g, m: text.NewEstimate(), vertical: g.dir != "LR", branches: g.sortedBranches(),
+		g: g, m: g.c.d.estimate(), vertical: g.dir != "LR", branches: g.sortedBranches(),
 		lane: map[string]float64{}, labels: map[string][]string{}, labelW: map[string]float64{},
 		pos: map[string]gitPoint{}, rows: map[string][]any{},
 		minX: math.Inf(1), minY: math.Inf(1), maxX: math.Inf(-1), maxY: math.Inf(-1),

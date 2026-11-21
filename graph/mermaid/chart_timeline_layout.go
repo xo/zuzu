@@ -71,7 +71,7 @@ type tlBox struct {
 // newTimelineLayout lays out a timeline.
 func newTimelineLayout(t *timeline) *tlLayout {
 	l := &tlLayout{
-		t: t, m: text.NewEstimate(), rows: map[string][]any{},
+		t: t, m: t.c.d.estimate(), rows: map[string][]any{},
 		minX: math.Inf(1), minY: math.Inf(1), maxX: math.Inf(-1), maxY: math.Inf(-1),
 	}
 	if t.dir == "TD" {

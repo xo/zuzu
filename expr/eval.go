@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"time"
 	"unicode/utf16"
@@ -42,6 +43,9 @@ type Scope struct {
 	// Locale holds the names and symbols of the formats (D27). Nil is US
 	// English.
 	Locale *format.Locale
+	// Now is the time of the render, which now() gives (D38). The zero
+	// time gives 0, so that the same spec gives the same bytes.
+	Now time.Time
 }
 
 // locale returns the locale of the scope.
@@ -68,6 +72,15 @@ func (s *Scope) random() float64 {
 	return s.Rand.Float64()
 }
 
+// now returns the time of the render in milliseconds since 1970, or 0
+// when the scope has no time.
+func (s *Scope) now() float64 {
+	if s == nil || s.Now.IsZero() {
+		return 0
+	}
+	return float64(s.Now.UnixMilli())
+}
+
 // Program is a parsed expression.
 type Program struct {
 	src  string
@@ -89,6 +102,37 @@ func Compile(src string) (*Program, error) {
 // String returns the text of the expression.
 func (p *Program) String() string {
 	return p.src
+}
+
+// Calls reports whether the expression calls a function of the name, such
+// as now, in any branch.
+func (p *Program) Calls(name string) bool {
+	return calls(p.root, name)
+}
+
+// calls reports whether a node calls a function of the name.
+func calls(n node, name string) bool {
+	var kids []node
+	switch x := n.(type) {
+	case call:
+		if x.name == name {
+			return true
+		}
+		kids = x.args
+	case member:
+		kids = []node{x.obj, x.prop}
+	case unary:
+		kids = []node{x.x}
+	case binary:
+		kids = []node{x.x, x.y}
+	case cond:
+		kids = []node{x.test, x.yes, x.no}
+	case array:
+		kids = x.elems
+	case object:
+		kids = x.vals
+	}
+	return slices.ContainsFunc(kids, func(k node) bool { return calls(k, name) })
 }
 
 // Eval evaluates the expression in a scope.

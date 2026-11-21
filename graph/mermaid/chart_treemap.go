@@ -187,7 +187,7 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 	labelSize := settingNumber(cfg, "labelFontSize", 11)
 	valueSize := settingNumber(cfg, "valueFontSize", 10)
 	fit := newTreemapFit(rows, labelSize, valueSize, showValues)
-	if err := fit.measure(values, valueFormat); err != nil {
+	if err := fit.measure(values, valueFormat, c.d.estimate()); err != nil {
 		return nil, false, err
 	}
 	inner := settingNumber(cfg, "padding", 3)
@@ -380,13 +380,12 @@ func newTreemapFit(rows []*treemapRow, labelSize, valueSize float64, showValues 
 }
 
 // measure sets the width of the name and of the value of each leaf at a
-// size of 1 pixel, in the bundled font.
-func (f *treemapFit) measure(values []any, valueFormat string) error {
+// size of 1 pixel, with m.
+func (f *treemapFit) measure(values []any, valueFormat string, m text.Measurer) error {
 	write, err := format.Number(valueFormat, format.EnUS)
 	if err != nil {
 		return fmt.Errorf("writing the values of a treemap: %w", err)
 	}
-	m := text.NewEstimate()
 	for _, v := range values[1:] {
 		row, _ := v.(map[string]any)
 		name, _ := row["name"].(string)

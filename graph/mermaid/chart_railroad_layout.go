@@ -59,7 +59,7 @@ type rrLayout struct {
 func newRailroadLayout(r *railroad) *rrLayout {
 	s := scaleWrap(r.c.d.Kind, "", 1)
 	l := &rrLayout{
-		r: r, m: text.NewEstimate(), scale: s,
+		r: r, m: r.c.d.estimate(), scale: s,
 		pad: r.sizes.padding * s, vsep: r.sizes.vsep * s, hsep: r.sizes.hsep * s, arc: r.sizes.arc * s, marker: r.sizes.marker * s,
 		rows: map[string][]any{},
 		minX: math.Inf(1), minY: math.Inf(1), maxX: math.Inf(-1), maxY: math.Inf(-1),

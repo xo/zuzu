@@ -159,7 +159,8 @@ such a link as an issue, and the item has no link.
 
 An option is a functional option named `With...`, and the caller owns every
 value it gives (okage D20). There are two kinds, so that an option given in
-the wrong place does not compile.
+the wrong place does not compile. `WithEmoji` is of both kinds (D38). It
+returns a `SharedOption`, which is an `Option` and a `RenderOption`.
 
 `Option` applies when a spec is parsed and compiled:
 
@@ -169,6 +170,8 @@ the wrong place does not compile.
 | `WithStrict(bool)` | loose | the feature mode (D26) |
 | `WithFunction(name string, fn expr.Func)` | none | a Go function that an expression can call |
 | `WithMath(*text.MathFont)` | none, so the math of KaTeX in a label of Mermaid draws its source | the font of math, from the package `text/math`, which draws a formula of a label as math (D36) |
+| `WithEmoji(*text.Fallback)` | none, so an emoji measures as nothing | the font of the emoji, which a kind of Mermaid that lays out when it compiles, such as a sequence, a pie or a mindmap, measures an emoji with. The chart keeps it, and a render that gives no font of its own draws with it (D38) |
+| `WithNow(time.Time)` | none, so a gantt draws no marker of today and puts a date with no day on 1970-01-01, and `now()` gives 0 | the time of the render. A gantt of Mermaid draws the marker of today at it, and takes the day of a date with no day from it, in the time zone of the time. `now()` gives it. The chart keeps it (D38) |
 | `WithEvaluator(expr.Evaluator)` | the native evaluator | the evaluator of expressions, such as the goja one (D9). Not built yet |
 | `WithLogger(*slog.Logger)` | none | where zuzu logs |
 
@@ -191,7 +194,7 @@ the wrong place does not compile.
 | `WithRenderLogger(*slog.Logger)` | none | where a render logs |
 | `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
 | `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |
-| `WithEmoji(*text.Fallback)` | none, so an emoji draws nothing | the font of the emoji, from the package `text/emoji`, which draws an emoji in color (D32) |
+| `WithEmoji(*text.Fallback)` | the font of `WithEmoji` of `Parse`, then none, so an emoji draws nothing | the font of the emoji, from the package `text/emoji`, which draws an emoji in color (D32). `Parse` accepts it too, and the font of the render wins over the font of `Parse` (D38) |
 
 A spec can ask for a look in its `config`, with two keys that Vega does not
 have (D6, D32). `zuzu.mode` is `light` or `dark`, and `zuzu.scheme` is the
@@ -218,8 +221,14 @@ background that the caller gives with `WithBackground` wins over
 `zuzu.mode`. The compiler of Vega-Lite passes the key on. A value that is
 not a color is an issue, as above. `theme.ConfigBackground` names the key.
 
-A Go function cannot have two types, so the logger of a render is
-`WithRenderLogger`, and `WithLogger` is the logger of `Parse`.
+The logger of a render is `WithRenderLogger`, and `WithLogger` is the
+logger of `Parse`, so that each logger has its own place.
+
+Without `WithNow`, a call of `now()` in an expression gives 0, so that the
+same spec gives the same bytes. The report names each expression that
+calls it, and in the strict mode the call is an error that wraps
+`ErrNoNow`. A function `now` of `WithFunction` takes the place of the built
+in one and needs no time.
 
 `WithRandom` takes a function that makes a source, and not a source, so that
 two renders on two goroutines never share one. The `rand` package is
@@ -404,6 +413,7 @@ const (
 	ErrCycle          Error = "cycle in the spec"
 	ErrUnknownName    Error = "unknown name"
 	ErrNoGlyph        Error = "no font has the character"
+	ErrNoNow          Error = "no time of the render"
 )
 ```
 
@@ -415,6 +425,10 @@ or a scale that the spec does not have.
 render has, such as a character of Chinese, or an emoji without
 `WithEmoji`. The character draws nothing. In the loose mode, the report
 names each such character once for each render (D32).
+
+`ErrNoNow` is the error of an expression that calls `now()` when `Parse`
+has no `WithNow`, in the strict mode. In the loose mode, `now()` gives 0,
+and the report names the expression once for each render (D38).
 
 A constant cannot wrap another error, so the issue does it. An issue for an
 unsupported mark, transform or function unwraps to its own sentinel and to
@@ -644,7 +658,9 @@ Noto Color Emoji, the font of 10.7 MB that draws an emoji in color (D32). A
 program that does not import the package does not hold the font.
 `NewFallback` accepts a font in TrueType, OpenType, WOFF, WOFF2 or EOT, and
 `Data` gives it as TrueType or OpenType (D34). A render takes the font with
-`WithEmoji`, as it takes a pack of icons:
+`WithEmoji`, as it takes a pack of icons. `Parse` takes it too, so that a
+kind of Mermaid that lays out when it compiles measures an emoji with it
+(D38):
 
 ```go
 package text
@@ -665,6 +681,7 @@ func Font() *text.Fallback
 ```
 
 ```go
+c, report, err := zuzu.Parse(src, zuzu.WithEmoji(emoji.Font()))
 img, report, err := c.Image(ctx, zuzu.WithEmoji(emoji.Font()))
 ```
 

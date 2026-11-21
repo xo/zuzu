@@ -119,7 +119,7 @@ func mindmapChart(c *chart) (map[string]any, bool, error) {
 	}
 	// Mermaid 12.3 draws the math of KaTeX in a label of HTML, and the
 	// source in a label of SVG, as zuzu does.
-	m := text.NewEstimate()
+	m := c.d.estimate()
 	if !breakWords {
 		m.SetMath(c.d.Math)
 		for _, n := range nodes {

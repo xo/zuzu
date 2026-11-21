@@ -211,7 +211,7 @@ type seqPart struct {
 // newSeqLayout lays out a sequence diagram.
 func newSeqLayout(s *sequence, cfg seqConfig) *seqLayout {
 	l := &seqLayout{
-		s: s, cfg: cfg, m: text.NewEstimate(), idx: map[string]int{}, rows: map[string][]any{},
+		s: s, cfg: cfg, m: s.c.d.estimate(), idx: map[string]int{}, rows: map[string][]any{},
 		minX: math.Inf(1), maxX: math.Inf(-1), acts: map[string][]float64{},
 	}
 	// A sequence diagram draws the math of KaTeX in its labels, and the

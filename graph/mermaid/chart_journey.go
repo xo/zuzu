@@ -107,13 +107,13 @@ func journeyChart(c *chart) (map[string]any, bool, error) {
 		wrap = 0
 	}
 	wrap = scaleWrap(c.d.Kind, "", wrap)
-	return journeySpec(title, tasks, wrap), true, nil
+	return journeySpec(title, tasks, wrap, c.d.estimate()), true, nil
 }
 
 // journeySpec writes the spec of a user journey. When wrap is more than 0,
 // the actors under a task wrap at that width, or at the width of the
-// column of the task if it is less.
-func journeySpec(title string, tasks []journeyTask, wrap float64) map[string]any {
+// column of the task if it is less. m measures the actors.
+func journeySpec(title string, tasks []journeyTask, wrap float64, m text.Measurer) map[string]any {
 	n := float64(len(tasks))
 	step := max(560/n, 120)
 	var rows, sections []any
@@ -143,7 +143,7 @@ func journeySpec(title string, tasks []journeyTask, wrap float64) map[string]any
 		if wrap > 0 && len(t.actors) > 0 {
 			// Each line of the actors is a row of its own, so that each
 			// draws as a text of one line.
-			for k, l := range journeyWrap(strings.Join(t.actors, ", "), min(wrap, step-8)) {
+			for k, l := range journeyWrap(strings.Join(t.actors, ", "), min(wrap, step-8), m) {
 				rows = append(rows, map[string]any{"kind": "actors", "section": t.section, "x": i, "line": k, "label": l})
 				lines = max(lines, k+1)
 			}
@@ -245,9 +245,8 @@ const journeyActorSize = 10
 // wraps the name of an actor: a text that fits stays one line. Else each
 // word goes on the line before it when the line still fits, and on a new
 // line when not. A word wider than the width breaks into parts that each
-// end with a hyphen. zuzu measures the text in the bundled font.
-func journeyWrap(s string, width float64) []string {
-	m := text.NewEstimate()
+// end with a hyphen. m measures the text.
+func journeyWrap(s string, width float64, m text.Measurer) []string {
 	font := text.Font{Family: text.Family, Size: journeyActorSize, Weight: 400}
 	fits := func(t string) bool { return m.Width(font, t) <= width }
 	if fits(s) {

@@ -124,7 +124,7 @@ type arch struct {
 // in Go on a grid (D31). An edge `a:R -- L:b` puts b to the right of a, and
 // a group is a box around a grid of its own.
 func architectureChart(c *chart) (map[string]any, bool, error) {
-	a := &arch{c: c, byID: map[string]any{}, tile: 56, font: 11, pad: 16, gap: 40, m: text.NewEstimate()}
+	a := &arch{c: c, byID: map[string]any{}, tile: 56, font: 11, pad: 16, gap: 40, m: c.d.estimate()}
 	// The layout uses no random numbers, so architecture.randomize and
 	// architecture.seed change nothing, and inert accepts them.
 	if err := c.unreadSettings("architecture.iconSize", "architecture.fontSize", "architecture.padding", "architecture.nodeSeparation"); err != nil {

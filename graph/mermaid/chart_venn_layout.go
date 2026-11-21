@@ -145,7 +145,7 @@ func newVennLayout(v *venn, titled bool) (*vennLayout, error) {
 		return nil, nil
 	}
 	l := &vennLayout{
-		v: v, m: text.NewEstimate(), rows: map[string][]any{},
+		v: v, m: v.c.d.estimate(), rows: map[string][]any{},
 		k:    scaleWrap("venn-beta", "", vennDefaultWidth) / v.width,
 		minX: math.Inf(1), minY: math.Inf(1), maxX: math.Inf(-1), maxY: math.Inf(-1),
 	}

@@ -184,8 +184,8 @@ func makeBuiltins() map[string]Func {
 		},
 
 		// Dates and times.
-		"now": func(_ *Scope, _ []any) (any, error) {
-			return float64(time.Now().UnixMilli()), nil
+		"now": func(s *Scope, _ []any) (any, error) {
+			return s.now(), nil
 		},
 		"datetime": func(s *Scope, args []any) (any, error) {
 			// One argument is a date, milliseconds since 1970, or a string

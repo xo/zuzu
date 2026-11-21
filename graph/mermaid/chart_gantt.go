@@ -42,10 +42,11 @@ const (
 // ganttChart compiles a chart of the kind gantt into Vega-Lite: a bar for
 // each task on a time axis, colored by section, and a diamond for each
 // milestone. The compiler plans the tasks in Go, and gives Vega-Lite the
-// start and the end of each as a local time. zuzu has no time of the
-// render here, so a date with no day takes the day 1970-01-01.
+// start and the end of each as a local time. A date with no day takes the
+// day of the time of the render of zuzu.WithNow, or 1970-01-01 without it
+// (D38).
 func ganttChart(c *chart) (map[string]any, bool, error) {
-	g, err := planGantt(c, time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC))
+	g, err := planGantt(c, ganttToday(c.d.Now))
 	if err != nil {
 		return nil, false, err
 	}
@@ -100,6 +101,7 @@ func (g *gantt) spec() (map[string]any, error) {
 	// right, or to the left at the end of the axis, so that the axis does
 	// not grow.
 	least := ganttMillis(lo, hi) * ganttMinBar / g.width
+	measure := g.c.d.estimate()
 	var normal, done, active, crit, miles, verts, names []any
 	for i, t := range g.tasks {
 		if t.vert {
@@ -124,7 +126,7 @@ func (g *gantt) spec() (map[string]any, error) {
 			row["tone"] = tone(t.section)
 		}
 		if g.compact {
-			names = append(names, ganttName(t, row["key"], lo, hi, g.width))
+			names = append(names, ganttName(t, row["key"], lo, hi, g.width, measure))
 		}
 		if t.milestone {
 			row["at"] = t.start.Add(t.render.Sub(t.start) / 2).Format(ganttLayout)
@@ -281,6 +283,13 @@ func (g *gantt) spec() (map[string]any, error) {
 				"encoding": map[string]any{"x": vx, "y": map[string]any{"value": 0}, "text": map[string]any{"field": "name"}},
 			})
 	}
+	today, err := g.todayLayer(lo, hi, xOf("at"))
+	if err != nil {
+		return nil, err
+	}
+	if today != nil {
+		layers = append(layers, today)
+	}
 	if len(layers) == 0 {
 		return nil, g.c.errorf("the gantt has no task")
 	}
@@ -374,8 +383,9 @@ func (g *gantt) rows(keys []string) ([]int, []ganttLane) {
 // Mermaid places it: in the middle of its bar when it is no wider than the
 // bar, else past the end of the bar, and else before the start of the bar
 // when it does not fit at the right of the time axis. The time axis runs
-// from lo to hi. The name of a milestone is beside its diamond.
-func ganttName(t *ganttTask, key any, lo, hi time.Time, width float64) map[string]any {
+// from lo to hi, and m measures the name. The name of a milestone is
+// beside its diamond.
+func ganttName(t *ganttTask, key any, lo, hi time.Time, width float64, m text.Measurer) map[string]any {
 	scale := max(ganttMillis(lo, hi), 1) / width
 	px := func(at time.Time) float64 { return ganttMillis(lo, at) / scale }
 	start, end := t.start, t.render
@@ -385,7 +395,7 @@ func ganttName(t *ganttTask, key any, lo, hi time.Time, width float64) map[strin
 		mid := t.start.Add(t.render.Sub(t.start) / 2)
 		start, end = ganttAdd(mid, -ganttDiamond*scale), ganttAdd(mid, ganttDiamond*scale)
 	}
-	w := text.NewEstimate().Width(text.Font{Family: text.Family, Size: layout.LabelSize, Weight: 600}, t.name)
+	w := m.Width(text.Font{Family: text.Family, Size: layout.LabelSize, Weight: 600}, t.name)
 	x0, x1 := px(start), px(end)
 	out := map[string]any{"key": key, "name": t.name}
 	switch {
@@ -439,7 +449,7 @@ func (g *gantt) sections(rows []ganttLane, labeled bool) []any {
 		first, last int
 	}
 	var runs []run
-	m := text.NewEstimate()
+	m := g.c.d.estimate()
 	var keyWidth, nameWidth float64
 	for i, r := range rows {
 		if labeled {

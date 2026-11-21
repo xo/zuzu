@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/text"
@@ -58,6 +59,13 @@ type Diagram struct {
 	// Math is the font of math of zuzu.WithMath, or nil. A kind that lays
 	// out when it compiles lays out its math in it (D36).
 	Math *text.MathFont
+	// Emoji holds the fonts of zuzu.WithEmoji. A kind that lays out when
+	// it compiles measures an emoji with them (D38).
+	Emoji []*text.Fallback
+	// Now is the time of the render of zuzu.WithNow, or the zero time. A
+	// gantt with the time draws the marker of today, and fills the parts
+	// of a date that its format does not give from it (D38).
+	Now time.Time
 
 	// unread holds the parts of the front matter that zuzu does not read,
 	// which Graph and Chart report.
@@ -214,6 +222,12 @@ func Read(src string) (*Diagram, error) {
 	}
 	merge(d.Config, inits)
 	return d, nil
+}
+
+// estimate returns a measurer of text with the fonts of Emoji, for a kind
+// that lays out when it compiles.
+func (d *Diagram) estimate() *text.Estimate {
+	return text.NewEstimate(d.Emoji...)
 }
 
 // raw returns the line n of the source as the source gives it, with its
