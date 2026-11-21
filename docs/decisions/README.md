@@ -37,17 +37,18 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D21](D021-the-names-of-the-packages.md) | The names of the packages | Decided |
 | [D22](D022-the-documents-name-no-person.md) | The documents name no person | Decided |
 | [D23](D023-the-survey-of-other-libraries-lives-in-docs-survey.md) | The survey of other libraries lives in docs/survey | Decided |
-| [D24](D024-the-public-api.md) | The public API | Decided |
+| [D24](D024-the-public-api.md) | The public API | Decided. Amended by D38 |
 | [D25](D025-zuzu-reads-data-only-through-a-loader-that-the-caller-gives.md) | zuzu reads data only through a loader that the caller gives | Decided |
 | [D26](D026-a-feature-mode-decides-between-an-error-and-a-report.md) | A feature mode decides between an error and a report | Decided |
 | [D27](D027-time-is-in-the-time-zone-of-the-system-and-the-locale-is-us.md) | Time is in the time zone of the system, and the locale is US English | Decided |
-| [D28](D028-random-numbers-are-random-and-the-caller-can-give-a-source.md) | Random numbers are random, and the caller can give a source | Decided |
+| [D28](D028-random-numbers-are-random-and-the-caller-can-give-a-source.md) | Random numbers are random, and the caller can give a source | Decided. Amended by D38 |
 | [D29](D029-zuzu-builds-with-tinygo-for-webassembly-and-has-no-size.md) | zuzu builds with TinyGo for WebAssembly, and has no size target | Decided |
 | [D30](D030-the-transforms-and-the-scale-that-zuzu-adds-for-tiers-1-and-2.md) | The transforms and the scale that zuzu adds for tiers 1 and 2 | Decided |
-| [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Decided. Amended by D32 and D35 |
-| [D32](D032-how-zuzu-reads-the-parts-of-mermaid-and-dot-that-it-does-not-draw.md) | How zuzu reads the parts of Mermaid and DOT that it does not draw | Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36 and D37 |
+| [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Decided. Amended by D32, D35 and D38 |
+| [D32](D032-how-zuzu-reads-the-parts-of-mermaid-and-dot-that-it-does-not-draw.md) | How zuzu reads the parts of Mermaid and DOT that it does not draw | Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36, D37 and D38 |
 | [D33](D033-vegajs-is-the-oracle-of-expressions-and-schemes-are-go-values.md) | vega.js is the oracle of expressions, and schemes are Go values | Decided. Amends D9 and D15 |
 | [D34](D034-ibm-plex-sans-is-embedded-in-woff2.md) | IBM Plex Sans is embedded in WOFF2 | Decided. Amends D16 |
 | [D35](D035-the-answers-of-the-maintainers-of-2026-11-20.md) | The answers of the maintainers of 2026-11-20 | Decided. Amends D14, D16, D31 and D32. Amended by D36 and D37 |
 | [D36](D036-zuzu-draws-the-math-of-katex-with-the-math-layout-of-okage.md) | zuzu draws the math of KaTeX with the math layout of okage | Decided. Amends D16, D32 and D35 |
 | [D37](D037-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-20.md) | The answers of the maintainers on the backlog of 2026-11-20 | Decided. Amends D14, D32 and D35 |
+| [D38](D038-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-22.md) | The answers of the maintainers on the backlog of 2026-11-22 | Decided. Amends D24, D28, D31 and D32 |

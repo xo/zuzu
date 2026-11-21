@@ -1,6 +1,6 @@
 # D28. Random numbers are random, and the caller can give a source
 
-Status: Decided.
+Status: Decided. Amended by D38.
 
 Vega has a function `random()` in its expression language, and transforms
 such as `sample` use random numbers. A spec cannot set a seed. vega.js sends

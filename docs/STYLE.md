@@ -234,6 +234,8 @@ next to it, so that the two do not touch.
 | link of a sankey | the color of its source at 0.32 opacity |
 | node of a graph | a rounded rectangle with a tint of its color and an outline of 1.25 |
 | use case diagram with `colorScheme: rotate` | each actor, use case and system boundary takes a categorical color in turn, and draws as a node of a graph of that color (D37) |
+| a status, such as a critical task of a gantt or the priority of a kanban card | a critical task and the priority Very High take the color of a fall of the scheme, and High a tint of it, the same color at 0.32 opacity. Low takes the first categorical color, and Very Low a tint of it (D38) |
+| marker of today of a gantt | a line of `edgeWidth` in `edge` across the chart, as an edge of a diagram (D38) |
 | external element of a C4 diagram | a node in `muted`, with the tint and the outline of the other nodes, as Mermaid draws it gray (D32) |
 | edge of a graph | a line of `edgeWidth` in `edge`, with round caps and joins, and an arrowhead in `edge`, as "Edges" says |
 | guide line of a diagram | a line of 1.25 in `axis`, with round caps and joins, such as a lifeline of a sequence diagram or an axis of a radar |
