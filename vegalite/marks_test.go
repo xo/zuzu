@@ -452,6 +452,59 @@ func TestPolarText(t *testing.T) {
 	}
 }
 
+// A text is centered on its point, unless its mark, the config or a style
+// sets its align or its baseline. A style of the config passes on to Vega,
+// so the mark writes nothing. The config of the text and of every mark do
+// not pass on, so the mark writes their value.
+func TestTextAnchor(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, mark, config string
+		align, baseline    string
+	}{
+		{"default", `"text"`, `{}`, `{"value":"center"}`, `{"value":"middle"}`},
+		{"mark baseline", `{"type": "text", "baseline": "top"}`, `{}`, `{"value":"center"}`, `{"value":"top"}`},
+		{"mark align", `{"type": "text", "align": "right"}`, `{}`, `{"value":"right"}`, `{"value":"middle"}`},
+		{"mark expr", `{"type": "text", "align": {"expr": "'left'"}}`, `{}`, `{"signal":"'left'"}`, `{"value":"middle"}`},
+		{"config text", `"text"`, `{"text": {"align": "left"}}`, `{"value":"left"}`, `{"value":"middle"}`},
+		{"config mark", `"text"`, `{"mark": {"baseline": "top"}}`, `{"value":"center"}`, `{"value":"top"}`},
+		{"config text over mark", `"text"`, `{"mark": {"align": "right"}, "text": {"align": "left"}}`, `{"value":"left"}`, `{"value":"middle"}`},
+		{"style named", `{"type": "text", "style": "label"}`, `{"style": {"label": {"align": "right"}}}`, `null`, `{"value":"middle"}`},
+		{"style list", `{"type": "text", "style": ["a", "b"]}`, `{"style": {"b": {"baseline": "top"}}}`, `{"value":"center"}`, `null`},
+		{"style text", `"text"`, `{"style": {"text": {"align": "right"}}}`, `null`, `{"value":"middle"}`},
+		{"style of another mark", `"text"`, `{"style": {"label": {"align": "right"}}}`, `{"value":"center"}`, `{"value":"middle"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := compileMap(t, `{
+				"data": {"values": [{"a": 1}]},
+				"mark": `+tt.mark+`,
+				"encoding": {"text": {"field": "a", "type": "quantitative"}},
+				"config": `+tt.config+`
+			}`)
+			u := update(find(s, "marks", "marks"))
+			if got := asJSON(u["align"]); got != tt.align {
+				t.Errorf("align = %s, want %s", got, tt.align)
+			}
+			if got := asJSON(u["baseline"]); got != tt.baseline {
+				t.Errorf("baseline = %s, want %s", got, tt.baseline)
+			}
+		})
+	}
+	// A mark that is not a text gets neither.
+	u := update(find(compileMap(t, `{
+		"data": {"values": [{"a": 1}]},
+		"mark": "point",
+		"encoding": {"x": {"field": "a", "type": "quantitative"}}
+	}`), "marks", "marks"))
+	for _, k := range []string{"align", "baseline"} {
+		if v, ok := u[k]; ok {
+			t.Errorf("a point has %s %s", k, asJSON(v))
+		}
+	}
+}
+
 // The header of a time unit writes the value in the format of the unit, a
 // facet in a concatenation keeps its title, and the spacing of the config
 // sets the padding of the layout.

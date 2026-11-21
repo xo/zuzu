@@ -112,9 +112,9 @@ func (c *compiler) issue(path, format string, args ...any) error {
 	return nil
 }
 
-// config holds the parts of the config of a spec that change the data or
-// the scales. The parts that change only the look are left to the theme of
-// zuzu (D12).
+// config holds the parts of the config of a spec that change the data, the
+// scales or the place of a mark. The parts that change only the look are
+// left to the theme of zuzu (D12).
 type config struct {
 	// invalid is false when the config keeps invalid values, with
 	// "mark": {"invalid": null}.
@@ -125,6 +125,10 @@ type config struct {
 	step float64
 	// marks holds the config of each type of mark, such as "bar".
 	marks map[string]map[string]any
+	// mark is the config of every mark.
+	mark map[string]any
+	// styles holds each style of the config, by name.
+	styles map[string]map[string]any
 	// facetSpacing and concatSpacing are the default spacing between the
 	// cells of a facet and between the views of a concatenation, or nil
 	// for the default of 20.
@@ -155,7 +159,16 @@ func readConfig(raw []byte) *config {
 				cfg.marks[k] = x
 			}
 		}
+		if st, ok := all["style"].(map[string]any); ok {
+			cfg.styles = map[string]map[string]any{}
+			for k, x := range st {
+				if x, ok := x.(map[string]any); ok {
+					cfg.styles[k] = x
+				}
+			}
+		}
 	}
+	cfg.mark = m.Mark
 	if v, ok := m.Mark["invalid"]; ok && v == nil {
 		cfg.keepInvalid = true
 	}

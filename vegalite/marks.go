@@ -57,6 +57,7 @@ func (u *unit) markOf() (*vega.Mark, error) {
 			e.set(k, propRef(v))
 		}
 	}
+	u.textAnchor(e)
 	m := &vega.Mark{Type: typ, Name: u.v.prefix + "marks", From: &vega.From{Data: u.c.name(u.data)}}
 	style := u.mark
 	if u.mark == "circle" || u.mark == "square" {
@@ -141,6 +142,55 @@ func (u *unit) markOf() (*vega.Mark, error) {
 	}
 	u.geoEncode(m)
 	return m, nil
+}
+
+// textAnchors are the properties that place a text on its point, with the
+// value that Vega-Lite gives each when nothing sets it. A text is centered
+// on its point.
+var textAnchors = [...]struct{ prop, value string }{{"align", "center"}, {"baseline", "middle"}}
+
+// textAnchor sets the align and the baseline of a text mark, where the
+// mark does not set them. If a style of the config that the mark names sets
+// one, the mark writes nothing, because the style passes on to the Vega
+// config. If the config of the text, or else of every mark, sets one, the
+// mark writes that value, because that config does not pass on to the Vega
+// config. Else the mark writes the value of Vega-Lite.
+func (u *unit) textAnchor(e enc) {
+	if u.mark != "text" {
+		return
+	}
+	cfg := u.c.cfg
+	if cfg == nil {
+		cfg = &config{}
+	}
+	styles := []string{u.mark}
+	switch st := u.props["style"].(type) {
+	case string:
+		styles = append(styles, st)
+	case []any:
+		for _, x := range st {
+			styles = append(styles, expr.String(x))
+		}
+	}
+	for _, a := range textAnchors {
+		if _, set := e[a.prop]; set {
+			continue
+		}
+		if slices.ContainsFunc(styles, func(name string) bool {
+			_, ok := cfg.styles[name][a.prop]
+			return ok
+		}) {
+			continue
+		}
+		v, ok := cfg.marks[u.mark][a.prop]
+		if !ok {
+			v, ok = cfg.mark[a.prop]
+		}
+		if !ok {
+			v = a.value
+		}
+		e.set(a.prop, propRef(v))
+	}
 }
 
 // color sets the fill or the stroke of a mark from the channel color, or
