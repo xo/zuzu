@@ -144,6 +144,48 @@ func TestGanttChart(t *testing.T) {
 	}
 }
 
+// TestGanttBackward checks that a gantt whose tasks all end before the
+// first start runs its time axis backward, as Mermaid does. The task
+// starts at 0, which the Date of JavaScript reads as 2000-01-01, and ends
+// at the second 20 of the day of the render, or of 1970-01-01 without it.
+func TestGanttBackward(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("testdata/gantt/19-seconds-number.mmd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		now      time.Time
+		end      string
+		backward bool
+	}{
+		{ganttNow, `"end":"2024-03-15T00:00:20.000"`, false},
+		{time.Time{}, `"end":"1970-01-01T00:00:20.000"`, true},
+	} {
+		d, err := Read(string(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		d.Now = test.now
+		b, _, report, err := Chart(d, true)
+		if err != nil {
+			t.Fatalf("%v: %v", test.now, err)
+		}
+		if len(report) != 0 {
+			t.Errorf("%v: the report %v, want none", test.now, report)
+		}
+		s := string(b)
+		for _, want := range []string{`"start":"2000-01-01T00:00:00.000"`, test.end} {
+			if !strings.Contains(s, want) {
+				t.Errorf("%v: the spec has no %s", test.now, want)
+			}
+		}
+		if got := strings.Contains(s, `"reverse":true`); got != test.backward {
+			t.Errorf("%v: the axis runs backward: %t, want %t", test.now, got, test.backward)
+		}
+	}
+}
+
 func TestGanttCycle(t *testing.T) {
 	t.Parallel()
 	for _, src := range []string{
@@ -169,6 +211,8 @@ func TestGanttErrors(t *testing.T) {
 		{"gantt\njust words", "is not a statement"},
 		{"gantt\na : a, 2024-01-01, 1d, 2d", "takes one to three"},
 		{"gantt\ndateFormat YYYY-MM-DD\naccDescr {\nnever ends", "has no end"},
+		// Mermaid reads no date after the year 10000.
+		{"gantt\ndateFormat ss\na : 10001, 20", "is not a date"},
 	}
 	for _, test := range tests {
 		_, _, err := ganttOf(t, test.src, false)

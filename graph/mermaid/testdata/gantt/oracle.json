@@ -1371,5 +1371,18 @@
    "vert": false,
    "tags": []
   }
+ ],
+ "19-seconds-number.mmd": [
+  {
+   "id": "rtt",
+   "name": "RTT",
+   "section": "Network Request",
+   "start": 946684800000,
+   "end": 1710460820000,
+   "renderEnd": null,
+   "milestone": false,
+   "vert": false,
+   "tags": []
+  }
  ]
 }

@@ -1930,6 +1930,15 @@ the task has no length, as in Mermaid. An item of `excludes` or
 includes no day, as in Mermaid. Mermaid draws nothing for either part, so
 neither is an issue (D32).
 
+The Date of JavaScript also reads a number alone. So in `dateFormat ss`,
+where a date has two digits, a start of `0` is 2000-01-01, and a start of
+`5` is 2001-05-01, because a number from 1 to 12 is a month. A start
+before the year -10000 or after the year 10000 is an error, as in
+Mermaid. If every task ends before the first start, the time axis runs
+backward, from right to left, as in Mermaid. A task `0, 20` in
+`dateFormat ss` does this without `zuzu.WithNow`, because it ends on
+1970-01-01. With the time, it ends on the day of the time.
+
 A section draws as Mermaid draws it. Every other section, from the
 first, has a band behind its rows. The band starts at the left of the
 names of the sections and ends at the end of the time axis. It is in the

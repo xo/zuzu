@@ -1,6 +1,7 @@
 package format
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -13,14 +14,34 @@ import (
 // The ISO form, such as 2024-02-29 or 2024-02-29T12:30:05.007+05:30, is
 // first. A date with no time is in UTC, and a time with no offset is in
 // zone. Other forms, such as 2024/02/29, 02/29/2024, Feb 29 2024 and
-// February 29, 2024 1:30 PM, are in zone unless they give an offset. A year
-// of two digits is in 1950 to 2049.
+// February 29, 2024 1:30 PM, are in zone unless they give an offset. In
+// them a year of 0 to 99 is in 1950 to 2049, and a number alone is a date
+// too: 0 is 2000-01-01, 5 is 2001-05-01 and 32 is 2032-01-01. A time more
+// than 100,000,000 days from 1970-01-01 is not a date, as in JavaScript.
 func ParseDate(s string, zone *time.Location) (time.Time, bool) {
 	s = strings.TrimSpace(s)
-	if t, ok := parseISO(s, zone); ok {
-		return t, true
+	t, ok := parseISO(s, zone)
+	if !ok {
+		t, ok = parseLoose(s, zone)
 	}
-	return parseLoose(s, zone)
+	if !ok || !inRange(t) {
+		return time.Time{}, false
+	}
+	return t, true
+}
+
+// maxDate is the most milliseconds from 1970-01-01 that a Date of
+// JavaScript holds, before or after.
+const maxDate = 8.64e15
+
+// inRange reports whether a Date of JavaScript can hold a time.
+func inRange(t time.Time) bool {
+	// The year comes first, so that UnixMilli does not overflow.
+	if y := t.Year(); y < -300000 || y > 300000 {
+		return false
+	}
+	ms := t.UnixMilli()
+	return ms >= -maxDate && ms <= maxDate
 }
 
 // parseISO parses the date time string format of ECMAScript.
@@ -162,7 +183,6 @@ func (p *scan) digits(n int) (int, bool) {
 func parseLoose(s string, zone *time.Location) (time.Time, bool) {
 	var (
 		nums         []int
-		widths       []int
 		month        = -1
 		hour, minute = -1, 0
 		sec          = 0
@@ -170,6 +190,7 @@ func parseLoose(s string, zone *time.Location) (time.Time, bool) {
 		pm           = -1
 		loc          = zone
 		offset       = 0
+		utc          = false
 	)
 	tokens := tokenize(s)
 	for i := 0; i < len(tokens); i++ {
@@ -192,12 +213,10 @@ func parseLoose(s string, zone *time.Location) (time.Time, bool) {
 				}
 				continue
 			}
-			n, _ := strconv.Atoi(tok)
-			nums = append(nums, n)
-			widths = append(widths, len(tok))
+			nums = append(nums, digitsOf(tok))
 		case tok == "+" || tok == "-":
 			// An offset follows a time or GMT, as in GMT+0530 or +05:30.
-			if hour < 0 || i+1 >= len(tokens) {
+			if (hour < 0 && !utc) || i+1 >= len(tokens) {
 				continue
 			}
 			v := tokens[i+1]
@@ -229,7 +248,7 @@ func parseLoose(s string, zone *time.Location) (time.Time, bool) {
 					pm = 1
 				}
 			case w == "z" || w == "gmt" || w == "utc" || w == "ut":
-				loc = time.UTC
+				loc, utc = time.UTC, true
 			case len(w) >= 3 && monthOf(w) >= 0:
 				month = monthOf(w)
 			case len(w) >= 3 && isDayName(w):
@@ -241,35 +260,15 @@ func parseLoose(s string, zone *time.Location) (time.Time, bool) {
 			}
 		}
 	}
-	// yi is the index of the year in nums.
-	var year, mon, day, yi int
+	year, mon, day, ok := dayOf(nums, month)
+	if !ok {
+		return time.Time{}, false
+	}
 	switch {
-	case month >= 0 && len(nums) == 2:
-		mon, day, year, yi = month+1, nums[0], nums[1], 1
-		if widths[0] > 2 || nums[0] > 31 {
-			year, day, yi = nums[0], nums[1], 0
-		}
-	case month >= 0 && len(nums) == 1:
-		mon, day, year = month+1, 1, nums[0]
-	case month < 0 && len(nums) == 3:
-		mon, day, year, yi = nums[0], nums[1], nums[2], 2
-		if widths[0] > 2 || nums[0] > 31 {
-			year, mon, day, yi = nums[0], nums[1], nums[2], 0
-		}
-	default:
+	case pm >= 0 && hour < 0:
+		// AM or PM needs a time.
 		return time.Time{}, false
-	}
-	if mon < 1 || mon > 12 || day < 1 || day > 31 {
-		return time.Time{}, false
-	}
-	if widths[yi] <= 2 {
-		if year < 50 {
-			year += 2000
-		} else {
-			year += 1900
-		}
-	}
-	if hour < 0 {
+	case hour < 0:
 		hour = 0
 	}
 	if pm >= 0 {
@@ -283,6 +282,55 @@ func parseLoose(s string, zone *time.Location) (time.Time, bool) {
 	}
 	t := WallTime(year, mon, day, hour, minute, sec, ms, loc)
 	return t.Add(-time.Duration(offset) * time.Minute).In(zone), true
+}
+
+// dayOf returns the year, the month and the day of a date from its numbers
+// in order, and the month that a word named, from 0, or -1. A date has one
+// to three numbers, and a missing number is 1. With no named month, the
+// numbers are the month, the day and the year, or the year, the month and
+// the day when the first number cannot be a day. With a named month, they
+// are the day and the year, or the year and the day when the first number
+// cannot be a day, and a third number does not count. A day is 1 to 31. A
+// year of 0 to 49 is in 2000 to 2049, and a year of 50 to 99 is in 1950 to
+// 1999. So 0 is 2000-01-01, 5 is 2001-05-01, 13 is not a date, and 32 is
+// 2032-01-01.
+func dayOf(nums []int, month int) (year, mon, day int, ok bool) {
+	if len(nums) == 0 || len(nums) > 3 {
+		return 0, 0, 0, false
+	}
+	n := [3]int{1, 1, 1}
+	copy(n[:], nums)
+	isDay := n[0] >= 1 && n[0] <= 31
+	switch {
+	case month >= 0 && isDay:
+		mon, day, year = month+1, n[0], n[1]
+	case month >= 0:
+		mon, year, day = month+1, n[0], n[1]
+	case isDay:
+		mon, day, year = n[0], n[1], n[2]
+	default:
+		year, mon, day = n[0], n[1], n[2]
+	}
+	if mon < 1 || mon > 12 || day < 1 || day > 31 {
+		return 0, 0, 0, false
+	}
+	switch {
+	case year < 50:
+		year += 2000
+	case year < 100:
+		year += 1900
+	}
+	return year, mon, day, true
+}
+
+// digitsOf reads a run of digits, and stops at 2147483647, the largest that
+// a browser reads in a date.
+func digitsOf(s string) int {
+	var n int64
+	for i := range len(s) {
+		n = min(n*10+int64(s[i]-'0'), math.MaxInt32)
+	}
+	return int(n)
 }
 
 // tokenize splits s into runs of digits, runs of letters and single

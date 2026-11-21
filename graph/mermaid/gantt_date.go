@@ -455,13 +455,19 @@ func ganttOrdinal(n int) string {
 	return "th"
 }
 
-// ganttLoose reads a date as the Date of JavaScript reads a string.
+// ganttLoose reads a date as the Date of JavaScript reads a string, so 0 is
+// 2000-01-01. As in Mermaid, a date before the year -10000 or after the
+// year 10000 is not a date, so that the axis does not take too many ticks.
 func ganttLoose(s string, loc *time.Location) (time.Time, bool) {
 	t, ok := format.ParseDate(s, loc)
 	if !ok {
 		return time.Time{}, false
 	}
-	return t.In(loc), true
+	t = t.In(loc)
+	if y := t.Year(); y < -10000 || y > 10000 {
+		return time.Time{}, false
+	}
+	return t, true
 }
 
 // ganttDuration is a length of a task, such as 3d: a number and a unit.

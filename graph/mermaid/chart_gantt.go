@@ -162,6 +162,12 @@ func (g *gantt) spec() (map[string]any, error) {
 	if hasMiles || g.compact {
 		xScale = map[string]any{"domain": []any{ganttDateTime(lo), ganttDateTime(hi)}}
 	}
+	if g.backward() {
+		if xScale == nil {
+			xScale = map[string]any{}
+		}
+		xScale["reverse"] = true
+	}
 	xOf := func(field string) map[string]any {
 		x := map[string]any{"field": field, "type": "temporal", "title": nil, "axis": axis}
 		if xScale != nil {
@@ -617,6 +623,25 @@ func ganttData(rows []any, fields ...string) map[string]any {
 		parse[f] = "date"
 	}
 	return map[string]any{"values": rows, "format": map[string]any{"parse": parse}}
+}
+
+// backward reports whether the time axis runs from right to left. Mermaid
+// runs its axis from the first start of a task to the last end, so the
+// axis runs backward when every task ends before the first start. Without
+// zuzu.WithNow, a task with a start of 0 and an end of 20 in the format ss
+// does: it starts on 2000-01-01, and it ends on 1970-01-01, the day of a
+// date with no day.
+func (g *gantt) backward() bool {
+	var first, last time.Time
+	for i, t := range g.tasks {
+		if i == 0 || t.start.Before(first) {
+			first = t.start
+		}
+		if i == 0 || t.end.After(last) {
+			last = t.end
+		}
+	}
+	return last.Before(first)
 }
 
 // span returns the first and the last time that the tasks draw.
