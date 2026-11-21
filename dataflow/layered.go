@@ -291,11 +291,17 @@ func layered(p *params, rows []Row) ([]Row, error) {
 			}
 			return measureRow(r, label)
 		}
+		// minLabel is the least width of the box of the label, as Mermaid
+		// sizes a node with minNodeWidth. A narrower label takes the
+		// middle of the box, and the shape grows around the box. A node
+		// with no label keeps its size.
+		minLabel := expr.Number(r["minLabelWidth"])
 		if m, ok := mediaOf(r, padding); ok {
 			medias[i] = m
 			m.tw, m.th = measureLabel()
 			if m.inline {
-				n.Width, n.Height = graph.NodeSize(kind, m.tw+m.w+4, math.Max(m.th, m.h), padding)
+				// The icon in the line is a part of the label.
+				n.Width, n.Height = graph.NodeSize(kind, math.Max(m.tw+m.w+4, minLabel), math.Max(m.th, m.h), padding)
 			} else {
 				n.Shape = "rect"
 				n.Width, n.Height = math.Max(m.fw, m.tw), m.fh
@@ -306,6 +312,9 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		if !(n.Width > 0) || !(n.Height > 0) {
 			tw, th := measureLabel()
+			if minLabel > tw && text(r, fields["label"]) != "" {
+				tw = minLabel
+			}
 			if ms, ok := r["margin"].([]any); ok && len(ms) == 2 {
 				// A margin of DOT is the space around the label in place
 				// of the padding.

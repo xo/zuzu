@@ -36,8 +36,10 @@ type stateDiagram struct {
 	regions     int
 	line        int
 	acc         []string
-	// wrap is the width at which the label of a state wraps.
-	wrap float64
+	// wrap is the width at which the label of a state wraps, and minLabel
+	// the least width of the label of a state or a note, or 0 for none,
+	// in the pixels of zuzu.
+	wrap, minLabel float64
 }
 
 // state is a simple state: its node and its kind, which is empty, start,
@@ -111,18 +113,39 @@ func (s *stateDiagram) errorf(format string, args ...any) error {
 
 // config reads the config of the front matter and the directives. The
 // settings of the section state set the spacing and the look of Mermaid,
-// so each one is an issue, except wrappingWidth, nodeSpacing and
-// rankSpacing.
+// so each one is an issue, except wrappingWidth, minNodeWidth, nodeSpacing
+// and rankSpacing.
 func (s *stateDiagram) config() error {
-	if err := sectionConfig(s.d, s.issues, "state", "wrappingWidth", "nodeSpacing", "rankSpacing"); err != nil {
+	if err := sectionConfig(s.d, s.issues, "state", "wrappingWidth", "minNodeWidth", "nodeSpacing", "rankSpacing"); err != nil {
 		return err
 	}
 	if err := stateSpacing(s.d, s.g, s.issues); err != nil {
 		return err
 	}
 	var err error
-	s.wrap, err = wrapSetting(s.issues, s.d, nodeWrap, "state", "wrappingWidth")
+	if s.wrap, err = wrapSetting(s.issues, s.d, nodeWrap, "state", "wrappingWidth"); err != nil {
+		return err
+	}
+	s.minLabel, err = s.minNodeWidth()
 	return err
+}
+
+// minNodeWidth reads state.minNodeWidth, the least width of the label of a
+// state or a note in the pixels of Mermaid, 120 by default, and returns it
+// in the pixels of zuzu, scaled as a wrap is. 0 turns it off. A value that
+// is not a number of 0 or more is an issue, and the width keeps its
+// default.
+func (s *stateDiagram) minNodeWidth() (float64, error) {
+	m, _ := s.d.Config["state"].(map[string]any)
+	v := m["minNodeWidth"]
+	if v == nil {
+		return scaleWrap(s.d.Kind, "", mermaidMinNodeWidth), nil
+	}
+	n, isNum := configNumber(map[string]any{"v": v}, "v")
+	if !isNum || n < 0 {
+		return scaleWrap(s.d.Kind, "", mermaidMinNodeWidth), s.issues.Add("config", "the setting state.minNodeWidth: %v", v)
+	}
+	return scaleWrap(s.d.Kind, "", n), nil
 }
 
 // top returns the scope that holds the current line.
@@ -590,6 +613,13 @@ func (s *stateDiagram) finish() error {
 	}
 	for _, n := range s.g.Nodes {
 		n.Style = classStyle(s.classes, s.nodeClasses[n.ID], s.nodeStyles[n.ID], n.Style)
+		// The label of a state or a note is at least state.minNodeWidth
+		// wide, as in Mermaid 12.3. A start, an end, a choice, a fork and
+		// a join have a size of their own, and a state with more
+		// descriptions keeps the width of its fields.
+		if !(n.Width > 0) && len(n.Fields) == 0 {
+			n.MinLabelWidth = s.minLabel
+		}
 	}
 	for _, c := range s.g.Clusters {
 		c.Style = classStyle(s.classes, s.nodeClasses[c.ID], s.nodeStyles[c.ID], c.Style)

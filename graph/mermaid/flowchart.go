@@ -37,6 +37,9 @@ type flowchart struct {
 	wrap     wrapping
 	nodeWrap float64
 	markdown map[string]bool
+	// minLabel is the least width of the label of a node in the pixels of
+	// zuzu, from minNodeWidth, or 0 for none.
+	minLabel float64
 	// edgeClasses are the classes of each edge by its id, in order.
 	edgeClasses map[string][]string
 	// animated holds the edges that animate or animation makes dashed.
@@ -135,10 +138,8 @@ func (f *flowchart) config() error {
 	if f.nodeWrap, err = wrapSetting(f.issues, f.d, nodeWrap, f.section(), "wrappingWidth"); err != nil {
 		return err
 	}
-	if f.af != nil {
-		if err := f.agentConfig(); err != nil {
-			return err
-		}
+	if f.minLabel, err = f.minNodeWidth(); err != nil {
+		return err
 	}
 	if c := str(cfg, "flowchart", "curve"); c != "" {
 		vc, ok := curves[c]
@@ -1260,6 +1261,9 @@ func (f *flowchart) finish() error {
 	for _, n := range f.g.Nodes {
 		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)
 		n.Wrap = f.wrap.width(f.nodeWrap, f.markdown[n.ID])
+		if minLabelOf(n) {
+			n.MinLabelWidth = f.minLabel
+		}
 	}
 	f.g.Description = describe(f.d, f.acc...)
 	return nil

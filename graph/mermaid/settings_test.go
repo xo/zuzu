@@ -494,7 +494,7 @@ func TestFlowchartSpacing(t *testing.T) {
 		"---\nconfig:\n  flowchart:\n    diagramPadding: wide\n---\nflowchart LR\n  A\n",
 		"---\nconfig:\n  flowchart:\n    subGraphTitleMargin:\n      left: 3\n---\nflowchart LR\n  A\n",
 		"---\nconfig:\n  flowchart:\n    inheritDir: maybe\n---\nflowchart LR\n  A\n",
-		"---\nconfig:\n  flowchart:\n    minNodeWidth: 120\n---\nflowchart LR\n  A\n",
+		"---\nconfig:\n  flowchart:\n    minNodeWidth: -1\n---\nflowchart LR\n  A\n",
 	} {
 		if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
 			t.Errorf("%q: expected an unsupported setting, got %v", src, err)
@@ -639,6 +639,83 @@ func TestLinkStyleOrder(t *testing.T) {
 		_, _, err = Graph(d, false)
 		if err == nil || !strings.Contains(err.Error(), "link 3,") {
 			t.Fatalf("expected the error of the link 3, got %v", err)
+		}
+	}
+}
+
+// TestMinNodeWidth checks which nodes take the least width of the label of
+// minNodeWidth, as in Mermaid 12.3.0: each node of a flowchart, a swimlane
+// diagram, an agentflow diagram and a state diagram with a label, except a
+// circle, a double circle, a node of a size of its own and a node with an
+// icon outside its label. A class diagram does not read it. The flowchart
+// and the swimlane diagram read it in the section flowchart, the agentflow
+// diagram in the section agentflow, and the state diagram in the section
+// state, from the front matter or a directive. 0 turns it off.
+func TestMinNodeWidth(t *testing.T) {
+	t.Parallel()
+	def := scaleWrap("flowchart", "", 120)
+	tests := []struct {
+		name, src string
+		want      map[string]float64
+	}{
+		{
+			"flowchart", "flowchart LR\n  a[A] --> b{B} --> c((C)) --> d(((D))) --> e@{ shape: sm-circ } --> f@{ shape: fork }\n" +
+				"  g@{ icon: \"fa:user\", label: \"G\" } --> h[\"fa:fa-user H\"] --> i@{ shape: text, label: \"I\" } --> j@{ shape: circ, label: \"J\" }\n" +
+				"  k@{ shape: dbl-circ, label: \"K\" } --> l[\"$$x^2$$\"]\n",
+			map[string]float64{"a": def, "b": def, "c": 0, "d": 0, "e": 0, "f": 0, "g": 0, "h": def, "i": def, "j": 0, "k": 0, "l": def},
+		},
+		{
+			"front matter", "---\nconfig:\n  flowchart:\n    minNodeWidth: 50\n---\nflowchart LR\n  a --> b\n",
+			map[string]float64{"a": scaleWrap("flowchart", "", 50), "b": scaleWrap("flowchart", "", 50)},
+		},
+		{
+			"directive", "%%{init: {\"flowchart\": {\"minNodeWidth\": 200}}}%%\ngraph TD\n  a --> b\n",
+			map[string]float64{"a": scaleWrap("graph", "", 200)},
+		},
+		{"zero", "---\nconfig:\n  flowchart:\n    minNodeWidth: 0\n---\nflowchart LR\n  a --> b\n", map[string]float64{"a": 0, "b": 0}},
+		{
+			"swimlane", "---\nconfig:\n  flowchart:\n    minNodeWidth: 50\n---\nswimlane-beta LR\n  subgraph L\n    a --> b\n  end\n",
+			map[string]float64{"a": scaleWrap("swimlane-beta", "", 50)},
+		},
+		{
+			"agentflow", "---\nconfig:\n  agentflow:\n    minNodeWidth: 80\n---\nagentflow-beta LR\n  a --> b\n",
+			map[string]float64{"a": scaleWrap("agentflow-beta", "", 80), "b": scaleWrap("agentflow-beta", "", 80)},
+		},
+		{
+			"state", "stateDiagram-v2\n  [*] --> A\n  A --> B\n  B : title\n  B : more\n  state ch <<choice>>\n  A --> ch\n" +
+				"  state fk <<fork>>\n  ch --> fk\n  note right of A : N\n  fk --> [*]\n",
+			map[string]float64{"A": def, "B": 0, "ch": 0, "fk": 0, "root_start": 0, "root_end": 0, "A----note": def},
+		},
+		{
+			"state setting", "---\nconfig:\n  state:\n    minNodeWidth: 60\n  flowchart:\n    minNodeWidth: 10\n---\nstateDiagram-v2\n  A --> B\n",
+			map[string]float64{"A": scaleWrap("stateDiagram-v2", "", 60)},
+		},
+		{
+			"class", "---\nconfig:\n  flowchart:\n    minNodeWidth: 50\n---\nclassDiagram\n  class A\n",
+			map[string]float64{"A": 0},
+		},
+	}
+	for _, test := range tests {
+		d, err := Read(test.src)
+		if err != nil {
+			t.Fatalf("%s: %v", test.name, err)
+		}
+		g, _, err := Graph(d, false)
+		if err != nil {
+			t.Fatalf("%s: %v", test.name, err)
+		}
+		for id, want := range test.want {
+			if n := node(t, g, id); n.MinLabelWidth != want {
+				t.Errorf("%s: node %s: expected the least width %v of the label, got %v", test.name, id, want, n.MinLabelWidth)
+			}
+		}
+	}
+	for _, src := range []string{
+		"---\nconfig:\n  flowchart:\n    minNodeWidth: wide\n---\nflowchart LR\n  a\n",
+		"---\nconfig:\n  state:\n    minNodeWidth: -1\n---\nstateDiagram-v2\n  A\n",
+	} {
+		if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
+			t.Errorf("%q: expected an unsupported value, got %v", src, err)
 		}
 	}
 }

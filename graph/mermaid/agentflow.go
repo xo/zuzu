@@ -23,10 +23,6 @@ var (
 	agentFlowSettings = []string{"curve", "subGraphTitleMargin", "inheritDir"}
 )
 
-// agentMinWidth is the least width in the pixels of Mermaid of the label of
-// a node of an agentflow diagram, the default of agentflow.minNodeWidth.
-const agentMinWidth = 120
-
 // agentState holds what a flowchart reads only in an agentflow diagram.
 type agentState struct {
 	// blocks are the flows and the blocks global that are open, the
@@ -46,8 +42,6 @@ type agentState struct {
 	global map[string]bool
 	// connectors holds the id of each connector.
 	connectors map[string]bool
-	// minWidth is the least width of a node in the pixels of zuzu.
-	minWidth float64
 }
 
 // agentBlock is a flow or a block global that is open: the cluster of a
@@ -92,7 +86,6 @@ func agentflowGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) 
 	f := newFlowchart(d, strict)
 	f.af = &agentState{
 		flows: map[string]*graph.Cluster{}, global: map[string]bool{}, connectors: map[string]bool{},
-		minWidth: agentWidth(agentMinWidth),
 	}
 	if err := f.config(); err != nil {
 		return nil, f.issues.Report, err
@@ -102,27 +95,6 @@ func agentflowGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) 
 	}
 	f.inheritDir()
 	return f.g, f.issues.Report, nil
-}
-
-// agentWidth returns the least width of a node in the pixels of zuzu for
-// a least width of its label in the pixels of Mermaid: the width scaled as
-// a wrap is, and the padding of the node on each side.
-func agentWidth(w float64) float64 {
-	return scaleWrap("agentflow-beta", "", w) + 2*8
-}
-
-// agentConfig reads agentflow.minNodeWidth.
-func (f *flowchart) agentConfig() error {
-	m, _ := f.d.Config["agentflow"].(map[string]any)
-	n, ok, err := f.configNum("agentflow.minNodeWidth", m["minNodeWidth"])
-	if err != nil || !ok {
-		return err
-	}
-	f.af.minWidth = 0
-	if n > 0 {
-		f.af.minWidth = agentWidth(n)
-	}
-	return nil
 }
 
 // agentStmt reads a statement that only an agentflow diagram has: flow,
@@ -558,15 +530,11 @@ func (f *flowchart) agentMembers() error {
 }
 
 // agentShapes draws each node with no shape of its own as a rounded
-// rectangle, and gives each node the least width of agentflow.minNodeWidth,
-// except a collapsed flow and a diamond, which grows to fit its label.
+// rectangle.
 func (f *flowchart) agentShapes() {
 	for _, n := range f.g.Nodes {
 		if n.Shape == "rect" || n.Shape == "" {
 			n.Shape = "rounded"
-		}
-		if n.Shape != "collapsedGroup" && n.Shape != "diamond" {
-			n.MinWidth = f.af.minWidth
 		}
 	}
 }

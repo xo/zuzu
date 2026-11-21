@@ -83,11 +83,12 @@ func texts(m *scene.Mark) []string {
 
 // TestEmoji checks that an emoji measures with the font of WithEmoji, so
 // that its node is wider, that the SVG names the family of the font, and
-// that the PNG draws the emoji in color.
+// that the PNG draws the emoji in color. minNodeWidth is 0, so that the
+// node takes the width of its label.
 func TestEmoji(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	src := []byte("flowchart LR\n  A[\"go 🚀🚀🚀\"]\n")
+	src := []byte("---\nconfig:\n  flowchart:\n    minNodeWidth: 0\n---\nflowchart LR\n  A[\"go 🚀🚀🚀\"]\n")
 	chart, _, err := Parse(src)
 	if err != nil {
 		t.Fatal(err)

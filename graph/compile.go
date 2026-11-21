@@ -272,6 +272,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if n.MinHeight > 0 {
 			r["minHeight"] = n.MinHeight
 		}
+		if n.MinLabelWidth > 0 {
+			r["minLabelWidth"] = n.MinLabelWidth
+		}
 		if n.Wrap > 0 && len(n.Fields) == 0 && n.HTML == "" {
 			r["wrap"] = n.Wrap
 		}

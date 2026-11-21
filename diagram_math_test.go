@@ -135,10 +135,10 @@ func TestMathSource(t *testing.T) {
 // with math by its formulas: a fraction makes its node and its edge label
 // higher than a line of text, the space next to a formula takes no width,
 // and the text and the formulas of a label sit in one row around its
-// center.
+// center. minNodeWidth is 0, so that no node takes a least width.
 func TestMathSizes(t *testing.T) {
 	t.Parallel()
-	rows := mathRows(t, "flowchart LR\n  a[\"$$\\frac{a}{b}$$ of a whole\"] -->|\"$$\\frac{p}{q}$$\"| b[\"of a whole\"]\n  b --> c[\"x $$y$$\"]\n  c --> d[\"x$$y$$\"]\n")
+	rows := mathRows(t, "---\nconfig:\n  flowchart:\n    minNodeWidth: 0\n---\nflowchart LR\n  a[\"$$\\frac{a}{b}$$ of a whole\"] -->|\"$$\\frac{p}{q}$$\"| b[\"of a whole\"]\n  b --> c[\"x $$y$$\"]\n  c --> d[\"x$$y$$\"]\n")
 	node := map[string]map[string]any{}
 	var edge map[string]any
 	var runs, paths []map[string]any

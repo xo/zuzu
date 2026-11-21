@@ -138,6 +138,13 @@ type Node struct {
 	// MinWidth and MinHeight are the least size of the node, which grows to
 	// fit its label, or 0 for none.
 	MinWidth, MinHeight float64
+	// MinLabelWidth is the least width of the box of the label, or 0 for
+	// none. A narrower label takes the middle of a box of this width, and
+	// the shape grows around the box, as Mermaid sizes a node with
+	// minNodeWidth. A node with no label, a node with fields or HTML, and
+	// a node with an icon or an image outside the line of its label do not
+	// read it.
+	MinLabelWidth float64
 	// Wrap is the width in pixels at which the label wraps, or 0 for a
 	// label that does not wrap. A line of the label that is wider breaks at
 	// its spaces into lines that are not wider. The label of a node with

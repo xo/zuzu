@@ -10,8 +10,47 @@ import (
 // flowSettings are the settings of the section flowchart of the config
 // that a flowchart reads.
 var flowSettings = []string{
-	"curve", "wrappingWidth", "nodeSpacing", "rankSpacing", "diagramPadding",
+	"curve", "wrappingWidth", "minNodeWidth", "nodeSpacing", "rankSpacing", "diagramPadding",
 	"titleTopMargin", "subGraphTitleMargin", "inheritDir",
+}
+
+// mermaidMinNodeWidth is the default of flowchart.minNodeWidth, of
+// agentflow.minNodeWidth and of state.minNodeWidth in Mermaid 12.3: the
+// least width of the label of a node, in the pixels of Mermaid.
+const mermaidMinNodeWidth = 120
+
+// minNodeWidth reads minNodeWidth of the section that section names and
+// returns it in the pixels of zuzu, scaled as a wrap is. A swimlane diagram
+// reads it in the section flowchart, as Mermaid does. 0 turns it off. A
+// value that is not a number of 0 or more is an issue, and the width keeps
+// its default.
+func (f *flowchart) minNodeWidth() (float64, error) {
+	m, _ := f.d.Config[f.section()].(map[string]any)
+	n, ok, err := f.configNum(f.section()+".minNodeWidth", m["minNodeWidth"])
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		n = mermaidMinNodeWidth
+	}
+	return scaleWrap(f.d.Kind, "", n), nil
+}
+
+// minLabelOf reports whether the label of a node of a flowchart, of a
+// swimlane diagram or of an agentflow diagram is at least minNodeWidth
+// wide, as in Mermaid 12.3. Each node is, except a circle, a double
+// circle, a collapsed subgraph, a node of a size of its own, such as a
+// small circle, and a node with an icon or an image outside the line of
+// its label.
+func minLabelOf(n *graph.Node) bool {
+	if n.Width > 0 && n.Height > 0 || n.Media != nil && !n.Media.Inline {
+		return false
+	}
+	switch kind, _ := graph.ShapeOf(n.Shape); kind {
+	case "circle", "doublecircle", "collapsedGroup":
+		return false
+	}
+	return true
 }
 
 // The defaults of Mermaid 12 and of zuzu for the spaces of a flowchart. The

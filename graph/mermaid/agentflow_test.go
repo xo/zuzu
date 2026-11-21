@@ -74,13 +74,13 @@ func TestAgentShapes(t *testing.T) {
 	if n := node(t, g, "r"); n.Label != "Arr" {
 		t.Errorf("expected the label Arr, got %q", n.Label)
 	}
-	// The label of a node is at least agentflow.minNodeWidth wide, and a
-	// diamond grows to fit its label.
-	if n := node(t, g, "a"); n.MinWidth != agentWidth(agentMinWidth) {
-		t.Errorf("expected the least width %v, got %v", agentWidth(agentMinWidth), n.MinWidth)
-	}
-	if n := node(t, g, "d"); n.MinWidth != 0 {
-		t.Errorf("expected no least width on a diamond, got %v", n.MinWidth)
+	// The label of each node is at least agentflow.minNodeWidth wide, a
+	// diamond too, as in Mermaid 12.3.
+	want := scaleWrap("agentflow-beta", "", 120)
+	for _, id := range []string{"a", "d"} {
+		if n := node(t, g, id); n.MinLabelWidth != want || n.MinWidth != 0 {
+			t.Errorf("%s: expected the least width %v of the label, got %v and %v", id, want, n.MinLabelWidth, n.MinWidth)
+		}
 	}
 }
 
@@ -202,8 +202,8 @@ func TestAgentCollapsed(t *testing.T) {
   end
   receive --> validate
   enrich --> x`)
-	if n := node(t, g, "processing"); n.Shape != "collapsedGroup" || n.Label != "Processing" || n.MinWidth != 0 {
-		t.Errorf("expected the collapsed flow Processing, got %q %q %v", n.Shape, n.Label, n.MinWidth)
+	if n := node(t, g, "processing"); n.Shape != "collapsedGroup" || n.Label != "Processing" || n.MinLabelWidth != 0 {
+		t.Errorf("expected the collapsed flow Processing, got %q %q %v", n.Shape, n.Label, n.MinLabelWidth)
 	}
 	if n := node(t, g, "f2"); n.Shape != "collapsedGroup" || n.Label != "Two" {
 		t.Errorf("expected the collapsed flow Two, got %q %q", n.Shape, n.Label)
@@ -246,8 +246,8 @@ agentflow-beta
 	if g.NodeSep != 48 || g.RankSep != 20 {
 		t.Errorf("expected the spaces 48 and 20, got %v and %v", g.NodeSep, g.RankSep)
 	}
-	if n := node(t, g, "a"); n.MinWidth != 0 || n.Wrap != scaleWrap("agentflow-beta", "", 140) {
-		t.Errorf("expected no least width and a wrap of %v, got %v and %v", scaleWrap("agentflow-beta", "", 140), n.MinWidth, n.Wrap)
+	if n := node(t, g, "a"); n.MinLabelWidth != 0 || n.Wrap != scaleWrap("agentflow-beta", "", 140) {
+		t.Errorf("expected no least width and a wrap of %v, got %v and %v", scaleWrap("agentflow-beta", "", 140), n.MinLabelWidth, n.Wrap)
 	}
 	if g.Edges[0].Curve != "linear" {
 		t.Errorf("expected a linear curve, got %q", g.Edges[0].Curve)
