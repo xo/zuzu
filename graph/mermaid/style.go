@@ -249,6 +249,11 @@ func inert(kind, path string) bool {
 		// Of the kinds that zuzu draws, only the sequence diagram and the
 		// C4 diagrams read wrap at the top level, which %%{wrap}%% sets.
 		return kind != "sequenceDiagram" && !strings.HasPrefix(kind, "C4")
+	case is("flowchart.nodeSpacing", "flowchart.rankSpacing", "class.nodeSpacing", "class.rankSpacing"):
+		// Mermaid 12.3 lays out a state diagram and a class diagram with
+		// the spaces of the section state, as stateSpacing says, and not
+		// with these.
+		return strings.HasPrefix(kind, "stateDiagram") || strings.HasPrefix(kind, "classDiagram")
 	case is("gantt.compact"):
 		// Mermaid 12 has no setting gantt.compact and ignores it. Its
 		// documents show it next to displayMode: compact.
@@ -530,8 +535,13 @@ func sectionConfig(d *Diagram, is *graph.Issues, section string, known ...string
 			continue
 		}
 		var read []string
-		if k == section {
+		switch {
+		case k == section:
 			read = known
+		case k == "state" && section == "class":
+			// A class diagram takes its spaces from the section state,
+			// as stateSpacing says.
+			read = spacingKeys
 		}
 		if err := graphSection(is, d.Kind, k, v, read...); err != nil {
 			return err

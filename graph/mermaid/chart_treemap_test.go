@@ -108,6 +108,16 @@ func TestTreemapDashes(t *testing.T) {
 			t.Errorf("the box of %q does not draw the dashes %v", name, want)
 		}
 	}
+	// A comma after a backslash is a comma of the value, as in Mermaid
+	// 12.3, so 6\,3 is two lengths, and the style goes on after it.
+	escaped := drawTreemap(t, "treemap-beta\n\"Plans\"\n  \"Basic\": 30:::dashed\n  \"Pro\": 50\n"+
+		`classDef dashed stroke-dasharray:6\,3,stroke:red;`+"\n")
+	n := countDrawn(escaped, scene.Rect, func(it drawnItem) bool {
+		return it.datum["name"] == "Basic" && slices.Equal(it.item.StrokeDash, []float64{6, 3}) && it.item.Stroke.Color == "red"
+	})
+	if n != 1 {
+		t.Errorf("the box of %q does not draw the dashes 6\\,3 in red", "Basic")
+	}
 	// A dash that is not a length is an error.
 	src := "treemap-beta\n\"A\": 1:::c\nclassDef c stroke-dasharray:a b;"
 	if _, err := chartOf(src, false); !errors.Is(err, mermaid.ErrSyntax) {

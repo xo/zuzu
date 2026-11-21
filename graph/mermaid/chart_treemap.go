@@ -300,10 +300,16 @@ func filteredData(name, source, test string) map[string]any {
 }
 
 // css reads the style of a class of a chart, as fill:#f96,stroke:#333.
-// Each property that the chart does not draw is an issue.
+// A comma after a backslash, as in stroke-dasharray:6\,3, is a comma of
+// the value and does not end the part, as in a flowchart. Each property
+// that the chart does not draw is an issue.
 func (c *chart) css(s string) (map[string]any, error) {
 	st := map[string]any{}
+	// escComma stands for an escaped comma while the style splits.
+	const escComma = "\x00"
+	s = strings.ReplaceAll(s, `\,`, escComma)
 	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' }) {
+		part = strings.ReplaceAll(part, escComma, ",")
 		k, v, ok := strings.Cut(part, ":")
 		if !ok {
 			return nil, c.errorf("the style %q has no colon", strings.TrimSpace(part))
@@ -320,9 +326,9 @@ func (c *chart) css(s string) (map[string]any, error) {
 			st["strokeWidth"] = w
 		case "stroke-dasharray":
 			// Mermaid splits a style at commas, so a list of dashes has
-			// spaces between its lengths.
+			// spaces or escaped commas between its lengths.
 			var dash []any
-			for f := range strings.FieldsSeq(v) {
+			for f := range strings.FieldsSeq(strings.ReplaceAll(v, ",", " ")) {
 				n, err := strconv.ParseFloat(strings.TrimSuffix(f, "px"), 64)
 				if err != nil || n < 0 {
 					return nil, c.errorf("the stroke-dasharray %q is not a list of lengths", v)

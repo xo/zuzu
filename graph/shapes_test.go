@@ -2,8 +2,13 @@ package graph
 
 import (
 	"math"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/xo/zuzu/theme"
 )
 
 func TestShapeOfMermaid(t *testing.T) {
@@ -122,5 +127,40 @@ func TestStrokeHoldsNoArea(t *testing.T) {
 	got := stroke([2]float64{0, 0}, [2]float64{10, 0}, [2]float64{10, 5})
 	if want := "M0,0L10,0L10,5L10,0L0,0"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFramedCircleDot(t *testing.T) {
+	t.Parallel()
+	// The dot of fr-circ is the circles inside the ring. The outline of a
+	// node fills each one as a band, and the bands cover the dot from the
+	// middle out to a radius of 2.5, so the dot is 5 pixels wide, as in
+	// Mermaid 12.3. A circle smaller than half the outline leaves a hole
+	// in the middle when okage draws it.
+	path := ShapePath("fr-circ", 14, 14)
+	var radii []float64
+	for _, m := range regexp.MustCompile(`A([0-9.]+),`).FindAllStringSubmatch(path, -1) {
+		r, err := strconv.ParseFloat(m[1], 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r < 7 && !slices.Contains(radii, r) {
+			radii = append(radii, r)
+		}
+	}
+	slices.Sort(radii)
+	half := theme.NodeOutline / 2
+	if len(radii) == 0 || radii[0] < half {
+		t.Fatalf("the circles of the dot are %v, want the smallest at least %v", radii, half)
+	}
+	covered := 0.0
+	for _, r := range radii {
+		if r-half > covered {
+			t.Errorf("the dot has a gap from %v to %v", covered, r-half)
+		}
+		covered = math.Max(covered, r+half)
+	}
+	if math.Abs(covered-2.5) > 1e-9 {
+		t.Errorf("the dot has a radius of %v, want 2.5", covered)
 	}
 }

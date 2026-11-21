@@ -157,6 +157,61 @@ func TestTopSpacing(t *testing.T) {
 	}
 }
 
+func TestStateSpacing(t *testing.T) {
+	t.Parallel()
+	// Mermaid 12.3 lays out a state diagram and a class diagram with
+	// state.nodeSpacing and state.rankSpacing. It does not read the spaces
+	// of the section flowchart or class there, so they change nothing and
+	// are no issue.
+	state := "stateDiagram-v2\n  A --> B\n"
+	class := "classDiagram\n  A --> B\n"
+	tests := []struct {
+		cfg, body  string
+		node, rank float64
+	}{
+		{"  state:\n    nodeSpacing: 100\n    rankSpacing: 25\n", state, 48, 20},
+		{"  state:\n    nodeSpacing: 100\n    rankSpacing: 25\n", class, 48, 20},
+		{"  flowchart:\n    nodeSpacing: 100\n    rankSpacing: 25\n", state, 0, 0},
+		{"  flowchart:\n    nodeSpacing: 100\n    rankSpacing: 25\n", class, 0, 0},
+		{"  class:\n    nodeSpacing: 100\n    rankSpacing: 25\n", class, 0, 0},
+		// 0 keeps the default, as in Mermaid.
+		{"  state:\n    nodeSpacing: 0\n    rankSpacing: '100'\n", state, 0, 80},
+		// The top level wins over the section state.
+		{"  nodeSpacing: 50\n  state:\n    nodeSpacing: 100\n    rankSpacing: 25\n", class, 24, 20},
+	}
+	for _, test := range tests {
+		src := "---\nconfig:\n" + test.cfg + "---\n" + test.body
+		d, err := Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, report, err := Graph(d, true)
+		if err != nil {
+			t.Fatalf("%q: %v", src, err)
+		}
+		if len(report) != 0 {
+			t.Errorf("%q: expected no issue, got %v", src, report)
+		}
+		if g.NodeSep != test.node || g.RankSep != test.rank {
+			t.Errorf("%q: expected the spaces %v and %v, got %v and %v", src, test.node, test.rank, g.NodeSep, g.RankSep)
+		}
+	}
+	for body, want := range map[string]string{
+		state: "config: the setting state.nodeSpacing: -1",
+		class: "config: the setting state.nodeSpacing: -1",
+	} {
+		src := "---\nconfig:\n  state:\n    nodeSpacing: -1\n---\n" + body
+		if got := reportOf(t, src); !slices.Contains(got, want) {
+			t.Errorf("%q: expected the issue %q, got %q", src, want, got)
+		}
+	}
+	// A class diagram reads only the spaces of the section state.
+	src := "---\nconfig:\n  state:\n    padding: 4\n---\n" + class
+	if got := reportOf(t, src); !slices.Contains(got, "config: the setting state.padding") {
+		t.Errorf("%q: expected an issue of state.padding, got %q", src, got)
+	}
+}
+
 func TestLayoutHints(t *testing.T) {
 	t.Parallel()
 	bodies := []string{"flowchart LR\n  A --> B\n", "stateDiagram-v2\n  A --> B\n", "pie\n  \"a\" : 1\n", "mindmap\n  root\n"}

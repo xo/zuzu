@@ -496,7 +496,8 @@ diagram" says. A mindmap accepts `cose-bilkent` and `tidy-tree` too.
 
 `nodeSpacing` and `rankSpacing` at the top of the config set the spaces of
 every graph, as in Mermaid 12.3, over the spaces of the section of the
-kind, such as `flowchart.nodeSpacing`. A space takes the ratio of the
+kind, such as `flowchart.nodeSpacing`, or `state.nodeSpacing` in a state
+diagram and a class diagram. A space takes the ratio of the
 default of zuzu to the default of Mermaid for the kind: 140 and 80 in an
 entity relationship diagram, and 50 and 50 in the other graphs. So
 `nodeSpacing: 100` is a space of 48 between two nodes of a rank of a
@@ -561,6 +562,7 @@ kind, with no issue:
 | `htmlLabels`, `flowchart.htmlLabels`, in a chart other than a mindmap | nothing. A chart draws its text in SVG |
 | `wrap` at the top level, in a kind other than the sequence diagram and the C4 diagrams | nothing. Of the kinds that zuzu draws, only the sequence diagram and the C4 diagrams read it |
 | `gantt.compact` | nothing. Mermaid 12 has no such setting |
+| `flowchart.nodeSpacing`, `flowchart.rankSpacing`, `class.nodeSpacing`, `class.rankSpacing`, in a state diagram and a class diagram | nothing. Mermaid 12.3 takes the spaces of these kinds from the section `state` |
 | a section inside a section of the same name, such as `sequence.sequence`, which `%%{init: {'config': {'sequence': {...}}}}%%` makes | nothing. Mermaid has no setting there (D32) |
 
 zuzu matches the names of these settings in any case, so `loglevel` is
@@ -678,8 +680,8 @@ named shapes of Mermaid 12:
 | `fork`, `join` | a filled bar across the flow, 70 by 10, with no text |
 | `hourglass`, `collate` | an hourglass of 30 by 30, with no text |
 | `bolt`, `com-link`, `lightning-bolt` | a lightning bolt of 35 by 70, with no text |
-| `cross-circ`, `summary`, `crossed-circle` | a circle of 40 with a cross in it, with no text |
-| `fr-circ`, `stop`, `framed-circle` | a ring of 14 with a dot in it, with no text |
+| `cross-circ`, `summary`, `crossed-circle` | a circle of 60 with a cross in it, with no text |
+| `fr-circ`, `stop`, `framed-circle` | a ring of 14 with a dot of 5 in it, with no text |
 | `f-circ`, `filled-circle`, `junction` | a filled circle of 14, with no text |
 | `sm-circ`, `small-circle`, `start` | an open circle of 14, with no text (D38) |
 | `choice` | a diamond of 28 by 28, with no text |
@@ -958,10 +960,17 @@ Mermaid.
 A state takes a link and a tooltip from `click`, as "Links and tooltips"
 says.
 
+`state.nodeSpacing` and `state.rankSpacing` set the space between two
+states of a rank and the space between two ranks, as the settings of the
+same names of a flowchart do. Mermaid 12.3 does not read
+`flowchart.nodeSpacing` and `flowchart.rankSpacing` in a state diagram, so
+they change nothing and are no issue.
+
 These parts are issues: `scale`, a floating note with no state,
 such as `note "text" as N1`, the settings of the section `state` of
-the config other than `wrappingWidth`, a `theme` that Mermaid does not
-have, the `themeVariables`, and a style that a flowchart does not read.
+the config other than `wrappingWidth`, `nodeSpacing` and `rankSpacing`, a
+`theme` that Mermaid does not have, the `themeVariables`, and a style that
+a flowchart does not read.
 
 ### Class diagram
 
@@ -1039,9 +1048,17 @@ with its whole name as its title, as Mermaid does.
 A class takes a link and a tooltip from `click`, `link` and `callback`, as
 "Links and tooltips" says.
 
+A class diagram takes its spaces from the section `state` of the config,
+as in Mermaid 12.3. `state.nodeSpacing` and `state.rankSpacing` set the
+space between two classes of a rank and the space between two ranks, as
+in a state diagram. Mermaid does not read `nodeSpacing` and `rankSpacing`
+of the sections `flowchart` and `class` in a class diagram, so they change
+nothing and are no issue.
+
 These parts are issues: the target of a link, the settings of
 the section `class` of the config other than `hideEmptyMembersBox` and
-`hierarchicalNamespaces`, a `theme` that Mermaid does not have, the
+`hierarchicalNamespaces`, the settings of the section `state` other than
+`nodeSpacing` and `rankSpacing`, a `theme` that Mermaid does not have, the
 `themeVariables`, and a style that a flowchart does not read.
 
 ### Entity relationship diagram
@@ -2020,7 +2037,9 @@ Names in quotes, nested by their indent with spaces or tabs, and a value
 on a leaf, `"Leaf": 12`. `classDef` and `:::class` style a node with
 `fill`, `stroke`, `stroke-width`, `stroke-dasharray` and `color`. Mermaid
 splits a style at commas, so the lengths of `stroke-dasharray` have spaces
-between them, as `stroke-dasharray:5 3`. zuzu reads `valueFormat`,
+between them, as `stroke-dasharray:5 3`. A comma after a backslash is a
+comma of the value, as in a flowchart, so `stroke-dasharray:5\,3` draws
+the same dashes. zuzu reads `valueFormat`,
 `showValues`, `padding`, `diagramPadding`, `labelFontSize` and
 `valueFontSize`. A value on a section with children, and a leaf with no
 value, are issues.

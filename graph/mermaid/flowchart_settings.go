@@ -153,10 +153,15 @@ func (f *flowchart) inheritDir() {
 	}
 }
 
+// spacingKeys are the settings that set the space between two nodes of a
+// rank and the space between two ranks of a graph, at the top level of
+// the config and in the section state.
+var spacingKeys = []string{"nodeSpacing", "rankSpacing"}
+
 // topSpacing reports whether a key of the top level of the config is
 // nodeSpacing or rankSpacing, which graphSpacing reads.
 func topSpacing(k string) bool {
-	return k == "nodeSpacing" || k == "rankSpacing"
+	return slices.Contains(spacingKeys, k)
 }
 
 // graphSpacing reads nodeSpacing and rankSpacing at the top level of the
@@ -171,14 +176,33 @@ func graphSpacing(d *Diagram, g *graph.Graph, is *graph.Issues) error {
 	if d.Kind == "erDiagram" {
 		node, rank = 140, 80
 	}
-	for _, k := range []string{"nodeSpacing", "rankSpacing"} {
-		v, ok := d.Config[k]
+	return readSpacing(d.Config, "", node, rank, g, is)
+}
+
+// stateSpacing reads nodeSpacing and rankSpacing of the section state of
+// the config. Mermaid 12.3 lays out a state diagram and a class diagram
+// with them, and not with the settings of the section flowchart or class.
+// 0 keeps the default, as in Mermaid. graphSpacing reads the settings at
+// the top level of the config later, and they win.
+func stateSpacing(d *Diagram, g *graph.Graph, is *graph.Issues) error {
+	m, _ := d.Config["state"].(map[string]any)
+	return readSpacing(m, "state.", mermaidNodeSpacing, mermaidRankSpacing, g, is)
+}
+
+// readSpacing reads nodeSpacing and rankSpacing of a map of the config,
+// whose path starts with prefix, into the spaces of a graph. A space takes
+// the ratio of the default of zuzu to node or rank, the default of
+// Mermaid. 0 changes nothing. A value that is not a number of 0 or more is
+// an issue.
+func readSpacing(m map[string]any, prefix string, node, rank float64, g *graph.Graph, is *graph.Issues) error {
+	for _, k := range spacingKeys {
+		v, ok := m[k]
 		if !ok {
 			continue
 		}
-		n, ok := configNumber(d.Config, k)
+		n, ok := configNumber(m, k)
 		if !ok || n < 0 {
-			if err := is.Add("config", "the setting %s: %v", k, v); err != nil {
+			if err := is.Add("config", "the setting %s%s: %v", prefix, k, v); err != nil {
 				return err
 			}
 			continue

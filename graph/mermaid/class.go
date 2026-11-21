@@ -86,6 +86,9 @@ func classGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	if err := sectionConfig(d, c.issues, "class", "hideEmptyMembersBox", "hierarchicalNamespaces"); err != nil {
 		return nil, c.issues.Report, err
 	}
+	if err := stateSpacing(d, c.g, c.issues); err != nil {
+		return nil, c.issues.Report, err
+	}
 	if m, ok := d.Config["class"].(map[string]any); ok {
 		c.hideEmpty, _ = m["hideEmptyMembersBox"].(bool)
 		if v, ok := m["hierarchicalNamespaces"]; ok {

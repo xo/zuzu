@@ -111,9 +111,13 @@ func (s *stateDiagram) errorf(format string, args ...any) error {
 
 // config reads the config of the front matter and the directives. The
 // settings of the section state set the spacing and the look of Mermaid,
-// so each one is an issue, except wrappingWidth.
+// so each one is an issue, except wrappingWidth, nodeSpacing and
+// rankSpacing.
 func (s *stateDiagram) config() error {
-	if err := sectionConfig(s.d, s.issues, "state", "wrappingWidth"); err != nil {
+	if err := sectionConfig(s.d, s.issues, "state", "wrappingWidth", "nodeSpacing", "rankSpacing"); err != nil {
+		return err
+	}
+	if err := stateSpacing(s.d, s.g, s.issues); err != nil {
 		return err
 	}
 	var err error

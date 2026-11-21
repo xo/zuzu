@@ -167,6 +167,7 @@ func TestNamedShapes(t *testing.T) {
   d@{ shape: fork, label: "hidden" }
   e@{ shape: hourglass }
   f@{ shape: fr-circ }
+  g@{ shape: cross-circ, label: "hidden" }
   h@{ shape: choice, label: "hidden" }
   i@{ shape: anchor }`
 	d, err := Read(src)
@@ -184,11 +185,11 @@ func TestNamedShapes(t *testing.T) {
 	for _, n := range g.Nodes {
 		got = append(got, fmt.Sprintf("%s %s %q %vx%v", n.ID, n.Shape, n.Label, n.Width, n.Height))
 	}
-	// A fork, an hourglass, a framed circle, a choice and an anchor draw
-	// no text, at the size of Mermaid. A fork across a flowchart LR stands
-	// up.
+	// A fork, an hourglass, a framed circle, a crossed circle, a choice
+	// and an anchor draw no text, at the size of Mermaid 12.3. A fork
+	// across a flowchart LR stands up.
 	want := `a lined-document "Doc" 0x0|b comment "Note" 0x0|c braces "c" 0x0|d fork "" 10x70|e hourglass "" 30x30|f fr-circ "" 14x14|` +
-		`h choice "" 28x28|i anchor "" 2x2`
+		`g cross-circ "" 60x60|h choice "" 28x28|i anchor "" 2x2`
 	if s := strings.Join(got, "|"); s != want {
 		t.Errorf("got  %s\nwant %s", s, want)
 	}

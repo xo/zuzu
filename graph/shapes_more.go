@@ -316,9 +316,10 @@ func morePath(kind string, w, h float64) (string, bool) {
 		c := x * math.Sqrt2 / 2
 		return circlePath(0, 0, x) + stroke([2]float64{-c, -c}, [2]float64{c, c}) + stroke([2]float64{c, -c}, [2]float64{-c, c}), true
 	case "fr-circ":
-		// A ring and a dot. The dot is two small circles that the outline
-		// fills.
-		return circlePath(0, 0, x) + circlePath(0, 0, 0.7) + circlePath(0, 0, 1.9), true
+		// A ring and a dot 5 pixels wide, as in Mermaid 12.3. The dot is
+		// three small circles that the outline of theme.NodeOutline fills
+		// from the middle out to a radius of 2.5.
+		return circlePath(0, 0, x) + circlePath(0, 0, 0.625) + circlePath(0, 0, 1.25) + circlePath(0, 0, 1.875), true
 	case businessEllipse:
 		at := func(px, sign float64) [2]float64 { return [2]float64{px, sign * y * math.Sqrt(1-px*px/(x*x))} }
 		return ellipsePath(x, y) + stroke(at(x*0.6, 1), at(x*0.94, -1)), true
@@ -334,7 +335,7 @@ func morePath(kind string, w, h float64) (string, bool) {
 		}
 		dots := y - collapsedRow/2 + 2
 		for i := -1; i <= 1; i++ {
-			// Two rings that the outline fills, as the dot of fr-circ.
+			// Two rings that the outline fills, as in the dot of fr-circ.
 			b.WriteString(circlePath(float64(i)*10, dots, 2) + circlePath(float64(i)*10, dots, 0.8))
 		}
 		return b.String(), true

@@ -1033,7 +1033,7 @@ func (f *flowchart) bare(n *graph.Node) {
 	case "bolt":
 		w, h = 35, 70
 	case "cross-circ":
-		w, h = 40, 40
+		w, h = 60, 60
 	case "fr-circ":
 		w, h = 14, 14
 	default:
