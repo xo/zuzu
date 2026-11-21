@@ -66,18 +66,13 @@ numbers before strings.
 D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
 zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
 11 lists. These are left:
-1. A kind of Mermaid that lays out when it is read, such as a sequence, a
-   pie, a gantt, a journey, a mindmap, a treemap, an architecture diagram,
-   a gitGraph, a block diagram, a timeline or a C4 diagram, measures an
-   emoji as nothing, because `WithEmoji` is an option of the render. Its
-   labels can be too narrow (6).
-2. The SVG writer measures the `limit` of a text without the font of
+1. The SVG writer measures the `limit` of a text without the font of
    emoji (6).
-3. A weight or a style in `fontFamily` draws only in the graphs and in the
+2. A weight or a style in `fontFamily` draws only in the graphs and in the
    sequence. It is an issue in the other kinds (5).
-4. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
+3. `href` and `tooltip` on a table or a cell of an HTML label of DOT are
    issues, because the package `html` of okage keeps no link (10).
-5. The wrap of a kind with labels of more than one size in Mermaid uses
+4. The wrap of a kind with labels of more than one size in Mermaid uses
    11/14 for all of them (7): a sequence wraps its messages at 16 pixels
    and its actors and notes at 14, and a use case diagram draws its use
    cases at 12 and its actors at 14.
@@ -125,17 +120,14 @@ and places nodes in another way.
    lays out in the direction of the subgraph that holds it. Mermaid 12
    draws some of these in another direction. In a `flowchart LR`, a
    subgraph inside a subgraph with `direction TB` draws LR in Mermaid.
-3. `f-circ`, `junction`, `sm-circ` and `start` keep their label, and
-   `start` draws as a full circle. Mermaid draws them as small circles with
-   no text.
-4. The shape `subroutine` is too narrow for a short label, so the label
-   covers its two inner lines.
-5. A subgraph title with a break, such as `subgraph s ["t<br>u"]`, draws
-   its lines in one text, not on two lines.
-6. In a color theme of Mermaid, a use case diagram colors each system
+3. In a color theme of Mermaid, a use case diagram colors each system
    boundary in turn also with `colorScheme: role`. zuzu draws such a
    boundary as a plain panel. With `rotate`, zuzu turns through the 10
    categorical colors of its scheme, and Mermaid through 12 colors.
+4. `cross-circ` draws as a circle of 40. Mermaid 12.3 draws it as a circle
+   of 60.
+5. The dot in `fr-circ` is about 4 pixels wide. Mermaid 12.3 draws it 5
+   pixels wide.
 
 ### Fix what the corpus of mermaid-go-renderer found
 
@@ -144,36 +136,33 @@ holds 2811 files of Mermaid 12.2. mmdc draws 2807 of them. On 2026-11-12
 zuzu drew 2808 of them, and 2732 with no issue. Of the 3 that it does not
 draw, one is an example of the documents of Mermaid whose kind is `...`,
 one ends in a link with no node, which mmdc does not draw either, and one
-is item 9 below.
+is item 8 below.
 
-1. A style or a class on the id of a subgraph of a flowchart, such as
-   `style sub fill:#f00`, is dropped with no issue. zuzu makes a node of
-   the id and removes it. Mermaid styles the subgraph.
-2. A flowchart does not read properties after brackets, as
+1. A flowchart does not read properties after brackets, as
    `a["A"]@{ shape: cyl }`, and it reads `@{ ... }` over more lines with
    the commas of one line. The agentflow diagram reads both.
-3. Mermaid moves a node into the innermost subgraph that names it, at the
+2. Mermaid moves a node into the innermost subgraph that names it, at the
    `end` of that subgraph. zuzu keeps the node in the first subgraph that
    names it.
-4. In a layout LR with subgraphs inside subgraphs, the title of an outer
+3. In a layout LR with subgraphs inside subgraphs, the title of an outer
    subgraph covers the border of an inner one.
-5. A `classDef` of a treemap splits at `\,`. Mermaid reads it as a comma of
+4. A `classDef` of a treemap splits at `\,`. Mermaid reads it as a comma of
    a value, as in a flowchart.
-6. A state or a class diagram reports `flowchart.nodeSpacing`, which
+5. A state or a class diagram reports `flowchart.nodeSpacing`, which
    Mermaid reads there.
-7. In an ER diagram, a text where only a part is bold or italic, such as
+6. In an ER diagram, a text where only a part is bold or italic, such as
    `*first*Name`, draws plain. A line draws in one font.
-8. An outlined label of a sankey stays inside the chart, where Mermaid
+7. An outlined label of a sankey stays inside the chart, where Mermaid
    draws it past the left edge.
-9. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
-   reads `0` as a date of 2000 and the end as a time of the day of the
-   render. It needs the time of the render (see "Give a chart of Mermaid
-   the time of the render").
-10. A swimlane diagram does not do `optimizeRanksByCrossings` with
-    `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
-    lines. Some of its routes share a line, and the titles of its lanes do
-    not turn in a layout LR.
-11. The reader of every kind cuts a `%%` in the middle of a line, also
+8. A gantt with `dateFormat ss` and a start of `0` is an error. Mermaid
+   reads `0` as the `Date` of JavaScript reads it, as a date in 2000. zuzu
+   does not read a number alone as a date. With `WithNow`, the end then
+   takes the day of the render, as in Mermaid.
+9. A swimlane diagram does not do `optimizeRanksByCrossings` with
+   `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
+   lines. Some of its routes share a line, and the titles of its lanes do
+   not turn in a layout LR.
+10. The reader of every kind cuts a `%%` in the middle of a line, also
     inside single quotes and after a colon of ZenUML, as in `A->B: 50%%
     off`. In Mermaid each lexer cuts a comment by its own rule: a kind of
     jison cuts `%%` where a token can start, a timeline also cuts a single
@@ -182,12 +171,10 @@ is item 9 below.
     `flowchart LR %% c` is an error in mmdc, and `sequenceDiagram%% c`
     draws. Each reader handles its comments itself. The railroad kinds
     already do.
-12. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
+11. A run of spaces in a label draws as one space in the PNG. Mermaid keeps
     the spaces.
-13. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
+12. A ZenUML comment with markdown, such as `**bold**`, draws plain, and is
     an issue.
-14. The priority line of a kanban card takes the colors of Mermaid, red,
-    orange, blue and light blue, and not tokens of `docs/STYLE.md`.
 
 
 ### Draw the math of KaTeX as Mermaid does
@@ -206,8 +193,6 @@ differ from Mermaid 12.3:
    label with both is a little wider than its formula and its text.
 3. Mermaid sets a message of a sequence diagram with math closer to its
    line than a message of text. zuzu keeps the gap of its own look.
-4. `test/cmd/review` and `test/cmd/gallery` draw with no font of math, so
-   their labels with math draw the source.
 
 ### Draw more of Mermaid
 
@@ -224,6 +209,10 @@ differ from Mermaid 12.3:
 4. The title of a gantt with sections starts at the names of the tasks, to
    the right of the names of the sections, because a title takes the bounds
    of the axes.
+5. In a `flowchart LR` with two subgraphs that no edge links, the box of the
+   second subgraph covers the box of the first by 3 pixels.
+6. Outside the time axis, Mermaid draws the marker of today of a gantt in
+   the margin or past the edge of the image. zuzu draws no marker there.
 
 ### Draw more of DOT
 
@@ -241,15 +230,7 @@ The DOT files come from the gallery of Graphviz, in `testdata/zuzu` of iv.
 4. An edge to a cluster, with `lhead` or `ltail`, whose route is cut at the
    box of the cluster, puts its end labels back at the first place, with no
    check for overlap (`clipEdge` in `graph/nest.go`).
-5. The ends of a loop sit 2 or 3 pixels off the outline of an ellipse or a
-   circle, because they sit on its bounding box.
 
-
-### Give a chart of Mermaid the time of the render
-
-A gantt draws no marker of today, and a `dateFormat` with no date, such as
-`HH:mm`, puts its tasks on 1970-01-01, because the compile has no time of
-the render. A time that the caller gives fixes both.
 
 ### Fix the gaps of the Vega-Lite compiler that the charts found
 
@@ -345,24 +326,31 @@ out before any encode, in `layout/legend.go`. To apply such an encode, the
 layout of the legend reads the encode, or gives each entry a group of its
 own. No spec of the corpus encodes the place of a part of a legend.
 
-### Read the properties of an axis that the runtime drops
+### Read the other properties of an axis
 
-The runtime drops the properties `labelAlign`, `titleX`, `titleY`,
-`titleAlign` and `titleAngle` of an axis with no issue. `vega.Axis` reads
-`LabelAlign` and nothing uses it, and `guideProps` and `styleGuide` ignore
-the others. So the years of `calendar-view` still cover "Jan".
+The runtime drops the properties `labelPadding`, `labelOffset`,
+`labelBaseline`, `titleAnchor` and `titlePadding` of an axis with no
+issue. `vega.Axis` reads `LabelBase`, and nothing uses it. So the labels
+of `bar_axis_space_saving` take `labelAlign: "left"` but not
+`labelPadding: -5`, and they run into the plot.
 
-### Fix the bounds of a text and the place of an axis title
+### Compile the place of an axis title from Vega-Lite
 
-The bounds of a path add the origin of the item, `it.X` and `it.Y`, so a
-path drawn away from its origin makes an autosized view larger than the
-drawing (`itemBounds` in `layout/layout.go`). vega.js does not add the
-origin.
+The compiler of Vega-Lite reports the properties `titleX`, `titleY`,
+`titleAngle`, `titleAlign` and `titleBaseline` of the axis of a channel,
+and does not pass them to the Vega axis (`axisKeys` in
+`vegalite/unit.go`). The runtime reads them.
 
-The bounds of a text ignore its `lineHeight`, so a text of more lines with
-a `lineHeight` above its font size is cut at the bottom of a chart. The
-title of the axis at the bottom has a fixed place, so it covers labels
-that turn, such as with `labelAngle: 45`.
+### Draw a text of more lines as vega.js draws it
+
+The writers move the first line of a text of more lines up, by the line
+height for each line after the first, for the baselines `alphabetic` and
+`bottom`, and by half of that for `middle` (`multiline` in
+`internal/shape/text.go`). vega.js does not. It puts the first line on
+its baseline and the other lines below it, for each baseline. So the
+source note of `sankey-chart` sits 16 pixels higher than in vega.js. The
+bounds of a text follow the writers. The diagrams use texts of more lines,
+so a change to the writers must check them too.
 
 ### Fix the text of the direct renderer
 
@@ -370,12 +358,10 @@ A rotated text whose mark holds a glyph that the font lacks, such as ❤,
 also draws a mirrored copy of each text. `dx` and `dy` on a rotated text
 move it on the page, not along the text as in Vega.
 
-### Give the look a color of a critical task
+### Give the look a style of a text on a color
 
-A critical task of a gantt has an outline of `#e5484d`, which is not a
-token of `docs/STYLE.md`. A text on a leaf of a treemap takes the style
-`zuzu.edgeLabelBox` for the color of the background. A style of text on a
-color is cleaner.
+A text on a leaf of a treemap takes the style `zuzu.edgeLabelBox` for the
+color of the background. A style of text on a color is cleaner.
 
 ## Themes
 

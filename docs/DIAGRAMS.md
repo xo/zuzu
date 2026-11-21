@@ -212,7 +212,8 @@ The layout follows dot in these steps:
    lines up with the median of their places, and each edge counts by its
    weight. An edge of `weight=0` does not pull its ends, as in dot.
 4. A loop and its label take room at the side of their node, so that no
-   other node or label covers them.
+   other node or label covers them. The ends of a loop sit on the outline
+   of the node, such as an ellipse or a circle, not on the box around it.
 5. Edges between the same two nodes spread apart. Straight edges from one
    node to the next, in either direction, run side by side, 14 pixels
    apart, each with ends of its own on the borders of the nodes. The gap
@@ -642,8 +643,8 @@ The shapes of a node:
 `A@{ shape: name, label: "Text" }` names a shape. zuzu draws the names that
 the map `shapes` in `graph/shapes.go` lists, such as `rect`, `rounded`,
 `stadium`, `subproc`, `cyl`, `circle`, `dbl-circ`, `diam`, `hex`,
-`lean-r`, `lean-l`, `trap-b`, `trap-t`, `odd`, `tri`, `flip-tri`, `doc`,
-`f-circ` and `text`, with the aliases of Mermaid 12. zuzu also draws these
+`lean-r`, `lean-l`, `trap-b`, `trap-t`, `odd`, `tri`, `flip-tri`, `doc`
+and `text`, with the aliases of Mermaid 12. zuzu also draws these
 named shapes of Mermaid 12:
 
 | Name and aliases | What zuzu draws |
@@ -679,6 +680,8 @@ named shapes of Mermaid 12:
 | `bolt`, `com-link`, `lightning-bolt` | a lightning bolt of 35 by 70, with no text |
 | `cross-circ`, `summary`, `crossed-circle` | a circle of 40 with a cross in it, with no text |
 | `fr-circ`, `stop`, `framed-circle` | a ring of 14 with a dot in it, with no text |
+| `f-circ`, `filled-circle`, `junction` | a filled circle of 14, with no text |
+| `sm-circ`, `small-circle`, `start` | an open circle of 14, with no text (D38) |
 | `choice` | a diamond of 28 by 28, with no text |
 | `anchor` | a filled dot of 2, with no text |
 | `subprocess` | a subroutine |
@@ -687,8 +690,8 @@ named shapes of Mermaid 12:
 | `bpmn-annotation` | a square bracket on the left of the label |
 
 A shape with no text drops its label, as Mermaid does. An edge ends on the
-box of the node, except for `cross-circ`, `fr-circ`, `cloud` and `bang`,
-where it ends on the ellipse. A shape that zuzu does not draw yet draws as a
+box of the node, except for `cross-circ`, `fr-circ`, `f-circ`, `sm-circ`,
+`start`, `cloud` and `bang`, where it ends on the circle or the ellipse. A shape that zuzu does not draw yet draws as a
 rounded rectangle, and the report says so. These are `person`, and the
 shapes of BPMN that put their label under the shape: `bpmn-start`,
 `bpmn-intermediate`, `bpmn-boundary`, `bpmn-end`, `bpmn-gateway`,
@@ -724,7 +727,8 @@ markdown, and in a label with math of KaTeX when `htmlLabels` is true,
 because Mermaid draws such a label as math. A text in double quotes, such as a string of
 markdown, can run over more lines, and each new line in it starts a new
 line of the label. This holds for a node, a link and the title of a
-subgraph. The value of a property in `A@{ ... }` can be in double quotes or
+subgraph. Each line of the title of a subgraph draws on its own line, and
+the title takes the space of its lines. The value of a property in `A@{ ... }` can be in double quotes or
 in single quotes, and zuzu takes the quotes off. In single quotes, `''` is
 one quote, as in YAML. A long label wraps, as "Labels that wrap" says.
 
@@ -795,6 +799,13 @@ as in Mermaid, so `stroke-dasharray: 9\,5` draws dashes of 9 and gaps of 5.
 CSS ignores a part with no colon, such as `fill#969` or the `5` of
 `stroke-dasharray: 9,5`, and Mermaid draws nothing for it. zuzu skips it
 with no issue (D32).
+
+A style or a class on the id of a subgraph styles the subgraph, as in
+Mermaid 12.3. The box takes `fill`, `stroke`, `stroke-width` and
+`stroke-dasharray`. The title takes `color`, `font-size`, `font-weight` and
+`font-style`. A `style` wins over a `class`. The class `default` does not
+style a subgraph. A flow of an agentflow diagram takes no style, as in
+Mermaid.
 
 `class` gives a class to a node, a link or a subgraph that a line before
 it names. A `class` on an id that names none of them, such as `class Z hot`
