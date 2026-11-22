@@ -71,6 +71,7 @@ const EmojiFamily = "Noto Color Emoji"
 // concurrent use, and it decodes and parses its font once, on its first use.
 type Fallback struct {
 	family string
+	source []byte
 	sfnt   func() ([]byte, error)
 	parse  func() (*gotext.Font, error)
 }
@@ -86,7 +87,7 @@ func NewFallback(family string, data []byte) *Fallback {
 		}
 		return b, nil
 	})
-	return &Fallback{family: family, sfnt: sfnt, parse: sync.OnceValues(func() (*gotext.Font, error) {
+	return &Fallback{family: family, source: data, sfnt: sfnt, parse: sync.OnceValues(func() (*gotext.Font, error) {
 		b, err := sfnt()
 		if err != nil {
 			return nil, err
@@ -102,6 +103,13 @@ func NewFallback(family string, data []byte) *Fallback {
 // Family returns the family of the font.
 func (f *Fallback) Family() string {
 	return f.family
+}
+
+// Source returns the bytes of the font file that NewFallback took, in their
+// own format, such as WOFF2, so that the SVG writer can embed the font as it
+// came (D43). Do not change the bytes.
+func (f *Fallback) Source() []byte {
+	return f.source
 }
 
 // Data returns the bytes of the font as a TrueType or OpenType file, so
@@ -156,10 +164,11 @@ func Weight(s string) int {
 
 // Estimate measures text from the advance widths of the bundled font. It
 // does not shape or kern, so a measured width can differ from the width that
-// a renderer draws by a little. Each family measures as IBM Plex Sans. A
-// character that the bundled font does not have measures in the first
-// fallback that has it, and as nothing when no fallback has it. It is safe
-// for concurrent use, and it keeps the widths it measured.
+// a renderer draws by a little. Each family measures as IBM Plex Sans, or as
+// the main font of SetMain where it has the character. A character that
+// neither has measures in the first fallback that has it, and as nothing
+// when no fallback has it. It is safe for concurrent use, and it keeps the
+// widths it measured.
 type Estimate struct {
 	mu    sync.Mutex
 	cache map[key]float64
@@ -172,6 +181,10 @@ type Estimate struct {
 	// has a nil face.
 	fallbacks     []*Fallback
 	fallbackFaces []*gotext.Face
+	// main is the font of SetMain, or nil, and mainFace its face, which
+	// the first use makes.
+	main     *Fallback
+	mainFace *gotext.Face
 	// math is the font of math of SetMath, or nil.
 	math *MathFont
 }
@@ -196,6 +209,20 @@ func NewEstimate(fallbacks ...*Fallback) *Estimate {
 // KaTeX in a label of Mermaid (D36). A nil font draws no math.
 func (e *Estimate) SetMath(f *MathFont) {
 	e.math = f
+}
+
+// SetMain gives the Estimate a main font, which measures each character
+// that it has before the bundled font, in each family, weight and style.
+// The look like Excalidraw measures its text in Excalifont this way, with
+// IBM Plex Sans for the characters that Excalifont does not have (D40). A
+// nil font measures in the bundled font. Call it before the first
+// measure.
+func (e *Estimate) SetMain(f *Fallback) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.main = f
+	e.mainFace = nil
+	clear(e.cache)
 }
 
 // Math returns the font of math of SetMath, or nil.
@@ -223,7 +250,7 @@ func (e *Estimate) Width(f Font, s string) float64 {
 	if !e.load() {
 		return 0
 	}
-	w := measure(e.faces, e.fallbackFaces, f, s)
+	w := measure(e.faces, e.mainFace, e.fallbackFaces, f, s)
 	if len(e.cache) >= maxCache {
 		clear(e.cache)
 	}
@@ -244,7 +271,7 @@ func (e *Estimate) Missing(s string) []rune {
 	}
 	var out []rune
 	for _, r := range s {
-		if invisible(r) || has(e.faces[0].face, r) || fallbackOf(e.fallbackFaces, r) != nil {
+		if invisible(r) || has(e.mainFace, r) || has(e.faces[0].face, r) || fallbackOf(e.fallbackFaces, r) != nil {
 			continue
 		}
 		if !slices.Contains(out, r) {
@@ -276,7 +303,7 @@ func (e *Estimate) Split(s string) []string {
 		switch {
 		case r == 0x200d || unicode.Is(unicode.Variation_Selector, r) || (inFallback && invisible(r) && !unicode.IsSpace(r)):
 			fallback = inFallback
-		case has(base, r) && (!inFallback || !joined):
+		case (has(base, r) || has(e.mainFace, r)) && (!inFallback || !joined):
 			fallback = keycap(s[i:], base, e.fallbackFaces)
 		default:
 			fallback = true
@@ -290,9 +317,15 @@ func (e *Estimate) Split(s string) []string {
 	return append(out, s[start:])
 }
 
-// load makes the faces of the Estimate once. It reports false when the
-// bundled font does not parse.
+// load makes the faces of the Estimate once, and the face of the main
+// font after each SetMain. It reports false when the bundled font does not
+// parse.
 func (e *Estimate) load() bool {
+	if e.main != nil && e.mainFace == nil {
+		if ft, err := e.main.parse(); err == nil {
+			e.mainFace = gotext.NewFace(ft)
+		}
+	}
 	if e.faces != nil {
 		return true
 	}
@@ -411,9 +444,10 @@ func abs(n int) int {
 }
 
 // measure sums the advance widths of the glyphs of s, read with the font
-// parser of go-text, which okage uses too. A rune that the font does not
-// hold measures in the first fallback that holds it, and as nothing when
-// none does, because it draws nothing.
+// parser of go-text, which okage uses too. A rune that the main face holds
+// measures in it, at each weight. A rune that neither the main face nor
+// the font holds measures in the first fallback that holds it, and as
+// nothing when none does, because it draws nothing.
 //
 // A fallback draws a sequence of emoji as one glyph, which this sum does
 // not shape. So a rune that joins the glyph before it measures as nothing:
@@ -422,7 +456,7 @@ func abs(n int) int {
 // a digit, # or * takes the place of that character. A character of format
 // and a selector of a variation that the font does not hold measure as
 // nothing.
-func measure(fs []face, fallbacks []*gotext.Face, f Font, s string) float64 {
+func measure(fs []face, main *gotext.Face, fallbacks []*gotext.Face, f Font, s string) float64 {
 	if len(fs) == 0 || f.Size <= 0 || s == "" {
 		return 0
 	}
@@ -436,14 +470,19 @@ func measure(fs []face, fallbacks []*gotext.Face, f Font, s string) float64 {
 	// joiner follows it, and flag that it opens a flag.
 	emoji, joined, flag := false, false, false
 	var last rune
+	lastFace := ft
 	for _, r := range s {
 		if r == 0x200d {
 			joined = emoji
 			continue
 		}
-		if has(ft, r) && (!emoji || !joined) {
-			width += advance(ft, r)
-			emoji, joined, flag, last = false, false, false, r
+		base := ft
+		if has(main, r) {
+			base = main
+		}
+		if has(base, r) && (!emoji || !joined) {
+			width += advance(base, r)
+			emoji, joined, flag, last, lastFace = false, false, false, r, base
 			continue
 		}
 		fc := fallbackOf(fallbacks, r)
@@ -457,7 +496,7 @@ func measure(fs []face, fallbacks []*gotext.Face, f Font, s string) float64 {
 			joined, flag = false, false
 			continue
 		case r == 0x20e3 && (last >= '0' && last <= '9' || last == '#' || last == '*'):
-			width -= advance(ft, last)
+			width -= advance(lastFace, last)
 		}
 		width += advance(fc, r)
 		emoji, joined, flag, last = true, false, regional(r), r

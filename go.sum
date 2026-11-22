@@ -1,4 +1,4 @@
-github.com/xo/okage v0.19.0 h1:KX9iGNJ7htpTHXobLY64b/gmQgg8sl+TCMlTuZQeAr0=
-github.com/xo/okage v0.19.0/go.mod h1:pte/3aqjk2ElZwxYex0erXC3kT2tqxOwWuIHA8fhKOM=
+github.com/xo/okage v0.20.1 h1:KxGTgKamWRa3eTgpy9PmFDELGiK4sUb/a8f83i8HOJQ=
+github.com/xo/okage v0.20.1/go.mod h1:pte/3aqjk2ElZwxYex0erXC3kT2tqxOwWuIHA8fhKOM=
 golang.org/x/image v0.48.0 h1:1AvuPcuoOTJpA7s4VZ5umrb90T3So0rkB/bSGmxkxik=
 golang.org/x/image v0.48.0/go.mod h1:mmtg64iqJKGqEgy+r13dfybl85tmxUd2lMnmaiSdWYY=
