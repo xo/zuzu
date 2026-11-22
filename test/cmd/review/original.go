@@ -21,36 +21,93 @@ import (
 // drawTimeout is the time that dot or mmdc can take on one source.
 const drawTimeout = 2 * time.Minute
 
+// variant is a way to draw the original of a source: as the source asks,
+// or in a config of mmdc, such as the look drawn by hand or the layout
+// dagre of Mermaid.
+type variant string
+
+// The variants of an original.
+const (
+	// asSource draws the original as its source asks.
+	asSource variant = ""
+	// byHand draws the original of a diagram of Mermaid with the config
+	// look: handDrawn and handDrawnSeed: 1, so that the page can show it
+	// beside the looks of zuzu drawn by hand (D40).
+	byHand variant = "handdrawn"
+	// byDagre draws the original of a diagram of Mermaid with the config
+	// layout: dagre. The default layout of Mermaid 12.3 is ELK, so this is
+	// the original that zuzu.dagre follows (D44).
+	byDagre variant = "dagre"
+)
+
+// variantConfigs are the configs of mmdc for the variants of an original.
+var variantConfigs = map[variant]string{
+	byHand:  `{"look": "handDrawn", "handDrawnSeed": 1}` + "\n",
+	byDagre: `{"layout": "dagre"}` + "\n",
+}
+
+// job is an original to draw: a source in a variant.
+type job struct {
+	s *source
+	v variant
+}
+
 // drawOriginals draws the original of each source whose cached SVG is
-// older than the source, and fills in the original of every source. A
-// missing tool gives each of its sources an error, not a failed run.
+// older than the source, and fills in the original of every source, with
+// the original drawn by hand of each diagram of Mermaid when the flag
+// -handdrawn is on. A missing tool gives each of its sources an error, not
+// a failed run.
 func drawOriginals(ctx context.Context, cfg config, srcs []*source) {
-	var corpus, diagrams []*source
+	var all []job
 	for _, s := range srcs {
-		if !cfg.force && fresh(cfg, s) {
+		all = append(all, job{s, asSource})
+		if cfg.handDrawn && hasHandOriginal(s) {
+			all = append(all, job{s, byHand})
+		}
+		if cfg.layouts && s.front == frontMermaid {
+			all = append(all, job{s, byDagre})
+		}
+	}
+	var corpus []*source
+	var diagrams []job
+	for _, j := range all {
+		if !cfg.force && fresh(cfg, j.s, j.v) {
 			continue
 		}
 		// An old SVG must not stand for a source that fails now.
-		file := filepath.Join(cfg.out, originalFile(s))
+		file := filepath.Join(cfg.out, originalFile(j.s, j.v))
 		_ = os.Remove(file)
 		_ = os.Remove(file + ".err")
-		if s.spec != "" {
-			corpus = append(corpus, s)
+		if j.s.spec != "" {
+			corpus = append(corpus, j.s)
 		} else {
-			diagrams = append(diagrams, s)
+			diagrams = append(diagrams, j)
 		}
 	}
-	fmt.Fprintf(os.Stderr, "review: drawing %d originals, %d are cached\n", len(corpus)+len(diagrams), len(srcs)-len(corpus)-len(diagrams))
-	// failed holds the reason for a source that gets no SVG and no error
-	// from its original, such as a missing tool.
-	failed := map[*source]string{}
+	fmt.Fprintf(os.Stderr, "review: drawing %d originals, %d are cached\n", len(corpus)+len(diagrams), len(all)-len(corpus)-len(diagrams))
+	// failed holds the reason for an original that gets no SVG and no error,
+	// such as a missing tool.
+	failed := map[job]string{}
 	var mu sync.Mutex
+	configs := map[variant]string{}
+	for v, text := range variantConfigs {
+		file, err := writeConfig(cfg, v, text)
+		if err != nil {
+			for _, j := range diagrams {
+				if j.v == v {
+					failed[j] = err.Error()
+				}
+			}
+			continue
+		}
+		configs[v] = file
+	}
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		if msg := drawCorpus(ctx, cfg, corpus); msg != "" {
 			mu.Lock()
 			for _, s := range corpus {
-				failed[s] = msg
+				failed[job{s, asSource}] = msg
 			}
 			mu.Unlock()
 		}
@@ -64,46 +121,66 @@ func drawOriginals(ctx context.Context, cfg config, srcs []*source) {
 				tools[name] = name + " is not on PATH, so the original is missing"
 			}
 		}
-		for _, s := range diagrams {
+		for _, j := range diagrams {
 			tool := toolDOT
-			if s.front == frontMermaid {
+			if j.s.front == frontMermaid {
 				tool = toolMmdc
 			}
+			mu.Lock()
 			if msg := tools[tool]; msg != "" {
-				mu.Lock()
-				failed[s] = msg
-				mu.Unlock()
+				failed[j] = msg
+			}
+			_, skip := failed[j]
+			mu.Unlock()
+			if skip {
 				continue
 			}
 			sem <- struct{}{}
 			inner.Go(func() {
 				defer func() { <-sem }()
-				drawDiagram(ctx, cfg, s)
+				drawDiagram(ctx, cfg, j, configs[j.v])
 			})
 		}
 		inner.Wait()
 	})
 	wg.Wait()
-	for _, s := range srcs {
-		readOriginal(cfg, s, failed[s])
+	for _, j := range all {
+		readOriginal(cfg, j, failed[j])
 	}
 }
 
-// originalFile returns the SVG of the original, relative to the output
-// folder. The same name with .err holds the error of a source that the
-// original cannot draw.
-func originalFile(s *source) string {
-	return filepath.ToSlash(filepath.Join("original", s.front, s.slug+".svg"))
+// writeConfig writes the config of mmdc for the originals of a variant, and
+// returns its path.
+func writeConfig(cfg config, v variant, text string) (string, error) {
+	file, err := filepath.Abs(filepath.Join(cfg.out, "original", string(v)+".json"))
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return "", err
+	}
+	return file, os.WriteFile(file, []byte(text), 0o644)
 }
 
-// fresh reports whether the cached SVG or error of a source is newer than
-// the source.
-func fresh(cfg config, s *source) bool {
+// originalFile returns the SVG of the original in a variant, relative to the
+// output folder. The same name with .err holds the error of a source that
+// the original cannot draw.
+func originalFile(s *source, v variant) string {
+	name := s.slug
+	if v != asSource {
+		name += "." + string(v)
+	}
+	return filepath.ToSlash(filepath.Join("original", s.front, name+".svg"))
+}
+
+// fresh reports whether the cached SVG or error of the original of a source
+// in a variant is newer than the source.
+func fresh(cfg config, s *source, v variant) bool {
 	src, err := os.Stat(s.path)
 	if err != nil {
 		return false
 	}
-	file := filepath.Join(cfg.out, originalFile(s))
+	file := filepath.Join(cfg.out, originalFile(s, v))
 	for _, p := range []string{file, file + ".err"} {
 		if fi, err := os.Stat(p); err == nil && fi.ModTime().After(src.ModTime()) {
 			return true
@@ -112,24 +189,31 @@ func fresh(cfg config, s *source) bool {
 	return false
 }
 
-// readOriginal fills in the original of a source from the cache. The reason
-// is the error of a source that has nothing in the cache.
-func readOriginal(cfg config, s *source, reason string) {
-	file := filepath.Join(cfg.out, originalFile(s))
+// readOriginal fills in the original of a job from the cache. The reason is
+// the error of an original that has nothing in the cache.
+func readOriginal(cfg config, j job, reason string) {
+	svg, msg := &j.s.original, &j.s.originalErr
+	switch j.v {
+	case byHand:
+		svg, msg = &j.s.handOriginal, &j.s.handOriginalErr
+	case byDagre:
+		svg, msg = &j.s.dagreOriginal, &j.s.dagreOriginalErr
+	}
+	file := filepath.Join(cfg.out, originalFile(j.s, j.v))
 	if _, err := os.Stat(file); err == nil {
-		s.original = originalFile(s)
+		*svg = originalFile(j.s, j.v)
 		return
 	}
 	if b, err := os.ReadFile(file + ".err"); err == nil {
-		s.originalErr = strings.TrimSpace(string(b))
-		if s.originalErr == "" {
-			s.originalErr = "the original failed with no message"
+		*msg = strings.TrimSpace(string(b))
+		if *msg == "" {
+			*msg = "the original failed with no message"
 		}
 		return
 	}
-	s.originalErr = reason
+	*msg = reason
 	if reason == "" {
-		s.originalErr = "the original wrote no SVG"
+		*msg = "the original wrote no SVG"
 	}
 }
 
@@ -158,7 +242,7 @@ func drawCorpus(ctx context.Context, cfg config, srcs []*source) string {
 	var in bytes.Buffer
 	enc := json.NewEncoder(&in)
 	for _, s := range srcs {
-		out, err := filepath.Abs(filepath.Join(cfg.out, originalFile(s)))
+		out, err := filepath.Abs(filepath.Join(cfg.out, originalFile(s, asSource)))
 		if err != nil {
 			return err.Error()
 		}
@@ -189,11 +273,13 @@ func drawCorpus(ctx context.Context, cfg config, srcs []*source) string {
 }
 
 // drawDiagram draws the original of a diagram with dot or mmdc, and writes
-// its SVG or its error to the cache.
-func drawDiagram(ctx context.Context, cfg config, s *source) {
+// its SVG or its error to the cache. The original of a variant gives mmdc
+// the config in the file conf.
+func drawDiagram(ctx context.Context, cfg config, j job, conf string) {
 	ctx, cancel := context.WithTimeout(ctx, drawTimeout)
 	defer cancel()
-	file := filepath.Join(cfg.out, originalFile(s))
+	s := j.s
+	file := filepath.Join(cfg.out, originalFile(s, j.v))
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		fmt.Fprintln(os.Stderr, "review:", err)
 		return
@@ -205,8 +291,11 @@ func drawDiagram(ctx context.Context, cfg config, s *source) {
 		cmd = exec.CommandContext(ctx, toolDOT, "-Tsvg", "-o", tmp, s.path) //nolint:gosec // the command is fixed, and the file is a fixture of this repository.
 	} else {
 		args := []string{"-q", "-i", s.path, "-o", tmp}
-		if pc := os.Getenv("PUPPETEER_CONFIG"); pc != "" {
-			args = append(args, "-p", pc)
+		if j.v != asSource {
+			args = append(args, "-c", conf)
+		}
+		if cfg.puppeteer != "" {
+			args = append(args, "-p", cfg.puppeteer)
 		}
 		cmd = exec.CommandContext(ctx, toolMmdc, args...) //nolint:gosec // the command is fixed, and the file is a fixture of this repository.
 	}

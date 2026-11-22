@@ -28,7 +28,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `diagrams/` | the test that checks the fixtures against their references (D31) |
 | `testdata/icons/` | the digests of the bundled icons, and a small pack of turns and flips |
 | `icons/` | the test that checks the package `icon` against `@iconify/utils` (D31) |
-| `oracle/` | the oracles, which run vega.js, vega-lite.js, d3, mermaid.js and `@iconify/utils` in Node.js, the script that draws the references of the diagrams, and `svg.mjs`, which draws the SVG of vega.js for `cmd/review` |
+| `oracle/` | the oracles, which run vega.js, vega-lite.js, d3, mermaid.js and `@iconify/utils` in Node.js, the script that draws the references of the diagrams, `svg.mjs`, which draws the SVG of vega.js for `cmd/review`, and `mermaid-svg.mjs`, which draws diagrams of Mermaid in a chosen layout in Chrome (D44) |
 
 ## The corpus
 
@@ -126,7 +126,8 @@ go run ./cmd/gallery -out /tmp/gallery
 It draws each spec of the first target with zuzu, and writes the SVG files
 and a page, `index.html`, that shows them with the issues of each. Add
 `-dark` for the dark mode, `-only text` to draw some specs, and `-n` to draw
-at most that many.
+at most that many. Add `-look excalidraw` to draw each spec in the look like
+Excalidraw, with Excalifont (D40).
 
 `go run ./cmd/survey` draws each spec in `docs/survey/zuzu` in the light and
 the dark mode. It writes the zuzu images of `docs/survey/compare.html` to
@@ -148,9 +149,14 @@ and writes a page that shows the two side by side. The sources are these:
 
 The tool needs Node.js with `npm install` done in `oracle`, and `dot` and
 `mmdc` on the `PATH`. If one of them is missing, the tool draws the other
-sources, and each row without an original says why. If `mmdc` cannot find
-its Chrome, give it a configuration of puppeteer in `PUPPETEER_CONFIG`, as
-for the references of the diagrams.
+sources, and each row without an original says why. `mmdc` asks for one
+exact version of chrome-headless-shell, which an update of mermaid-cli can
+change. So the tool gives `mmdc` the newest chrome-headless-shell in the
+cache of puppeteer, `~/.cache/puppeteer` or `PUPPETEER_CACHE_DIR`, through
+a configuration of puppeteer that it writes in the folder of `-out`. A
+configuration in `PUPPETEER_CONFIG` wins over it, as for the references of
+the diagrams. If the cache holds no shell, install one:
+`npx puppeteer browsers install chrome-headless-shell`.
 
 Run this in this folder:
 
@@ -171,6 +177,9 @@ seconds. The flags are these:
 | `-front list` | draws only these front ends, a comma list of `vega`, `vegalite`, `deneb`, `dot` and `mermaid` |
 | `-force` | draws each original again |
 | `-j n` | draws this many sources at the same time, half of the processors by default |
+| `-look name` | draws each source of zuzu in this look, such as `excalidraw`, rather than in the look of the source. Without it, a Mermaid diagram with `look: handDrawn` draws in the look like Excalidraw, with Excalifont (D40) |
+| `-handdrawn=false` | leaves out the row drawn by hand. By default, each row also shows the source drawn by hand, below a dashed line: the original of a Mermaid diagram drawn by `mmdc` with `look: handDrawn` and `handDrawnSeed: 1`, and the source drawn by zuzu in each look drawn by hand, in the light and the dark mode (D40) |
+| `-layouts=false` | leaves out the row of layouts. By default, each diagram also shows its layouts, below a dashed line: the original, the original of a Mermaid diagram drawn by `mmdc` with `layout: dagre`, and zuzu with `zuzu.layered`, `zuzu.dagre` and `zuzu.elk`, each forced with `zuzu.WithLayout`. Each layout of a Mermaid diagram names its error of the places of the nodes against the original of its layout: `zuzu.dagre` against dagre, and the others against the default original, which is ELK in Mermaid 12.3 (D44, D45). The tool reads the places of an original with `cmd/mmdcref`, which does not add the offset of a cluster that dagre lays out on its own, so the error of `zuzu.dagre` is too high for such a diagram (`docs/BACKLOG.md`) |
 
 The page has a tab for each front end, with the count of the sources, of
 the errors on each side and of the sources with report lines. Each row
@@ -184,7 +193,68 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory ../docs/review
 
 Then open `http://127.0.0.1:8000/`.
 
-## Write the cases of the expressions and the formats
+## Draw the layouts of Mermaid
+
+`oracle/mermaid-svg.mjs` is the oracle of the layouts of D44. It draws
+diagrams of Mermaid with mermaid.js in headless Chrome, and writes the SVG
+of each. It draws as `mmdc` draws: on the same page, with the same style
+sheets of fonts, the same mermaid.js 12.3.0 and the same config. It draws
+many diagrams with one Chrome. On 2026-11-22, it drew the 95 fixtures in
+`testdata/diagrams/mermaid` in about 9 seconds. Each SVG had the same view
+box, the same places of the nodes and the same paths of the edges as the
+SVG of `mmdc`.
+
+mermaid.js 12.3.0 bundles the layouts of ELK, and its default layout is
+`elk`. Thus `mmdc` draws a flowchart, a state diagram, a class diagram, an
+entity relationship diagram, a requirement diagram and an agentflow diagram
+in ELK when the source sets no layout. The references of these diagrams in
+`testdata/diagrams` hold the places of ELK. `mmdc` draws in dagre only when
+the source or the config sets `layout: dagre`.
+
+The script sets `layout: elk` in its config. A source that sets its own
+layout, in its front matter or in a directive, keeps it. A job can merge
+more config over the config of the script, as the flag `-c` of `mmdc`
+does. The layouts are `dagre` and `elk`, and the variants of ELK
+`elk.stress`, `elk.force`, `elk.mrtree`, `elk.sporeOverlap`, `elk.box` and
+`elk.rectpacking`.
+
+The script needs Node.js and Chrome. Run `npm install` in `oracle` first.
+It installs mermaid.js, puppeteer-core, KaTeX and the fonts that `mmdc`
+loads, at the versions of mermaid-cli 12.2.0. puppeteer-core downloads no
+browser. The script starts the stable Chrome of the system. To start
+another Chrome, give a config of puppeteer in `PUPPETEER_CONFIG`, the same
+file that `mmdc` reads with `-p`.
+
+The script reads one job per line on its standard input, as JSON. A job
+names the source in `in` and the SVG to write in `out`, and can give more
+config in `config`. A path is relative to the current folder. Run this in
+this folder to draw a fixture in ELK and in dagre:
+
+```bash
+cat >/tmp/jobs <<'EOF'
+{"in": "testdata/diagrams/mermaid/10-subgraph.mmd", "out": "/tmp/layouts/10-subgraph.elk.svg"}
+{"in": "testdata/diagrams/mermaid/10-subgraph.mmd", "out": "/tmp/layouts/10-subgraph.dagre.svg", "config": {"layout": "dagre"}}
+EOF
+node oracle/mermaid-svg.mjs </tmp/jobs
+```
+
+If mermaid.js cannot draw a source, the script writes the message to the
+file of `out` with the extension `.err`, and no SVG. Add `-j n` to draw n
+sources at the same time. The default is half of the processors.
+
+The script differs from `mmdc` in three ways:
+
+1. It does not register ZenUML and the layout `tidy-tree`, which `mmdc`
+   registers. It cannot draw a ZenUML diagram, and it draws a mindmap with
+   `layout: tidy-tree` in `cose-bilkent`, the default layout of the
+   mindmap.
+2. It adds the fonts that an SVG uses to the SVG, as `mmdc` does, but
+   without the text of their licenses.
+3. mermaid.js 12.3.0 fails on a mindmap with `layout: elk`, and on some
+   diagrams with `layout: elk.mrtree`. The script then writes the error.
+   `mmdc` fails the same way with that config.
+
+## Write the cases of the expressions, the formats and the schemes
 
 The tests of the packages `expr` and `format` compare zuzu with vega.js and
 d3 on cases that two scripts write. Run these in this folder after
@@ -201,6 +271,14 @@ TZ=America/New_York node oracle/formats.mjs ../format/testdata
 The time zone is New York, so that the cases of local time cross a change
 of the clock. `oracle/exprs.mjs` reads the expressions from
 `expr/testdata/exprs.txt`.
+
+The tests of the named schemes in the package `zuzu` compare each scheme of
+vega.js, and some scales with a scheme, with zuzu (D46). Run this in this
+folder to write their cases in `testdata/schemes.json`:
+
+```bash
+node oracle/schemes.mjs ../testdata
+```
 
 ## Check the diagrams and the icons
 
@@ -222,6 +300,20 @@ them again:
 
 If `mmdc` cannot find its Chrome, give it a config of puppeteer, a file
 that holds `{"executablePath": "..."}`, in `PUPPETEER_CONFIG`.
+
+`TestPositionError` in `diagrams` measures how far the nodes of zuzu lie
+from the nodes of these references, for the flowcharts, the state
+diagrams, the class diagrams and the entity relationship diagrams (D40
+part 11, D44 part 4). It prints a column for `zuzu.layered`, `zuzu.dagre`
+and `zuzu.elk`, and never fails. The test module requires the module of
+ELK in `../elk` for it, and for the review page. Run it with `-v` to see
+the numbers. The references hold the places of ELK. To compare with dagre
+too, set `ZUZU_DAGRE_REFS` to a folder of references that `cmd/mmdcref`
+wrote from `mmdc` with the config `{"layout": "dagre"}`:
+
+```bash
+ZUZU_DAGRE_REFS=/tmp/dagre-refs go test -count=1 -run 'TestPositionError$' -v ./diagrams
+```
 
 The test in `icons` checks that the package `icon` reads each bundled icon
 with the same view box and the same body as `@iconify/utils`, and a small

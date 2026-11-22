@@ -1,4 +1,4 @@
-// Package diagrams checks the fixtures of DOT, and of the flowcharts, the
+// The tests of this file check the fixtures of DOT, and of the flowcharts, the
 // state diagrams, the class diagrams, the entity relationship diagrams, the
 // requirement diagrams and the agentflow diagrams of Mermaid, against the
 // references of dot and of mmdc (D31). zuzu lays out a graph its own way, so the check does not
@@ -8,6 +8,7 @@
 // worse than those of the reference, plus 10 percent and 1.
 //
 // Run oracle/diagrams.sh to write the references again.
+
 package diagrams
 
 import (

@@ -21,6 +21,7 @@ import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import * as vega from "vega";
 import * as vegaLite from "vega-lite";
+import "./projections.mjs";
 
 const corpus = resolve(process.argv[2] || "testdata/corpus");
 

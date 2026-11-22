@@ -25,6 +25,8 @@ import (
 
 	"github.com/xo/zuzu"
 	"github.com/xo/zuzu/test/conform"
+	"github.com/xo/zuzu/text"
+	"github.com/xo/zuzu/text/excalifont"
 	"github.com/xo/zuzu/text/math"
 	"github.com/xo/zuzu/theme"
 )
@@ -37,16 +39,18 @@ func main() {
 	limit := flag.Int("n", 0, "draw at most this many specs")
 	pngs := flag.Bool("png", false, "also render each SVG to PNG with okage")
 	vl := flag.Bool("vl", false, "compile each Vega-Lite spec with zuzu, rather than read the Vega spec that vega-lite.js compiled")
+	look := flag.String("look", "", "draw in this look, such as excalidraw")
 	flag.Parse()
 	ctx := context.Background() //nolint:forbidigo // main owns the context of the program.
-	if err := run(ctx, *dir, *out, *only, *dark, *limit, *pngs, *vl); err != nil {
+	if err := run(ctx, *dir, *out, *only, *dark, *limit, *pngs, *vl, theme.Look(*look)); err != nil {
 		fmt.Fprintln(os.Stderr, "gallery:", err)
 		os.Exit(1)
 	}
 }
 
-// run draws each spec and writes the page.
-func run(ctx context.Context, dir, out, only string, dark bool, limit int, pngs, vl bool) error {
+// run draws each spec, in a look or in the standard look when it is
+// empty, and writes the page.
+func run(ctx context.Context, dir, out, only string, dark bool, limit int, pngs, vl bool, look theme.Look) error {
 	paths, err := filepath.Glob(filepath.Join(dir, "references", "*", "*.ref.json"))
 	if err != nil {
 		return err
@@ -89,14 +93,22 @@ func run(ctx context.Context, dir, out, only string, dark bool, limit int, pngs,
 		name := strings.NewReplacer("/", "_", ".json", ".svg").Replace(ref.Spec)
 		var caption strings.Builder
 		caption.WriteString(html.EscapeString(ref.Spec))
-		chart, _, err := zuzu.Parse(src, zuzu.WithDialect(dialect), zuzu.WithMath(math.Font()))
+		popts := []zuzu.Option{zuzu.WithDialect(dialect), zuzu.WithMath(math.Font())}
+		ropts := []zuzu.RenderOption{
+			zuzu.WithLoader(zuzu.FSLoader(os.DirFS(filepath.Join(dir, "corpus")))),
+			zuzu.WithLocation(time.UTC), zuzu.WithMode(mode),
+			zuzu.WithRandom(func() rand.Source { return rand.NewPCG(1, 2) }),
+		}
+		if look != "" {
+			font := zuzu.WithLookFont(theme.LookExcalidraw, excalifont.Font())
+			popts = append(popts, zuzu.WithLook(look), font)
+			ropts = append(ropts, zuzu.WithLook(look), font)
+		}
+		chart, _, err := zuzu.Parse(src, popts...)
 		if err == nil {
 			var b bytes.Buffer
 			var report zuzu.Report
-			report, err = chart.SVG(ctx, &b,
-				zuzu.WithLoader(zuzu.FSLoader(os.DirFS(filepath.Join(dir, "corpus")))),
-				zuzu.WithLocation(time.UTC), zuzu.WithMode(mode),
-				zuzu.WithRandom(func() rand.Source { return rand.NewPCG(1, 2) }))
+			report, err = chart.SVG(ctx, &b, ropts...)
 			if err == nil {
 				err = os.WriteFile(filepath.Join(out, name), b.Bytes(), 0o644)
 			}
@@ -117,9 +129,11 @@ func run(ctx context.Context, dir, out, only string, dark bool, limit int, pngs,
 	return os.WriteFile(filepath.Join(out, "index.html"), []byte(page.String()), 0o644)
 }
 
-// writePNG renders SVG with okage and writes it as PNG.
+// writePNG renders SVG with okage, with Excalifont for the look like
+// Excalidraw, and writes it as PNG.
 func writePNG(path string, svg []byte) error {
-	img, err := okagesvg.New(okagesvg.WithBackground(color.White)).Render(svg)
+	img, err := okagesvg.New(okagesvg.WithBackground(color.White), okagesvg.WithLoadSystemFonts(false),
+		okagesvg.WithFontFS(text.Fonts()), okagesvg.WithFontFile(excalifont.Font().Data())).Render(svg)
 	if err != nil {
 		return err
 	}

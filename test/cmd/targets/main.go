@@ -42,6 +42,7 @@ import (
 
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/svg"
+	"github.com/xo/zuzu/text"
 )
 
 // tier0 are the targets of tier 0, whose scene graphs become golden tests.
@@ -81,7 +82,7 @@ func run(dir, testdata string) error {
 			return err
 		}
 	}
-	r := okagesvg.New(okagesvg.WithBackground(color.White))
+	r := okagesvg.New(okagesvg.WithBackground(color.White), okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()))
 	var results []result
 	for _, f := range files {
 		name := strings.TrimSuffix(filepath.Base(f), ".svg")

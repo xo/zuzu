@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/xo/zuzu"
+	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/graph/mermaid"
+	"github.com/xo/zuzu/theme"
 )
 
 // The names of the front ends, which the flag -front takes.
@@ -79,6 +81,60 @@ type source struct {
 	light, dark string
 	zuzuErr     []string
 	report      []string
+
+	// handOriginal is the SVG of the original drawn by hand, relative to the
+	// output folder, or empty with the reason in handOriginalErr. Only a
+	// diagram of Mermaid has one: mmdc with look: handDrawn.
+	handOriginal    string
+	handOriginalErr string
+	// hands are the drawings of zuzu in each look drawn by hand.
+	hands []handDrawing
+
+	// dagreOriginal is the SVG of the original of a diagram of Mermaid with
+	// layout: dagre, or empty with the reason in dagreOriginalErr. The
+	// default layout of Mermaid 12.3 is ELK, so the original of the page
+	// shows ELK (D44).
+	dagreOriginal    string
+	dagreOriginalErr string
+	// layouts are the drawings of zuzu in each layout.
+	layouts []layoutDrawing
+}
+
+// layoutDrawing is the drawing of zuzu in a layout: the SVG files of the
+// light and the dark mode, relative to the output folder, and the error of
+// the places of its nodes against the original of its layout, as text.
+type layoutDrawing struct {
+	name        string
+	light, dark string
+	errs        []string
+	position    string
+}
+
+// layoutNames are the layouts that the page shows beside each diagram, in
+// order: the layout of zuzu, dagre and ELK (D44, D45).
+var layoutNames = []string{graph.EngineLayered, graph.EngineDagre, graph.EngineELK}
+
+// hasLayouts reports whether a source is a diagram that lays out a graph.
+func hasLayouts(s *source) bool {
+	return s.front == frontMermaid || s.front == frontDOT
+}
+
+// handDrawing is the drawing of zuzu in a look drawn by hand: the SVG files
+// of the light and the dark mode, relative to the output folder.
+type handDrawing struct {
+	look        theme.Look
+	light, dark string
+}
+
+// handLooks are the looks drawn by hand that the page shows beside each
+// source (D40). A new look drawn by hand, such as the look like xkcd, goes
+// here.
+var handLooks = []theme.Look{theme.LookExcalidraw}
+
+// hasHandOriginal reports whether the original of a source has a look drawn
+// by hand.
+func hasHandOriginal(s *source) bool {
+	return s.front == frontMermaid
 }
 
 // collect returns the sources of the front ends that cfg selects.

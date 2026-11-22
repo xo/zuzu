@@ -1,10 +1,17 @@
 {
   "name": "zuzu-oracle",
   "private": true,
-  "description": "Runs vega.js and vega-lite.js over the corpus and writes the references of D17. See oracle.mjs.",
+  "description": "The oracles of the test module: vega.js, vega-lite.js, d3, @iconify/utils, and mermaid.js in Chrome. See test/README.md.",
   "type": "module",
   "dependencies": {
+    "@fontsource-variable/recursive": "5.3.0",
+    "@fontsource/open-sans": "5.3.0",
+    "@fortawesome/fontawesome-free": "7.3.1",
     "@iconify/utils": "3.1.7",
+    "d3-geo-projection": "4.0.0",
+    "katex": "0.18.10",
+    "mermaid": "12.3.0",
+    "puppeteer-core": "25.17.0",
     "vega": "6.4.0",
     "vega-lite": "6.5.0"
   }

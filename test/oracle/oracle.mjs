@@ -23,6 +23,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import * as vega from "vega";
 import * as vegaLite from "vega-lite";
+import "./projections.mjs";
 
 const root = resolve(process.argv[2] || "testdata");
 const corpus = join(root, "corpus");

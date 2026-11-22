@@ -32,6 +32,34 @@ type pageRow struct {
 	ZuzuErr, Report          []string
 	// Flagged is true for a row with an error or a report line.
 	Flagged bool
+
+	// HasHandOriginal is true for a source whose original has a look drawn
+	// by hand, with its SVG in HandOriginal or the reason in
+	// HandOriginalErr.
+	HasHandOriginal               bool
+	HandOriginal, HandOriginalErr string
+	// Hands are the drawings of zuzu in each look drawn by hand, and
+	// HandCols the number of frames in the row drawn by hand.
+	Hands    []pageHand
+	HandCols int
+
+	// Layouts are the drawings of zuzu in each layout. IsMermaid is true for
+	// a diagram of Mermaid, whose original with layout: dagre is in
+	// DagreOriginal or its reason in DagreOriginalErr.
+	Layouts                         []pageLayout
+	IsMermaid                       bool
+	DagreOriginal, DagreOriginalErr string
+}
+
+// pageLayout is a drawing of zuzu in a layout.
+type pageLayout struct {
+	Name, Light, Dark, Position string
+	Errs                        []string
+}
+
+// pageHand is a drawing of zuzu in a look drawn by hand.
+type pageHand struct {
+	Look, Light, Dark string
 }
 
 // writePage writes index.html.
@@ -54,13 +82,30 @@ func writePage(cfg config, srcs []*source) error {
 			if err != nil || strings.HasPrefix(path, "..") {
 				path = s.path
 			}
-			pf.Rows = append(pf.Rows, pageRow{
+			row := pageRow{
 				Name: s.name, Kind: s.kind, Path: filepath.ToSlash(path), Source: sourceFile(s),
 				Original: s.original, OriginalErr: s.originalErr,
 				Light: s.light, Dark: s.dark,
 				ZuzuErr: s.zuzuErr, Report: s.report,
 				Flagged: s.originalErr != "" || len(s.zuzuErr) > 0 || len(s.report) > 0,
-			})
+			}
+			if len(s.hands) > 0 {
+				row.HasHandOriginal = hasHandOriginal(s)
+				row.HandOriginal, row.HandOriginalErr = s.handOriginal, s.handOriginalErr
+				for _, h := range s.hands {
+					row.Hands = append(row.Hands, pageHand{Look: string(h.look), Light: h.light, Dark: h.dark})
+				}
+				// The first frame holds the original drawn by hand, or says that
+				// the original has none, so that each drawing of zuzu stays
+				// under the column of zuzu.
+				row.HandCols = len(row.Hands) + 1
+			}
+			for _, d := range s.layouts {
+				row.Layouts = append(row.Layouts, pageLayout{Name: d.name, Light: d.light, Dark: d.dark, Position: d.position, Errs: d.errs})
+			}
+			row.IsMermaid = s.front == frontMermaid
+			row.DagreOriginal, row.DagreOriginalErr = s.dagreOriginal, s.dagreOriginalErr
+			pf.Rows = append(pf.Rows, row)
 		}
 		data.Fronts = append(data.Fronts, pf)
 	}
@@ -100,6 +145,13 @@ main{padding:8px 16px 40px}
 .row h2 .kind{font-weight:normal;font-size:12px;border:1px solid var(--line);border-radius:10px;padding:0 8px;color:var(--muted)}
 .row h2 a{font-weight:normal;font-size:12px;color:var(--accent)}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hand{display:grid;gap:12px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.hand.cols-1{grid-template-columns:1fr}
+.hand.cols-2{grid-template-columns:1fr 1fr}
+.hand.cols-3{grid-template-columns:1fr 1fr 1fr}
+.hand.cols-4{grid-template-columns:1fr 1fr 1fr 1fr}
+.layouts{display:grid;gap:12px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.layouts .pos{font-size:12px;color:var(--muted);margin-top:4px}
 .side{min-width:0}
 .label{font-size:12px;color:var(--muted);margin-bottom:4px}
 .frame{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px;min-height:60px;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -112,12 +164,12 @@ body.dark .z-dark{display:flex}
 pre.err{color:var(--err);white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;margin:6px 0 0;max-height:200px;overflow:auto}
 ul.report{color:var(--warn);font-size:12px;margin:6px 0 0;padding-left:18px;max-height:200px;overflow:auto;overflow-wrap:anywhere}
 .hidden{display:none}
-@media (max-width:760px){.pair{grid-template-columns:1fr}}
+@media (max-width:760px){.pair,.hand[class]{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header>
-<h1>zuzu review</h1><span class="meta">Each source drawn by its original renderer, on the left, and by zuzu, on the right. Written {{.Generated}}.</span>
+<h1>zuzu review</h1><span class="meta">Each source drawn by its original renderer, on the left, and by zuzu, on the right. Below a dashed line, each source drawn by hand: by mmdc with look: handDrawn for Mermaid, and by zuzu in each look drawn by hand. Below another, each diagram in each layout: the original, and the original with layout: dagre for Mermaid, beside zuzu.layered, zuzu.dagre and zuzu.elk, each with its error of the places of the nodes against the original of its layout (0 is the same). Written {{.Generated}}.</span>
 <nav class="tabs" role="tablist">
 {{- range .Fronts}}
 <button role="tab" data-tab="{{.ID}}" aria-selected="false">{{.Title}} <span class="n">{{.Sources}}</span></button>
@@ -151,6 +203,51 @@ ul.report{color:var(--warn);font-size:12px;margin:6px 0 0;padding-left:18px;max-
 {{- if .Report}}<ul class="report">{{range .Report}}<li>{{.}}</li>{{end}}</ul>{{end}}
 </div>
 </div>
+{{- if .Hands}}
+<div class="hand cols-{{.HandCols}}">
+<div class="side original">
+{{- if .HasHandOriginal}}
+<div class="label">original, look: handDrawn</div>
+<div class="frame">{{if .HandOriginal}}<img src="{{.HandOriginal}}" loading="lazy" alt="{{.Name}}, original, drawn by hand">{{else}}<span class="none">no drawing</span>{{end}}</div>
+{{- if .HandOriginalErr}}<pre class="err">{{.HandOriginalErr}}</pre>{{end}}
+{{- else}}
+<div class="label">original, drawn by hand</div>
+<div class="frame"><span class="none">the original has no look drawn by hand</span></div>
+{{- end}}
+</div>
+{{- $name := .Name}}
+{{- range .Hands}}
+<div class="side zuzu">
+<div class="label">zuzu, look {{.Look}}</div>
+<div class="frame z-light">{{if .Light}}<img src="{{.Light}}" loading="lazy" alt="{{$name}}, zuzu, {{.Look}}, light">{{else}}<span class="none">no drawing</span>{{end}}</div>
+<div class="frame dark z-dark">{{if .Dark}}<img src="{{.Dark}}" loading="lazy" alt="{{$name}}, zuzu, {{.Look}}, dark">{{else}}<span class="none">no drawing</span>{{end}}</div>
+</div>
+{{- end}}
+</div>
+{{- end}}
+{{- if .Layouts}}
+<div class="layouts">
+<div class="side original">
+<div class="label">original{{if .IsMermaid}}, default layout: ELK{{end}}</div>
+<div class="frame">{{if .Original}}<img src="{{.Original}}" loading="lazy" alt="{{.Name}}, original">{{else}}<span class="none">no drawing</span>{{end}}</div>
+</div>
+<div class="side original">
+<div class="label">original, layout: dagre</div>
+<div class="frame">{{if .DagreOriginal}}<img src="{{.DagreOriginal}}" loading="lazy" alt="{{.Name}}, original, dagre">{{else if .IsMermaid}}<span class="none">no drawing</span>{{else}}<span class="none">the original has one layout</span>{{end}}</div>
+{{- if .DagreOriginalErr}}<pre class="err">{{.DagreOriginalErr}}</pre>{{end}}
+</div>
+{{- $name := .Name}}
+{{- range .Layouts}}
+<div class="side zuzu">
+<div class="label">zuzu, layout {{.Name}}</div>
+<div class="frame z-light">{{if .Light}}<img src="{{.Light}}" loading="lazy" alt="{{$name}}, zuzu, layout {{.Name}}, light">{{else}}<span class="none">no drawing</span>{{end}}</div>
+<div class="frame dark z-dark">{{if .Dark}}<img src="{{.Dark}}" loading="lazy" alt="{{$name}}, zuzu, layout {{.Name}}, dark">{{else}}<span class="none">no drawing</span>{{end}}</div>
+{{- if .Position}}<div class="pos">{{.Position}}</div>{{end}}
+{{- range .Errs}}<pre class="err">{{.}}</pre>{{end}}
+</div>
+{{- end}}
+</div>
+{{- end}}
 </article>
 {{- end}}
 </section>

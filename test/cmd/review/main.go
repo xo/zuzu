@@ -4,7 +4,14 @@
 // zuzu differs. The originals are vega.js, vega-lite.js, Graphviz dot and
 // mmdc of mermaid-cli. Run it in the test folder:
 //
-//	go run ./cmd/review [-out dir] [-only text] [-front list] [-force] [-j n]
+//	go run ./cmd/review [-out dir] [-only text] [-front list] [-force] [-j n] [-look name] [-handdrawn=false] [-layouts=false]
+//
+// With -handdrawn, on by default, each row also shows the source drawn by
+// hand: by mmdc with look: handDrawn for a diagram of Mermaid, and by zuzu
+// in each of its looks drawn by hand. With -layouts, on by default, each
+// diagram also shows its layouts: the original, and the original with
+// layout: dagre for Mermaid, beside zuzu.layered, zuzu.dagre and zuzu.elk,
+// each with its error of the places of the nodes (D44).
 //
 // It keeps the SVG of each original in the output folder, and draws an
 // original again only when its source is newer, or with -force.
@@ -31,6 +38,18 @@ type config struct {
 	fronts   []string
 	force    bool
 	jobs     int
+	// look is the look of the flag -look, or empty for the look of each
+	// source.
+	look string
+	// handDrawn draws each source in each look drawn by hand too, and the
+	// original of a diagram of Mermaid with look: handDrawn, side by side.
+	handDrawn bool
+	// layouts draws each diagram in each layout of zuzu too, and the
+	// original of a diagram of Mermaid with layout: dagre, side by side.
+	layouts bool
+	// puppeteer is the file of the config of puppeteer that mmdc reads, or
+	// empty for its own search.
+	puppeteer string
 }
 
 func main() {
@@ -43,6 +62,9 @@ func main() {
 	flag.IntVar(&cfg.jobs, "j", max(1, runtime.NumCPU()/2), "the number of sources to draw at the same time")
 	flag.StringVar(&cfg.testdata, "testdata", "testdata", "the testdata folder of the test module")
 	flag.StringVar(&cfg.root, "root", "..", "the root folder of the repository")
+	flag.StringVar(&cfg.look, "look", "", "draw each source of zuzu in this look, such as excalidraw, rather than in the look of the source")
+	flag.BoolVar(&cfg.handDrawn, "handdrawn", true, "draw each source in each look drawn by hand too, beside the original of Mermaid with look: handDrawn")
+	flag.BoolVar(&cfg.layouts, "layouts", true, "draw each diagram in each layout of zuzu too, beside the original of Mermaid with layout: dagre")
 	flag.Parse()
 	for f := range strings.SplitSeq(frontList, ",") {
 		f = strings.TrimSpace(f)
@@ -73,6 +95,12 @@ func run(ctx context.Context, cfg config) error {
 	if err := os.MkdirAll(cfg.out, 0o755); err != nil {
 		return err
 	}
+	if cfg.puppeteer, err = puppeteerConfig(cfg.out); err != nil {
+		return err
+	}
+	if cfg.puppeteer != "" {
+		fmt.Fprintf(os.Stderr, "review: mmdc reads the config of puppeteer %s\n", cfg.puppeteer)
+	}
 	fmt.Fprintf(os.Stderr, "review: %d sources\n", len(srcs))
 	done := make(chan struct{})
 	go func() {
@@ -81,6 +109,9 @@ func run(ctx context.Context, cfg config) error {
 	}()
 	drawOriginals(ctx, cfg, srcs)
 	<-done
+	if cfg.layouts {
+		measureLayouts(ctx, cfg, srcs)
+	}
 	if err := copySources(cfg, srcs); err != nil {
 		return err
 	}
