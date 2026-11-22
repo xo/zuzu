@@ -776,7 +776,9 @@ func (l *seqLayout) boxes(top, bottom float64) {
 			set = "boxesFilled"
 		}
 		l.add(set, row, x0, x1, bottom+l.cfg.boxMargin)
-		l.plainRow("boxLabels", "box", box.title.lines, f, x0+10, top-6-float64(len(box.title.lines)-1)*lh(f), "left", "bottom")
+		// The baseline bottom puts the last line at y and the lines before
+		// it above, as in Vega, so y is the bottom of the title.
+		l.plainRow("boxLabels", "box", box.title.lines, f, x0+10, top-6, "left", "bottom")
 	}
 }
 
@@ -1035,7 +1037,9 @@ func (l *seqLayout) note(k int, e seqEvent, y float64) float64 {
 	case "right":
 		tx = x0 + nw - l.cfg.noteMargin
 	}
-	l.textRow("noteLabels", "note", lines, f, tx, top+nh/2-float64(len(lines)-1)*lh(f)/2, l.cfg.noteAlign, "middle")
+	// The baseline middle centers the block of lines on y, as in Vega, so
+	// y is the middle of the note.
+	l.textRow("noteLabels", "note", lines, f, tx, top+nh/2, l.cfg.noteAlign, "middle")
 	return top + nh
 }
 
@@ -1080,7 +1084,7 @@ func (l *seqLayout) divider(e seqEvent, y float64) float64 {
 	if len(e.text.lines) > 0 {
 		w := tw + 2*l.cfg.noteMargin
 		l.add("notes", map[string]any{"kind": "divider", "x": mid - w/2, "x2": mid + w/2, "y": top, "y2": top + h}, mid-w/2, mid+w/2, top+h)
-		l.textRow("noteLabels", "divider", e.text.lines, f, mid, top+h/2-float64(len(e.text.lines)-1)*lh(f)/2, "center", "middle")
+		l.textRow("noteLabels", "divider", e.text.lines, f, mid, top+h/2, "center", "middle")
 	}
 	return top + h
 }

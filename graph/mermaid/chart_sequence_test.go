@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"html"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -517,5 +518,43 @@ func TestSequenceAccessibility(t *testing.T) {
 	}
 	if _, _, _, err := mermaid.Chart(d, false); !errors.Is(err, mermaid.ErrSyntax) {
 		t.Errorf("an accDescr with no end: the error %v", err)
+	}
+}
+
+// TestTextInItsBox checks that the lines of a note center on its box, and
+// that the title of a box of participants lies in the box. The baseline
+// middle centers the block of lines on the y of the text, and the baseline
+// bottom puts the last line at y, as in Vega, so a note or a title of
+// three lines does not draw its first line above its box.
+func TestTextInItsBox(t *testing.T) {
+	t.Parallel()
+	src := "sequenceDiagram\n  participant Bob\n  Note over Bob: one<br>two<br>three\n  Bob->>Bob: hi\n"
+	items := seqRender(t, src, theme.Light)
+	boxes := map[string]seqItem{}
+	for _, it := range seqOf(items, "notes") {
+		kind, _ := it.datum["kind"].(string)
+		boxes[kind] = it
+	}
+	labels := seqOf(items, "noteLabels")
+	if len(labels) != 1 || len(boxes) != 1 {
+		t.Fatalf("%d labels and %d boxes, want 1 and 1", len(labels), len(boxes))
+	}
+	for _, l := range labels {
+		kind, _ := l.datum["kind"].(string)
+		b := boxes[kind]
+		mid := (seqNum(b.datum, "y") + seqNum(b.datum, "y2")) / 2
+		if y := seqNum(l.datum, "y"); math.Abs(y-mid) > 0.01 {
+			t.Errorf("%s: the text centers at %g, want the middle of the box, %g", kind, y, mid)
+		}
+	}
+	src = "sequenceDiagram\n  box Aqua one<br>two<br>three\n    participant A\n  end\n  A->>A: hi\n"
+	items = seqRender(t, src, theme.Light)
+	box, title := seqOf(items, "boxesFilled"), seqOf(items, "boxLabels")
+	if len(box) != 1 || len(title) != 1 {
+		t.Fatalf("%d boxes and %d titles, want 1 and 1", len(box), len(title))
+	}
+	// The title is three lines of 14.3, at the size 11 of its font.
+	if top, y := seqNum(box[0].datum, "y"), seqNum(title[0].datum, "y"); y-3*14.3 < top {
+		t.Errorf("the title ends at %g, so its first line starts above the top of its box, %g", y, top)
 	}
 }
