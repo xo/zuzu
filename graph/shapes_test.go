@@ -216,6 +216,14 @@ func TestTextOffsetOfDecoratedShapes(t *testing.T) {
 		{"bucket", 0, bucketRadius(60)},
 		{"browser", 0, browserBar / 2},
 		{"folder", 0, folderTab(60) / 2},
+		// At a height of 60, the wave of a document has its middle 6
+		// above the bottom, so the label moves up 3, and off the strip
+		// of 6 of a lined document. The front sheet of a stack of
+		// documents is 5 left and 10 down, with its wave of 6.
+		{"doc", 0, -3},
+		{"tag-doc", 0, -3},
+		{"lin-doc", 3, -3},
+		{"docs", -5, 2},
 	} {
 		dx, dy := TextOffset(tt.kind, 120, 60)
 		if dx != tt.dx || dy != tt.dy {

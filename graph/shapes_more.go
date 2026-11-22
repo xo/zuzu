@@ -223,9 +223,24 @@ func TextOffset(kind string, w, h float64) (float64, float64) {
 		return 0, browserBar / 2
 	case "folder":
 		return 0, folderTab(h) / 2
+	case "doc", "tag-doc":
+		// The wave across the bottom has its middle a above the bottom,
+		// so the label centers on the sheet above it.
+		return 0, -docWave(h) / 2
+	case "lin-doc":
+		return 3, -docWave(h) / 2
+	case "docs":
+		// The label centers on the front sheet, as for st-rect, over its
+		// wave.
+		o := stackOffset
+		return -o, o - math.Min(6, (h-2*o)/5)/2
 	}
 	return 0, 0
 }
+
+// docWave returns the depth of the wave across the bottom of a document of
+// a height, from its middle to the bottom of the shape.
+func docWave(h float64) float64 { return math.Min(6, h/5) }
 
 // paneBand is the band across the top of a divided process and of internal
 // storage, and the strip at the side of internal storage. linCylGap is the
@@ -262,10 +277,10 @@ func morePath(kind string, w, h float64) (string, bool) {
 	var p pen
 	switch kind {
 	case "lin-doc":
-		d := wave{-x, -y, x, y, math.Min(6, h/5)}
+		d := wave{-x, -y, x, y, docWave(h)}
 		return d.path() + stroke([2]float64{-x + 6, -y}, [2]float64{-x + 6, d.at(-x + 6)}), true
 	case "tag-doc":
-		d := wave{-x, -y, x, y, math.Min(6, h/5)}
+		d := wave{-x, -y, x, y, docWave(h)}
 		t := math.Min(10, h/4)
 		return d.path() + stroke([2]float64{x, y - d.a - t}, [2]float64{x - 1.5*t, d.at(x - 1.5*t)}), true
 	case "docs":

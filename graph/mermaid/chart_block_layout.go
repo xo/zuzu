@@ -167,6 +167,30 @@ func (n *blockNode) clip(tx, ty float64) (float64, float64) {
 	return cx + dx*t, cy + dy*t
 }
 
+// arrowTextOffset returns the offset of the label of a block arrow of a
+// size from its middle, by its directions: the middle of the shaft of an
+// arrow to one side, which ends where the head starts. An arrow to both
+// sides of an axis, or on both axes, keeps its label in its middle.
+func arrowTextOffset(dirs map[string]bool, w, h float64) (float64, float64) {
+	x, y := w/2, h/2
+	l, r, u, d := dirs["left"], dirs["right"], dirs["up"], dirs["down"]
+	switch {
+	case (l || r) && !u && !d && l != r:
+		m := min(y, x/2) / 2
+		if r {
+			return -m, 0
+		}
+		return m, 0
+	case (u || d) && !l && !r && u != d:
+		m := min(y/2, x) / 2
+		if d {
+			return 0, -m
+		}
+		return 0, m
+	}
+	return 0, 0
+}
+
 // arrowPath returns the path of a block arrow of a size around 0, 0, by its
 // directions. An arrow to one side, or to both sides of one axis, has a
 // shaft as high as its label and a head as wide as the arrow. An arrow on
@@ -323,11 +347,16 @@ func (b *blockDiagram) spec() map[string]any {
 			continue
 		}
 		path := graph.ShapePath(n.shape, n.dw, n.dh)
+		dx, dy := graph.TextOffset(n.shape, n.dw, n.dh)
 		if n.shape == blockArrow {
 			path = arrowPath(n.dirs, n.dw, n.dh, b.pad)
+			dx, dy = arrowTextOffset(n.dirs, n.dw, n.dh)
 		}
 		r["shape"], r["x"], r["y"], r["width"], r["height"], r["path"] = n.shape, cx, cy, n.dw, n.dh, path
 		shapes = append(shapes, r)
+		// The label centers where a reader expects it: on the shaft of an
+		// arrow, and on the body of a shape with a band or a wave.
+		cx, cy = cx+dx, cy+dy
 		if n.maths != nil {
 			texts, paths := b.mathLabel(n, cx, cy, true)
 			labelRuns, labelMath = append(labelRuns, texts...), append(labelMath, paths...)

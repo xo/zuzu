@@ -188,7 +188,10 @@ its body, below its top. So does the label of each shape with a part that
 is not its body: below the band of a divided process, of internal storage
 and of a browser, and the tab of a folder, right of the strip of internal
 storage, on the front sheet of a stack of processes, below the top of a
-disk and of a bucket, and left of the end of a cylinder on its side.
+disk and of a bucket, and left of the end of a cylinder on its side. The
+label of a document, a lined document and a tagged document sits above the
+middle of the wave across its bottom, right of the strip of a lined
+document, and on the front sheet of a stack of documents.
 
 `polygon` reads its attributes as Graphviz documents them:
 
@@ -2565,7 +2568,10 @@ zuzu places the blocks as Mermaid 12.3.0 does:
 7. A circle, a double circle, a diamond, a stadium and a block arrow keep
    their own size in the middle of their cells. A block arrow that spans
    more than one column takes the width of its cells. The other shapes
-   fill their cells.
+   fill their cells. The label of a block arrow to one side sits in the
+   middle of its shaft, which ends where its head starts. The label of a
+   shape with a part that is not its body sits on its body, as in a
+   flowchart.
 8. An edge is a straight line from the middle of one block toward the
    middle of the other, from the edge of one shape to the edge of the
    other. Its label sits on its middle.

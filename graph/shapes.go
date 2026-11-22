@@ -287,7 +287,7 @@ func shapePath(kind string, w, h float64) string {
 		return poly([2]float64{-x, -y}, [2]float64{x - f, -y}, [2]float64{x, -y + f}, [2]float64{x, y}, [2]float64{-x, y}) +
 			"M" + num(x-f) + "," + num(-y) + "V" + num(-y+f) + "H" + num(x)
 	case "doc":
-		a := math.Min(6, h/5)
+		a := docWave(h)
 		return "M" + num(-x) + "," + num(-y) + "H" + num(x) + "V" + num(y-a) +
 			"C" + num(x/2) + "," + num(y+a) + " " + num(-x/2) + "," + num(y-3*a) + " " + num(-x) + "," + num(y-a) + "Z"
 	case "folder":
