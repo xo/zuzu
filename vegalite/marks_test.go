@@ -215,6 +215,87 @@ func TestCompilePositions(t *testing.T) {
 			},
 		},
 		{
+			// A color with conditions alone falls back to the color of a
+			// mark of the theme, through a scale of one value, so a bar
+			// whose condition does not hold keeps its color, as in
+			// bar_grouped_thin.vl.json.
+			"conditions alone", `{
+				"data": {"values": [{"a": "A", "b": 28}]},
+				"mark": "bar",
+				"encoding": {
+					"x": {"field": "a", "type": "nominal"},
+					"y": {"field": "b", "type": "quantitative"},
+					"color": {"condition": {"test": "datum.b < 0", "value": "#aaa"}}
+				}
+			}`, "marks",
+			map[string]string{
+				"fill": `[{"test":"datum.b < 0","value":"#aaa"},{"scale":"zuzu_mark_color","value":"zuzu_mark_color"}]`,
+			},
+		},
+		{
+			// The color of the mark, then of the config of the mark, wins
+			// over the color of the theme as the fallback.
+			"conditions alone with the color of the mark", `{
+				"data": {"values": [{"a": "A", "b": 28}]},
+				"mark": {"type": "bar", "color": "red"},
+				"encoding": {
+					"x": {"field": "a", "type": "nominal"},
+					"y": {"field": "b", "type": "quantitative"},
+					"color": {"condition": {"test": "datum.b < 0", "value": "#aaa"}}
+				}
+			}`, "marks",
+			map[string]string{
+				"fill": `[{"test":"datum.b < 0","value":"#aaa"},{"value":"red"}]`,
+			},
+		},
+		{
+			"conditions alone with the color of the config", `{
+				"data": {"values": [{"a": "A", "b": 28}]},
+				"mark": "bar",
+				"encoding": {
+					"x": {"field": "a", "type": "nominal"},
+					"y": {"field": "b", "type": "quantitative"},
+					"color": {"condition": {"test": "datum.b < 0", "value": "#aaa"}}
+				},
+				"config": {"bar": {"color": "green"}}
+			}`, "marks",
+			map[string]string{
+				"fill": `[{"test":"datum.b < 0","value":"#aaa"},{"value":"green"}]`,
+			},
+		},
+		{
+			// A view that keeps invalid values puts an invalid value at
+			// zero of its scale, as vega-lite.js writes it, so a bar of a
+			// mean of no values has no height.
+			"invalid values kept", `{
+				"data": {"values": [{"a": "A", "b": 28}]},
+				"mark": "bar",
+				"encoding": {
+					"x": {"field": "a", "type": "nominal"},
+					"y": {"field": "b", "type": "quantitative", "stack": null}
+				},
+				"config": {"mark": {"invalid": null}}
+			}`, "marks",
+			map[string]string{
+				"y": `[{"test":"!isValid(datum[\"b\"]) || !isFinite(+datum[\"b\"])","scale":"y","value":0},{"scale":"y","field":"b"}]`,
+			},
+		},
+		{
+			// When the domain can leave out zero, an invalid value goes
+			// to the bottom of the view.
+			"invalid values kept with no zero", `{
+				"data": {"values": [{"a": "A", "b": 28}]},
+				"mark": {"type": "point", "invalid": null},
+				"encoding": {
+					"x": {"field": "a", "type": "nominal"},
+					"y": {"field": "b", "type": "quantitative", "scale": {"zero": false}}
+				}
+			}`, "marks",
+			map[string]string{
+				"y": `[{"test":"!isValid(datum[\"b\"]) || !isFinite(+datum[\"b\"])","field":{"group":"height"}},{"scale":"y","field":"b"}]`,
+			},
+		},
+		{
 			// A rule from one band to another runs between their middles,
 			// and the offsets of the mark move its ends.
 			"rule between bands with offsets", `{

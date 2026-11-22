@@ -259,6 +259,14 @@ func (u *unit) color(e enc) {
 		}
 	}
 	if c := u.channelRef("color"); c != nil {
+		if d := u.ch["color"]; d != nil && !d.hasValue && !d.hasDatum && !d.isField() {
+			// A color with conditions alone falls back to the color of the
+			// mark, as vega-lite.js writes it. Otherwise a mark whose
+			// conditions do not hold has no color, because the encode
+			// sets the property and the style of the config does not
+			// apply.
+			c = u.withFallback(c, ref)
+		}
 		ref = c
 	}
 	switch {
@@ -284,6 +292,43 @@ func (u *unit) color(e enc) {
 			e.set(name, map[string]any{"value": v})
 		}
 	}
+}
+
+// keepsInvalid reports whether the view keeps the invalid values of its
+// data, with "invalid": null on the mark or the config of the marks.
+func (u *unit) keepsInvalid() bool {
+	if v, ok := u.props["invalid"]; ok {
+		return v == nil
+	}
+	return u.c.cfg != nil && u.c.cfg.keepInvalid
+}
+
+// invalidAtZero returns the reference of a position of a field on a
+// continuous scale, ref, with a rule before it that puts an invalid value
+// of the field at zero, as vega-lite.js writes it when the view keeps
+// invalid values: at zero of the scale when its domain holds zero, or else
+// at the bottom for y and at the left for x. A line, an area and a trail
+// break at an invalid value instead, and a view that filters out invalid
+// values needs no rule.
+func (u *unit) invalidAtZero(ch, field string, hasScale bool, ref map[string]any) map[string]any {
+	switch u.mark {
+	case "line", "area", "trail":
+		return ref
+	}
+	if !hasScale || !u.keepsInvalid() || ref["field"] == nil {
+		return ref
+	}
+	f := fieldRef(field)
+	rule := map[string]any{"test": "!isValid(" + f + ") || !isFinite(+" + f + ")"}
+	switch {
+	case u.zeroInDomain(ch):
+		rule["scale"], rule["value"] = u.v.sn(ch), 0
+	case ch == "y":
+		rule["field"] = map[string]any{"group": "height"}
+	default:
+		rule["value"] = 0
+	}
+	return map[string]any{rulesKey: []any{rule, ref}}
 }
 
 // zeroInDomain reports whether the domain of the scale of a channel
@@ -390,6 +435,28 @@ func (u *unit) channelRef(name string) map[string]any {
 		return base
 	}
 	return u.conditional(d, base)
+}
+
+// withFallback adds to the rules of a channel with conditions alone the
+// color of the mark as the last rule: own, the color that the mark gives,
+// or else the color of the config of the mark, or else the color of a mark
+// of the theme.
+func (u *unit) withFallback(rules, own map[string]any) map[string]any {
+	list, _ := rules[rulesKey].([]any)
+	fallback := own
+	if fallback == nil && u.c.cfg != nil {
+		for _, m := range []map[string]any{u.c.cfg.marks[u.mark], u.c.cfg.mark} {
+			if c, ok := m["color"].(string); ok {
+				fallback = map[string]any{"value": c}
+				break
+			}
+		}
+	}
+	if fallback == nil {
+		u.c.markColor = true
+		fallback = map[string]any{"scale": MarkColorScale, "value": MarkColorScale}
+	}
+	return map[string]any{rulesKey: append(slices.Clone(list), fallback)}
 }
 
 // conditional returns a list of rules for a channel with conditions: each
@@ -801,7 +868,7 @@ func (u *unit) axis(e enc, ch, size string) error {
 			e.set(p2, r2)
 		}
 	case u.mark == "tick" && u.measure() == ch:
-		e.set(pc, ref(d.out))
+		e.set(pc, u.invalidAtZero(ch, d.out, hasScale, ref(d.out)))
 		e.set(size, map[string]any{"value": u.tickThickness()})
 		return nil
 	case (u.mark == "bar" || u.mark == "tick") && ch == u.dimension() && d2 == nil:
@@ -820,10 +887,14 @@ func (u *unit) axis(e enc, ch, size string) error {
 		if sz == nil {
 			sz = u.continuousBandSize()
 		}
-		e.set(pc, ref(d.out))
+		e.set(pc, u.invalidAtZero(ch, d.out, hasScale, ref(d.out)))
 		e.set(size, propRef(sz))
 	default:
-		e.set(p, ref(d.out))
+		if discrete {
+			e.set(p, ref(d.out))
+		} else {
+			e.set(p, u.invalidAtZero(ch, d.out, hasScale, ref(d.out)))
+		}
 		if discrete && u.v.scaleType(ch) == "point" && u.ch[ch+"Offset"] == nil {
 			// A later layer, such as the box of a boxplot, can turn the
 			// scale into bands. The mark then goes in the middle of its
@@ -842,7 +913,11 @@ func (u *unit) axis(e enc, ch, size string) error {
 			e.set(p, u.spanRef(ch, d.out, o1))
 			e.set(p2, u.spanRef(ch, d2.out, o2))
 		case d2 != nil && d2.isField():
-			e.set(p2, ref(d2.out))
+			if discrete {
+				e.set(p2, ref(d2.out))
+			} else {
+				e.set(p2, u.invalidAtZero(ch, d2.out, hasScale, ref(d2.out)))
+			}
 		case d2 != nil && d2.hasValue:
 			e.set(p2, propRef(d2.value))
 		case u.mark == "area" && u.measure() == ch && hasScale && !u.zeroInDomain(ch):

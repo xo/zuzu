@@ -575,13 +575,17 @@ func compareStructure(res *Result, src []byte, want jsontext.Value) bool {
 }
 
 // structure returns the datasets, the scales and the marks of a Vega spec,
-// by name and type.
+// by name and type. It leaves out the scale of the color of a mark of the
+// theme, which stands in for a color that vega-lite.js writes as a value.
 func structure(spec map[string]any) map[string]any {
 	names := func(key string, fields ...string) []any {
 		list, _ := spec[key].([]any)
 		var out []any
 		for _, e := range list {
 			m, _ := e.(map[string]any)
+			if key == "scales" && m["name"] == vegalite.MarkColorScale {
+				continue
+			}
 			var parts []string
 			for _, f := range fields {
 				parts = append(parts, fmt.Sprint(m[f]))

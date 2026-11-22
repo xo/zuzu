@@ -16,6 +16,7 @@ import (
 
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -697,6 +698,27 @@ func TestSizeOfAChart(t *testing.T) {
 		}
 		if b := img.Bounds(); b.Dx() < c.w-1 || b.Dx() > c.w+1 || b.Dy() < c.h-1 || b.Dy() > c.h+1 {
 			t.Errorf("%s: the image is %dx%d, want %dx%d", c.name, b.Dx(), b.Dy(), c.w, c.h)
+		}
+	}
+}
+
+// TestConditionsAloneKeepTheMarkColor checks that a bar whose color has
+// conditions alone draws in the color of a mark of the theme when its
+// condition does not hold, in each mode, as bar_grouped_thin.vl.json does.
+func TestConditionsAloneKeepTheMarkColor(t *testing.T) {
+	t.Parallel()
+	src := `{"$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+		"data": {"values": [{"a": "A", "b": 2}, {"a": "B", "b": -1}]}, "mark": "bar",
+		"encoding": {"x": {"field": "a", "type": "nominal"}, "y": {"field": "b", "type": "quantitative"},
+		"color": {"condition": {"test": "datum.b < 0", "value": "#aaa"}}}}`
+	for _, mode := range []theme.Mode{theme.Light, theme.Dark} {
+		s, report, err := svgOf(t, src, false, WithMode(mode))
+		if err != nil {
+			t.Fatalf("%v (%v)", err, report)
+		}
+		want := theme.New(mode, theme.Zuzu).Category[0]
+		if !strings.Contains(s, `fill="`+want+`"`) || !strings.Contains(s, `fill="#aaa"`) {
+			t.Errorf("mode %v: expected a bar in %s and one in #aaa", mode, want)
 		}
 	}
 }

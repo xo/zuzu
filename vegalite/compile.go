@@ -43,8 +43,24 @@ func Compile(s *Spec, opts ...CompileOption) (*vega.Spec, vega.Report, error) {
 	if err != nil {
 		return nil, c.report, err
 	}
+	if c.markColor {
+		// The scale gives the color of a mark of the theme, the first
+		// categorical color, which the render fills from its theme, so
+		// that a color with conditions alone falls back to it.
+		out.Scales = append(out.Scales, vega.Scale{
+			Name: MarkColorScale, Type: "ordinal",
+			Domain: vega.ScaleDomain{Values: []vega.Value{vega.Lit(MarkColorScale)}},
+			Range:  vega.ScaleRange{Name: "category"},
+		})
+	}
 	return out, c.report, nil
 }
+
+// MarkColorScale is the name of the scale of one value that gives the
+// color of a mark of the theme. vega-lite.js writes the color itself in
+// its place, because it knows the config, where the compile of zuzu does
+// not know the theme of the render.
+const MarkColorScale = "zuzu_mark_color"
 
 // compiler holds the state of one compile.
 type compiler struct {
@@ -94,6 +110,9 @@ type compiler struct {
 	// innerFacet says that the facet being compiled is the cells of
 	// another facet, whose scales take no prefix.
 	innerFacet bool
+	// markColor says that a mark falls back to the color of a mark of the
+	// theme, through the scale MarkColorScale.
+	markColor bool
 }
 
 // reservation is a number of a dataset that a layer over a dataset takes.
