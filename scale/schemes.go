@@ -47,7 +47,9 @@ func (s Scheme) At(t float64) string {
 	case n == 0:
 		return s.Colors[0]
 	}
-	t *= float64(n)
+	// The conversion keeps the product from fusing with the subtraction
+	// below, as in color.Mix.
+	t = float64(t * float64(n))
 	i := max(0, min(n-1, int(math.Floor(t))))
 	a, _ := color.Parse(s.Colors[i])
 	b, _ := color.Parse(s.Colors[i+1])

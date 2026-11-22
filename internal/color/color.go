@@ -324,7 +324,10 @@ func (c RGBA) Luminance() float64 {
 // space: rgb, the default, lab, hcl or hsl. A space that ends in -long
 // takes the long way round the hue.
 func Mix(a, b RGBA, f float64, space string) RGBA {
-	mix := func(x, y float64) float64 { return x + f*(y-x) }
+	// The conversion rounds the product, so that no architecture fuses
+	// the multiply and the add, which gives other bits on arm64 than on
+	// amd64 and d3, and a channel at .5 then rounds the other way.
+	mix := func(x, y float64) float64 { return x + float64(f*(y-x)) }
 	switch strings.TrimSuffix(space, "-long") {
 	case "lab":
 		la, lb := a.Lab(), b.Lab()
