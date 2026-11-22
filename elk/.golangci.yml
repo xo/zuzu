@@ -1,0 +1,139 @@
+# Lint configuration for the module github.com/xo/zuzu/elk. It is the
+# configuration of the root module, with the same rules and the same
+# reasons, so that the code of zuzu in this module answers to the same
+# linters. Only the exclusions differ: this module holds the copy of elk-go.
+#
+# Keep this file in step with the .golangci.yml of the root module.
+
+version: "2"
+
+run:
+  modules-download-mode: readonly
+
+linters:
+  default: all
+  disable:
+    # A sentinel error is a constant of the type Error here (D24), which
+    # err113 does not know how to check.
+    - err113
+    # wrapcheck wants every error from another package wrapped again, which
+    # adds nothing where the caller already wraps it with context.
+    - wrapcheck
+    # A compiled regular expression or a fixed table at the package level is
+    # data, not configuration. The rule that configuration belongs to the
+    # caller (AGENTS.md, hard rule 9) is held by review.
+    - gochecknoglobals
+    # Style opinions that argue with gofmt or with plain code.
+    - nlreturn
+    - varnamelen
+    - exhaustruct
+    - exhaustruct_v5
+    - mnd
+    - nilnil
+    - ireturn
+    - nonamedreturns
+    - wsl
+    - wsl_v5
+    - lll
+    # prealloc rewrites readable loops for a gain nothing has measured.
+    - prealloc
+    # Complexity metrics. A function that walks a large spec is long by
+    # nature, and these count it as complex.
+    - cyclop
+    - funlen
+    - gocognit
+    - gocyclo
+    - maintidx
+    - nestif
+    # The tests of the documents are in package zuzu_test, and a test of an
+    # unexported part is in the package it tests. Both are deliberate.
+    - testpackage
+    # noinlineerr bans `if err := f(); err != nil`, which is the form the Go
+    # standard library uses.
+    - noinlineerr
+    # exhaustive wants an empty case for each value that a switch answers
+    # after the switch, which says less than the code already does.
+    - exhaustive
+    # A type that decodes itself takes a pointer, and the same type encodes
+    # itself as a value, as encoding/json/v2 expects. recvcheck reports the
+    # mix, which is the pattern and not a defect.
+    - recvcheck
+    # depguard and gomodguard hold a list of allowed imports, and D5 allows
+    # any import.
+    - depguard
+    - gomodguard
+    - gomodguard_v2
+    # This module replaces the root module with the checkout it sits in, as
+    # the test module does, so that it builds against the zuzu beside it.
+    - gomoddirectives
+    # The documents of this repository use American spelling, which misspell
+    # holds, and dupword reads a test fixture of prose as a typo.
+    - dupword
+  settings:
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^context\.(Background|TODO)$
+          msg: take the context from the caller, never make one here
+    # A file that was only read returns an error from Close that nothing can
+    # act on.
+    # An operator of the expression language, such as ===, reads best as
+    # itself in the tables and the switches of the lexer and the evaluator.
+    goconst:
+      ignore-string-values:
+        - '^[-+*/%<>=!&|^~?:]+$'
+        # A name of the grammar of Vega, such as left, linear or utc, reads
+        # best as itself, as the spec writes it.
+        - '^[a-z][a-zA-Z0-9-]*$'
+        # A value of a layout option of ELK, such as BRANDES_KOEPF, reads
+        # best as itself, as Mermaid and ELK write it.
+        - '^[A-Z][A-Z_]*$'
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close
+        - (io.ReadCloser).Close
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    revive:
+      rules:
+        - name: context-as-argument
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: exported
+        - name: indent-error-flow
+        - name: package-comments
+        - name: receiver-naming
+        - name: var-naming
+  exclusions:
+    # A copy of another project keeps the code and the comments of its
+    # upstream, which follow the rules of that project and not these. The
+    # folder of this module in the column path of docs/upstream/upstreams.tsv
+    # is here (D39, D40, docs/UPSTREAM.md).
+    paths:
+      - internal/elkgo/
+    rules:
+      # A test builds its own values and does not answer to the context rule.
+      - path: _test\.go
+        linters:
+          - dupl
+          - forbidigo
+          - gosec
+          # a test names the same file or value in several messages, where a
+          # constant hides what the message says
+          - goconst
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  # The same copy as above. gofmt -l still checks it, as CI runs it.
+  exclusions:
+    paths:
+      - internal/elkgo/
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/xo/zuzu

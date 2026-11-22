@@ -1,0 +1,29 @@
+// Copied from github.com/d2lang/elk-go, file internal/spore/doc.go, at commit
+// 4e0a9977ed8b (D39, docs/UPSTREAM.md). The SPDX line below names its license,
+// and elk/internal/elkgo holds the license texts and the notices. Its
+// import paths name the copy (change 2).
+
+// Copyright (c) 2017 Kiel University and others.
+// Copyright (c) 2026 The elk-go Authors.
+//
+// This program and the accompanying materials are made available under the
+// terms of the Eclipse Public License 2.0 which is available at
+// https://www.eclipse.org/legal/epl-2.0.
+//
+// SPDX-License-Identifier: EPL-2.0
+
+// Package spore is a native Go port of the SPOrE overlap-removal and
+// compaction providers targeting ELK.js 0.12.0 behavior.
+//
+// The implementation is translated from these EPL-2.0 sources at ELK commit
+// 5dc0f65c78778beb74a36e0f470c6fe6ecdcef67:
+//
+//   - plugins/org.eclipse.elk.alg.spore/src/org/eclipse/elk/alg/spore/**
+//   - plugins/org.eclipse.elk.alg.common/src/org/eclipse/elk/alg/common/
+//     {BowyerWatsonTriangulation,NaiveMinST,TEdge,TTriangle,Tree}.java
+//   - plugins/org.eclipse.elk.alg.common/src/org/eclipse/elk/alg/common/spore/**
+//   - the relevant geometry methods in ElkMath, KVector, and Utils
+//
+// The exact official elkjs 0.12.0 bundle is the behavioral oracle. No code
+// from elkrs or OpenJDK is used by this package.
+package spore

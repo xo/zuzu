@@ -1,0 +1,376 @@
+// Copied from github.com/d2lang/elk-go, file internal/layered/transferrer.go, at commit
+// 4e0a9977ed8b (D39, docs/UPSTREAM.md). The SPDX line below names its license,
+// and elk/internal/elkgo holds the license texts and the notices. Its
+// import paths name the copy (change 2).
+
+// Copyright (c) 2008, 2020 Kiel University and others.
+// Copyright (c) 2015, 2020 Kiel University and others.
+//
+// This program and the accompanying materials are made available under the
+// terms of the Eclipse Public License 2.0 which is available at
+// https://www.eclipse.org/legal/epl-2.0.
+//
+// SPDX-License-Identifier: EPL-2.0
+
+package layered
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/basicoptions"
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/common/elkutil"
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/common/nodespacing"
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/core"
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/geometry"
+	basegraph "github.com/xo/zuzu/elk/internal/elkgo/internal/graph"
+)
+
+type ElkGraphLayoutTransferrer struct {
+	Model *basegraph.Model
+	Maps  ImportMaps
+}
+
+func NewElkGraphLayoutTransferrer(model *basegraph.Model, maps ImportMaps) *ElkGraphLayoutTransferrer {
+	return &ElkGraphLayoutTransferrer{Model: model, Maps: maps}
+}
+
+func (transferrer *ElkGraphLayoutTransferrer) ApplyLayout(
+	arena *LGraphArena,
+	topGraph LGraphID,
+) error {
+	if transferrer.Model == nil {
+		return fmt.Errorf("layered: cannot transfer into a nil graph")
+	}
+	if err := transferrer.applyGraph(arena, topGraph, make(map[LGraphID]bool)); err != nil {
+		return err
+	}
+	seenEdges := make(map[basegraph.EdgeID]bool)
+	for index := range arena.Edges {
+		edgeID := LEdgeID(index)
+		origin, found := basegraph.TryGet(&arena.Edge(edgeID).Properties, OriginalElement)
+		if !found || origin.Kind != OriginEdge || seenEdges[origin.Edge] {
+			continue
+		}
+		seenEdges[origin.Edge] = true
+		transferrer.applyEdge(arena, edgeID, origin.Edge)
+	}
+	return nil
+}
+
+func (transferrer *ElkGraphLayoutTransferrer) applyGraph(
+	arena *LGraphArena,
+	graphID LGraphID,
+	seen map[LGraphID]bool,
+) error {
+	if seen[graphID] {
+		return nil
+	}
+	seen[graphID] = true
+	graph := arena.Graph(graphID)
+	origin, found := basegraph.TryGet(&graph.Properties, OriginalElement)
+	if !found || origin.Kind != OriginNode {
+		return fmt.Errorf("layered: graph %d has no original parent node", graphID)
+	}
+	offset := graph.Offset.Add(geometry.Point{X: graph.Padding.Left, Y: graph.Padding.Top})
+	processed := make(map[LNodeID]bool)
+	for _, nodeID := range arena.GraphAllNodes(graphID) {
+		if processed[nodeID] {
+			continue
+		}
+		processed[nodeID] = true
+		nodeOrigin, hasOrigin := basegraph.TryGet(&arena.Node(nodeID).Properties, OriginalElement)
+		if hasOrigin && nodeOrigin.Kind == OriginNode {
+			transferrer.applyNode(arena, nodeID, nodeOrigin.Node, offset)
+		} else if hasOrigin && nodeOrigin.Kind == OriginPort && graph.ParentNode == nil {
+			// A top-level external-port dummy represents a port on the node
+			// whose contents are currently being laid out. Its position is
+			// relative to that node rather than to a regular child node.
+			port := transferrer.Model.Port(nodeOrigin.Port)
+			position := arena.ExternalPortPosition(
+				graphID, nodeID, port.Shape.Width, port.Shape.Height)
+			port.Shape.SetLocation(position.X, position.Y)
+		}
+		if arena.Node(nodeID).NestedGraph != nil {
+			if err := transferrer.applyGraph(arena, *arena.Node(nodeID).NestedGraph, seen); err != nil {
+				return err
+			}
+		}
+	}
+	if graph.ParentNode == nil {
+		transferrer.applyParentNodeLayout(arena, graphID, origin.Node)
+	}
+	return nil
+}
+
+// applyParentNodeLayout mirrors ElkGraphLayoutTransferrer.applyParentNodeLayout.
+// In particular, a graph without imported external-port dummies still has its
+// ports moved by ElkUtil.resizeNode. This matters for isolated fixed-side ports
+// on compound nodes whose dimensions change during their own layout run.
+func (transferrer *ElkGraphLayoutTransferrer) applyParentNodeLayout(
+	arena *LGraphArena,
+	graphID LGraphID,
+	originalID basegraph.NodeID,
+) {
+	graph := arena.Graph(graphID)
+	original := transferrer.Model.Node(originalID)
+	sizeConstraints := basegraph.Get(&original.Properties, core.NodeSizeConstraints)
+	sizeConstraintsIncludedPortLabels := containsString(sizeConstraints, "PORT_LABELS")
+
+	size := arena.GraphActualSize(graphID)
+	graphProperties := basegraph.Get(&graph.Properties, GraphProperties)
+	if graphProperties&GraphPropertyExternalPorts != 0 {
+		// External-port dummies have already assigned final port positions.
+		basegraph.Set(&original.Properties, core.PortConstraints, "FIXED_POS")
+		elkutil.ResizeNode(transferrer.Model, originalID, size.X, size.Y, false, true)
+	} else if !basegraph.Get(&original.Properties, basicoptions.NodeSizeFixedGraphSize) {
+		// No external-port dummy was imported, so resizing must adjust the
+		// original node's peripheral ports exactly like ELK does.
+		elkutil.ResizeNode(transferrer.Model, originalID, size.X, size.Y, true, true)
+	}
+
+	if sizeConstraintsIncludedPortLabels {
+		basegraph.Set(&original.Properties, core.NodeSizeConstraints, []string{"PORT_LABELS"})
+	} else {
+		basegraph.Set(&original.Properties, core.NodeSizeConstraints, []string{})
+	}
+}
+
+func containsString(values []string, value string) bool {
+	for _, candidate := range values {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+func (transferrer *ElkGraphLayoutTransferrer) applyNode(
+	arena *LGraphArena,
+	nodeID LNodeID,
+	originalID basegraph.NodeID,
+	offset geometry.Point,
+) {
+	node := arena.Node(nodeID)
+	original := transferrer.Model.Node(originalID)
+	original.Shape.SetLocation(node.Position.X+offset.X, node.Position.Y+offset.Y)
+	original.Shape.SetDimensions(node.Size.X, node.Size.Y)
+	basegraph.Set(&original.Properties, LayerIDOption,
+		func() int {
+			if node.Layer == nil {
+				return -1
+			}
+			return arena.LayerIndex(*node.Layer)
+		}())
+	basegraph.Set(&original.Properties, PositionIDOption, arena.NodeIndexInLayer(nodeID))
+
+	for _, portID := range node.Ports {
+		origin, found := basegraph.TryGet(&arena.Port(portID).Properties, OriginalElement)
+		if !found || origin.Kind != OriginPort {
+			continue
+		}
+		port := arena.Port(portID)
+		originalPort := transferrer.Model.Port(origin.Port)
+		originalPort.Shape.SetLocation(port.Position.X, port.Position.Y)
+		originalPort.Shape.SetDimensions(port.Size.X, port.Size.Y)
+		basegraph.Set(&originalPort.Properties, core.PortSide, port.Side.String())
+		if !fixedPortLabelPlacement(&node.Properties) {
+			for _, labelID := range port.Labels {
+				transferrer.applyLabel(arena, labelID, geometry.Point{})
+			}
+		}
+	}
+	nodeHasLabelPlacement := nonemptyPlacement(&node.Properties, nodespacing.NodeLabelsPlacement.ID)
+	for _, labelID := range node.Labels {
+		if nodeHasLabelPlacement || nonemptyPlacement(
+			&arena.Label(labelID).Properties,
+			nodespacing.NodeLabelsPlacement.ID,
+		) {
+			transferrer.applyLabel(arena, labelID, geometry.Point{})
+		}
+	}
+}
+
+func nonemptyPlacement(properties *basegraph.PropertyMap, id string) bool {
+	value, found := properties.Raw(id)
+	if !found {
+		return false
+	}
+	switch typed := value.(type) {
+	case []string:
+		return len(typed) > 0
+	case string:
+		return strings.TrimSpace(typed) != ""
+	default:
+		return false
+	}
+}
+
+func fixedPortLabelPlacement(properties *basegraph.PropertyMap) bool {
+	value, found := properties.Raw(nodespacing.PortLabelsPlacement.ID)
+	if !found {
+		return false
+	}
+	switch typed := value.(type) {
+	case []string:
+		for _, item := range typed {
+			if strings.EqualFold(item, "FIXED") {
+				return true
+			}
+		}
+	case string:
+		for _, field := range strings.FieldsFunc(typed, func(r rune) bool {
+			return r == ' ' || r == ',' || r == '[' || r == ']'
+		}) {
+			if strings.EqualFold(field, "FIXED") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (transferrer *ElkGraphLayoutTransferrer) applyLabel(
+	arena *LGraphArena,
+	labelID LLabelID,
+	offset geometry.Point,
+) {
+	transferrer.applyLabelInCoordinateSystem(arena, labelID, offset, geometry.Point{})
+}
+
+func (transferrer *ElkGraphLayoutTransferrer) applyLabelInCoordinateSystem(
+	arena *LGraphArena,
+	labelID LLabelID,
+	offset geometry.Point,
+	containerOrigin geometry.Point,
+) {
+	origin, found := basegraph.TryGet(&arena.Label(labelID).Properties, OriginalElement)
+	if !found || origin.Kind != OriginLabel {
+		return
+	}
+	label := arena.Label(labelID)
+	original := transferrer.Model.Label(origin.Label)
+	original.Shape.SetDimensions(label.Size.X, label.Size.Y)
+	position := label.Position.Add(offset).Sub(containerOrigin)
+	original.Shape.SetLocation(position.X, position.Y)
+}
+
+func (transferrer *ElkGraphLayoutTransferrer) applyEdge(
+	arena *LGraphArena,
+	edgeID LEdgeID,
+	originalID basegraph.EdgeID,
+) {
+	edge := arena.Edge(edgeID)
+	if edge.Source == nil || edge.Target == nil {
+		return
+	}
+	original := transferrer.Model.Edge(originalID)
+	if len(original.Sources) == 0 || len(original.Targets) == 0 {
+		return
+	}
+	sourceNode := arena.EdgeSourceNode(edgeID)
+	targetNode := arena.EdgeTargetNode(edgeID)
+	descendantTarget := arena.IsDescendant(targetNode, sourceNode) &&
+		arena.Node(sourceNode).NestedGraph != nil
+	layoutGraph := arena.NodeGraph(sourceNode)
+	if descendantTarget {
+		layoutGraph = *arena.Node(sourceNode).NestedGraph
+	}
+	baseOffset, edgeOffset := transferrer.edgeLayoutOffsets(arena, edgeID, layoutGraph)
+	sourcePort := arena.Port(*edge.Source)
+	targetPort := arena.Port(*edge.Target)
+	// LPort.getAbsoluteAnchor sums node, port, and anchor first. The layout
+	// transferrer adds the graph offset afterwards. That evaluation order is
+	// observable at the final ULP for fractional component and port positions.
+	var sourcePoint geometry.Point
+	if descendantTarget {
+		// Descendant edges are laid out inside their source node. The source
+		// anchor is already relative to that node; Java removes the base graph
+		// offset before applying the complete edge offset below.
+		sourcePoint = sourcePort.Position.Add(sourcePort.Anchor).Sub(baseOffset)
+	} else {
+		sourcePoint = arena.Node(sourceNode).Position.
+			Add(sourcePort.Position).
+			Add(sourcePort.Anchor)
+	}
+	sourcePoint = sourcePoint.Add(edgeOffset)
+	targetPoint := arena.Node(targetNode).Position.
+		Add(targetPort.Position).
+		Add(targetPort.Anchor)
+	if targetOffset, found := basegraph.TryGet(&edge.Properties, TargetOffset); found {
+		targetPoint = targetPoint.Add(targetOffset)
+	}
+	targetPoint = targetPoint.Add(edgeOffset)
+	// TARGET_OFFSET moves the target anchor into the edge's reference graph;
+	// edgeOffset then converts that graph into the original edge container's
+	// coordinate system.
+	sectionID := transferrer.Model.FirstSection(originalID, true)
+	section := transferrer.Model.Section(sectionID)
+	section.Start = sourcePoint
+	section.End = targetPoint
+	section.StartPresent, section.EndPresent = true, true
+	section.IncomingShape = copyShapeID(&original.Sources[0])
+	section.OutgoingShape = copyShapeID(&original.Targets[0])
+	section.BendPoints = make(geometry.Chain, len(edge.BendPoints))
+	for index, point := range edge.BendPoints {
+		section.BendPoints[index] = point.Add(edgeOffset)
+	}
+	section.BendPointsPresent = len(section.BendPoints) > 0
+
+	for _, labelID := range edge.Labels {
+		transferrer.applyLabel(arena, labelID, edgeOffset)
+	}
+	if junctions, found := basegraph.TryGet(&edge.Properties, JunctionPoints); found && len(junctions) > 0 {
+		translated := make(geometry.Chain, len(junctions))
+		for index, point := range junctions {
+			translated[index] = point.Add(edgeOffset)
+		}
+		basegraph.Set(&original.Properties, core.JunctionPoints, translated)
+	} else {
+		basegraph.Unset(&original.Properties, core.JunctionPoints)
+	}
+}
+
+func (transferrer *ElkGraphLayoutTransferrer) edgeLayoutOffsets(
+	arena *LGraphArena,
+	edgeID LEdgeID,
+	layoutGraph LGraphID,
+) (geometry.Point, geometry.Point) {
+	graph := arena.Graph(layoutGraph)
+	baseOffset := graph.Offset.Add(
+		geometry.Point{X: graph.Padding.Left, Y: graph.Padding.Top})
+	hierarchicalOffset := geometry.Point{}
+	targetGraph, found := basegraph.TryGet(
+		&arena.Edge(edgeID).Properties,
+		CoordinateSystemOrigin,
+	)
+	if found {
+		currentGraph := arena.NodeGraph(arena.EdgeSourceNode(edgeID))
+		for currentGraph != targetGraph {
+			current := arena.Graph(currentGraph)
+			if current.ParentNode == nil {
+				break
+			}
+			representingNode := *current.ParentNode
+			hierarchicalOffset = hierarchicalOffset.Add(
+				arena.Node(representingNode).Position)
+			currentGraph = arena.NodeGraph(representingNode)
+			parentGraph := arena.Graph(currentGraph)
+			hierarchicalOffset = hierarchicalOffset.
+				Add(parentGraph.Offset).
+				Add(geometry.Point{
+					X: parentGraph.Padding.Left,
+					Y: parentGraph.Padding.Top,
+				})
+		}
+	}
+	return baseOffset, baseOffset.Add(hierarchicalOffset)
+}
+
+func copyShapeID(value *basegraph.ShapeID) *basegraph.ShapeID {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}

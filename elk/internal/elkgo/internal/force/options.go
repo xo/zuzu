@@ -1,0 +1,78 @@
+// Copied from github.com/d2lang/elk-go, file internal/force/options.go, at commit
+// 4e0a9977ed8b (D39, docs/UPSTREAM.md). The SPDX line below names its license,
+// and elk/internal/elkgo holds the license texts and the notices. Its
+// import paths name the copy (change 2).
+
+// Copyright (c) 2015, 2020 Kiel University and others.
+//
+// This program and the accompanying materials are made available under the
+// terms of the Eclipse Public License 2.0 which is available at
+// https://www.eclipse.org/legal/epl-2.0.
+//
+// SPDX-License-Identifier: EPL-2.0
+
+// Package force is a native Go port of org.eclipse.elk.force targeting ELK.js
+// 0.12.0. Its source-shaped names and iteration order retain the historical
+// ELK 0.8.1 translation where that behavior remains observable in 0.12.0.
+package force
+
+import (
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/core"
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/geometry"
+	"github.com/xo/zuzu/elk/internal/elkgo/internal/graph"
+)
+
+const (
+	ModelFruchtermanReingold = "FRUCHTERMAN_REINGOLD"
+	ModelEades               = "EADES"
+)
+
+var (
+	Model          = graph.PropertyWithDefault("org.eclipse.elk.force.model", func() string { return ModelFruchtermanReingold })
+	Iterations     = graph.PropertyWithDefault("org.eclipse.elk.force.iterations", func() int { return 300 })
+	RepulsivePower = graph.PropertyWithDefault("org.eclipse.elk.force.repulsivePower", func() int { return 0 })
+	Temperature    = graph.PropertyWithDefault("org.eclipse.elk.force.temperature", func() float64 { return 0.001 })
+	Repulsion      = graph.PropertyWithDefault("org.eclipse.elk.force.repulsion", func() float64 { return 5 })
+
+	Priority                    = graph.PropertyWithDefault("org.eclipse.elk.priority", func() int { return 1 })
+	SpacingNodeNode             = graph.PropertyWithDefault("org.eclipse.elk.spacing.nodeNode", func() float64 { return 80 })
+	SpacingEdgeLabel            = graph.PropertyWithDefault("org.eclipse.elk.spacing.edgeLabel", func() float64 { return 5 })
+	AspectRatio                 = graph.PropertyWithDefault("org.eclipse.elk.aspectRatio", func() float64 { return 1.6 })
+	RandomSeed                  = graph.PropertyWithDefault("org.eclipse.elk.randomSeed", func() int { return 1 })
+	SeparateConnectedComponents = graph.PropertyWithDefault("org.eclipse.elk.separateConnectedComponents", func() bool { return true })
+	Interactive                 = graph.PropertyWithDefault("org.eclipse.elk.interactive", func() bool { return false })
+	OmitNodeMicroLayout         = graph.PropertyWithDefault("org.eclipse.elk.omitNodeMicroLayout", func() bool { return false })
+	EdgeLabelsInline            = graph.PropertyWithDefault("org.eclipse.elk.edgeLabels.inline", func() bool { return false })
+	NodeSizeFixedGraphSize      = graph.PropertyWithDefault("org.eclipse.elk.nodeSize.fixedGraphSize", func() bool { return false })
+	Padding                     = graph.CloneablePropertyWithDefault("org.eclipse.elk.padding", func() geometry.Spacing {
+		return geometry.UniformSpacing(50)
+	})
+)
+
+// RegisterOptions adds the ForceOptions metadata supported by ELK 0.12.0.
+// Shared core options may already be present, so registration is idempotent.
+func RegisterOptions(registry *core.OptionRegistry) {
+	options := []core.OptionData{
+		{ID: Model.ID, Kind: core.EnumOption, Targets: core.Parents, EnumValues: []string{ModelEades, ModelFruchtermanReingold}},
+		{ID: Iterations.ID, Kind: core.IntegerOption, Targets: core.Parents},
+		{ID: RepulsivePower.ID, Kind: core.IntegerOption, Targets: core.Edges},
+		{ID: Temperature.ID, Kind: core.DoubleOption, Targets: core.Parents},
+		{ID: Repulsion.ID, Kind: core.DoubleOption, Targets: core.Parents},
+		{ID: Priority.ID, Kind: core.IntegerOption, Targets: core.Nodes | core.Edges},
+		{ID: SpacingNodeNode.ID, Kind: core.DoubleOption, Targets: core.Parents},
+		{ID: SpacingEdgeLabel.ID, Kind: core.DoubleOption, Targets: core.Parents},
+		{ID: AspectRatio.ID, Kind: core.DoubleOption, Targets: core.Parents},
+		{ID: RandomSeed.ID, Kind: core.IntegerOption, Targets: core.Parents},
+		{ID: SeparateConnectedComponents.ID, Kind: core.BooleanOption, Targets: core.Parents},
+		{ID: Interactive.ID, Kind: core.BooleanOption, Targets: core.Parents},
+		{ID: OmitNodeMicroLayout.ID, Kind: core.BooleanOption, Targets: core.Parents},
+		{ID: NodeSizeFixedGraphSize.ID, Kind: core.BooleanOption, Targets: core.Parents},
+	}
+	for _, option := range options {
+		if registry.ByID(option.ID) == nil {
+			if err := registry.Register(option); err != nil {
+				panic(err)
+			}
+		}
+	}
+}
