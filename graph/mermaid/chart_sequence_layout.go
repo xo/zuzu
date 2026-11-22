@@ -1262,10 +1262,12 @@ func (l *seqLayout) spec() map[string]any {
 	texts("comments", graph.StyleEdgeLabel, l.cfg.noteFont)
 	texts("numberLabels", graph.StyleEdgeLabel, numberFont)
 	texts("actorLabels", graph.StyleNodeLabel, l.cfg.actorFont)
-	var domain []any
-	for _, p := range l.ps {
-		domain = append(domain, p.id)
+	// Each participant takes the color of the hash of its id (D56).
+	ids := make([]string, len(l.ps))
+	for i, p := range l.ps {
+		ids[i] = p.id
 	}
+	domain := hashDomain(ids)
 	return map[string]any{
 		"width":    math.Ceil(l.maxX - l.minX),
 		"height":   math.Ceil(l.maxY),

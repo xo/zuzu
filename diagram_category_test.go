@@ -9,10 +9,9 @@ import (
 )
 
 // TestUsecaseRotate checks that colorScheme rotate draws each actor and
-// use case, and each system boundary, as a node of the next color of the
-// category scheme of the theme of the render, and that the colors start
-// again after the last one (D37). A node fills with the solid tint of its
-// color (D55).
+// use case, and each system boundary, in a color of the category scheme of
+// the theme of the render, so that the first ten actors take the ten
+// colors (D37, D56). A node fills with the solid tint of its color (D55).
 func TestUsecaseRotate(t *testing.T) {
 	t.Parallel()
 	var b strings.Builder
@@ -36,16 +35,17 @@ func TestUsecaseRotate(t *testing.T) {
 			t.Fatalf("%s: %v (%v)", test.name, err, report)
 		}
 		c := test.th.Category
-		// Each actor takes the next color, the eleventh the first again,
-		// and the use case the second. The boundary takes the first.
-		for i, want := range []string{c[0], c[1], c[9], c[0], c[1]} {
+		// The first ten actors take the ten colors, each by the hash of
+		// its id or the next free color. The boundary S takes the color
+		// of its hash, 3 modulo 9, the fifth.
+		for i, want := range c {
 			paint := fmt.Sprintf(`fill="%s" stroke="%s" stroke-width="1.25"`, test.th.Tint(want), want)
 			if !strings.Contains(s, paint) {
 				t.Errorf("%s: %d: the SVG has no node in %s", test.name, i, want)
 			}
 		}
-		if n := strings.Count(s, `rx="6" fill="`+test.th.Tint(c[0])+`" stroke="`+c[0]+`"`); n != 1 {
-			t.Errorf("%s: expected the boundary in %s, got %d", test.name, c[0], n)
+		if n := strings.Count(s, `rx="6" fill="`+test.th.Tint(c[4])+`" stroke="`+c[4]+`"`); n != 1 {
+			t.Errorf("%s: expected the boundary in %s, got %d", test.name, c[4], n)
 		}
 	}
 	// With role, or in a theme that is not a color theme of Mermaid,

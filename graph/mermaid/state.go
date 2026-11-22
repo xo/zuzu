@@ -103,19 +103,17 @@ func stateGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	// state with more descriptions is a record, and does not wrap.
 	wrapGraph(d, s.g, s.wrap)
 	// A composite state draws with a band for its title, as in Mermaid.
-	// In a color theme, each takes the categorical colors in turn, in the
-	// order in which the composite states open (D54).
-	colors := slices.Contains(colorThemes, themeName(d))
-	next := 0
+	// In a color theme, each takes the color of the hash of its id (D54,
+	// D56).
+	var composites []*graph.Cluster
 	for _, c := range s.g.Clusters {
-		if s.composites[c.ID] != c {
-			continue
+		if s.composites[c.ID] == c {
+			c.Shape = graph.ClusterState
+			composites = append(composites, c)
 		}
-		c.Shape = graph.ClusterState
-		if colors {
-			c.Category = panelColor(next)
-			next++
-		}
+	}
+	if slices.Contains(colorThemes, themeName(d)) {
+		panelColors(composites)
 	}
 	s.pointColors()
 	return s.g, s.issues.Report, nil

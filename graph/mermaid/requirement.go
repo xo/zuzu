@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
@@ -109,6 +110,11 @@ func requirementGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error
 	// Mermaid wraps the label of a relation, and not a requirement or an
 	// element.
 	wrapGraph(d, r.g, 0)
+	if slices.Contains(colorThemes, themeName(d)) {
+		// In a color theme, each requirement and each element takes the
+		// color of the hash of its id (D56).
+		nodeColors(r.g.Nodes, r.g.Clusters)
+	}
 	return r.g, r.issues.Report, nil
 }
 

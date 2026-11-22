@@ -1,6 +1,6 @@
 # D54. Composite states draw a title band, and notes take the yellow of the scheme
 
-Status: Decided. Amends D53. Amended by D55.
+Status: Decided. Amends D53. Amended by D55 and D56.
 
 On 2026-11-22 the maintainers saw that zuzu drew a composite state of a
 state diagram, such as those of `diagrams/37-state-composite.mmd`, as a

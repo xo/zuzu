@@ -106,6 +106,18 @@ func classGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	}
 	// Mermaid wraps the label of a relation, and not a class or a note.
 	wrapGraph(d, c.g, 0)
+	if slices.Contains(colorThemes, themeName(d)) {
+		// In a color theme, each namespace and each class takes the color
+		// of the hash of its id (D56).
+		panelColors(c.g.Clusters)
+		var classes []*graph.Node
+		for _, n := range c.g.Nodes {
+			if cl, ok := c.classes[n.ID]; ok && cl.node == n {
+				classes = append(classes, n)
+			}
+		}
+		nodeColors(classes, c.g.Clusters)
+	}
 	return c.g, c.issues.Report, nil
 }
 

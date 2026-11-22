@@ -740,12 +740,3 @@ func readStatements(d *Diagram, line *int, acc *[]string, inBody func() bool, bo
 	}
 	return nil
 }
-
-// panelColor returns the place of the categorical color, from 1, of the
-// panel that opens i-th, from 0, such as a subgraph or a composite state
-// in a color theme. The panels take the second to the tenth colors in
-// turn, so that a panel never takes the first color, the color of the
-// nodes in it (D55).
-func panelColor(i int) int {
-	return i%9 + 2
-}

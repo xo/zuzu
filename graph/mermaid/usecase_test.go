@@ -360,10 +360,11 @@ func ucCategories(g *graph.Graph) []string {
 }
 
 // TestUsecaseRotate checks that colorScheme rotate gives the actors and
-// then the use cases the colors of the category scheme in turn, and the
-// system boundaries their own turn from the first color, in the order of
-// their first mention, as Mermaid 12.3 gives data-color-id (D37). The
-// notes and the blocks of JSON take no color.
+// then the use cases the colors of the FNV-1a hash of their ids, and the
+// system boundaries the colors of the hash of theirs among the second to
+// the tenth, in the order of their first mention (D37, D56). U3 in S2 and
+// U4 in S1 do not take the color of their boundary. The notes and the
+// blocks of JSON take no color.
 func TestUsecaseRotate(t *testing.T) {
 	t.Parallel()
 	const body = `usecase-beta
@@ -385,15 +386,15 @@ func TestUsecaseRotate(t *testing.T) {
 	if len(report) != 0 {
 		t.Errorf("expected no issue, got %v", report)
 	}
-	want := []string{"B=1", "A=2", "U2=3", "U1=4", "U3=5", "U4=6", "note-0=0", "J=0", "S2=1", "S1=2"}
+	want := []string{"B=10", "A=3", "U2=5", "U1=6", "U3=4", "U4=7", "note-0=0", "J=0", "S2=5", "S1=2"}
 	if got := ucCategories(g); !slices.Equal(got, want) {
 		t.Errorf("expected %q, got %q", want, got)
 	}
 	// A style of a name stays on the node, and wins over the color when
 	// the graph compiles.
 	g, _ = stateOf(t, "---\nconfig:\n  usecase:\n    colorScheme: rotate\n---\nusecase-beta\nactor A\nU\nstyle U fill:#f00")
-	if n := node(t, g, "U"); n.Category != 2 || n.Style["fill"] != "#f00" {
-		t.Errorf("expected the category 2 and the fill of the style, got %d %v", n.Category, n.Style)
+	if n := node(t, g, "U"); n.Category != 1 || n.Style["fill"] != "#f00" {
+		t.Errorf("expected the category 1 and the fill of the style, got %d %v", n.Category, n.Style)
 	}
 	// rotate takes effect in a color theme of Mermaid only: redux-color,
 	// the default of a use case diagram, and redux-dark-color.
@@ -441,9 +442,9 @@ func TestUsecaseRotate(t *testing.T) {
 	}
 }
 
-// TestUsecaseRotateCycles checks that each element takes the next place
-// past the ten colors of a scheme. The scale of the colors starts the
-// colors again when the graph compiles.
+// TestUsecaseRotateCycles checks that the first ten elements take the ten
+// colors of a scheme, and that each element after them takes the color of
+// its hash (D56).
 func TestUsecaseRotateCycles(t *testing.T) {
 	t.Parallel()
 	var b strings.Builder
@@ -452,9 +453,10 @@ func TestUsecaseRotateCycles(t *testing.T) {
 		b.WriteString("actor A" + strconv.Itoa(i) + "\n")
 	}
 	g, _ := stateOf(t, b.String())
+	want := []int{9, 8, 7, 6, 3, 2, 1, 10, 4, 5, 10, 1}
 	for i, n := range g.Nodes {
-		if n.Category != i+1 {
-			t.Errorf("%s: expected the category %d, got %d", n.ID, i+1, n.Category)
+		if n.Category != want[i] {
+			t.Errorf("%s: expected the category %d, got %d", n.ID, want[i], n.Category)
 		}
 	}
 }

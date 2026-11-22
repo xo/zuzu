@@ -3,6 +3,7 @@ package mermaid
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
@@ -87,6 +88,12 @@ func erGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	}
 	// Mermaid wraps the label of a relationship, and not an entity.
 	wrapGraph(d, e.g, 0)
+	if slices.Contains(colorThemes, themeName(d)) {
+		// In a color theme, each subgraph and each entity takes the color
+		// of the hash of its id (D56).
+		panelColors(e.g.Clusters)
+		nodeColors(e.g.Nodes, e.g.Clusters)
+	}
 	return e.g, e.issues.Report, nil
 }
 

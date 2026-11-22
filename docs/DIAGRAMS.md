@@ -595,9 +595,14 @@ in its source draws in the scheme of the caller, or `zuzu`, with the blue
 of a chart and a graph of DOT (D55). A diagram of such a kind still counts
 as one in `redux-color`, so its nodes and its panels take the colors of
 D53 and D54 from that scheme. Each subgraph of a flowchart and each lane
-of a swimlane takes the colors in turn from the second, as a composite
-state does (D55). A theme that the source gives wins over the default,
-and a mode or a scheme that the caller gives wins over both.
+of a swimlane takes the color of the hash of its id among the second to
+the tenth colors, as a composite state does (D55, D56). Each class of a
+class diagram, entity of an ER diagram, and requirement and element of a
+requirement diagram takes the color of the hash of its id among all ten
+(D56). Mermaid gives them the colors of its palette in the order in which
+they first appear, so a name of zuzu keeps its color where a name of
+Mermaid can change it. A theme that the source gives wins over the
+default, and a mode or a scheme that the caller gives wins over both.
 
 A theme that Mermaid 12.3.0 does not have, such as `sepia` or `Forest`, is
 an issue. `themeVariables` and `themeCSS` are issues too, except the theme
@@ -1509,18 +1514,19 @@ zuzu reads these settings of `usecase`:
    the style that the name of a family holds.
 6. `colorScheme: role`, the default, which draws in the colors of zuzu.
 7. `colorScheme: rotate`, which gives each actor, use case and system
-   boundary a color in turn, as the next paragraphs say.
+   boundary a color, as the next paragraphs say.
 
-With `colorScheme: rotate`, each actor, use case and system boundary takes
-a color of the category scheme in turn, and draws as a node of that color:
-a tint and an outline (D37). The figure of an actor takes the color too.
-The actors come first, then the use cases, each in the order of its first
-mention, as in Mermaid. The system boundaries take the colors in turn from
-the first color again. A note and a block of JSON take no color. A fill or
-a stroke of a class or a style wins over the color. After the last color
-of the scheme, the colors start again. The category scheme has ten colors
-and the palette of Mermaid has twelve, so the eleventh element takes the
-first color in zuzu and the eleventh color in Mermaid.
+With `colorScheme: rotate`, each actor and use case takes the categorical
+color at the FNV-1a hash of its id, and draws as a node of that color: a
+solid tint and an outline (D37, D56). The figure of an actor takes the
+color too. The actors come first, then the use cases, each in the order of
+its first mention. A node whose color an earlier node took takes the next
+free color, so up to ten take ten colors. Each system boundary takes the
+color of the hash of its id among the second to the tenth colors, as a
+panel. A note and a block of JSON take no color. A fill or a stroke of a
+class or a style wins over the color. Mermaid gives the colors of its
+palette in the order of first mention, so a name of zuzu keeps its color
+where a name of Mermaid can change it.
 
 Mermaid 12.3.0 gives the colors in turn only in a color theme,
 `redux-color` or `redux-dark-color`. A use case diagram with no theme
@@ -2254,7 +2260,9 @@ metadata that zuzu does not know is an issue, and the participant draws as
 a box. A color of a rect that does not read is an issue, and the rect draws
 as a panel.
 
-Each participant takes the next color of the scheme. A message is an edge,
+Each participant takes the color of the FNV-1a hash of its id, or the
+next free color when an earlier participant took that color, so a name
+keeps its color in each diagram (D56). A message is an edge,
 and a note, a frame and a box without a color are panels. A color that the
 source gives to a box or a rect draws at its own opacity, or at 0.25 when
 it is opaque, so that the text on it reads in both modes.
@@ -2479,8 +2487,9 @@ the link goes around it. The link then runs in a lane of its own between
 the two lanes, with arcs of 10, at least 10 pixels away from each other
 line, as in Mermaid.
 
-Each branch takes the next color of the category scheme of the theme, and
-the eleventh branch takes the first color again. A branch has a lane, a
+Each branch takes the color of the FNV-1a hash of its name in the category
+scheme of the theme, or the next free color when an earlier branch took
+that color, so up to ten branches take ten colors (D56). A branch has a lane, a
 dashed line in its color, and its name in a label with a tint of its color
 at the start of the lane. A link is in the color of the branch of its
 commit. A link to a merge from the branch that it merges, and a link that

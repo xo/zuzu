@@ -305,9 +305,10 @@ func TestStateCompile(t *testing.T) {
 }
 
 // TestStateCompositeAndNotes checks that a composite state draws with a band
-// for its title, that in the default theme the composite states take the
-// categorical colors in turn from the second, and that a note is a note,
-// which draws in the yellow of the scheme (D54, D55).
+// for its title, that in the default theme each composite state takes the
+// color of the hash of its id among the second to the tenth colors, and
+// that a note is a note, which draws in the yellow of the scheme (D54, D55,
+// D56). The hash of A is 3 and of B is 0, modulo 9.
 func TestStateCompositeAndNotes(t *testing.T) {
 	t.Parallel()
 	g, _ := stateOf(t, `stateDiagram-v2
@@ -328,8 +329,8 @@ func TestStateCompositeAndNotes(t *testing.T) {
 			cats[c.ID] = c.Category
 		}
 	}
-	if cats["A"] != 2 || cats["B"] != 3 {
-		t.Errorf("the composites take the colors %v, want A 2 and B 3", cats)
+	if cats["A"] != 5 || cats["B"] != 2 {
+		t.Errorf("the composites take the colors %v, want A 5 and B 2", cats)
 	}
 	notes := 0
 	for _, n := range g.Nodes {

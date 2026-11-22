@@ -163,8 +163,10 @@ func TestGitGraphFixtures(t *testing.T) {
 
 func TestGitGraphColors(t *testing.T) {
 	t.Parallel()
-	// The branches take the colors of the scheme in their order, and the
-	// eleventh branch takes the first color again.
+	// Each branch takes the color of the FNV-1a hash of its name, or the
+	// next free color, so the first ten take ten colors. The eleventh, b10,
+	// finds no free color and takes the color of its hash, 4, which b8
+	// took when its own, 9, was taken (D56).
 	src, err := os.ReadFile(filepath.Join("testdata", "gitgraph", "12-branches.mmd"))
 	if err != nil {
 		t.Fatal(err)
@@ -177,8 +179,10 @@ func TestGitGraphColors(t *testing.T) {
 	for _, it := range drawnOf(items, "branchBoxes") {
 		colors = append(colors, it.item.Stroke.Color)
 	}
-	if len(colors) != 11 || colors[10] != colors[0] || len(slices.Compact(slices.Clone(colors[:10]))) != 10 {
-		t.Errorf("expected ten colors, then the first again, got %v", colors)
+	sorted := slices.Clone(colors[:min(10, len(colors))])
+	slices.Sort(sorted)
+	if len(colors) != 11 || colors[10] != colors[8] || len(slices.Compact(sorted)) != 10 {
+		t.Errorf("expected ten colors, then the color of b8 again, got %v", colors)
 	}
 }
 

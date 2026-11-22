@@ -647,10 +647,12 @@ func (l *gitLayout) spec() map[string]any {
 		"x": field("x"), "y": field("y"), "text": field("lines"), "align": value("center"), "baseline": value("middle"),
 		"fontSize": value(gitBranchFont.Size), "fontWeight": value(gitBranchFont.Weight), "lineHeight": value(lh(gitBranchFont)),
 	})
-	var domain []any
-	for _, b := range l.branches {
-		domain = append(domain, b.name)
+	// Each branch takes the color of the hash of its name (D56).
+	names := make([]string, len(l.branches))
+	for i, b := range l.branches {
+		names[i] = b.name
 	}
+	domain := hashDomain(names)
 	pad := l.g.cfg.padding
 	return map[string]any{
 		"width":    math.Ceil(l.maxX - l.minX),

@@ -50,7 +50,7 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D34](D034-ibm-plex-sans-is-embedded-in-woff2.md) | IBM Plex Sans is embedded in WOFF2 | Decided. Amends D16 |
 | [D35](D035-the-answers-of-the-maintainers-of-2026-11-20.md) | The answers of the maintainers of 2026-11-20 | Decided. Amends D14, D16, D31 and D32. Amended by D36, D37, D40, D46 and D48 |
 | [D36](D036-zuzu-draws-the-math-of-katex-with-the-math-layout-of-okage.md) | zuzu draws the math of KaTeX with the math layout of okage | Decided. Amends D16, D32 and D35 |
-| [D37](D037-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-20.md) | The answers of the maintainers on the backlog of 2026-11-20 | Decided. Amends D14, D32 and D35. Amended by D48, D53 and D55 |
+| [D37](D037-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-20.md) | The answers of the maintainers on the backlog of 2026-11-20 | Decided. Amends D14, D32 and D35. Amended by D48, D53, D55 and D56 |
 | [D38](D038-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-22.md) | The answers of the maintainers on the backlog of 2026-11-22 | Decided. Amends D24, D28, D31 and D32 |
 | [D39](D039-zuzu-copies-the-layouts-of-dagre-and-elk-and-the-sketch-of-rough-js.md) | zuzu copies the layouts of dagre and ELK and the sketch of rough.js | Decided. Amends D6 and D32. Amended by D41, D44 and D45 |
 | [D40](D040-the-details-of-the-look-drawn-by-hand.md) | The details of the look drawn by hand | Decided. Amends D32 and D35. Amended by D41, D42, D43, D47 and D49 |
@@ -67,5 +67,6 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D51](D051-an-axis-draws-the-grid-of-vega-and-labels-fewer-ticks.md) | An axis draws the grid of Vega and labels fewer ticks | Decided. Amends D46 |
 | [D52](D052-zuzu-draws-the-projections-of-vega-projection-extended.md) | zuzu draws the projections of vega-projection-extended | Decided. Amends D7 |
 | [D53](D053-an-agentflow-diagram-colors-its-nodes-by-kind-and-its-flows-in-turn.md) | An agentflow diagram colors its nodes by kind and its flows in turn | Decided. Amends D37. Amended by D54 and D55 |
-| [D54](D054-composite-states-draw-a-title-band-and-notes-take-the-yellow-of-the-scheme.md) | Composite states draw a title band, and notes take the yellow of the scheme | Decided. Amends D53. Amended by D55 |
-| [D55](D055-mermaid-takes-the-scheme-of-zuzu-and-tints-are-solid.md) | Mermaid takes the scheme of zuzu, and tints are solid | Decided. Amends D31, D37, D53 and D54 |
+| [D54](D054-composite-states-draw-a-title-band-and-notes-take-the-yellow-of-the-scheme.md) | Composite states draw a title band, and notes take the yellow of the scheme | Decided. Amends D53. Amended by D55 and D56 |
+| [D55](D055-mermaid-takes-the-scheme-of-zuzu-and-tints-are-solid.md) | Mermaid takes the scheme of zuzu, and tints are solid | Decided. Amends D31, D37, D53 and D54. Amended by D56 |
+| [D56](D056-a-named-node-takes-the-color-of-the-hash-of-its-name.md) | A named node takes the color of the hash of its name | Decided. Amends D37, D54 and D55 |

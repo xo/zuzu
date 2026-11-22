@@ -832,12 +832,9 @@ func readGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 		f.lanes()
 	}
 	if slices.Contains(colorThemes, themeName(d)) {
-		// In a color theme, each subgraph and each lane takes the
-		// categorical colors in turn, in the order in which they open, as
-		// Mermaid colors them (D55).
-		for i, c := range f.g.Clusters {
-			c.Category = panelColor(i)
-		}
+		// In a color theme, each subgraph and each lane takes the color
+		// of the hash of its id, as Mermaid gives each a color (D55, D56).
+		panelColors(f.g.Clusters)
 	}
 	return f.g, f.issues.Report, nil
 }

@@ -768,16 +768,10 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 		}
 	}
 	// With rotate, the actors and then the use cases take the colors of
-	// the category scheme in turn, and the system boundaries take them in
-	// turn from the first color again, as in Mermaid (D37).
-	next, nextBoundary := 0, 0
-	category := func(n *int) int {
-		if !cfg.rotate {
-			return 0
-		}
-		*n++
-		return *n
-	}
+	// the hash of their ids, and the system boundaries take the colors of
+	// the hash of theirs, as panels (D37, D56). colored holds the nodes
+	// that take a color, in that order.
+	var colored []*graph.Node
 	labelOf := func(s *ucState) (string, graph.Font) {
 		t, font := ucText(s.label)
 		if s.stereotype != "" {
@@ -793,8 +787,8 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 		}
 		under(st, fontStyle(font))
 		under(st, cfg.actorFont)
-		n := &graph.Node{ID: s.id, Label: t, Shape: ucRect, Cluster: s.parent, Style: st, Wrap: w.width(wrap, s.label.markdown),
-			Category: category(&next)}
+		n := &graph.Node{ID: s.id, Label: t, Shape: ucRect, Cluster: s.parent, Style: st, Wrap: w.width(wrap, s.label.markdown)}
+		colored = append(colored, n)
 		business := s.business != nil && *s.business
 		if s.icon != "" {
 			name := s.icon
@@ -825,9 +819,10 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 		case s.business != nil && *s.business:
 			shape = "businessEllipse"
 		}
-		g.Nodes = append(g.Nodes, &graph.Node{ID: s.id, Label: t, Shape: shape, Cluster: s.parent, Style: st,
-			Wrap: w.width(caseWrap, s.label.markdown), MinWidth: scaleWrap(d.Kind, labelUsecase, cfg.minWidth+2*pad),
-			Category: category(&next)})
+		n := &graph.Node{ID: s.id, Label: t, Shape: shape, Cluster: s.parent, Style: st,
+			Wrap: w.width(caseWrap, s.label.markdown), MinWidth: scaleWrap(d.Kind, labelUsecase, cfg.minWidth+2*pad)}
+		colored = append(colored, n)
+		g.Nodes = append(g.Nodes, n)
 	}
 	for i, n := range m.notes {
 		t, font := ucText(n.label)
@@ -854,13 +849,17 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 			return err
 		}
 		under(st, fontStyle(font))
-		c := &graph.Cluster{ID: id, Label: t, Style: st, Category: category(&nextBoundary)}
+		c := &graph.Cluster{ID: id, Label: t, Style: st}
 		if b.typ == "package" {
 			// A boundary of the type package draws with a tab at its top
 			// left, as a package of UML (D32).
 			c.Shape = graph.ClusterPackage
 		}
 		g.Clusters = append(g.Clusters, c)
+	}
+	if cfg.rotate {
+		panelColors(g.Clusters)
+		nodeColors(colored, g.Clusters)
 	}
 	for _, e := range m.edges {
 		ge, err := m.edge(e, classes, addf)

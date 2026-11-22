@@ -806,9 +806,10 @@ func TestEdgeClass(t *testing.T) {
 	}
 }
 
-// TestSubgraphColors checks that in the default theme the subgraphs of a
-// flowchart take the categorical colors in turn from the second, and that
-// in another theme they take none (D55).
+// TestSubgraphColors checks that in the default theme each subgraph of a
+// flowchart takes the color of the FNV-1a hash of its id among the second
+// to the tenth colors, and that in another theme they take none (D55,
+// D56). The hash of one is 6 and of two is 1, modulo 9.
 func TestSubgraphColors(t *testing.T) {
 	t.Parallel()
 	const body = "flowchart LR\n  subgraph one\n    a\n  end\n  subgraph two\n    b\n  end\n"
@@ -816,7 +817,7 @@ func TestSubgraphColors(t *testing.T) {
 		src  string
 		want string
 	}{
-		{body, "one:2 two:3"},
+		{body, "one:8 two:3"},
 		{"---\nconfig:\n  theme: forest\n---\n" + body, "one:0 two:0"},
 	} {
 		d, err := Read(test.src)
