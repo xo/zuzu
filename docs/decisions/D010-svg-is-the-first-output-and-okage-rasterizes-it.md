@@ -1,6 +1,6 @@
 # D10. SVG is the first output, and okage rasterizes it
 
-Status: Decided.
+Status: Decided. Amended by D43.
 
 The maintainers decided on 2026-11-10 that zuzu writes SVG first, and that
 the package `svg` of `github.com/xo/okage` turns the SVG into an image. okage

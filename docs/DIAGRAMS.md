@@ -181,6 +181,15 @@ The shapes are `box`, `rect`, `rectangle`, `square`, `ellipse`, `oval`,
 across each corner. `Mcircle` is a circle with a line across its top and
 its bottom.
 
+A `cylinder` takes the size of a `box` around the same label, with its
+ends inside the box, as Graphviz draws it. A cylinder of Mermaid is taller
+than its label by its ends. The label of a cylinder sits in the middle of
+its body, below its top. So does the label of each shape with a part that
+is not its body: below the band of a divided process, of internal storage
+and of a browser, and the tab of a folder, right of the strip of internal
+storage, on the front sheet of a stack of processes, below the top of a
+disk and of a bucket, and left of the end of a cylinder on its side.
+
 `polygon` reads its attributes as Graphviz documents them:
 
 | Attribute | What zuzu draws |
@@ -219,6 +228,14 @@ The layout follows dot in these steps:
    apart, each with ends of its own on the borders of the nodes. The gap
    narrows to fit a small node. An edge that passes other ranks bends
    away from the others at its middle.
+6. An edge that passes other ranks crosses each of them at the place
+   that the layout keeps for it beside their nodes, and runs straight
+   across the rank there, so that it does not cut across a node of the
+   rank, as the routes of dot do.
+7. An edge with a curve of steps, `step`, `stepBefore` or `stepAfter`,
+   between two ranks turns at a bend halfway between them, level with the
+   middle of its target, as the route of dagre in Mermaid does. So it comes
+   straight into the middle of the side of its target.
 
 The flowcharts, the state, the class, the entity relationship, the
 requirement, the agentflow and the use case diagrams of Mermaid use the
@@ -477,19 +494,56 @@ text there.
 
 ### Hints of the look and the layout
 
-`look: handDrawn` and `layout: elk` are hints of a way to draw (D32). zuzu
-accepts them with no issue in every kind, in the config or at the top of
-the front matter. zuzu draws its own look for `handDrawn`, and its own
-layered layout, `zuzu.layered`, for `elk`. Two looks drawn by hand, one
-like Excalidraw and one like xkcd, and an ELK layout are work for later. The other looks, such
-as `classic` and `neo`, draw in the look of zuzu too. The other ELK
-layouts of Mermaid 12.3, `elk.stress`, `elk.force`, `elk.mrtree`,
-`elk.sporeOverlap`, `elk.box` and `elk.rectpacking`, and the section `elk`
-of the config, which holds the settings of ELK, are hints too. So is the
+`look` selects a look in every kind (D35 part 12, D40). `look: handDrawn`
+draws the diagram in the look like Excalidraw of `docs/STYLE.md`, with its
+text in Excalifont when the caller gives the font with `WithLookFont`.
+`classic` and `neo` draw in the standard look of zuzu. As in Mermaid 12.3,
+the look of the section of the kind, such as `flowchart.look`, wins over
+the look at the top of the config, and a value that Mermaid does not have
+gives way to the other. When neither is a look of Mermaid, the value is an
+issue, and the diagram draws in the standard look. zuzu puts the look in
+the config of the spec as `zuzu.look`, and `WithLook` of the caller wins
+over it. Mermaid ignores `look` at the top of the front matter, out of its
+`config`, and zuzu accepts it there with no issue and draws nothing for
+it.
+
+`handDrawnSeed` seeds the lines of the look, as `zuzu.lookSeed`. Its
+default, 0, gives a random seed in Mermaid, and the seed 1 of zuzu, so that
+the same source draws the same bytes (D39 part 6). A seed that is not a
+whole number is an issue. A look like xkcd waits for a font (D40).
+
+`layout` picks the layout of a graph, as in Mermaid 12.3 (D45). zuzu
+accepts it with no issue in every kind, in the config or at the top of the
+front matter, and in the section of the kind, such as `flowchart.layout`,
+which wins over the top. In a graph, such as a flowchart, a state diagram,
+a class diagram or an ER diagram, the layout fills the key `zuzu.layout` of
+the config of the spec, and the runtime picks the engine from it, as
+"Layouts" in `docs/API.md` says:
+
+1. A graph that sets no layout draws with ELK, because ELK is the default
+   layout of every kind of graph in Mermaid 12.3, except the swimlane
+   diagram. So does `layout: elk`, the kind `flowchart-elk`, and each
+   other ELK layout of Mermaid 12.3: `elk.stress`, `elk.force`,
+   `elk.mrtree`, `elk.sporeOverlap`, `elk.box` and `elk.rectpacking`. The
+   engine of ELK comes from the module `github.com/xo/zuzu/elk`, which the
+   caller makes available with `zuzu.WithLayoutEngine(elk.Layout())`.
+   Without it, zuzu draws the graph with its own layered layout,
+   `zuzu.layered`, with no issue, so an ELK layout is a hint (D32).
+2. `layout: dagre` draws with the transform `zuzu.dagre`: the layout of
+   dagre with the crossing sweep of dagre 0.8 and the wrap of Mermaid
+   around it, which places the nodes closest to mmdc with `layout: dagre`
+   (D45 parts 1 and 2). As in Mermaid, the sibling subgraphs of a
+   flowchart go to dagre in the reverse of the order of the source (D45
+   part 5).
+3. `zuzu.WithLayout` of the caller forces a layout by its name, such as
+   `layered`, `dagre` or `elk.stress`, on every graph, over the layout of
+   the source (D45 part 4).
+
+The section `elk` of the config, which holds the settings of ELK, is a
+hint, and the engine of ELK takes the settings of Mermaid. So is the
 property `algorithm` of a node, such as `grp@{ algorithm: elk.box }`, which
-picks an ELK layout for one subgraph. zuzu lays the subgraph out in its own
-layered layout, with no issue, whatever the value (D35 part 9). Every kind
-accepts `layout: dagre`, the default layout of Mermaid, with no issue.
+picks an ELK layout for one subgraph. zuzu lays the subgraph out in the
+layout of the graph, with no issue, whatever the value (D35 part 9).
 Another layout, such as `elk.layered` or `tidy-tree`, is an issue. A
 swimlane diagram and a flowchart accept `layout: swimlane`, as "Swimlane
 diagram" says. A mindmap accepts `cose-bilkent` and `tidy-tree` too.
@@ -536,11 +590,14 @@ gives still wins.
 
 Mermaid 12.3 sets the theme `redux-color` by default in the sections
 `flowchart`, `swimlane`, `agentflow`, `sequence`, `class`, `state`, `er`,
-`requirement`, `usecase` and `venn`. A diagram of such a kind with no
-theme in its source draws in the scheme `mermaid-redux-color`, as in
-Mermaid (D37). A theme that the source gives wins over the default, and a
-mode or a scheme that the caller gives wins over both. A diagram of
-another kind with no theme draws in the scheme of the caller, or `zuzu`.
+`requirement`, `usecase` and `venn`. A diagram of any kind with no theme
+in its source draws in the scheme of the caller, or `zuzu`, with the blue
+of a chart and a graph of DOT (D55). A diagram of such a kind still counts
+as one in `redux-color`, so its nodes and its panels take the colors of
+D53 and D54 from that scheme. Each subgraph of a flowchart and each lane
+of a swimlane takes the colors in turn from the second, as a composite
+state does (D55). A theme that the source gives wins over the default,
+and a mode or a scheme that the caller gives wins over both.
 
 A theme that Mermaid 12.3.0 does not have, such as `sepia` or `Forest`, is
 an issue. `themeVariables` and `themeCSS` are issues too, except the theme
@@ -556,7 +613,6 @@ kind, with no issue:
 | `logLevel` | sets what Mermaid writes to the log of the browser |
 | `securityLevel` | sets which scripts, links and tags of HTML a page can run |
 | `useMaxWidth`, at the top or in a section, such as `flowchart.useMaxWidth` | makes the SVG as wide as the page that holds it. zuzu writes an SVG of a fixed size |
-| `handDrawnSeed` | seeds the random lines of the look `handDrawn`, which zuzu draws in its own look |
 | `architecture.seed`, `architecture.randomize` | seed and start the layout of forces of an architecture diagram. The layout of zuzu uses no random numbers |
 | `class.htmlLabels` | nothing. Mermaid 12 does not read it |
 | `htmlLabels`, `flowchart.htmlLabels`, in a chart other than a mindmap | nothing. A chart draws its text in SVG |
@@ -722,8 +778,11 @@ makes a link with no text one rank longer. A link with text whose marks do
 not agree, as in `<-- Text ---`, draws as `-->`, as in Mermaid.
 
 The text of a label can hold `<br>` as a new line, an entity such as
-`#quot;` or `#35;`, and a string of markdown in backquotes, which draws as
-plain text without its marks. The two characters `\n` start a new line
+`#quot;` or `#35;`, and a string of markdown in backquotes, which draws
+without its marks: its text between two stars or two underscores in bold,
+and its text between one star or one underscore in italic, each word in
+its font, as a label of HTML draws them. Such a label wraps by the widths
+of its words in their fonts. The two characters `\n` start a new line
 too, whatever `htmlLabels` is, as in Mermaid. They are text in a string of
 markdown, and in a label with math of KaTeX when `htmlLabels` is true,
 because Mermaid draws such a label as math. A text in double quotes, such as a string of
@@ -1319,8 +1378,10 @@ tint of its color, as in a flowchart, and a flow is a panel with its
 title at the top left. A link and its arrowhead take the color `edge`, and
 a link to a reference is dotted. Mermaid draws an agentflow diagram in
 the theme `redux-color` by default, with a color for each kind of node and
-for each flow. zuzu takes the scheme `mermaid-redux-color` by default too
-(D37), and draws every kind of node in the color of the scheme.
+for each flow. zuzu takes the scheme of zuzu by default (D55). In
+`redux-color` and `redux-dark-color`, each kind of node and each
+flow takes a categorical color of the scheme, as Mermaid colors them
+(D53). In any other theme, every node draws in the color of the scheme.
 
 These parts are issues: a `theme` that Mermaid does not have, the
 `themeVariables`, which draw in the look of zuzu, the other settings of
@@ -1592,7 +1653,7 @@ and these settings:
 | `swimlane.optimizeRanksByCrossings` | true | nothing, when `ignoreCrossLaneEdges` is true. When it is false, true is an issue, because zuzu does not move the ranks to fewer crossings |
 | `swimlane.automaticLaneOrdering` | false | true is an issue. zuzu keeps the lanes in the order of the source |
 | `swimlane.lineHops` | `arc` | false draws no hop, as zuzu always does. `arc` and `gap` are issues |
-| `swimlane.look`, `swimlane.useMaxWidth` | `neo`, true | nothing, as `look` and `useMaxWidth` |
+| `swimlane.look`, `swimlane.useMaxWidth` | `neo`, true | `swimlane.look` selects the look, as "Hints of the look and the layout" says, and `useMaxWidth` does nothing |
 
 A swimlane diagram with `layout: dagre` or `layout: elk` reads no other
 setting of the section `swimlane`, and such a setting is an issue. Another
@@ -1856,13 +1917,13 @@ categories, which is at the left of a horizontal chart.
 | `titlePadding` | the `offset` of the title |
 | `xAxis.labelFontSize`, `yAxis.labelFontSize` | the `labelFontSize` of the axis |
 | `xAxis.titleFontSize`, `yAxis.titleFontSize` | the `titleFontSize` of the axis |
-| `xAxis.axisLineWidth` | the `domainWidth` of the axis of categories |
+| `xAxis.axisLineWidth`, `yAxis.axisLineWidth` | the `domainWidth` of the axis |
+| `xAxis.tickLength`, `yAxis.tickLength` | the `tickSize` of the axis |
+| `xAxis.tickWidth`, `yAxis.tickWidth` | the `tickWidth` of the axis |
 
 These settings are issues, because the look of zuzu has no place for them.
-An axis has no ticks, so `tickLength` and `tickWidth` are issues. The
-compile of an xychart does not pass `labelPadding` and `titlePadding` of
-an axis to Vega yet, though the runtime reads them, so they are issues. An
-axis of numbers has no axis line, so `axisLineWidth` on it is an issue.
+The compile of an xychart does not pass `labelPadding` and `titlePadding`
+of an axis to Vega yet, though the runtime reads them, so they are issues.
 `width` and `height` give the size of the plot, so
 `plotReservedSpacePercent` is an issue.
 
@@ -1876,14 +1937,14 @@ Each axis, `xAxis` and `yAxis`, reads the settings that show its parts:
 | --- | --- |
 | `showLabel: false` | the axis has no labels |
 | `showTitle: false` | the axis has no title |
-| `showAxisLine: false` | the axis of categories has no axis line. An axis of numbers has none in the look of zuzu |
-| `showTick: false` | nothing, because an axis has no ticks in the look of zuzu |
+| `showAxisLine: false` | the axis has no axis line |
+| `showTick: false` | the axis has no ticks |
 | `labelRotation` | the labels turn by that many degrees, clockwise |
 
 As in Mermaid, only the axis at the bottom turns its labels: the x axis
 of a vertical chart, and the y axis of a horizontal one. A rotation
-outside -90 to 90 degrees is 0. `showTick: true`, and `showAxisLine: true`
-on an axis of numbers, are issues.
+outside -90 to 90 degrees is 0. An axis has its line and its ticks by
+default, as in Mermaid and in Vega (D46).
 
 A bar or a line with more values than the x axis has categories draws a
 value for each category. Mermaid does not draw the values past the last
@@ -3763,8 +3824,8 @@ the report in two cases. Each is an error in the strict mode:
 
 1. The parse has no font of math. Labels with the same text give one issue.
 2. okage cannot lay out the formula, such as one with a command that it
-   does not have, like `\phase`. The issue names the command, and the line
-   of the formula draws its source.
+   does not have. The issue names the command, and the line of the formula
+   draws its source.
 
 With `htmlLabels: false`, Mermaid draws the source of the math as text in a
 graph, a mindmap and a block diagram. zuzu draws the same, so that is no

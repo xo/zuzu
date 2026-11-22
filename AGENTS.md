@@ -15,7 +15,7 @@ done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
 draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
 of DOT and Mermaid of D31, and since then every other kind of Mermaid
 12.3, in the order of D32. Code follows the plan (D3).
-Every decision from D1 to D38 is decided. The open questions are at the
+Every decision from D1 to D55 is decided. The open questions are at the
 end of `docs/PLAN.md`.
 
 ## Standing rules
@@ -45,14 +45,14 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | working on expressions, formats or scripting | [docs/EXPRESSIONS.md](docs/EXPRESSIONS.md), then D9 and D33 |
 | working on the scene graph or a renderer | "Architecture" and "Rendering" in [docs/PLAN.md](docs/PLAN.md), then D10, D11 and D8 |
 | working on text, fonts or the measurement of a label | "Text" in [docs/PLAN.md](docs/PLAN.md), then D11, D16, D32 and D34 |
-| working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12, D14, D35 and D37 |
+| working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12, D14, D35, D37, D39 and D40 |
 | changing or adding a target SVG | [docs/targets/README.md](docs/targets/README.md), then D13 |
 | adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15 and D33 |
 | choosing or adding a font | D16, then D32, D34, D35 and D36 |
 | naming a package | D21 |
 | deciding whether zuzu supports a feature of Vega | "The Vega subset" in [docs/PLAN.md](docs/PLAN.md), then D6 and D7 |
 | testing against vega.js or the corpus | "Conformance" in [docs/PLAN.md](docs/PLAN.md), then D17 and D32 |
-| working on DOT, Mermaid, icons or a graph layout | [docs/DIAGRAMS.md](docs/DIAGRAMS.md), then "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18, D31, D32, D35, D36 and D37 |
+| working on DOT, Mermaid, icons or a graph layout | [docs/DIAGRAMS.md](docs/DIAGRAMS.md), then "Diagrams" in [docs/PLAN.md](docs/PLAN.md), then D18, D31, D32, D35, D36, D37 and D39 |
 | working on the browser component | "The browser" in [docs/PLAN.md](docs/PLAN.md), then D19 |
 | working on charts for `usql` | "usql" in [docs/PLAN.md](docs/PLAN.md), then D20 |
 | adding an outside package | D5, then the table of dependencies in [docs/PLAN.md](docs/PLAN.md) |
@@ -61,6 +61,7 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | writing a document, a code comment, an error message or a commit message | the `simple-english` skill. Load it first. Then "Writing documentation" below |
 | writing or reviewing Go code | the `go-pedantry` skill. Load it first. Then "Hard rules" below |
 | adding or updating an agent skill | "Agent skills" in [CONTRIBUTING.md](CONTRIBUTING.md) |
+| copying Go code from another project, or changing a copy in `internal/` | [docs/UPSTREAM.md](docs/UPSTREAM.md), then D39, D40 and D41 |
 | needing something from another `xo` repository | "Peer sessions" below |
 
 `README.md` is for a person who uses zuzu. `CONTRIBUTING.md` is for a person
@@ -98,8 +99,8 @@ the end of `docs/PLAN.md` until the maintainers answer it.
 5. Every renderer reads the scene graph, and only the scene graph (D8). A
    renderer never reads a spec.
 6. The output is deterministic. The same spec, data, theme, fonts and time
-   zone give the same bytes, except where the spec asks for random numbers
-   and the caller gives no source (D28). A test never depends on the fonts
+   zone give the same bytes on the same architecture (D41), except where the
+   spec asks for random numbers and the caller gives no source (D28). A test never depends on the fonts
    or the time zone of the machine it runs on.
 7. zuzu reads no file and makes no request of its own. Data that a spec
    names by `url` comes through the loader that the caller gives (D25).
@@ -154,6 +155,8 @@ On 2026-11-12 the repository holds these files:
 | `skills-lock.json`, `.agents/skills/`, `.claude/skills/` | the agent skills (D2) |
 | `.gitignore`, `.gitattributes` | the files that git reads |
 | `docs/PLAN.md` | the plan and the open questions |
+| `docs/UPSTREAM.md`, `docs/upstream/upstreams.tsv` | the rules for a copy of another project, and the list of the upstreams (D39) |
+| `upstream/` | the checkouts of the upstreams, which git ignores (docs/UPSTREAM.md) |
 | `docs/API.md` | the public API (D24) |
 | `docs/EXPRESSIONS.md` | the expression language and scripting |
 | `docs/BACKLOG.md` | the work that is known and not done |
@@ -170,7 +173,12 @@ On 2026-11-12 the repository holds these files:
 | `format/` | the formats of numbers and times of d3, the units of time and the dates that JavaScript reads, with their oracle cases in `format/testdata` (D27) |
 | `dataflow/` | the reading of data and the transforms |
 | `geo/` | the projections, the geographic paths, the graticule, and the features and the meshes of TopoJSON |
-| `scale/` | the scales and their ticks |
+| `scale/` | the scales and their ticks, and the named schemes of Vega, with the licenses of their colors in `scale/LICENSE-schemes.txt` (D46) |
+| `internal/rough/` | the copy of rough-go, which draws a shape as if by hand, with its golden file of amd64 in `internal/rough/testdata` (D39, D41) |
+| `internal/dagre/` | the copy of dagro, dagre 3.1.1 in Go with the crossing sweep of dagre 0.8, which the transform `zuzu.dagre` lays out with, with its golden file of amd64 in `internal/dagre/testdata` (D39, D44, D45) |
+| `elk/` | the module `github.com/xo/zuzu/elk` under EPL-2.0, with its own `go.mod`, licenses, `README.md` and `.golangci.yml`: the package `elk`, which returns the layout engine `elk` of the interface `graph.Engine`, the adapter in `elk/internal/adapter` with its golden file of amd64 in `elk/internal/adapter/testdata`, and the program for TinyGo in `elk/internal/wasm` (D39, D44, D45) |
+| `elk/internal/elkgo/` | the copy of elk-go, ELK.js 0.12.0 in Go, with its licenses and notices (D39, docs/UPSTREAM.md) |
+| `internal/sketch/` | the pass that draws a scene in a look drawn by hand with `internal/rough`, after the layout and before every renderer, with the golden files of the look in `testdata/look` (D39, D40) |
 | `internal/color/` | the colors of CSS and their color spaces, which `scale` and `expr` share |
 | `layout/` | the axes, the legends and the titles in the look of zuzu, and the bounds of a scene (D12) |
 | `scene/` | the scene graph and its JSON form (D8) |
@@ -183,7 +191,8 @@ On 2026-11-12 the repository holds these files:
 | `icons/` | the bundled packs of icons, one package each, each with its license (D31) |
 | `text/` | the measurement of text and the bundled IBM Plex Sans, one collection in WOFF2 in `text/fonts` with its license (D11, D16, D34) |
 | `text/emoji/` | the bundled Noto Color Emoji with its license, in a package that a caller imports (D32) |
-| `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration and the CI workflow |
+| `text/excalifont/` | the bundled Excalifont with its license, in a package that a caller imports, for the look like Excalidraw (D40) |
+| `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration of the root module and the CI workflow, which also builds and tests the module of ELK |
 | `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |
 
 The packages go where "Packages" in `docs/PLAN.md` says.
@@ -195,6 +204,7 @@ Run these, as CI does:
 ```bash
 gofmt -l . && go vet ./... && go build ./... && CGO_ENABLED=0 go build ./... && go test -race -count=2 ./...
 golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go build ./... && go test -race -count=1 ./...)
+(cd elk && gofmt -l . && go vet ./... && go build ./... && go test -race -count=1 ./... && golangci-lint run ./...)
 ```
 
 `gofmt -l .` must print nothing. The tests of the root module read the

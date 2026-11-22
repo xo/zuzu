@@ -1,17 +1,23 @@
 # Tests zuzu on every push and pull request.
 #
-# The unit job lints, formats, vets, builds and tests both modules. The root
-# module and the test module each have a go.mod, so each is linted and tested
-# from its own folder.
+# The unit job lints, formats, vets, builds and tests the three modules. The
+# root module, the test module and the module of ELK in elk/ each have a
+# go.mod, so each is linted and tested from its own folder. The module of
+# ELK is under the EPL-2.0 and holds the copy of elk-go (D39 part 13, D44).
 #
 # The conformance job runs vega.js and vega-lite.js over the corpus to write
 # the references of D17, then checks that zuzu still matches them at the
 # shares that the plan states for phases 3 and 4. It also checks that the direct
 # renderer draws the corpus as okage draws its SVG (D11).
 #
+# The arm64 job tests the root module and the module of ELK on arm64, where the compiler of Go fuses
+# a multiply and an add and the package math gives other bits than on amd64.
+# zuzu gives the same bytes on one architecture (D41), so the golden test of a
+# copy of docs/UPSTREAM.md, which holds the bytes of amd64, does not run there.
+#
 # The tinygo job builds the packages of zuzu with TinyGo for WebAssembly, which
 # D29 makes a target. TinyGo builds a program, so it builds test/cmd/wasm,
-# which imports them.
+# which imports them, and elk/internal/wasm, which imports the module of ELK.
 name: Test
 
 on:
@@ -60,6 +66,11 @@ jobs:
         working-directory: test
         run: golangci-lint run ./...
 
+      - name: Lint the module of ELK
+        # elk/.golangci.yml skips the copy of elk-go in elk/internal/elkgo.
+        working-directory: elk
+        run: golangci-lint run ./...
+
       - name: Check formatting
         run: |
           out=$(gofmt -l .)
@@ -70,15 +81,15 @@ jobs:
           fi
 
       - name: Vet
-        run: go vet ./... && (cd test && go vet ./...)
+        run: go vet ./... && (cd test && go vet ./...) && (cd elk && go vet ./...)
 
       - name: Build
-        run: go build ./... && (cd test && go build ./...)
+        run: go build ./... && (cd test && go build ./...) && (cd elk && go build ./...)
 
       - name: Build without cgo
         # The module that a user imports uses no cgo (D5), and a consumer
         # builds it with CGO_ENABLED=0. That is checked rather than assumed.
-        run: CGO_ENABLED=0 go build ./...
+        run: CGO_ENABLED=0 go build ./... && (cd elk && CGO_ENABLED=0 go build ./...)
 
       - name: Test
         run: go test -race -count=2 ./...
@@ -86,6 +97,30 @@ jobs:
       - name: Test the test module
         working-directory: test
         run: go test -race -count=1 ./...
+
+      - name: Test the module of ELK
+        working-directory: elk
+        run: go test -race -count=1 ./...
+
+  arm64:
+    name: Unit on arm64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Test
+        run: go test -count=1 ./...
+
+      - name: Test the module of ELK
+        working-directory: elk
+        run: go test -count=1 ./...
 
   conformance:
     name: Conformance
@@ -145,3 +180,7 @@ jobs:
       - name: Build for WebAssembly
         working-directory: test
         run: GOOS=wasip1 GOARCH=wasm tinygo build -o zuzu.wasm ./cmd/wasm
+
+      - name: Build the module of ELK for WebAssembly
+        working-directory: elk
+        run: GOOS=wasip1 GOARCH=wasm tinygo build -o elk.wasm ./internal/wasm

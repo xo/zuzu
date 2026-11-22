@@ -1,6 +1,6 @@
 # D37. The answers of the maintainers on the backlog of 2026-11-20
 
-Status: Decided. Amends D14, D32 and D35.
+Status: Decided. Amends D14, D32 and D35. Amended by D48, D53 and D55.
 
 On 2026-11-20 the work on the backlog raised five questions. The
 maintainers answered each one. This decision records the answers.

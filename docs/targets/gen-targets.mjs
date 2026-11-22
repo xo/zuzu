@@ -39,10 +39,17 @@ const MODES = {
 // BAND is the opacity of the text that draws a band behind a group of rows,
 // so that the band of each mode is the text at 0.06 over the background.
 const BAND = 0.06;
+// RAMP_START is how far the sequential ramp starts from the background
+// toward its first color, so that the lowest value shows in both modes
+// (D48).
+const RAMP_START = 0.4;
 // EDGE_WIDTH is the width of the line of an edge of a diagram, and
 // ARROW_LENGTH the length of its arrowhead, which is 0.8 of its length wide.
 const EDGE_WIDTH = 1.5;
 const ARROW_LENGTH = 8;
+// NODE_TINT is how far the solid tint of a node goes from the background to
+// its color, with no opacity (D55).
+const NODE_TINT = 0.14;
 // Each scheme gives ten categorical colors for the light mode, the index of
 // the color for a rise and a fall, and, if it wants, its own colors for the
 // dark mode. Without them, the dark mode lifts each light color.
@@ -151,22 +158,28 @@ function theme(mode, scheme = "zuzu") {
   // toward the text color, so that a chart with ten series still differs.
   for (let i = cat.length; i < 10; i++) cat = [...cat, d3.interpolateRgb(cat[i % cat.length], m.text)(0.4)];
   const base = cat[0];
-  // The sequential ramp runs from the background to the first color and
-  // past it, so that it reads in either mode: on to a lighter color on a
-  // dark background, and to a darker color on a light one.
+  // The sequential ramp starts at a tint of the first color, RAMP_START of
+  // the way from the background, so that the lowest value shows (D48). It
+  // runs through a tint halfway from there to the first color, through the
+  // first color and past it, so that it reads in either mode: on to a
+  // lighter color on a dark background, and to a darker color on a light
+  // one.
+  const tints = [d3.interpolateRgb(m.bg, base)(RAMP_START), d3.interpolateRgb(m.bg, base)((1 + RAMP_START) / 2), base];
   const seq = d3.hsl(m.bg).l < 0.5
-    ? [d3.interpolateRgb(m.bg, base)(0.12), d3.interpolateRgb(m.bg, base)(0.45), base, d3.interpolateRgb(base, "#ffffff")(0.45), d3.interpolateRgb(base, "#ffffff")(0.85)]
-    : [d3.interpolateRgb(m.bg, base)(0.1), d3.interpolateRgb(m.bg, base)(0.4), base, d3.interpolateRgb(base, "#000000")(0.35), d3.interpolateRgb(base, "#000000")(0.6)];
+    ? [...tints, d3.interpolateRgb(base, "#ffffff")(0.45), d3.interpolateRgb(base, "#ffffff")(0.85)]
+    : [...tints, d3.interpolateRgb(base, "#000000")(0.35), d3.interpolateRgb(base, "#000000")(0.6)];
   // The diverging ramp runs from the color of a fall through the grid
-  // color to the color of a rise. The wheel of a cyclical scheme runs
-  // through the categorical colors, and the last joins the first.
+  // color to the color of a rise. A scheme that a spec names draws in its
+  // own colors, so the theme holds no ramp for it (D46).
   const div = [cat[s.down], m.grid, cat[s.up]];
-  const wheel = [...cat, cat[0]];
-  return { ...m, scheme, cat, seq, div, wheel, up: cat[s.up], down: cat[s.down] };
+  return { ...m, scheme, cat, seq, div, up: cat[s.up], down: cat[s.down] };
 }
 const THEMES = { light: theme("light"), dark: theme("dark") };
 const PAD = 24;
 const SIZE = { title: 16, subtitle: 12.5, label: 11, small: 10, source: 10.5 };
+// AXIS holds the sizes of an axis: its ticks, its line and the padding of
+// its labels (D46). The line and the ticks are in the color axis.
+const AXIS = { tickSize: 5, tickWidth: 1, domainWidth: 1, labelPadding: 3 };
 
 // est estimates the width of a string in the font of the targets. zuzu
 // measures text (D11), and this script only needs a close guess.
@@ -251,23 +264,98 @@ function svg(t, f, body, defs = "") {
     head.join("") + legend.flat().join("") + body + (src || "") + "</svg>\n";
 }
 
-// yGrid draws the horizontal grid lines and their labels on the left.
-function yGrid(t, f, y, ticks, fmt, { right = false, color } = {}) {
-  return g({}, ticks.map((v) => [
-    el("line", { x1: f.x0, x2: f.x1, y1: y(v), y2: y(v), stroke: t.grid, "stroke-width": 1 }),
-    txt(fmt(v), right
-      ? { x: f.x1 + 8, y: y(v) + 3.5, "font-size": SIZE.label, fill: color || t.muted }
-      : { x: f.x0 - 8, y: y(v) + 3.5, "font-size": SIZE.label, fill: color || t.muted, "text-anchor": "end" }),
-  ]));
-}
-// yLabels draws the labels of an axis without grid lines.
-const yLabels = (t, f, y, ticks, fmt, x, anchor, color) => g({}, ticks.map((v) =>
-  txt(fmt(v), { x, y: y(v) + 3.5, "font-size": SIZE.label, fill: color || t.muted, "text-anchor": anchor })));
+// LABEL is the distance between a label of an axis and the line of the
+// axis: a tick and the padding of a label.
+const LABEL = AXIS.tickSize + AXIS.labelPadding;
 
-// xAxis draws the base line and the labels below the plot area.
-function xAxis(t, f, x, ticks, fmt, { line = true, at } = {}) {
+// endTicks returns the ticks of a scale of numbers, about count of them and
+// at most six, whose step lands on both ends of a nice domain (D46), as
+// scale.EndTicks of zuzu chooses them. It takes the ticks of d3 when they
+// do. Else it takes the step of three ticks or more that is nearest count
+// and lands on both ends from zero, then, for a nice domain, the roundest
+// such step from the start, then the ticks of d3 when they land on both
+// ends, though they are more than six.
+function endTicks(scale, count = 5, most = 6) {
+  let [lo, hi] = scale.domain();
+  const rev = hi < lo;
+  if (rev) [lo, hi] = [hi, lo];
+  most = Math.max(2, Math.min(most, Math.floor(count) + 1));
+  const span = hi - lo, std = d3.ticks(lo, hi, count);
+  const near = (a, b) => Math.abs(a - b) <= 1e-9 * span;
+  const whole = (v) => Math.abs(v - Math.round(v)) <= 1e-9 * Math.max(1, Math.abs(v));
+  const ends = std.length >= 2 && near(std[0], lo) && near(std.at(-1), hi);
+  let out = std;
+  if (!(ends && std.length <= most)) {
+    const e0 = Math.floor(Math.log10(span));
+    let round = null, start = null;
+    for (let e = e0 - 1; e <= e0; e++) {
+      [1, 2, 5, 2.5, 4, 3, 1.5, 6, 8].forEach((k, rank) => {
+        const step = k * 10 ** e, q = span / step, n = Math.round(q) + 1;
+        if (!whole(q) || n < 3 || n > most) return;
+        const d = Math.abs(n - count), c = { d, rank, step, n };
+        if (whole(lo / step)) {
+          if (!round || d < round.d || (d === round.d && rank < round.rank)) round = c;
+        } else if (!start || rank < start.rank || (rank === start.rank && d < start.d)) {
+          start = c;
+        }
+      });
+    }
+    const [nlo, nhi] = d3.nice(lo, hi, 10);
+    const best = round ?? (near(nlo, lo) && near(nhi, hi) ? start : null);
+    if (best) out = d3.range(best.n).map((i) => +(lo + i * best.step).toPrecision(12));
+  }
+  return rev ? out.reverse() : out;
+}
+
+// gridTicks returns the ticks at which an axis draws its grid lines and its
+// ticks (D51): the ticks of Vega, the ticks of the scale for 10, when each
+// label is one of them and two of them stand at least 10 apart, and else
+// the labels. A band scale keeps its labels.
+function gridTicks(scale, labels) {
+  if (typeof scale.ticks !== "function" || typeof scale.bandwidth === "function" || !labels.length) return labels;
+  const vega = scale.ticks(10);
+  if (vega.length <= labels.length) return labels;
+  const pos = vega.map((v) => scale(v));
+  for (let i = 1; i < pos.length; i++) if (Math.abs(pos[i] - pos[i - 1]) < 10) return labels;
+  const same = (a, b) => Math.abs(+a - +b) <= 1e-9 * Math.max(1, Math.abs(+a), Math.abs(+b));
+  return labels.every((l) => vega.some((v) => same(l, v))) ? vega : labels;
+}
+
+// yLine draws the line of a vertical axis at x along the range of y, and a
+// tick at each value, out from the plot area.
+function yLine(t, y, ticks, x, right = false) {
+  const [r0, r1] = y.range(), dir = right ? 1 : -1;
+  return g({}, el("line", { x1: x, x2: x, y1: r0, y2: r1, stroke: t.axis, "stroke-width": AXIS.domainWidth }),
+    ticks.map((v) => el("line", { x1: x, x2: x + dir * AXIS.tickSize, y1: y(v), y2: y(v), stroke: t.axis, "stroke-width": AXIS.tickWidth })));
+}
+// xLine draws the line of an axis below the plot area, and a tick at each
+// value, pointing down.
+function xLine(t, f, x, ticks, at) {
   const y = at ?? f.y1;
-  return g({}, line && el("line", { x1: f.x0, x2: f.x1, y1: y, y2: y, stroke: t.axis, "stroke-width": 1 }),
+  return g({}, el("line", { x1: f.x0, x2: f.x1, y1: y, y2: y, stroke: t.axis, "stroke-width": AXIS.domainWidth }),
+    ticks.map((v) => el("line", { x1: x(v), x2: x(v), y1: y, y2: y + AXIS.tickSize, stroke: t.axis, "stroke-width": AXIS.tickWidth })));
+}
+
+// yGrid draws the horizontal grid lines, the line and the ticks of the
+// axis, and the labels, on the left or on the right.
+function yGrid(t, f, y, ticks, fmt, { right = false, color } = {}) {
+  const lines = gridTicks(y, ticks);
+  return g({}, lines.map((v) => el("line", { x1: f.x0, x2: f.x1, y1: y(v), y2: y(v), stroke: t.grid, "stroke-width": 1 })),
+    ticks.map((v) => txt(fmt(v), right
+      ? { x: f.x1 + LABEL, y: y(v) + 3.5, "font-size": SIZE.label, fill: color || t.muted }
+      : { x: f.x0 - LABEL, y: y(v) + 3.5, "font-size": SIZE.label, fill: color || t.muted, "text-anchor": "end" })),
+    yLine(t, y, lines, right ? f.x1 : f.x0, right));
+}
+// yLabels draws the line, the ticks and the labels of an axis without grid
+// lines.
+const yLabels = (t, f, y, ticks, fmt, x, anchor, color) => g({},
+  yLine(t, y, ticks, anchor === "start" ? x - LABEL : x + LABEL, anchor === "start"),
+  ticks.map((v) => txt(fmt(v), { x, y: y(v) + 3.5, "font-size": SIZE.label, fill: color || t.muted, "text-anchor": anchor })));
+
+// xAxis draws the line, the ticks and the labels below the plot area.
+function xAxis(t, f, x, ticks, fmt, { at } = {}) {
+  const y = at ?? f.y1;
+  return g({}, xLine(t, f, x, gridTicks(x, ticks), y),
     ticks.map((v) => txt(fmt(v), { x: x(v), y: y + 18, "font-size": SIZE.label, fill: t.muted, "text-anchor": "middle" })));
 }
 
@@ -323,7 +411,7 @@ chart("line", 0, "Multi-series line with a crosshair", "stocks.csv", (t) => {
   const tx = x(at), tipW = 128, tipH = 26 + tipRows.length * 17, tipX = tx - tipW - 12, tipY = f.y0 + 6;
   const ends = relax(SYMBOLS.map((s, i) => { const last = bySym.get(s).at(-1); return { s, i, x: x(last.date), y: y(last.price), v: last.price }; }).map((e) => ({ ...e, py: e.y })), 13, f.y0, f.y1);
   const body = [
-    yGrid(t, f, y, y.ticks(5), fmtUsd),
+    yGrid(t, f, y, endTicks(y, 5), fmtUsd),
     xAxis(t, f, x, x.ticks(d3.utcYear.every(2)), d3.utcFormat("%Y")),
     el("line", { x1: tx, x2: tx, y1: f.y0, y2: f.y1, stroke: t.faint, "stroke-width": 1, "stroke-dasharray": "3 3" }),
     SYMBOLS.map((s, i) => el("path", { d: line(bySym.get(s)), fill: "none", stroke: t.cat[i], "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" })),
@@ -356,7 +444,7 @@ chart("area", 0, "Area with a gradient", "stocks.csv", (t) => {
     el("stop", { offset: 0, "stop-color": t.cat[0], "stop-opacity": 0.32 }),
     el("stop", { offset: 1, "stop-color": t.cat[0], "stop-opacity": 0.02 }));
   const body = [
-    yGrid(t, f, y, y.ticks(5), fmtUsd),
+    yGrid(t, f, y, endTicks(y, 5), fmtUsd),
     xAxis(t, f, x, x.ticks(d3.utcYear.every(2)), d3.utcFormat("%Y")),
     el("path", { d: area(rows), fill: "url(#fill)" }),
     el("path", { d: line(rows), fill: "none", stroke: t.cat[0], "stroke-width": 2, "stroke-linejoin": "round" }),
@@ -411,7 +499,7 @@ chart("streamgraph", 1, "Streamgraph with direct labels", "stocks.csv", (t) => {
       if (y(d[0]) - y(d[1]) < 16) return "";
       return txt(s.key, { x: x(d.data.d), y: (y(d[0]) + y(d[1])) / 2 + 4, "font-size": SIZE.label + 1, "font-weight": 600, fill: t.bg, "text-anchor": "middle" });
     }),
-    xAxis(t, f, x, x.ticks(d3.utcYear.every(2)), d3.utcFormat("%Y"), { line: false }),
+    xAxis(t, f, x, x.ticks(d3.utcYear.every(2)), d3.utcFormat("%Y")),
   ];
   return svg(t, f, body.flat().join(""));
 });
@@ -428,7 +516,7 @@ chart("bar-grouped", 0, "Grouped bar", "barley.json", (t) => {
   const xi = d3.scaleBand([1931, 1932], [0, x.bandwidth()]).paddingInner(0.08);
   const y = d3.scaleLinear([0, d3.max([...sum.values()], (m) => d3.max(m.values()))], [f.y1, f.y0]).nice();
   const body = [
-    yGrid(t, f, y, y.ticks(5), String),
+    yGrid(t, f, y, endTicks(y, 5), String),
     barleySites.map((s) => [1931, 1932].map((yr, k) => {
       const v = sum.get(s).get(yr);
       return el("path", { d: barUp(x(s) + xi(yr), y(v), xi.bandwidth(), y(0) - y(v), 3), fill: t.cat[k * 2] });
@@ -450,10 +538,11 @@ chart("bar-stacked", 0, "Stacked horizontal bar", "barley.json", (t) => {
   const y = d3.scaleBand(barleySites, [f.y0, f.y1]).padding(0.28);
   const x = d3.scaleLinear([0, d3.max(series.at(-1), (d) => d[1])], [f.x0, f.x1]).nice();
   const body = [
-    x.ticks(5).map((v) => [
+    endTicks(x, 5).map((v) => [
       el("line", { x1: x(v), x2: x(v), y1: f.y0, y2: f.y1, stroke: t.grid }),
-      txt(String(v), { x: x(v), y: f.y1 + 16, "font-size": SIZE.label, fill: t.muted, "text-anchor": "middle" }),
+      txt(String(v), { x: x(v), y: f.y1 + 18, "font-size": SIZE.label, fill: t.muted, "text-anchor": "middle" }),
     ]),
+    xLine(t, f, x, endTicks(x, 5)),
     series.map((s, i) => s.map((d) => {
       const last = i === series.length - 1;
       const w = x(d[1]) - x(d[0]) - (last ? 0 : 1.5);
@@ -474,7 +563,7 @@ chart("histogram", 0, "Histogram with a reference line", "cars.json", (t) => {
   const y = d3.scaleLinear([0, d3.max(bins, (b) => b.length)], [f.y1, f.y0]).nice();
   const mean = d3.mean(mpg);
   const body = [
-    yGrid(t, f, y, y.ticks(5), String),
+    yGrid(t, f, y, endTicks(y, 5), String),
     bins.map((b) => el("path", { d: barUp(x(b.x0) + 1, y(b.length), x(b.x1) - x(b.x0) - 2, y(0) - y(b.length), 2.5), fill: t.cat[4] })),
     el("line", { x1: x(mean), x2: x(mean), y1: f.y0 - 4, y2: f.y1, stroke: t.text, "stroke-width": 1.5, "stroke-dasharray": "4 3" }),
     txt(`Mean ${mean.toFixed(1)} mpg`, { x: x(mean) + 6, y: f.y0 + 6, "font-size": SIZE.label, "font-weight": 600, fill: t.text }),
@@ -497,10 +586,10 @@ chart("bubble", 0, "Bubble scatter with labels", "gapminder.json", (t) => {
   const big = d3.sort(rows, (d) => -d.pop).slice(0, 4).map((d) => d.country);
   const body = [
     yGrid(t, f, y, [40, 50, 60, 70, 80], String),
-    x.ticks(7).map((v) => el("line", { x1: x(v), x2: x(v), y1: f.y0, y2: f.y1, stroke: t.grid })),
-    xAxis(t, f, x, x.ticks(7), String, { line: false }),
-    txt("Children per woman", { x: f.x1, y: f.y1 + 34, "font-size": SIZE.small, fill: t.faint, "text-anchor": "end" }),
-    txt("Life expectancy in years", { x: f.x0 - 30, y: f.y0 - 12, "font-size": SIZE.small, fill: t.faint }),
+    endTicks(x, 7).map((v) => el("line", { x1: x(v), x2: x(v), y1: f.y0, y2: f.y1, stroke: t.grid })),
+    xAxis(t, f, x, endTicks(x, 7), String),
+    txt("Children per woman", { x: f.x1, y: f.y1 + 34, "font-size": SIZE.small, fill: t.muted, "text-anchor": "end" }),
+    txt("Life expectancy in years", { x: f.x0 - 30, y: f.y0 - 12, "font-size": SIZE.small, fill: t.muted }),
     d3.sort(rows, (d) => -d.pop).map((d) => el("circle", { cx: x(d.fertility), cy: y(d.life_expect), r: Math.max(2.5, r(d.pop)), fill: t.cat[d.cluster], "fill-opacity": 0.72, stroke: t.bg, "stroke-width": 1 })),
     rows.filter((d) => big.includes(d.country)).map((d) => txt(d.country, { x: x(d.fertility), y: y(d.life_expect) - r(d.pop) - 5, "font-size": SIZE.label, "font-weight": 600, fill: t.text, "text-anchor": "middle" })),
   ];
@@ -568,7 +657,7 @@ chart("dual-axis", 0, "Bars and a line with two axes", "seattle-weather.csv", (t
   const line = d3.line().x((r) => x(r.m) + x.bandwidth() / 2).y((r) => yr(r.high)).curve(d3.curveMonotoneX);
   const mn = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
   const body = [
-    yGrid(t, f, yl, yl.ticks(5), String, { color: t.cat[4] }),
+    yGrid(t, f, yl, endTicks(yl, 5), String, { color: t.cat[4] }),
     yLabels(t, f, yr, yr.ticks(5).filter((v) => v <= 30), (v) => v + "°", f.x1 + 8, "start", t.cat[7]),
     rows.map((r) => el("path", { d: barUp(x(r.m), yl(r.rain), x.bandwidth(), yl(0) - yl(r.rain), 3), fill: t.cat[4], "fill-opacity": 0.85 })),
     el("path", { d: line(rows), fill: "none", stroke: t.cat[7], "stroke-width": 2.5, "stroke-linejoin": "round" }),
@@ -616,7 +705,8 @@ chart("box", 1, "Box plot with raw points", "penguins.json", (t) => {
   const x = d3.scaleLinear(d3.extent(penguins, (r) => r["Body Mass (g)"]), [f.x0, f.x1]).nice();
   const rnd = lcg(11);
   const body = [
-    x.ticks(6).map((v) => [el("line", { x1: x(v), x2: x(v), y1: f.y0, y2: f.y1, stroke: t.grid }), txt(fmtInt(v), { x: x(v), y: f.y1 + 16, "font-size": SIZE.label, fill: t.muted, "text-anchor": "middle" })]),
+    endTicks(x, 6).map((v) => [el("line", { x1: x(v), x2: x(v), y1: f.y0, y2: f.y1, stroke: t.grid }), txt(fmtInt(v), { x: x(v), y: f.y1 + 18, "font-size": SIZE.label, fill: t.muted, "text-anchor": "middle" })]),
+    xLine(t, f, x, endTicks(x, 6)),
     SPECIES.map((s, i) => {
       const v = penguins.filter((r) => r.Species === s).map((r) => r["Body Mass (g)"]).sort(d3.ascending);
       const q1 = d3.quantile(v, 0.25), q2 = d3.quantile(v, 0.5), q3 = d3.quantile(v, 0.75), iqr = q3 - q1;
@@ -675,7 +765,7 @@ chart("candlestick", 1, "Candlestick on a trading-day scale", "ohlc.json", (t) =
   const line = d3.line().x((p) => x(p.r.date) + x.bandwidth() / 2).y((p) => y(p.v)).curve(d3.curveMonotoneX);
   const firsts = rows.filter((r, i) => i === 0 || r.d.getUTCDay() < rows[i - 1].d.getUTCDay());
   const body = [
-    yGrid(t, f, y, y.ticks(5), String),
+    yGrid(t, f, y, endTicks(y, 5), String),
     rows.map((r) => {
       const c = r.close >= r.open ? t.up : t.down, cx = x(r.date) + x.bandwidth() / 2;
       const top = y(Math.max(r.open, r.close)), h = Math.max(1, Math.abs(y(r.open) - y(r.close)));
@@ -872,7 +962,7 @@ chart("waterfall", 1, "Waterfall", "stocks.csv", (t) => {
   const x = d3.scaleBand(steps.map((s, i) => i), [f.x0, f.x1]).padding(0.28);
   const y = d3.scaleLinear([0, d3.max(steps, (s) => Math.max(s.a, s.b))], [f.y1, f.y0]).nice();
   const body = [
-    yGrid(t, f, y, y.ticks(5), fmtUsd),
+    yGrid(t, f, y, endTicks(y, 5), fmtUsd),
     steps.map((s, i) => {
       const c = s.kind !== "delta" ? t.cat[0] : s.v >= 0 ? t.up : t.down;
       const top = y(Math.max(s.a, s.b)), h = Math.max(1, Math.abs(y(s.a) - y(s.b)));
@@ -902,7 +992,7 @@ chart("parallel", 2, "Parallel coordinates", "penguins.json", (t) => {
     keys.map((k) => [
       el("line", { x1: x(k), x2: x(k), y1: f.y0, y2: f.y1, stroke: t.axis }),
       txt(k.replace(/ \(.*\)/, ""), { x: x(k), y: f.y0 - 12, "font-size": SIZE.label, "font-weight": 600, fill: t.text, "text-anchor": "middle" }),
-      ys[k].ticks(4).map((v) => txt(fmtInt(v), { x: x(k) + 5, y: ys[k](v) + 3.5, "font-size": SIZE.small, fill: t.muted, stroke: t.bg, "stroke-width": 3, "paint-order": "stroke" })),
+      endTicks(ys[k], 4).map((v) => txt(fmtInt(v), { x: x(k) + 5, y: ys[k](v) + 3.5, "font-size": SIZE.small, fill: t.muted, stroke: t.bg, "stroke-width": 3, "paint-order": "stroke" })),
     ]),
   ];
   return svg(t, f, body.flat(2).join(""));
@@ -1016,14 +1106,15 @@ chart("beeswarm", 2, "Beeswarm", "cars.json", (t) => {
   const f = frame(640, Math.ceil(need + f0.y0 + (400 - f0.y1)), { title: "Fuel economy by origin", subtitle: "Each dot is one car. Dots pile up where many cars share a value", source: "Source: vega-datasets, cars.json", left: 60, bottom: 26 });
   let top = f.y0;
   const body = [
-    x.ticks(8).map((v) => [el("line", { x1: x(v), x2: x(v), y1: f.y0, y2: f.y1, stroke: t.grid }), txt(String(v), { x: x(v), y: f.y1 + 16, "font-size": SIZE.label, fill: t.muted, "text-anchor": "middle" })]),
+    endTicks(x, 8).map((v) => [el("line", { x1: x(v), x2: x(v), y1: f.y0, y2: f.y1, stroke: t.grid }), txt(String(v), { x: x(v), y: f.y1 + 18, "font-size": SIZE.label, fill: t.muted, "text-anchor": "middle" })]),
+    xLine(t, f, x, endTicks(x, 8)),
     swarms.map((s, i) => {
       const cy = top - s.lo;
       top += s.hi - s.lo + GAP;
       return [txt(s.o, { x: f.x0 - 14, y: cy + 4, "font-size": 12, "font-weight": 600, fill: t.text, "text-anchor": "end" }),
         s.placed.map(([px, py]) => el("circle", { cx: px, cy: cy + py, r: R, fill: t.cat[i], "fill-opacity": 0.9 }))];
     }),
-    txt("Miles per gallon", { x: f.x1, y: f.y1 + 30, "font-size": SIZE.small, fill: t.faint, "text-anchor": "end" }),
+    txt("Miles per gallon", { x: f.x1, y: f.y1 + 30, "font-size": SIZE.small, fill: t.muted, "text-anchor": "end" }),
   ];
   return svg(t, f, body.flat(2).join(""));
 });
@@ -1036,8 +1127,8 @@ chart("contour", 2, "Density contours", "penguins.json", (t) => {
   const y = d3.scaleLinear([13, 22], [f.y1, f.y0]);
   const path = d3.geoPath();
   const body = [
-    yGrid(t, f, y, y.ticks(5), String),
-    xAxis(t, f, x, x.ticks(7), String),
+    yGrid(t, f, y, endTicks(y, 5), String),
+    xAxis(t, f, x, endTicks(x, 7), String),
     SPECIES.map((s, i) => {
       const pts = rows.filter((r) => r.Species === s);
       const cs = d3.contourDensity().x((r) => x(r[kx]) - f.x0).y((r) => y(r[ky]) - f.y0).size([f.x1 - f.x0, f.y1 - f.y0]).bandwidth(16).thresholds(6)(pts);
@@ -1057,10 +1148,10 @@ chart("hexbin", 2, "Hexagonal bins", "gapminder.json", (t) => {
   const bins = hb(rows);
   const color = seqScale(t, [1, d3.max(bins, (b) => b.length)]);
   const body = [
-    yGrid(t, f, y, y.ticks(6), String),
-    xAxis(t, f, x, x.ticks(8), String, { line: false }),
-    txt("Children per woman", { x: f.x1, y: f.y1 + 34, "font-size": SIZE.small, fill: t.faint, "text-anchor": "end" }),
-    txt("Life expectancy in years", { x: f.x0 - 30, y: f.y0 - 12, "font-size": SIZE.small, fill: t.faint }),
+    yGrid(t, f, y, endTicks(y, 6), String),
+    xAxis(t, f, x, endTicks(x, 8), String),
+    txt("Children per woman", { x: f.x1, y: f.y1 + 34, "font-size": SIZE.small, fill: t.muted, "text-anchor": "end" }),
+    txt("Life expectancy in years", { x: f.x0 - 30, y: f.y0 - 12, "font-size": SIZE.small, fill: t.muted }),
     bins.map((b) => el("path", { d: `M${b.x},${b.y}` + hb.hexagon(11), fill: color(b.length), stroke: t.bg, "stroke-width": 0.5 })),
   ];
   return svg(t, f, body.flat().join(""));
@@ -1121,7 +1212,7 @@ chart("flowchart", 3, "Flowchart with a layered layout", "the zuzu pipeline", (t
     N.map(([id, label]) => {
       const n = gr.node(id), k = kind[id], c = fillOf[k];
       return g({ transform: `translate(${n.x - n.width / 2},${n.y - n.height / 2})` },
-        el("rect", { width: n.width, height: n.height, rx: k === "data" ? 16 : 8, fill: k === "step" ? t.panel : c, "fill-opacity": k === "step" ? 1 : 0.16, stroke: k === "step" ? t.axis : c, "stroke-width": 1.25 }),
+        el("rect", { width: n.width, height: n.height, rx: k === "data" ? 16 : 8, fill: k === "step" ? t.panel : d3.interpolateRgb(t.bg, c)(NODE_TINT), stroke: k === "step" ? t.axis : c, "stroke-width": 1.25 }),
         txt(label, { x: n.width / 2, y: n.height / 2 + 4, "font-size": 12, "font-weight": k === "data" ? 600 : 500, fill: t.text, "text-anchor": "middle" }));
     }));
   return svg(t, f, body, defs);

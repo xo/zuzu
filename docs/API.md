@@ -132,6 +132,10 @@ err = svg.Write(w, s)
 pix, err := raster.Draw(s, raster.WithRenderer(fonts)) // phase 6 (D11)
 ```
 
+`svg.Write` takes options. `svg.WithFont` embeds a font in a rule
+`@font-face` when a text names its family, as `SVG` does for the font of a
+look drawn by hand (D43).
+
 `raster.Draw` exists since phase 6. `raster.WithRenderer` names the
 renderer of okage whose fonts draw the text, with the layout of text of
 okage D37. A program makes one and shares it, because it loads the fonts of
@@ -159,8 +163,10 @@ such a link as an issue, and the item has no link.
 
 An option is a functional option named `With...`, and the caller owns every
 value it gives (okage D20). There are two kinds, so that an option given in
-the wrong place does not compile. `WithEmoji` is of both kinds (D38). It
-returns a `SharedOption`, which is an `Option` and a `RenderOption`.
+the wrong place does not compile. `WithEmoji`, `WithLook`,
+`WithLookFont`, `WithLayoutEngine` and `WithLayout` are of both kinds (D38,
+D40, D44, D45). Each returns a `SharedOption`, which is an `Option` and a
+`RenderOption`.
 
 `Option` applies when a spec is parsed and compiled:
 
@@ -171,6 +177,10 @@ returns a `SharedOption`, which is an `Option` and a `RenderOption`.
 | `WithFunction(name string, fn expr.Func)` | none | a Go function that an expression can call |
 | `WithMath(*text.MathFont)` | none, so the math of KaTeX in a label of Mermaid draws its source | the font of math, from the package `text/math`, which draws a formula of a label as math (D36) |
 | `WithEmoji(*text.Fallback)` | none, so an emoji measures as nothing | the font of the emoji, which a kind of Mermaid that lays out when it compiles, such as a sequence, a pie or a mindmap, measures an emoji with. The chart keeps it, and a render that gives no font of its own draws with it (D38) |
+| `WithLook(theme.Look)` | `zuzu.look` of the spec, then `theme.LookStandard` | the look, such as `theme.LookExcalidraw`, in which a kind of Mermaid that lays out when it compiles measures its text. The chart keeps it, and a render that gives no look of its own draws in it (D40) |
+| `WithLookFont(theme.Look, *text.Fallback)` | none | the font of a look drawn by hand, such as Excalifont of the package `text/excalifont`, which a kind of Mermaid that lays out when it compiles measures its text in when the parse draws in that look. The chart keeps it (D40) |
+| `WithLayoutEngine(graph.Engine)` | the built in engines, `layered` and `dagre` | a layout engine that a graph can lay out with, under its name, such as the engine `elk` of `elk.Layout()`. It forces nothing. The chart keeps it (D45) |
+| `WithLayout(name string)` | the layout of the source | the layout that each graph of the chart lays out with, such as `dagre` or `elk.stress`, over the layout of the source. The chart keeps it, and a render that forces no layout of its own lays out with it (D45) |
 | `WithNow(time.Time)` | none, so a gantt draws no marker of today and puts a date with no day on 1970-01-01, and `now()` gives 0 | the time of the render. A gantt of Mermaid draws the marker of today at it, and takes the day of a date with no day from it, in the time zone of the time. `now()` gives it. The chart keeps it (D38) |
 | `WithEvaluator(expr.Evaluator)` | the native evaluator | the evaluator of expressions, such as the goja one (D9). Not built yet |
 | `WithLogger(*slog.Logger)` | none | where zuzu logs |
@@ -195,6 +205,10 @@ returns a `SharedOption`, which is an `Option` and a `RenderOption`.
 | `WithIcons(name string, *icon.Pack)` | the five built-in icons | a pack of icons, under the name that a diagram uses for it (D31) |
 | `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |
 | `WithEmoji(*text.Fallback)` | the font of `WithEmoji` of `Parse`, then none, so an emoji draws nothing | the font of the emoji, from the package `text/emoji`, which draws an emoji in color (D32). `Parse` accepts it too, and the font of the render wins over the font of `Parse` (D38) |
+| `WithLook(theme.Look)` | the look of `WithLook` of `Parse`, then `zuzu.look` of the spec, then `theme.LookStandard` | the look in which the chart draws, as "Looks" says (D40) |
+| `WithLookFont(theme.Look, *text.Fallback)` | the font of `WithLookFont` of `Parse` for the look, then none, so the look draws its text in IBM Plex Sans | the font of a look drawn by hand, as "Looks" says (D40) |
+| `WithLayoutEngine(graph.Engine)` | the engines of `WithLayoutEngine` of `Parse` | a layout engine that a graph can lay out with, as "Layouts" says. An engine of the render wins over an engine of `Parse` with the same name (D45) |
+| `WithLayout(name string)` | the layout of `WithLayout` of `Parse`, then the layout of the source | the layout that each graph lays out with, as "Layouts" says. An empty name forces no layout (D45) |
 
 A spec can ask for a look in its `config`, with two keys that Vega does not
 have (D6, D32). `zuzu.mode` is `light` or `dark`, and `zuzu.scheme` is the
@@ -220,6 +234,142 @@ background that the caller gives with `WithBackground` wins over
 `zuzu.background`, and the mode is then that of the caller or of
 `zuzu.mode`. The compiler of Vega-Lite passes the key on. A value that is
 not a color is an issue, as above. `theme.ConfigBackground` names the key.
+
+### Looks
+
+A look changes the shapes and the font of a chart, and keeps the colors
+of its mode and its scheme (D39, D40). `theme.LookStandard` is the look
+of `docs/STYLE.md`, the default. `theme.LookExcalidraw` draws each mark
+as if by hand, as "The look like Excalidraw" in `docs/STYLE.md` says, and
+draws its text in Excalifont. A look like xkcd waits for a font (D40).
+
+1. `WithLook` of a render wins over `WithLook` of `Parse`, which wins over
+   the key `zuzu.look` of the config of the spec, whose values are the
+   names of the looks, `standard` and `excalidraw`. The compiler of
+   Vega-Lite passes the key on. `look: handDrawn` of a Mermaid diagram
+   fills it, and `classic` and `neo` draw in the standard look, as
+   `docs/DIAGRAMS.md` says. `theme.ConfigLook` names the key.
+2. The key `zuzu.lookSeed` of the config is the seed of a look drawn by
+   hand, a whole number, 1 by default. `handDrawnSeed` of Mermaid fills
+   it, and its default, 0, keeps the seed 1. The same source, seed and
+   fonts give the same bytes on the same architecture (D41).
+   `theme.ConfigLookSeed` names the key.
+3. A look that zuzu does not have, and a seed that is not a whole number,
+   are issues, as a mode that zuzu does not have is. The render then draws
+   in the standard look, or with the seed 1.
+4. `WithLookFont` gives the font of a look, by look, as `WithEmoji` gives
+   the font of the emoji. The look like Excalidraw measures its text in
+   the font, with IBM Plex Sans for each character that the font does not
+   have, so each label fits its box. The SVG names the family of the font
+   first and embeds the font in a rule `@font-face` (D43), and the PNG of
+   `Image` draws with the font. Without the font, the look draws its text
+   in IBM Plex Sans, and the report warns of it with `ErrNoLookFont`, in
+   the strict mode too. A font for the standard look changes nothing.
+5. `Parse` takes both options, because a kind of Mermaid that lays out when
+   it compiles measures its text then. The look of `Parse` is the look of
+   `WithLook`, or else the look of the source. A render that gives another
+   look draws in it, with the layout of the parse.
+
+```go
+font := zuzu.WithLookFont(theme.LookExcalidraw, excalifont.Font())
+c, report, err := zuzu.Parse(src, zuzu.WithLook(theme.LookExcalidraw), font)
+img, report, err := c.Image(ctx, font)
+```
+
+A look drawn by hand runs after the layout and before every renderer, in
+`Render`, so the scene that `Render` returns, and its JSON form, hold the
+paths of the look (D40 part 7). The SVG writer and `raster` read the same
+scene and draw the same look.
+
+### Layouts
+
+A layout engine lays out the graph of a diagram (D39 part 10, D44). The
+interface `graph.Engine` holds it:
+
+```go
+package graph
+
+type Engine interface {
+	// Name returns the name of the engine, such as layered or dagre. The
+	// transform of the engine is zuzu. and the name, such as zuzu.dagre.
+	Name() string
+	// Lay lays out a graph, with the places in the order of the input.
+	Lay(in LayoutInput) (*Layout, error)
+}
+
+func Layered() Engine // the engine of zuzu.layered (D31)
+func Dagre() Engine   // the engine of zuzu.dagre (D39 part 12, D45)
+
+// The names of the engines. The module github.com/xo/zuzu/elk gives the
+// engine of EngineELK.
+const (
+	EngineLayered = "layered"
+	EngineDagre   = "dagre"
+	EngineELK     = "elk"
+)
+
+// Finish puts the ends on the outlines of the shapes, and sets the ends,
+// the labels at the ends, the xlabels, the size and the paths of a layout
+// that an engine made from its places and points.
+func Finish(in *LayoutInput, out *Layout)
+```
+
+```go
+package elk // the module github.com/xo/zuzu/elk, under the EPL-2.0
+
+// Layout returns the engine of ELK, named elk.
+func Layout() graph.Engine
+```
+
+`LayoutInput` holds the nodes with their sizes, the clusters nested by their
+parents, the edges with the boxes of their labels and of the labels at
+their ends, the ports, the direction and the spaces. `Layout` holds the
+places of the nodes and the clusters, the points of each edge and the
+places of its labels. An engine names each part of the input that it does
+not lay out as the input asks in `Layout.Unsupported`, and the transform
+reports each one as an issue that wraps `vega.ErrUnsupported`, which is an
+error in the strict mode (hard rule 4).
+
+An engine is available when the caller gives it with `WithLayoutEngine`,
+or when it is built in: `layered` and `dagre` (D45). zuzu registers no
+engine at the level of a package (hard rule 9). The module
+`github.com/xo/zuzu/elk` gives the engine of ELK, named `elk`
+(`graph.EngineELK`), which lays out the layout `elk` and each layout whose
+name starts with `elk.`, such as `elk.stress`. The runtime picks the layout
+of each graph of a render in this order:
+
+1. The layout that `WithLayout` of the render forces, else the layout that
+   `WithLayout` of `Parse` forces. The option of the caller wins over the
+   source, as `WithLook` does. A forced layout with no available engine is
+   an issue that wraps `vega.ErrUnsupported`, an error in the strict mode,
+   and the next rules pick the layout. The first graph that lays out
+   reports the issue, so a chart with no graph reports nothing.
+2. The key `zuzu.layout` of the config of the spec, which
+   `graph.ConfigLayout` names. A layout with an available engine lays out
+   with it. A layout of ELK with no engine of ELK lays out with the
+   transform of the spec, `zuzu.layered`, with no issue (D32). Another
+   layout with no engine is an issue, and the transform of the spec draws.
+3. The engine of each transform of a graph in the spec, `zuzu.layered` or
+   `zuzu.dagre`.
+
+A diagram of Mermaid fills `zuzu.layout` for its graphs. A graph that sets
+no layout, in a kind whose default layout in Mermaid 12.3 is ELK, gives
+`elk`: the flowchart, the state diagram, the class diagram, the ER
+diagram, the requirement diagram, the agentflow diagram and the use case
+diagram. `layout: dagre` gives `dagre`, and an ELK layout gives its name.
+The swimlane diagram, which lays out in lanes, and DOT give nothing, so
+they draw with `zuzu.layered`. So without an engine of ELK, the output is
+the output of `zuzu.layered`, except for `layout: dagre`, which draws with
+`zuzu.dagre` (D45 part 2).
+
+The engine gets the name of the layout as `LayoutInput.Algorithm`, so that
+an engine with more than one algorithm, such as the one of ELK, can choose
+one.
+
+```go
+c, report, err := zuzu.Parse(src, zuzu.WithLayoutEngine(elk.Layout()))
+report, err = c.SVG(ctx, w, zuzu.WithLayout("dagre"))
+```
 
 The logger of a render is `WithRenderLogger`, and `WithLogger` is the
 logger of `Parse`, so that each logger has its own place.
@@ -414,6 +564,7 @@ const (
 	ErrUnknownName    Error = "unknown name"
 	ErrNoGlyph        Error = "no font has the character"
 	ErrNoNow          Error = "no time of the render"
+	ErrNoLookFont     Error = "no font of the look"
 )
 ```
 
@@ -429,6 +580,14 @@ names each such character once for each render (D32).
 `ErrNoNow` is the error of an expression that calls `now()` when `Parse`
 has no `WithNow`, in the strict mode. In the loose mode, `now()` gives 0,
 and the report names the expression once for each render (D38).
+
+`ErrNoLookFont` is a warning, and never an error. A look drawn by hand
+with no font of the look, which `WithLookFont` gives, draws its text in
+IBM Plex Sans, so it drops nothing. The report holds the warning once for
+each render, in the loose and the strict mode alike (D40). It is the one
+warning of the report. A caller tells it apart with
+`errors.Is(issue, zuzu.ErrNoLookFont)`. A gradient in a look drawn by hand
+is no issue, because the look keeps its colors.
 
 A constant cannot wrap another error, so the issue does it. An issue for an
 unsupported mark, transform or function unwraps to its own sentinel and to
@@ -606,13 +765,30 @@ type Scheme struct{ /* unexported */ }
 func Lookup(name string) (Scheme, bool)
 func Schemes() []string
 
-// ConfigMode, ConfigScheme and ConfigBackground are the keys of the config
-// of a spec that ask for a mode, a scheme and a background (D32, D37).
+// ConfigMode, ConfigScheme, ConfigBackground, ConfigLook and
+// ConfigLookSeed are the keys of the config of a spec that ask for a mode,
+// a scheme, a background, a look and the seed of a look (D32, D37, D40).
 const (
 	ConfigMode       = "zuzu.mode"
 	ConfigScheme     = "zuzu.scheme"
 	ConfigBackground = "zuzu.background"
+	ConfigLook       = "zuzu.look"
+	ConfigLookSeed   = "zuzu.lookSeed"
 )
+
+// Look is a way to draw the marks of a chart (D40). Known reports whether
+// zuzu draws a look, and HandDrawn whether it draws as if by hand. The
+// tokens of the look like Excalidraw, such as SketchRoughness, are
+// constants of the package, from docs/STYLE.md.
+type Look string
+
+const (
+	LookStandard   Look = "standard"
+	LookExcalidraw Look = "excalidraw"
+)
+
+func (l Look) Known() bool
+func (l Look) HandDrawn() bool
 
 // Theme is a mode and a scheme together: every color that a chart uses.
 type Theme struct{ /* the neutrals and the colors */ }
@@ -691,6 +867,46 @@ names the family `'Noto Color Emoji'` after the family of a text that
 holds a character that IBM Plex Sans does not have, and a viewer draws
 the emoji in the color font that it has. Without the font, an emoji is a
 character that no font has: it draws nothing, and it is `ErrNoGlyph`.
+
+### Excalifont
+
+The package `text/excalifont` bundles Excalifont, the font of the look
+like Excalidraw, under the SIL Open Font License 1.1 (D40). It holds the
+file of Excalidraw in WOFF2, of 52 KB, unchanged. A program that does not
+import the package does not hold the font. `Font` gives the font in the
+same form as `emoji.Font`, so `Data` gives the TrueType bytes that a
+renderer of okage loads:
+
+```go
+package excalifont
+
+// Family is the family of the font.
+const Family = "Excalifont"
+
+// Font returns Excalifont.
+func Font() *text.Fallback
+```
+
+`WithLookFont` takes the font, as "Looks" says, and without the font the
+look draws its text in IBM Plex Sans (D40). Excalifont has no glyph for
+seven characters of Latin-1: `¤`, `§`, `¬`, `²`, `³`, `µ` and `¹`. Such a
+character draws in IBM Plex Sans.
+
+`WithLookFont` is an option of its own, and not a second argument of
+`WithLook`, because a source can ask for the look by itself, such as
+`look: handDrawn` of Mermaid, and the font then still reaches the render.
+It takes the look, so that each look drawn by hand gets its own font, such
+as a font for the look like xkcd later. This amends D24.
+
+An `Estimate` of the package `text` measures in the font with `SetMain`:
+
+```go
+package text
+
+// SetMain gives the Estimate a main font, which measures each character
+// that it has before IBM Plex Sans, in each family, weight and style.
+func (e *Estimate) SetMain(f *Fallback)
+```
 
 ## Where the models agreed and differed
 

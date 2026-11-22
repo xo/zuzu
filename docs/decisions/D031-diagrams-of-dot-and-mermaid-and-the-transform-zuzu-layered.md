@@ -1,6 +1,6 @@
 # D31. Diagrams of DOT and Mermaid, and the transform zuzu.layered
 
-Status: Decided. Amended by D32, D35 and D38.
+Status: Decided. Amended by D32, D35, D38, D45 and D55.
 
 D18 says that DOT, the language of Graphviz, and the flowchart of Mermaid
 compile into the same spec as a chart, with a layered layout that zuzu adds
@@ -64,6 +64,8 @@ the output of another.
 | `breakWords` | false | breaks a word that is wider than the width of a wrap between its letters. Otherwise the word stays whole |
 | `lanes` | false | lays the clusters out as lanes side by side across the ranks, with one node of a lane in each rank and edges at right angles, as the swimlane layout of Mermaid. Each top cluster is a lane |
 | `laneEdges` | false | with `lanes`, an edge between two lanes moves its target to the next rank. Otherwise it does not |
+| `clusterDirection` | empty | the direction of a cluster with no direction of its own that lays out on its own in `zuzu.dagre`. `zuzu.layered` does not read it (D44) |
+| `reverseClusters` | false | `zuzu.dagre` and the engine of ELK set the sibling clusters in the reverse of the order of the input, as Mermaid 12.3 gives the subgraphs of a flowchart to its layouts (D45 part 5) |
 | `as` | see below | the names of the output fields |
 
 A node or an edge of the input can hold the field `wrap`: the width, in

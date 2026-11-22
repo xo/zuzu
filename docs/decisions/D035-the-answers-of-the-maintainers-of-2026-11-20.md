@@ -1,6 +1,6 @@
 # D35. The answers of the maintainers of 2026-11-20
 
-Status: Decided. Amends D14, D16, D31 and D32. Amended by D36 and D37.
+Status: Decided. Amends D14, D16, D31 and D32. Amended by D36, D37, D40, D46 and D48.
 
 On 2026-11-20 the maintainers answered the questions on the look that the
 review page raised, open questions 12 and 29, and three questions of the

@@ -21,11 +21,9 @@ name to it.
 
 ### Draw the rest of the marks in the look of zuzu
 
-A tooltip comes with the browser, in phase 8. A scheme that a spec names,
-such as `blues`, takes a ramp of the theme, and a scheme of categories,
-such as `tableau10`, takes the colors of the categories of the theme. A
-Vega-Lite spec that vega-lite.js compiled, as the gallery draws it with
-`-vl=false`, still names `#4c78a8`.
+A tooltip comes with the browser, in phase 8. A Vega-Lite spec that
+vega-lite.js compiled, as the gallery draws it with `-vl=false`, still
+names `#4c78a8`.
 
 ### Make the grid layout follow the layout of Vega
 
@@ -48,7 +46,9 @@ projection, Vega measures on the sphere, and zuzu does not.
 A transform of Vega, such as `formula` or `stack`, changes the rows in
 place, and the datasets that derive from the same source share those rows.
 So a dataset of vega.js can hold fields that a transform of another dataset
-added, and `facet_bullet` and `pancake-spider-chart` differ for this reason.
+added. `pancake-spider-chart` differs for this reason, and so do the rows of
+`facet_bullet` when zuzu compiles it, where zuzu also computes the field of
+each layer in the dataset of that layer and not in a shared parent.
 zuzu copies a row before a transform changes it. D32 part 14 says that zuzu
 follows vega.js here.
 
@@ -78,38 +78,84 @@ zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
    cases at 12 and its actors at 14.
 
 
-### Draw two looks by hand
+### Draw the look like xkcd
 
-zuzu draws its standard look today. D32 adds two more looks, which a
-caller selects for any chart or diagram. zuzu draws each in its own way
-and ports no code of another program. Each look changes the lines, the
-fills and the font, and keeps the layout.
+zuzu draws the standard look and the look like Excalidraw, in the pass of
+`internal/sketch` (D39, D40). The look like xkcd, like the look that
+`plt.xkcd()` of matplotlib gives, waits for a font under the OFL, which
+open question 36 asks for (D40). Its lines wobble in long, smooth curves
+that follow the line, with no double stroke. It is code of zuzu in the
+same pass (D39 part 8), with a constant of `theme.Look` and a font of
+`WithLookFont`.
 
-1. A look like Excalidraw. Lines and outlines wobble as if drawn by hand,
-   and fills are hatched, as in Excalidraw. The text draws in Excalifont.
-2. A look like xkcd, like the look that `plt.xkcd()` of matplotlib gives.
-   Lines wobble in long, smooth curves, and the text draws in a font like
-   the handwriting of xkcd.
+### Bring the look like Excalidraw closer to Mermaid
 
-Before the work starts:
+1. The hachure of rough-go fills one polygon. zuzu joins the subpaths of a
+   path with bridges, so a hole stays empty, but subpaths that overlap in
+   the same direction, which the rule nonzero of SVG fills, draw as the
+   rule evenodd.
+2. Only `zuzu.lookSeed` and `handDrawnSeed` set the seed. No option of
+   the caller sets it.
+3. No target SVG shows the look, and `docs/targets/gen-targets.mjs` does
+   not draw it (hard rule 13).
+4. Vega-Lite turns the labels of a discrete x axis by 270 degrees, and
+   the compiler of zuzu passes it on (`axisOf` in `vegalite/view.go`), in
+   the standard look and in the look like Excalidraw alike, as in
+   `testdata/look/bar.vl.json`. Drawing them flat when each label fits
+   its band is a change to the standard look and needs a rule in
+   `docs/STYLE.md` first.
+5. The end state of a state diagram, a ring with a dot of 14, draws as a
+   scribble, because a hachure with a gap of 2 cannot show a ring with a
+   gap of 2.
 
-1. Make sure that the license of each font allows zuzu to bundle it, as
-   D16 asks: the Open Font License or a license like it. Check the license
-   of Excalifont, and find a font for the look of xkcd under such a
-   license.
-2. Make the font of a look opt-in: a caller can give another font, and by
-   default a look draws with the font that zuzu tests it with (D32 part 2).
-3. A wobble must be the same on each render, so that the output stays
-   deterministic.
+### Finish the layouts of dagre and ELK
 
-D35 part 12 says how a caller selects a look: the option `WithLook`, the key
-`zuzu.look` of the spec, and `look: handDrawn` of Mermaid.
+D45 makes `zuzu.dagre` the layout of `layout: dagre`, and the engine of
+ELK of `github.com/xo/zuzu/elk` the layout of a graph of Mermaid that sets
+no layout or an ELK layout, when the caller makes it available with
+`zuzu.WithLayoutEngine`. On 2026-11-22 the mean error of the places of the
+nodes over 88 fixtures was 0.016 for `zuzu.dagre` against mmdc with
+`layout: dagre`, and 0.022 for `zuzu.elk` against mmdc with ELK, against
+0.052 and 0.044 for `zuzu.layered`.
 
-### Add an ELK layout
+1. `cmd/mmdcref` does not add the translate of a nested `g class="root"`,
+   which Mermaid draws for a cluster that dagre lays out on its own. The
+   references of dagre were measured from SVG files that a script
+   flattened first.
+2. Add the passes of Mermaid that the adapter of ELK leaves out: turning
+   back the edges that return into a cluster (orientFeedbackEdges), pinning
+   the first node of a cycle (keepEntryNodeOnTop and the cyclic-entry
+   constraint), ordering the edges by nesting, and the room for the markers
+   at the ends of an edge.
+3. The engine of ELK gives ELK the clusters first and then the nodes, as
+   Mermaid gives a flowchart. Mermaid gives the composite states and the
+   notes of a state diagram among the states, in the order of the source,
+   and `graph.LayoutInput` does not hold that order. The state diagrams
+   have the worst error of `zuzu.elk`: 0.738 for `40-state-notes`, 0.305
+   for `39-state-concurrency` and 0.190 for `59-wrap-state`.
+4. The property `algorithm` of a subgraph, such as
+   `grp@{ algorithm: elk.box }`, does not reach the engine of ELK, because
+   `graph.LayoutCluster` has no field for it.
+5. The engine of ELK leaves out the ports of an edge, which it names as
+   unsupported, and gives the labels at the ends of an edge no place in the
+   layout. `graph.Finish` places them.
+6. Mermaid 12.3 also gives the subgraphs of an ER diagram to its layouts in
+   reverse. The reader of the ER diagram does not set `ReverseClusters`.
 
-D32 accepts `layout: elk` of Mermaid with no issue, and zuzu draws such a
-diagram with `zuzu.layered`. An ELK layout routes edges at right angles
-and places nodes in another way.
+### Offer the fixes of the copy of elk-go upstream
+
+1. Offer changes 3 (fixed seeds, no global `math/rand`) and 4 (no JSON) of
+   `elk/internal/elkgo/README.md` to d2lang/elk-go.
+2. Report that elk-go places a cluster label with
+   `[H_CENTER V_TOP, INSIDE]` at the left and halfway down in DOWN and UP,
+   and keeps no room for it in any direction, where ELK.js 0.12.0 places it
+   at the top in the middle and moves the children down. The adapter works
+   around it, but not for a title wider than its cluster in DOWN or UP (up
+   to 92 px) or a long title of a cluster whose frame draws none.
+3. Report that ports spread with `spacing.portsSurrounding` sit up to 0.67
+   px from where ELK.js puts them, and nodes up to 1 px.
+4. Report that a cluster with the radial algorithm is larger than in
+   ELK.js, and its nodes move up to 35 px.
 
 ### Draw the parts of Mermaid that draw another way
 
@@ -168,19 +214,16 @@ third, a gantt with `dateFormat ss` and a start of `0`, draws since
 
 ### Draw the math of KaTeX as Mermaid does
 
-D36. zuzu draws math with the math layout of okage v0.19.0. These parts
+D36. zuzu draws math with the math layout of okage v0.20.1, which added
+the seven commands that zuzu waited for, `\phase` among them. These parts
 differ from Mermaid 12.3:
 
-1. okage does not have `\phase` yet. A formula with it draws its source,
-   and the report names it. okage plans it next. `\omicron`,
-   `\impliedby`, `\eth`, `\Finv`, `\Game` and `\notni` come in the next
-   release of okage, and zuzu then moves to it.
-2. The browser of Mermaid draws MathML in its own font of math. Its
+1. The browser of Mermaid draws MathML in its own font of math. Its
    formulas are often wider than those of STIX Two Math: `x^2` by about a
    third, and a lone relation such as `\subset` more than twice. zuzu puts
    a thin space between text and a formula, where Mermaid puts none, so a
    label with both is a little wider than its formula and its text.
-3. Mermaid sets a message of a sequence diagram with math closer to its
+2. Mermaid sets a message of a sequence diagram with math closer to its
    line than a message of text. zuzu keeps the gap of its own look.
 
 ### Draw more of Mermaid
@@ -188,10 +231,8 @@ differ from Mermaid 12.3:
 1. The title of a subgraph that is wider than its nodes draws past the box
    of the subgraph. Mermaid makes the box wider. Only a subgraph that lays
    out on its own, in `graph/nest.go`, reads the width of its title.
-2. A chart of `xyChart` reports `tickLength`, `tickWidth`, `labelPadding`
-   and `titlePadding` of an axis, the width of the line of an axis of
-   numbers, and `plotReservedSpacePercent`. The look of zuzu has no ticks
-   and no line on an axis of numbers. The compile of `xyChart` does not
+2. A chart of `xyChart` reports `labelPadding` and `titlePadding` of an
+   axis, and `plotReservedSpacePercent`. The compile of `xyChart` does not
    pass `labelPadding` and `titlePadding` to the axis yet, though the
    runtime reads them.
 3. The title of a gantt with sections starts at the names of the tasks, to
@@ -237,15 +278,13 @@ The compilers of the charts work around each of these:
 1. `y2: {datum}` is dropped, and `y2: {field}` beside a datum `y` takes the
    value of `y`.
 2. An unfilled point draws with a stroke in the color of the background.
-3. A rule of Vega-Lite with one item takes the look of a reference, and its
-   label writes a time as a number.
+3. The label of a reference line writes a time as a number.
 4. `x2: {"value": "width"}` is dropped with no issue, and the rect does not
    draw.
-5. The axis of an encoding reports `tickWidth`, because the look of zuzu
-   draws no ticks. It also reports a condition on a property, such as a
-   `gridColor` or a `gridDash` that changes with the value of the tick,
-   because the compiler does not turn a condition into an encode of the
-   axis.
+5. The axis of an encoding reports a condition on a property, such as a
+   `gridColor`, a `gridDash` or a `tickDash` that changes with the value of
+   the tick, because the compiler does not turn a condition into an encode
+   of the axis.
 6. The channel `href` is read and dropped with no issue, and a field of
    the channel `tooltip` only joins the aggregate. Neither becomes an
    encoding of Vega, though the scene now carries both.
@@ -262,8 +301,6 @@ its cause is not known yet.
      title "Amount" of the spec.
    - `mark.width` and `mark.height` are dropped with no issue on a mark that
      is not a bar, such as the image of `scatter_image`.
-   - The text layer of `bar_layered_weather` compiles `y` with a scale and
-     no field.
    - `size: {expr}` of a bar with no y in `bar_bullet_expr_bind` is dropped,
      and the bar fills the height.
    - A legend of `opacity` alone, or of `strokeWidth` alone, draws nothing,
@@ -272,35 +309,97 @@ its cause is not known yet.
      not two values, such as a step or a named range.
    - `radiusOffset` and `thetaOffset` of an arc go to Vega, which does not
      have them.
+   - The title of the rows of `trellis_area_seattle` overlaps its labels,
+     which a negative titlePadding brings close. The layout of the grid
+     places the title of the rows without the width of the headers.
+   - `shape.RuleEnd` reads an end at 0 as an end that the item does not
+     set. The runtime turns such a rule of a spec around, but a rule that
+     layout builds with an end at 0 still draws from its start.
    - The compiler drops `config.text` and `config.mark`, except their
      `align` and `baseline`, which it writes on the mark. vega-lite.js moves
      `config.text` into `config.style.text`. So the `dx` and `dy` of the
      config of `layer_line_co2_concentration` are lost, with no issue.
+   - The title of an axis in a facet can cover a header or the title of
+     the axis of the next cell, as in `bar_column_fold`,
+     `trellis_cross_sort`, `trellis_cross_sort_array`,
+     `facet_cross_independent_scale`, `config_numberFormatType_test` and
+     `trellis_column_year`. The title moves clear only of the labels of the
+     axes of its own view (D46), and a header or the axis of another cell
+     is in another group.
+   - The title of an axis of a layer joins the titles of the layers, such
+     as `x, Median of median_x_by_a` in `trellis_cross_sort`, where
+     vega-lite.js writes `x`.
+   - The rules of `wheat_wages` do not draw. Their years are strings in
+     inline values, which the linear scale of zuzu does not turn into
+     numbers, as the scale of vega.js does. vega-lite.js also parses the
+     field `year` of `wheat.json` as a number, and zuzu does not.
+   - The dataset `source_0` of `bar_heatlane` has 11 rows, where vega.js
+     has 10, and its ordinal color scale with a scheme has no
+     `interpolate: hcl`.
+   - The x scale of `rect_mosaic_labelled` has `zero: false`, where
+     vega-lite.js writes `true`. zuzu counts the x of a rect with an x2 as
+     a dimension of the bar.
+   - The legend of a quarter in `line_quarter_legend` has no
+     `type: symbol`, which vega-lite.js writes.
+   - The compiler passes on `config.point`, `config.circle` and the config
+     of every other mark only for the opacity of a point.
+   - The diverging ramp of the theme runs through `grid`, so a value near
+     the middle almost disappears, as in `trail_comet`.
+   - A bar whose scale leaves out zero still runs from scale(0), which
+     vega-lite.js gives as the bottom of the domain.
+   - The compiler drops `config.numberFormat`, `config.numberFormatType`
+     and `config.customFormatTypes` with no issue, as in
+     `config_numberFormatType_test`.
 2. Vega:
    - The years of `calendar-view` cover "Jan", as "Read the properties of
      an axis that the runtime drops" says.
-   - The fit of `autosize` diverges in `flight-passengers`, because the
-     title is wider than the plot. Each pass makes the width smaller by the
-     same overflow, 500, 354, 208 and 62, and the x axis keeps two labels.
-     The loop is in `NewView` in `zuzu.go` and in `render.go`.
-3. Deneb, both in the Vega-Lite compiler:
-   - `calendar-heatmap` draws a strip 5374 pixels wide, not the grid of
-     seven years. The band scale `child_x` of the facet `cell` reads the
-     dataset of the top level, `data_2`, not the dataset of the cell,
-     `data_0`. The renaming of the datasets in `vegalite/facet.go` or
-     `vegalite/optimize.go` is the likely cause. The compiler also drops
-     the `labelFontSize`, `labelColor`, `labelFont` and `labelPadding` of
-     the header, the `spacing` of the facet and `config.view.stroke`, with
-     no issue. An axis with `format: ""` and a time unit writes a whole
-     date, where vega-lite.js writes the format of the time unit.
-   - `variance-chart` has no bars of Actual and Forecast. Its shared
-     `color` has no field, only a scale with a domain and a range, and a
-     legend with `orient: "top"`. zuzu drops the domain and the orient
-     with no issue, so the bars get no fill. The rule has no
-     `x2: {scale, value: 0}`, so the stems are missing. The bar
-     `height: {band: 0.5}` with a `yOffset` goes to the rect, not to the
-     group. The conditional `opacity` with no default is dropped.
-4. Mermaid, in `usecase/01-relations`:
+   - An axis reports `tickBand`, `tickOffset`, `tickRound` and
+     `tickExtra` and does not draw them.
+   - The interrupted and polyhedral projections of D52 leave the meridian
+     at ±180° and a strip of 1e-6 radians along each cut out of their clip.
+     d3-geo-projection draws the meridian at -180° along the west edge of
+     the first lobe or face. zuzu does not, because the same place on the
+     sphere cannot belong to both edges of one ring.
+   - The parameter `lobes` of an interrupted projection reads only the
+     longitudes of the three points of each lobe. A latitude other than 0
+     and ±90 changes nothing, and the report says so.
+   - If a spec sets `clipAngle` on `armadillo` or `berghaus`, zuzu clips
+     with that circle and draws the circle as the sphere. d3-geo-projection
+     keeps the torus or the star as the sphere. No spec of the corpus sets
+     it.
+   - A legend reports these properties and does not draw them:
+     `cornerRadius`, `fillColor`, `strokeColor`, `padding`, `gridAlign`,
+     `labelAlign`, `labelBaseline`, `labelOffset`, `labelOverlap`,
+     `labelSeparation`, `symbolDashOffset`, `symbolOffset`,
+     `symbolBaseFillColor`, `symbolBaseStrokeColor`, `titleAnchor`,
+     `titleAlign`, `titleBaseline`, `titleLimit`, `titleLineHeight`,
+     `titleOrient`, `titlePadding`, `tickCount`, `tickMinStep`,
+     `gradientOpacity`, `gradientStrokeColor` and `gradientStrokeWidth`.
+   - An expression of an encoding reads `item` as the scene graph of Vega
+     gives it: `item.datum`, and `item.mark` with its marktype, name, role
+     and group. zuzu does not give the properties that the encodings of the
+     item set, such as `item.x`, because it does not apply them in the
+     order of the spec. It does not give `item.bounds`, `item.mark.items`,
+     the items and the bounds of a group item, `item.mark` in an encoding
+     of a guide or of the root group, or a tooltip that shows the item.
+     Each goes in the report.
+   - A background that a signal gives does not decide the gray flip of the
+     dark mode (D48).
+   - A dark mode over a light background of the spec keeps the neutrals of
+     the dark mode for the guides, as in `point_background`.
+   - A layout of a grid aligns each row and each column on its own. It
+     reports the align `none`, the align `all` of cells of more than one
+     size, and `center`.
+   - The title of a group follows the properties that its spec sets, but
+     not the config title or the config of the style `group-title`.
+   - In `deneb/gantt-chart`, vega.js cuts the names of the tasks, such as
+     "Requirements …", at the limit of 130, and zuzu does not.
+   - In `deneb/coronation-arc`, the rows of the legend are closer together
+     than the `rowPadding` of 10 that vega.js draws.
+   - zuzu moves the content of `deneb/pancake-spider-chart` inside its
+     padding by 62 pixels more than vega.js does, with autosize `none` and
+     `"contains": "padding"`.
+3. Mermaid, in `usecase/01-relations`:
    - The ellipse of CheckCard is outside the boundary Front desk, but
      covers its top border by 3 pixels, and the label «include» touches
      that border. A node that is not in a cluster, in the rank of the nodes
@@ -308,7 +407,7 @@ its cause is not known yet.
    - The back edge from Librarian to Member crosses the long edge from
      Member to Return near Member, because of where the two edges join
      Member. The layout can avoid it.
-5. The originals: `contour-plot`, `density-heatmaps`,
+4. The originals: `contour-plot`, `density-heatmaps`,
    `labeled-scatter-plot` and `word-cloud` need the npm package `canvas`,
    which `test/oracle/package.json` does not install. vega.js does not know
    the projection `airy` of `projections`.

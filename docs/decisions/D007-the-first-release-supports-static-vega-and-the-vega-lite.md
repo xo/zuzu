@@ -1,6 +1,6 @@
 # D7. The first release supports static Vega and the Vega-Lite that compiles to it
 
-Status: Decided.
+Status: Decided. Amended by D52.
 
 All of Vega is large. Its signals react to the events of a mouse or a
 keyboard, and its dataflow updates only what changed, which is a program in a

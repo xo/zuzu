@@ -1,6 +1,6 @@
 # D24. The public API
 
-Status: Decided. Amended by D38.
+Status: Decided. Amended by D38, D42, D44 and D45.
 
 The maintainers asked on 2026-11-10 for a draft of the public API, and for
 the advice of the flagship models on its shape and on the relation of `vega`

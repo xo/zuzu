@@ -139,6 +139,10 @@ short word, and an exported name does not repeat its package.
 | `scene` | the scene graph and its JSON form (D8) |
 | `text` | the measurement of text, behind an interface (D11) |
 | `text/emoji` | Noto Color Emoji, which a caller imports and passes with `WithEmoji` (D32) |
+| `text/excalifont` | Excalifont, the font of the look like Excalidraw, which a caller imports and gives to zuzu (D40) |
+| `internal/rough` | the copy of rough-go, Rough.js 4.6.6 in Go, which draws a shape as if by hand (D39, docs/UPSTREAM.md) |
+| `elk` | a separate module under EPL-2.0: the layout engine of ELK, which a caller makes available to zuzu with `WithLayoutEngine`, the adapter that maps the graph and the options of Mermaid onto ELK in `elk/internal/adapter`, and the copy of elk-go in `elk/internal/elkgo` (D39 part 13, D44, D45) |
+| `internal/sketch` | the pass from scene to scene that draws a look drawn by hand with `internal/rough`, which `Render` runs after the layout (D39, D40) |
 | `theme` | the modes and the color schemes, and the Vega config they make (D14, D15) |
 | `svg` | the SVG writer |
 | `raster` | the direct okage renderer (D11) |
@@ -176,7 +180,20 @@ The module also embeds files that are not Go packages:
 | --- | --- | --- |
 | IBM Plex Sans, weights 400, 500 and 600, upright and italic | SIL Open Font License 1.1 | the bundled font (D16) |
 | Noto Color Emoji 2.057, the CBDT build, in `text/emoji` | SIL Open Font License 1.1 | the color emoji of a package that a caller imports (D32) |
+| Excalifont 1.000, one file in WOFF2 of 52 KB from Excalidraw, in `text/excalifont` | SIL Open Font License 1.1, with no Reserved Font Name | the font of the look like Excalidraw, in a package that a caller imports (D40) |
+| the colors of the named schemes of Vega 6.4.0, as Go values in `scale/schemes_data.go` | BSD-3-Clause for vega-scale 8.1.3, ISC for d3-scale-chromatic 3.1.1, and Apache 2.0 for the colors of ColorBrewer, in `scale/LICENSE-schemes.txt` | a scheme that a spec names draws in its own colors (D46) |
 | the color schemes, one JSON file each | the license of each upstream theme, MIT or compatible | the schemes of D15, with the license file of each source |
+
+The module also holds a copy of Go code from another project, which
+`docs/UPSTREAM.md` lists with its license: rough-go under MIT in
+`internal/rough`.
+
+The module `github.com/xo/zuzu/elk`, apart from the module that a user
+imports, holds a copy of elk-go under EPL-2.0 in `elk/internal/elkgo`, with
+two files under Apache-2.0 and one under BSD-3-Clause. It imports only the
+standard library and `github.com/xo/zuzu`, and it adds about 5 MB to a
+build of TinyGo for WebAssembly. The module `github.com/xo/zuzu` does not
+import it.
 
 The test module adds Node.js with vega.js and vega-lite.js as the oracle
 (D17), and goja as the oracle of the expression language (D9).
@@ -198,8 +215,9 @@ Vega-Lite spec without either is in the first target.
 zuzu never drops a feature that it does not support without a word (D26).
 In the strict mode, an unsupported feature is an error. In the loose mode,
 zuzu draws the rest and returns a report of what it skipped. D32 makes two
-exceptions for Mermaid: a hint of how to draw, such as `look: handDrawn`,
-and a part that Mermaid reads and draws nothing for.
+exceptions for Mermaid: a hint of how to draw, such as `layout: elk`, and
+a part that Mermaid reads and draws nothing for. `look: handDrawn` selects
+the look like Excalidraw (D40).
 
 ## Expressions and scripting
 
@@ -281,7 +299,9 @@ The fonts decide the output. A test that must give the same bytes on every
 machine uses fonts that the test brings, and never the fonts of the system.
 zuzu bundles IBM Plex Sans (D16), which the targets use. The package
 `text/emoji` bundles Noto Color Emoji, which a caller passes with
-`WithEmoji` (D32).
+`WithEmoji` (D32). The package `text/excalifont` bundles Excalifont, which
+a caller gives to zuzu with `WithLookFont` for the look like Excalidraw
+(D40).
 
 ### The browser
 
@@ -440,7 +460,9 @@ puts the nodes of a directed graph in ranks and keeps the edges short and
 uncrossed. It is also called a Sugiyama layout. zuzu adds it as a transform
 of its own, with a name that cannot collide with a transform of Vega, such
 as `zuzu.layered`. zuzu writes its own layout from the documented algorithm and
-does not port dagre, the layout that Mermaid uses (D6).
+does not port dagre, the layout that Mermaid uses (D6). D39 adds a copy of
+dagro, a Go port of dagre, behind the same interface, for the diagrams of
+Mermaid, and ELK in a separate module.
 
 The parsers came first for the subset that a flowchart needs: nodes, edges,
 labels, subgraphs and the direction of the graph. Mermaid has more than 30
@@ -1061,6 +1083,44 @@ D31 did not take this:
    credit. The flowcharts of Mermaid name `fa:` most often, so D31 keeps it
    as a package that a program imports by choice.
 
+On 2026-11-22 Gemini 3.1 Pro, GPT-6 Astra and DeepSeek V4 reviewed the
+plan of D39: copies of dagro, elk-go and rough-go, and the place of a look
+drawn by hand. DeepSeek V4 Pro timed out twice, so DeepSeek V4 Flash
+answered. The okage peer answered for okage. This is what each one said:
+
+1. Gemini said to keep `zuzu.layered` alone, because Mermaid moves toward
+   ELK and a match of the places of dagre is a trap. If the maintainers want
+   that match, add dagro for Mermaid only. It said to leave ELK out, and to
+   copy dagro and rough-go into `internal/` if the maintainers amend D6
+   and D32. It said the look is a pass from scene to scene.
+2. Astra said to keep `zuzu.layered` and add dagro for Mermaid, but only
+   after a spike shows that dagro draws closer to mmdc. It said that dagre
+   0.8.5 is not Mermaid 12.3, because Mermaid builds its graph and wraps its
+   clusters in its own way, so the spike must compare the whole pipeline
+   with mmdc. It said to leave ELK out at first, then to add its layered
+   algorithm alone as an optional module. It said to import dagro and
+   rough-go as pinned modules first, and to copy only when zuzu must change
+   them. It said the look is a pass from scene to scene, backed by a package
+   of geometry, with a seed from the identity of an item and never from the
+   order of a walk, and room for a stroke to wobble.
+3. DeepSeek said to keep `zuzu.layered`, and to add dagro as an optional
+   module for Mermaid. It said to keep ELK out of the core. It said to
+   import, not copy. It said the look is a path effect in the renderer, so
+   that the scene stays free of style.
+4. The okage peer said the look belongs in zuzu, as a pass from scene to
+   scene. The SVG writer needs the same geometry as `raster`, okage has no
+   path effect but the dash, and a sketch gives more than one path for each
+   shape. It said that a package of okage cannot be internal for zuzu. It
+   said to stop a fused multiply-add in each copy, as okage does (okage
+   D16), and to draw each set of strokes as one path, so that an alpha
+   stroke does not darken where its lines cross.
+
+D39 follows the majority on the look, because the SVG writer of zuzu is a
+renderer too, and a path effect needs the same code in two renderers.
+It follows all of them on ELK and proposes a separate module. It copies
+dagro and rough-go, as the maintainers asked, because zuzu must change each
+of them for the seeds, for D29 or for TinyGo.
+
 ## Open questions for the maintainers
 
 A question keeps its number after it is answered, so that a reference to it
@@ -1140,3 +1200,17 @@ stays true.
     from an optional package that `zuzu.WithMath` adds. It draws each
     formula as a path in the scene, and reads the fonts with the copy of
     go-text in okage instead of `github.com/go-text/typesetting`.
+32. Answered on 2026-11-22 by D39: the maintainers accept that D39 amends
+    D6 and D32, so that zuzu can copy dagro, elk-go and rough-go with the
+    rules for a copy that ivy has.
+33. Answered on 2026-11-22 by D39: the code of ELK lives in a separate Go
+    module of this repository under EPL-2.0, so that `github.com/xo/zuzu`
+    stays MIT.
+34. Answered on 2026-11-22 by D39: the copy of dagro starts at its HEAD,
+    dagre 3.1.1.
+35. Answered on 2026-11-22 by D39: zuzu copies dagro and rough-go, and does
+    not import them.
+36. Which font under the OFL does the look like xkcd draw its text in (D40)?
+    xkcd-script is under CC BY-NC 3.0 and Humor Sans has no clear license,
+    so neither meets D16. The candidates are Comic Neue, Patrick Hand and
+    Architects Daughter.

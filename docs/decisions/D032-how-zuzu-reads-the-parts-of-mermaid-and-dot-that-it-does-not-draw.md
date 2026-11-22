@@ -1,6 +1,6 @@
 # D32. How zuzu reads the parts of Mermaid and DOT that it does not draw
 
-Status: Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36, D37 and D38.
+Status: Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36, D37, D38, D39 and D40.
 
 On 2026-11-12 the maintainers answered open questions 14 and 17 to 28 of
 the plan, and more questions about Mermaid and the look. The files

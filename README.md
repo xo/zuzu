@@ -61,7 +61,9 @@ Mermaid 12.3: the sequence, state, class, ER, requirement, block,
 swimlane, use case, agentflow, timeline, C4, venn, ishikawa, Cynefin,
 event model, ZenUML, kanban, packet and railroad diagrams, the mindmap,
 the architecture diagram, the gitGraph, the tree view and info. The
-package `text/emoji` draws an emoji in color.
+package `text/emoji` draws an emoji in color. `WithLook` draws any chart
+or diagram in the look like Excalidraw, as if by hand, and the package
+`text/excalifont` holds its font, Excalifont (D40).
 [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what zuzu reads.
 [`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
 that the maintainers have not answered.
@@ -119,6 +121,7 @@ of vega.js for each, measures how far zuzu agrees with Vega.
 | [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) | the parts of DOT and of Mermaid that zuzu reads |
 | [`docs/targets/`](docs/targets/README.md) | the target SVGs that show the look zuzu aims for |
 | [`docs/survey/`](docs/survey/README.md) | the survey of other libraries, and the page that compares them |
+| [`docs/UPSTREAM.md`](docs/UPSTREAM.md) | the rules for the Go code that zuzu copies from other projects, and the list of those projects |
 | [`AGENTS.md`](AGENTS.md) | the rules for a coding agent, which apply to a person too |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | how to change zuzu |
 

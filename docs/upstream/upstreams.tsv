@@ -1,0 +1,4 @@
+name	url	kind	license	base	matched	path
+rough-go	https://github.com/d2lang/rough-go	copy	MIT	e7169d56ddc67985d9397e11035a0e9e4f6de2a6	e7169d56ddc67985d9397e11035a0e9e4f6de2a6	internal/rough
+elk-go	https://github.com/d2lang/elk-go	copy	EPL-2.0	4e0a9977ed8b9de6820c6f448bd50536cc33a683	4e0a9977ed8b9de6820c6f448bd50536cc33a683	elk/internal/elkgo
+dagro	https://github.com/d2lang/dagro	copy	MIT	30476a97eb110dfc64e32a5691e37a2e6f2dc175	30476a97eb110dfc64e32a5691e37a2e6f2dc175	internal/dagre
