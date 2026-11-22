@@ -418,7 +418,7 @@ func (l *emLayout) spec() map[string]any {
 	}
 	mark("rect", "lanes", lanes, graph.StyleCluster, rect(map[string]any{}))
 	mark("text", "laneLabels", laneLabels, graph.StyleClusterTitle, label("left", emNameFont))
-	mark("rect", "boxes", boxes, graph.StyleNode, rect(map[string]any{"fill": color, "stroke": color, "cornerRadius": value(4)}))
+	mark("rect", "boxes", boxes, graph.StyleNode, rect(map[string]any{"fill": map[string]any{"scale": "tint", "field": "kind"}, "stroke": color, "cornerRadius": value(4)}))
 	mark("rect", "uiBoxes", uis, graph.StyleNodeMuted, rect(map[string]any{"cornerRadius": value(4)}))
 	mark("text", "names", names, graph.StyleNodeLabel, label("center", emNameFont))
 	mark("text", "data", datas, graph.StyleNodeLabel, label("left", emDataFont))
@@ -430,7 +430,7 @@ func (l *emLayout) spec() map[string]any {
 		"padding":  8,
 		"autosize": "pad",
 		"data":     data,
-		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": emColors, "range": "category"}},
+		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": emColors, "range": "category"}, graph.TintScale("tint", emColors)},
 		"marks":    marks,
 	}
 }

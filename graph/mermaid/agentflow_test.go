@@ -2,6 +2,7 @@ package mermaid
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -327,5 +328,62 @@ func TestAgentCycle(t *testing.T) {
 	}
 	if a, b := clusterOf(t, g, "a"), clusterOf(t, g, "b"); a.Parent != "" || b.Parent != "a" {
 		t.Errorf("expected the flow b in the flow a, as Mermaid, got %q and %q", a.Parent, b.Parent)
+	}
+}
+
+// TestAgentColors checks that in the default theme, redux-color, each node
+// of an agentflow diagram takes the categorical color of its kind and each
+// flow the colors in turn from the eighth, as Mermaid colors them, and that
+// another theme keeps one color (D53).
+func TestAgentColors(t *testing.T) {
+	t.Parallel()
+	const body = `
+  flow a["A"]
+    t1@{ shape: tool }
+    t2@{ shape: task }
+    t3@{ shape: decision }
+    t4@{ shape: input }
+    t5@{ shape: refdoc }
+    t6@{ shape: action }
+  end
+  flow b["B"]
+    u
+  end`
+	g := agentOf(t, "agentflow-beta TB"+body)
+	want := map[string]int{"t1": 1, "t2": 2, "t3": 3, "t4": 4, "t5": 5, "t6": 7}
+	for _, n := range g.Nodes {
+		if w, ok := want[n.ID]; ok && n.Category != w {
+			t.Errorf("%s (%s) takes the color %d, want %d", n.ID, n.Shape, n.Category, w)
+		}
+	}
+	if a, b := clusterOf(t, g, "a"), clusterOf(t, g, "b"); a.Category != 8 || b.Category != 9 {
+		t.Errorf("the flows take the colors %d and %d, want 8 and 9", a.Category, b.Category)
+	}
+	plain := agentOf(t, "---\nconfig:\n  theme: neutral\n---\nagentflow-beta TB"+body)
+	for _, n := range plain.Nodes {
+		if n.Category != 0 {
+			t.Errorf("in the theme neutral, %s takes the color %d, want none", n.ID, n.Category)
+		}
+	}
+}
+
+// TestMarkdownRuns checks that a label of markdown with bold and italic
+// text has the runs of its fonts, and that a plain label has none.
+func TestMarkdownRuns(t *testing.T) {
+	t.Parallel()
+	d, err := Read("flowchart LR\n  a[\"`**Bold** and _italic_`\"] --> b[\"`Plain`\"]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, _, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []graph.Run{{Text: "Bold", Bold: true}, {Text: " and "}, {Text: "italic", Italic: true}}
+	if got := g.Nodes[0].Runs; !slices.Equal(got, want) {
+		t.Errorf("the runs of a are %+v, want %+v", got, want)
+	}
+	if got := g.Nodes[1].Runs; got != nil {
+		t.Errorf("the plain label has the runs %+v, want none", got)
 	}
 }

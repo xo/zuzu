@@ -2,6 +2,7 @@ package zuzu
 
 import (
 	"math"
+	"slices"
 
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/layout"
@@ -46,6 +47,13 @@ func containsPadding(v any) bool {
 	return ok && m["contains"] == "padding"
 }
 
+// rootPaint are the properties of a style that paint the group of the top
+// level. Its place and its size come from the spec.
+var rootPaint = []string{
+	"fill", "fillOpacity", "opacity", "stroke", "strokeOpacity", "strokeWidth", "strokeDash",
+	"strokeDashOffset", "strokeCap", "strokeJoin", "strokeMiterLimit", "cornerRadius",
+}
+
 // render runs the spec and builds the scene graph.
 func (rt *runtime) render() (*scene.Scene, error) {
 	s := rt.root
@@ -67,11 +75,24 @@ func (rt *runtime) render() (*scene.Scene, error) {
 	// dx and dy are the x and the y that the encode of the spec gives the
 	// root group. They move its content inside the padding, as in Vega.
 	var dx, dy float64
+	// The styles of the spec, such as the style cell of a view of
+	// Vega-Lite, paint the group of the top level, as in Vega, and its
+	// encode goes over them.
+	styles := configMap(rt.config["style"])
+	for _, name := range rt.chart.spec.Style.List {
+		st := &itemState{it: item, set: map[string]bool{}}
+		for k, v := range configMap(styles[name]) {
+			if slices.Contains(rootPaint, k) {
+				setProp(st, k, v)
+			}
+		}
+	}
 	if len(s.spec.Encode) > 0 {
 		st := &itemState{it: item, set: map[string]bool{}}
 		if err := s.encodeItem(s.spec.Encode, st, map[string]any{}, ""); err != nil {
 			return nil, err
 		}
+		s.values = st.values
 		badLink := false
 		if err := s.linkIssue(item, "", &badLink); err != nil {
 			return nil, err
@@ -100,17 +121,40 @@ func (rt *runtime) render() (*scene.Scene, error) {
 	if kind != "none" {
 		// The canvas grows to hold the guides, and the plot area moves
 		// inside it, as the autosize pad of Vega does.
-		b := layout.Empty()
+		// b holds every mark, for the canvas. fit holds the marks that
+		// the autosize fit counts: the title of the chart stays out of
+		// the width when it is above or below the plot area, and out of
+		// the height when it is at its side. Such a title does not move
+		// when the plot area changes size, so a smaller plot area cannot
+		// make room for a title that is wider than the chart, and the
+		// fit lets the canvas grow for it instead.
+		b, fit := layout.Empty(), layout.Empty()
 		st := rt.style()
+		orient := ""
+		if s.spec.Title != nil {
+			if orient, err = s.str(s.spec.Title.Orient, "top"); err != nil {
+				return nil, err
+			}
+		}
 		for i := range marks {
 			if marks[i].Clip {
 				// A mark that clips stays inside the plot area.
 				continue
 			}
 			m := st.MarkBounds(&marks[i])
-			if !m.IsEmpty() {
-				b.X1, b.Y1 = math.Min(b.X1, m.X1+dx), math.Min(b.Y1, m.Y1+dy)
-				b.X2, b.Y2 = math.Max(b.X2, m.X2+dx), math.Max(b.Y2, m.Y2+dy)
+			if m.IsEmpty() {
+				continue
+			}
+			m.X1, m.X2, m.Y1, m.Y2 = m.X1+dx, m.X2+dx, m.Y1+dy, m.Y2+dy
+			b.X1, b.Y1 = math.Min(b.X1, m.X1), math.Min(b.Y1, m.Y1)
+			b.X2, b.Y2 = math.Max(b.X2, m.X2), math.Max(b.Y2, m.Y2)
+			title := marks[i].Role == "title" && marks[i].Name == "title"
+			side := orient == "left" || orient == "right"
+			if !title || side {
+				fit.X1, fit.X2 = math.Min(fit.X1, m.X1), math.Max(fit.X2, m.X2)
+			}
+			if !title || !side {
+				fit.Y1, fit.Y2 = math.Min(fit.Y1, m.Y1), math.Max(fit.Y2, m.Y2)
 			}
 		}
 		if !b.IsEmpty() {
@@ -126,14 +170,19 @@ func (rt *runtime) render() (*scene.Scene, error) {
 			if containsPadding(av) {
 				padW, padH = pad.left+pad.right, pad.top+pad.bottom
 			}
+			// An empty side of fit adds nothing beyond the plot area.
+			fx1, fx2 := math.Min(0, math.Min(fit.X1, w)), math.Max(w, math.Max(fit.X2, 0))
+			fy1, fy2 := math.Min(0, math.Min(fit.Y1, h)), math.Max(h, math.Max(fit.Y2, 0))
+			rt.fitCanvasW = math.Ceil(fx2 - fx1 + pad.left + pad.right)
+			rt.fitCanvasH = math.Ceil(fy2 - fy1 + pad.top + pad.bottom)
 			if kind == "fit" || kind == "fit-x" {
-				rt.fitW = w - (x2 - x1 - w) - padW
+				rt.fitW = w - (fx2 - fx1 - w) - padW
 				rt.wantW = w + pad.left + pad.right - padW
 			} else if padW > 0 {
 				rt.fitW = w - padW
 			}
 			if kind == "fit" || kind == "fit-y" {
-				rt.fitH = h - (y2 - y1 - h) - padH
+				rt.fitH = h - (fy2 - fy1 - h) - padH
 				rt.wantH = h + pad.top + pad.bottom - padH
 			} else if padH > 0 {
 				rt.fitH = h - padH

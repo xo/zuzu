@@ -55,8 +55,10 @@ type Option func(*drawer)
 
 // WithRenderer sets the renderer of okage whose fonts draw the text, with
 // the layout of text of okage (okage D37). Make one renderer and share it,
-// because it loads the fonts of the system on its first use (okage D36).
-// Without it, Draw makes a renderer for a scene that has text.
+// and give it WithLoadSystemFonts(false), because a renderer of okage loads
+// the fonts of the system by default (okage D36), and the image then
+// depends on the machine. Without it, Draw makes a renderer with the
+// bundled fonts alone for a scene that has text.
 func WithRenderer(r *okagesvg.Renderer) Option {
 	return func(d *drawer) {
 		d.fonts = r
@@ -220,27 +222,53 @@ func place(ts okage.Transform, x, y, angle float64) okage.Transform {
 // with a clip path. A mark that clips draws the same way.
 func (d *drawer) group(it *scene.Item, ts okage.Transform) error {
 	ts = ts.PreTranslate(float32(it.X), float32(it.Y))
-	if !it.Fill.IsZero() || !it.Stroke.IsZero() {
-		bg := *it
-		bg.X, bg.Y = 0, 0
+	bg := *it
+	bg.X, bg.Y = 0, 0
+	if it.StrokeForeground {
+		// The stroke draws over the marks, as Vega draws it.
+		bg.Stroke = scene.Paint{}
+	}
+	if !bg.Fill.IsZero() || !bg.Stroke.IsZero() {
 		d.rect(&bg, ts)
 	}
+	var err error
 	if !it.Clip {
-		return d.marks(it, ts)
+		err = d.marks(it, ts)
+	} else {
+		data := ""
+		if tl, tr, br, bl := shape.Corners(it); tl != 0 || tr != 0 || br != 0 || bl != 0 {
+			// A group with round corners clips to its shape, as Vega
+			// clips it.
+			data = shape.RoundRect(0, 0, it.Width, it.Height, tl, tr, br, bl)
+		}
+		err = d.clippedTo(it.Width, it.Height, data, ts, func(lts okage.Transform) error { return d.marks(it, lts) })
 	}
-	return d.clipped(it.Width, it.Height, ts, func(lts okage.Transform) error { return d.marks(it, lts) })
+	if err != nil {
+		return err
+	}
+	if it.StrokeForeground && !it.Stroke.IsZero() {
+		fg := *it
+		fg.X, fg.Y = 0, 0
+		fg.Fill = scene.Paint{}
+		d.rect(&fg, ts)
+	}
+	return nil
 }
 
-// clipped draws into a layer, which goes onto the image through the mask
-// of the box from the origin of ts to (w, h). draw takes the transform of
-// the layer.
-func (d *drawer) clipped(w, h float64, ts okage.Transform, draw func(okage.Transform) error) error {
+// clippedTo draws into a layer, which goes onto the image through the mask
+// of the path data, or of the box from the origin of ts to (w, h) when the
+// data is empty. draw takes the transform of the layer.
+func (d *drawer) clippedTo(w, h float64, data string, ts okage.Transform, draw func(okage.Transform) error) error {
 	pb := okage.NewPathBuilder()
-	r, ok := okage.RectFromXYWH(0, 0, float32(w), float32(h))
-	if !ok {
-		return nil
+	if data != "" {
+		_ = shape.Parse(data, builder{pb})
+	} else {
+		r, ok := okage.RectFromXYWH(0, 0, float32(w), float32(h))
+		if !ok {
+			return nil
+		}
+		pb.PushRect(r)
 	}
-	pb.PushRect(r)
 	clip, ok := pb.Finish()
 	if !ok {
 		return nil
@@ -276,10 +304,11 @@ func (d *drawer) marks(it *scene.Item, ts okage.Transform) error {
 	slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(it.Items[a].ZIndex, it.Items[b].ZIndex) })
 	for _, i := range order {
 		m := &it.Items[i]
-		if m.Clip && !it.Clip {
-			// A mark that clips draws inside the box of its group, as
+		if m.Clip && (!it.Clip || m.ClipPath != "") {
+			// A mark that clips draws inside the box of its group, or
+			// inside its path, such as the sphere of a projection, as
 			// Vega clips it.
-			if err := d.clipped(it.Width, it.Height, ts, func(lts okage.Transform) error { return d.mark(m, lts) }); err != nil {
+			if err := d.clippedTo(it.Width, it.Height, m.ClipPath, ts, func(lts okage.Transform) error { return d.mark(m, lts) }); err != nil {
 				return err
 			}
 			continue
@@ -718,7 +747,11 @@ func (d *drawer) text(it *scene.Item, ts okage.Transform) error {
 		return nil
 	}
 	if d.fonts == nil {
-		d.fonts = okagesvg.New()
+		// The renderer reads the bundled fonts alone, never the fonts of
+		// the system, so that the image is the same on each machine
+		// (hard rule 6).
+		d.fonts = okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+			okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
 	}
 	family := it.Font
 	if family == "" {

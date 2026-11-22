@@ -32,12 +32,16 @@ type Scene struct {
 // Mark is a mark of the scene graph: a kind of shape and its items. A group
 // mark holds the marks of each of its items.
 type Mark struct {
-	Type   string `json:"marktype"`
-	Role   string `json:"role,omitzero"`
-	Name   string `json:"name,omitzero"`
-	Clip   bool   `json:"clip,omitzero"`
-	ZIndex int    `json:"zindex,omitzero"`
-	Items  []Item `json:"items"`
+	Type string `json:"marktype"`
+	Role string `json:"role,omitzero"`
+	Name string `json:"name,omitzero"`
+	Clip bool   `json:"clip,omitzero"`
+	// ClipPath is the path data, in the frame of the group, that a mark
+	// that clips clips to, in place of the box of its group, such as the
+	// outline of the sphere of a projection. It is empty for the box.
+	ClipPath string `json:"clipPath,omitzero"`
+	ZIndex   int    `json:"zindex,omitzero"`
+	Items    []Item `json:"items"`
 
 	// Extra holds the properties that zuzu does not use, such as
 	// interactive, so that a scene graph of vega.js reads without loss.
@@ -49,6 +53,19 @@ type Mark struct {
 // outline of a formula, or of a part of it in one color, and its TeX in
 // its field Text, which a path does not draw.
 const RoleMath = "math"
+
+// RoleEdge is the role of a mark that draws the lines or the arrowheads of
+// the edges of a graph, and RoleCluster the role of a mark that draws the
+// boxes of its clusters. The look like Excalidraw draws them as Mermaid
+// 12.3 draws them for look: handDrawn (D40, docs/STYLE.md). RoleSolid is
+// the role of a mark that draws the solid nodes of a graph, such as the
+// start of a state diagram, which the look fills solid and not with a
+// hachure (D55).
+const (
+	RoleEdge    = "zuzu-edge"
+	RoleCluster = "zuzu-cluster"
+	RoleSolid   = "zuzu-solid"
+)
 
 // The types of mark, as Vega names them.
 const (
@@ -142,9 +159,12 @@ type Item struct {
 	Aspect *bool  `json:"aspect,omitzero"`
 	Smooth *bool  `json:"smooth,omitzero"`
 
-	// A group: whether it clips its marks, and its marks.
-	Clip  bool   `json:"clip,omitzero"`
-	Items []Mark `json:"items,omitzero"`
+	// A group: whether it clips its marks, whether it draws its stroke over
+	// its marks, and its marks. A group that clips clips to its shape, with
+	// its corners.
+	Clip             bool   `json:"clip,omitzero"`
+	StrokeForeground bool   `json:"strokeForeground,omitzero"`
+	Items            []Mark `json:"items,omitzero"`
 
 	// Href is the link of the item, a URL that a click opens, as the
 	// encoding href of Vega gives it. A renderer writes it only when

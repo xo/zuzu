@@ -258,3 +258,28 @@ func TestDrawMarkClip(t *testing.T) {
 		t.Errorf("%.2f%% of the pixels differ from okage, more than 1%%", 100*d)
 	}
 }
+
+// TestDrawReadsNoSystemFont checks that Draw with no renderer reads the
+// bundled fonts alone, never the fonts of the system, so that a text in a
+// family that zuzu does not bundle, such as DejaVu Sans, draws the same as
+// with a renderer of the bundled fonts on each machine (hard rule 6).
+func TestDrawReadsNoSystemFont(t *testing.T) {
+	t.Parallel()
+	s := &scene.Scene{Width: 120, Height: 40, Background: scene.Paint{Color: "#ffffff"},
+		Root: scene.Mark{Type: scene.Group, Items: []scene.Item{{Width: 120, Height: 40, Items: []scene.Mark{
+			{Type: scene.Text, Items: []scene.Item{{X: 10, Y: 25, Text: []string{"Agpq"}, Font: "DejaVu Sans", FontSize: 16, Fill: scene.Paint{Color: "#000000"}}}},
+		}}}}}
+	plain, err := Draw(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family))
+	bundled, err := Draw(s, WithRenderer(r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(plain.Pix, bundled.Pix) {
+		t.Error("Draw with no renderer draws the text unlike a renderer of the bundled fonts")
+	}
+}

@@ -59,8 +59,17 @@ func TextOf(it *scene.Item, m text.Measurer) Text {
 	if lh == 0 {
 		lh = size
 	}
-	y += it.Dy + baselines[it.Baseline]*size - lh*float64(len(it.Text)-1)*multiline(it.Baseline)
-	x += it.Dx
+	// The dx, the dy and the shift of the baseline move the text in its
+	// own frame, after the turn of its angle, as in Vega. So a turned
+	// label with the baseline middle centers on its point.
+	ox := it.Dx
+	oy := it.Dy + baselineOffset(it.Baseline, size, lh) - lh*float64(len(it.Text)-1)*multiline(it.Baseline)
+	if it.Angle != 0 {
+		sin, cos := math.Sincos(it.Angle * math.Pi / 180)
+		ox, oy = ox*cos-oy*sin, ox*sin+oy*cos
+	}
+	x += ox
+	y += oy
 	anchor := "start"
 	switch it.Align {
 	case "center":
@@ -102,6 +111,20 @@ func reverse(s string) string {
 	return string(r)
 }
 
+// baselineOffset returns the offset of a baseline of Vega from the
+// alphabetic baseline, for a size of the font and a line height. The
+// baselines line-top and line-bottom are the top and the bottom of a box
+// one line height high, with the text at its middle.
+func baselineOffset(baseline string, size, lh float64) float64 {
+	switch baseline {
+	case "line-top":
+		return baselines[baselineTop]*size + (lh-size)/2
+	case "line-bottom":
+		return baselines[baselineBottom]*size - (lh-size)/2
+	}
+	return baselines[baseline] * size
+}
+
 // multiline returns how far the first line of a text of several lines moves
 // up, in lines, for a baseline: none for the top, half for the middle and all
 // of them for the bottom.
@@ -109,7 +132,7 @@ func multiline(baseline string) float64 {
 	switch baseline {
 	case baselineMiddle:
 		return 0.5
-	case baselineBottom, "alphabetic", "":
+	case baselineBottom, "line-bottom", "alphabetic", "":
 		return 1
 	}
 	return 0

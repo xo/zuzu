@@ -2,15 +2,20 @@ package zuzu
 
 import (
 	"cmp"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
 	"math"
+	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/geo"
+	"github.com/xo/zuzu/internal/shape"
+	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
@@ -24,14 +29,13 @@ var markTypes = map[string]bool{
 }
 
 // buildMarks builds the marks of a scope, in the order of the spec.
-func (s *scope) buildMarks(path string) ([]scene.Mark, error) {
-	var out []scene.Mark
+func (s *scope) buildMarks(path string) (out []scene.Mark, err error) {
 	// The styles of each mark of out, for the rules of the look that join
 	// marks, such as the parts of a box plot.
 	var styles [][]string
 	defer func() {
 		boxLook(out, styles, s.rt.theme.FillOpacity)
-		dodgeLabels(out)
+		out = s.fitLabels(out)
 	}()
 	for i := range s.spec.Marks {
 		m := &s.spec.Marks[i]
@@ -86,6 +90,13 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			return nil, err
 		}
 		sm.Clip = expr.Truthy(v)
+		if o, ok := v.(map[string]any); ok {
+			d, err := s.clipPath(o, path+"/clip")
+			if err != nil {
+				return nil, err
+			}
+			sm.ClipPath = d
+		}
 	}
 	data, facets, err := s.markData(m)
 	if err != nil {
@@ -98,19 +109,32 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 	for i, d := range data {
 		st := newItemState(d)
 		st.facet = i
+		st.mark = sm
 		for k, v := range defaults {
 			setProp(st, k, v)
 		}
+		ring := st.it.Stroke
 		if err := s.encodeItem(m.Encode, st, d, path); err != nil {
 			return nil, err
 		}
 		if err := s.linkIssue(st.it, path, &badLink); err != nil {
 			return nil, err
 		}
-		if m.Type == scene.Symbol && configStroke && st.it.Size != nil && *st.it.Size < minRingSize {
-			// The ring that the config gives a point covers a point this
-			// small, so it draws without one.
-			st.it.Stroke = scene.Paint{}
+		if m.Type == scene.Symbol && configStroke {
+			switch {
+			case st.it.Size != nil && *st.it.Size < minRingSize:
+				// The ring that the config gives a point covers a point
+				// this small, so it draws without one.
+				st.it.Stroke = scene.Paint{}
+			case !shape.Named(st.it.Shape) && reflect.DeepEqual(st.it.Stroke, ring) && ring.Color == s.rt.theme.Background:
+				// The ring also covers a thin shape of a path, such as a
+				// star. Another stroke, such as the stroke of an arrowhead,
+				// stays.
+				st.it.Stroke = scene.Paint{}
+			}
+		}
+		if m.Type == scene.Path {
+			scalePath(st)
 		}
 		geometry(m.Type, st)
 		states[i] = st
@@ -129,7 +153,12 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			stackGaps(states, o == "horizontal", gap)
 		}
 		if r := expr.Number(defaults[theme.CornerRadiusEnd]); r > 0 && !encodesCorners(m) {
-			roundEnds(states, o == "horizontal", r)
+			along := "y"
+			if o == "horizontal" {
+				along = "x"
+			}
+			zero, ok := s.zeroAt(m, along)
+			roundEnds(states, o == "horizontal", r, zero, ok)
 		}
 	}
 	if m.Type == scene.Symbol && expr.Truthy(defaults[theme.LargestFirst]) && (m.Sort == nil || m.Sort.Field.IsZero()) && encodes(m, "size") {
@@ -152,7 +181,7 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 		for i := range sm.Items {
 			it := &sm.Items[i]
 			child := s.rt.newScope(s, &m.Scope, path, it.Datum)
-			child.item = it
+			child.item, child.values, child.mark = it, states[i].values, sm
 			if m.From != nil && m.From.Facet != nil && facets != nil {
 				f := m.From.Facet
 				rows := facets[keyOfItem(i, states, sm)]
@@ -203,7 +232,7 @@ func (s *scope) buildScope(path string) ([]scene.Mark, error) {
 	}
 	out = append(out, title...)
 	if !s.spec.Layout.IsZero() {
-		if err := s.gridLayout(out); err != nil {
+		if err := s.gridLayout(out, path+"/layout"); err != nil {
 			return nil, err
 		}
 	}
@@ -268,7 +297,53 @@ func (s *scope) itemDatum(typ string, it *scene.Item) map[string]any {
 	if b := s.rt.style().ItemBounds(typ, it); !b.IsEmpty() {
 		d["bounds"] = map[string]any{"x1": b.X1, "y1": b.Y1, "x2": b.X2, "y2": b.Y2}
 	}
+	addItemStyle(d, it)
 	return d
+}
+
+// addItemStyle adds the visual properties that an item has to its datum,
+// such as fill and size, as Vega gives them to a mark whose data is
+// another mark. A property that the item does not have stays out of the
+// datum, where Vega gives undefined.
+func addItemStyle(d map[string]any, it *scene.Item) {
+	for k, p := range map[string]scene.Paint{"fill": it.Fill, "stroke": it.Stroke} {
+		switch {
+		case p.Gradient != nil:
+			var g any
+			if b, err := json.Marshal(p.Gradient); err == nil && json.Unmarshal(b, &g) == nil {
+				d[k] = g
+			}
+		case p.Color != "":
+			d[k] = p.Color
+		}
+	}
+	for k, v := range map[string]*float64{
+		"opacity": it.Opacity, "fillOpacity": it.FillOpacity, "strokeOpacity": it.StrokeOpacity,
+		"strokeWidth": it.StrokeWidth, "size": it.Size,
+	} {
+		if v != nil {
+			d[k] = *v
+		}
+	}
+	for k, v := range map[string]float64{
+		"angle": it.Angle, "startAngle": it.StartAngle, "endAngle": it.EndAngle,
+		"innerRadius": it.InnerRadius, "outerRadius": it.OuterRadius, "padAngle": it.PadAngle,
+		"cornerRadius": it.CornerRadius, "fontSize": it.FontSize, "dx": it.Dx, "dy": it.Dy,
+		"radius": it.Radius, "theta": it.Theta,
+	} {
+		if v != 0 {
+			d[k] = v
+		}
+	}
+	for k, v := range map[string]string{
+		"shape": it.Shape, "path": it.Path, "strokeCap": it.StrokeCap, "strokeJoin": it.StrokeJoin,
+		"font": it.Font, "fontWeight": string(it.FontWeight), "fontStyle": it.FontStyle,
+		"align": it.Align, "baseline": it.Baseline, "interpolate": it.Interpolate, "orient": it.Orient,
+	} {
+		if v != "" {
+			d[k] = v
+		}
+	}
 }
 
 // findMarkType returns the kind of a named mark of this scope or a scope
@@ -577,6 +652,17 @@ func geometry(typ string, st *itemState) {
 		it.X, it.Width = span(st, it.X, it.X2, it.Width, st.xc, "x", "x2", "xc", "width")
 		it.Y, it.Height = span(st, it.Y, it.Y2, it.Height, st.yc, "y", "y2", "yc", "height")
 	case scene.Text, scene.Symbol, scene.Arc, scene.Path, scene.Shape, scene.Line, scene.Area, scene.Trail:
+		if typ != scene.Line && typ != scene.Area && typ != scene.Trail {
+			// An x2 with no x places the item at x2 less its width, as
+			// Vega places it, such as the square of a phase of a gantt
+			// at its end. A symbol has no width, so it sits at x2.
+			if st.set["x2"] && !st.set["x"] {
+				it.X = it.X2 - it.Width
+			}
+			if st.set["y2"] && !st.set["y"] {
+				it.Y = it.Y2 - it.Height
+			}
+		}
 		if st.set["xc"] && !st.set["x"] {
 			it.X = st.xc
 		}
@@ -601,6 +687,16 @@ func geometry(typ string, st *itemState) {
 		}
 		if !st.set["y2"] {
 			it.Y2 = it.Y
+		}
+		// The scene reads an end at 0 as an end that the item does not
+		// set, so a rule that ends at the edge of its group, such as a
+		// whisker up to the top of the plot, draws from that end. A rule
+		// is the same line from either end, so it turns around when the
+		// other end is not at 0.
+		lost := it.X2 == 0 && it.X != 0 || it.Y2 == 0 && it.Y != 0
+		lostAfter := it.X == 0 && it.X2 != 0 || it.Y == 0 && it.Y2 != 0
+		if lost && !lostAfter {
+			it.X, it.X2, it.Y, it.Y2 = it.X2, it.X, it.Y2, it.Y
 		}
 	}
 	for _, f := range []*float64{&it.X, &it.Y, &it.X2, &it.Y2, &it.Width, &it.Height} {
@@ -686,6 +782,16 @@ func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) (
 		}
 		st := states[i]
 		setItem(st.it, r)
+		// A field that a transform adds, such as the as of a lookup, is a
+		// property of the item, which item.mark.group reads.
+		for k, v := range r {
+			if k != itemKey {
+				if st.values == nil {
+					st.values = map[string]any{}
+				}
+				st.values[k] = v
+			}
+		}
 		if m.Type == scene.Shape {
 			// The transform geoshape gives the path of a shape mark.
 			if v, ok := r["shape"].(string); ok {
@@ -826,22 +932,35 @@ func encodesCorners(m *vega.Mark) bool {
 	return false
 }
 
-// roundEnds rounds the end of each bar away from zero, the end at y, or at
-// x for a horizontal bar, with a radius. The bars at one place across form a
-// stack, and only the outermost bar of each side of the stack is rounded
-// (docs/STYLE.md).
-func roundEnds(states []*itemState, horizontal bool, r float64) {
+// roundEnds rounds the end of each bar away from zero, with a radius: the
+// end at y, or at x for a horizontal bar, or the end at y2 or x2 when it is
+// further from zero, the place of zero on the scale. The bars at one place
+// across form a stack, and only the outermost bar of each side of the
+// stack is rounded (docs/STYLE.md).
+func roundEnds(states []*itemState, horizontal bool, r, zero float64, hasZero bool) {
 	type place struct{ at, size float64 }
 	type ends struct{ low, high *scene.Item }
 	stacks := map[place]*ends{}
 	var order []place
 	for _, st := range states {
 		it := st.it
+		// The bar runs from low to high, and y2 is the end that the spec
+		// gives as its start, such as zero or the start of a stack.
 		p := place{math.Round(it.X*100) / 100, math.Round(it.Width*100) / 100}
-		end, start := it.Y, it.Y2
+		low, high, start := it.Y, it.Y+it.Height, it.Y2
 		if horizontal {
 			p = place{math.Round(it.Y*100) / 100, math.Round(it.Height*100) / 100}
-			end, start = it.X, it.X2
+			low, high, start = it.X, it.X+it.Width, it.X2
+		}
+		if high == low {
+			continue
+		}
+		// The end away from zero is the end further from zero, such as
+		// the top of the part of a bar above a line, from y to y2. With
+		// no zero, it is the end that is not the start.
+		atLow := math.Abs(start-low) > math.Abs(start-high)
+		if hasZero && math.Abs(low-zero) != math.Abs(high-zero) {
+			atLow = math.Abs(low-zero) > math.Abs(high-zero)
 		}
 		e := stacks[p]
 		if e == nil {
@@ -850,12 +969,12 @@ func roundEnds(states []*itemState, horizontal bool, r float64) {
 			order = append(order, p)
 		}
 		switch {
-		case end < start:
-			if e.low == nil || end < value(e.low, horizontal) {
+		case atLow:
+			if e.low == nil || low < lowEnd(e.low, horizontal) {
 				e.low = it
 			}
-		case end > start:
-			if e.high == nil || end > value(e.high, horizontal) {
+		default:
+			if e.high == nil || high > highEnd(e.high, horizontal) {
 				e.high = it
 			}
 		}
@@ -879,12 +998,44 @@ func roundEnds(states []*itemState, horizontal bool, r float64) {
 	}
 }
 
-// value returns the end of a bar: y, or x for a horizontal bar.
-func value(it *scene.Item, horizontal bool) float64 {
+// zeroAt returns the place of zero on the scale that the position of a
+// mark reads along an axis, y or x, and whether the scale is continuous
+// and has one.
+func (s *scope) zeroAt(m *vega.Mark, along string) (float64, bool) {
+	for _, set := range encodeSets {
+		for _, prop := range []string{along, along + "2"} {
+			for _, r := range m.Encode[set][prop] {
+				if r.Scale.IsZero() {
+					continue
+				}
+				sc, err := s.scaleRef(r.Scale, nil)
+				if err != nil || sc == nil || sc.Bandwidth() != 0 || scale.Discrete(sc.Type()) {
+					continue
+				}
+				if z, ok := sc.Map(0.0).(float64); ok && !math.IsNaN(z) && !math.IsInf(z, 0) {
+					return z, true
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
+// lowEnd returns the least end of a bar: y, or x for a horizontal bar.
+func lowEnd(it *scene.Item, horizontal bool) float64 {
 	if horizontal {
 		return it.X
 	}
 	return it.Y
+}
+
+// highEnd returns the greatest end of a bar: y and its height, or x and
+// its width for a horizontal bar.
+func highEnd(it *scene.Item, horizontal bool) float64 {
+	if horizontal {
+		return it.X + it.Width
+	}
+	return it.Y + it.Height
 }
 
 // stackGaps opens a gap between the bars of each stack, half of it from
@@ -961,4 +1112,23 @@ func sizeOf(it *scene.Item) float64 {
 		return 64
 	}
 	return *it.Size
+}
+
+// clipPath returns the path that a clip of a mark names, as Vega reads it:
+// the outline of the sphere of a projection for {"sphere": name}, or the
+// path data of {"path": data}. A clip that names neither, or whose path is
+// empty, clips to the box of the group.
+func (s *scope) clipPath(o map[string]any, path string) (string, error) {
+	if name, ok := o["sphere"].(string); ok {
+		p, err := s.projection(name)
+		if err != nil {
+			return "", fmt.Errorf("%s/sphere: %w", path, err)
+		}
+		d, _ := geo.Path(p, map[string]any{"type": "Sphere"}, 0)
+		return d, nil
+	}
+	if d, ok := o["path"].(string); ok {
+		return d, nil
+	}
+	return "", nil
 }

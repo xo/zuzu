@@ -322,7 +322,7 @@ func (l *rrLayout) spec() map[string]any {
 	}
 	rect := func(radius float64, enc map[string]any) map[string]any {
 		enc["x"], enc["y"], enc["x2"], enc["y2"] = field("x"), field("y"), field("x2"), field("y2")
-		enc["fill"], enc["stroke"], enc["cornerRadius"] = color, color, value(radius)
+		enc["fill"], enc["stroke"], enc["cornerRadius"] = map[string]any{"scale": "tint", "field": "key"}, color, value(radius)
 		return enc
 	}
 	label := func(f text.Font, enc map[string]any) map[string]any {
@@ -344,7 +344,7 @@ func (l *rrLayout) spec() map[string]any {
 		"autosize": "pad",
 		"padding":  map[string]any{"left": pad, "right": pad, "top": pad, "bottom": pad},
 		"data":     data,
-		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": rrKeys, "range": "category"}},
+		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": rrKeys, "range": "category"}, graph.TintScale("tint", rrKeys)},
 		"marks":    marks,
 	}
 }

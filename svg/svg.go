@@ -9,7 +9,9 @@
 package svg
 
 import (
+	"bytes"
 	"cmp"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math"
@@ -65,13 +67,41 @@ func emojiFont(family string) string {
 	return family + ", " + emoji
 }
 
+// Option is an option of Write.
+type Option func(*options)
+
+// options holds the options of Write.
+type options struct {
+	fonts []*text.Fallback
+}
+
+// WithFont embeds a font in the SVG, as a rule @font-face with the bytes of
+// its file in a data URL, when a text of the scene names its family. A
+// viewer that lacks the font, such as a browser that shows the SVG in an
+// image, then draws the text in it. The font keeps the format that
+// text.NewFallback took, such as WOFF2 (D43).
+func WithFont(f *text.Fallback) Option {
+	return func(o *options) {
+		if f != nil {
+			o.fonts = append(o.fonts, f)
+		}
+	}
+}
+
 // Write writes a scene as SVG.
-func Write(w io.Writer, s *scene.Scene) error {
-	wr := &writer{measure: text.NewEstimate()}
+func Write(w io.Writer, s *scene.Scene, opts ...Option) error {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	wr := &writer{measure: text.NewEstimate(), families: map[string]bool{}}
 	var body strings.Builder
 	wr.out = &body
 	if err := wr.mark(&s.Root); err != nil {
 		return err
+	}
+	if faces := wr.fontFaces(o.fonts); faces != "" {
+		wr.defs.WriteString(faces)
 	}
 	var doc strings.Builder
 	fmt.Fprintf(&doc, `<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s" viewBox="0 0 %s %s" font-family="%s">`,
@@ -104,6 +134,53 @@ type writer struct {
 	// attributes.
 	images  map[string]string
 	measure *text.Estimate
+	// families holds each list of font families that a text names.
+	families map[string]bool
+}
+
+// fontFaces returns a style element with a rule @font-face for each font
+// whose family a text names, or an empty string when no text names one.
+func (w *writer) fontFaces(fonts []*text.Fallback) string {
+	var b strings.Builder
+	for _, f := range fonts {
+		src := f.Source()
+		if len(src) == 0 || !w.names(f.Family()) {
+			continue
+		}
+		mime, format := fontFormat(src)
+		fmt.Fprintf(&b, "@font-face{font-family:'%s';src:url(data:%s;base64,%s) format('%s')}",
+			esc(f.Family()), mime, base64.StdEncoding.EncodeToString(src), format)
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "<style>" + b.String() + "</style>"
+}
+
+// names reports whether a text names a font family.
+func (w *writer) names(family string) bool {
+	for list := range w.families {
+		for f := range strings.SplitSeq(list, ",") {
+			if strings.Trim(strings.TrimSpace(f), `'"`) == family {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// fontFormat returns the media type and the format of CSS of a font file,
+// from its first bytes.
+func fontFormat(b []byte) (mime, format string) {
+	switch {
+	case bytes.HasPrefix(b, []byte("wOF2")):
+		return "font/woff2", "woff2"
+	case bytes.HasPrefix(b, []byte("wOFF")):
+		return "font/woff", "woff"
+	case bytes.HasPrefix(b, []byte("OTTO")):
+		return "font/otf", "opentype"
+	}
+	return "font/ttf", "truetype"
 }
 
 // id returns a new identifier for an element of the defs.
@@ -175,14 +252,18 @@ func (w *writer) group(it *scene.Item) error {
 	w.open(it)
 	fmt.Fprintf(w.out, `<g transform="translate(%s,%s)">`, num(it.X), num(it.Y))
 	w.title(it)
-	if !it.Fill.IsZero() || !it.Stroke.IsZero() {
-		bg := *it
-		bg.X, bg.Y = 0, 0
+	bg := *it
+	bg.X, bg.Y = 0, 0
+	if it.StrokeForeground {
+		// The stroke draws over the marks, as Vega draws it.
+		bg.Stroke = scene.Paint{}
+	}
+	if !bg.Fill.IsZero() || !bg.Stroke.IsZero() {
 		w.rect(&bg)
 	}
 	if it.Clip {
 		id := w.id("clip")
-		fmt.Fprintf(&w.defs, `<clipPath id="%s"><rect width="%s" height="%s"/></clipPath>`, id, num(it.Width), num(it.Height))
+		fmt.Fprintf(&w.defs, `<clipPath id="%s">%s</clipPath>`, id, clipShape(it))
 		fmt.Fprintf(w.out, `<g clip-path="url(#%s)">`, id)
 	}
 	// The marks draw in the order of their zindex, and in the order of the
@@ -195,8 +276,15 @@ func (w *writer) group(it *scene.Item) error {
 	markClip := ""
 	for _, i := range order {
 		m := &it.Items[i]
-		clipped := m.Clip && !it.Clip
-		if clipped {
+		clipped := m.Clip && (!it.Clip || m.ClipPath != "")
+		switch {
+		case clipped && m.ClipPath != "":
+			// A mark that clips to a path, such as the sphere of a
+			// projection, draws inside that path, as Vega clips it.
+			id := w.id("clip")
+			fmt.Fprintf(&w.defs, `<clipPath id="%s"><path d="%s"/></clipPath>`, id, esc(m.ClipPath))
+			fmt.Fprintf(w.out, `<g clip-path="url(#%s)">`, id)
+		case clipped:
 			// A mark that clips draws inside the box of its group, as
 			// Vega clips it.
 			if markClip == "" {
@@ -215,9 +303,25 @@ func (w *writer) group(it *scene.Item) error {
 	if it.Clip {
 		w.out.WriteString("</g>")
 	}
+	if it.StrokeForeground && !it.Stroke.IsZero() {
+		fg := *it
+		fg.X, fg.Y = 0, 0
+		fg.Fill = scene.Paint{}
+		w.rect(&fg)
+	}
 	w.out.WriteString("</g>")
 	w.closeLink(it)
 	return nil
+}
+
+// clipShape returns the shape that a group clips its marks to: its box,
+// with its corners when it has them, as Vega clips a group.
+func clipShape(it *scene.Item) string {
+	tl, tr, br, bl := shape.Corners(it)
+	if tl == 0 && tr == 0 && br == 0 && bl == 0 {
+		return fmt.Sprintf(`<rect width="%s" height="%s"/>`, num(it.Width), num(it.Height))
+	}
+	return fmt.Sprintf(`<path d="%s"/>`, shape.RoundRect(0, 0, it.Width, it.Height, tl, tr, br, bl))
 }
 
 // rect writes a rect item, with round corners if it has them.
@@ -388,6 +492,7 @@ func (w *writer) text(it *scene.Item) {
 		family = emojiFont(cmp.Or(family, DefaultFont))
 	}
 	if family != "" {
+		w.families[family] = true
 		fmt.Fprintf(w.out, ` font-family="%s"`, esc(family))
 	}
 	fmt.Fprintf(w.out, ` font-size="%s"`, num(t.Size))

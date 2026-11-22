@@ -8,13 +8,42 @@ import (
 
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/graph"
+	"github.com/xo/zuzu/vega"
 )
 
-// layered lays out a graph in ranks (D31). It runs on the rows of the
-// nodes, reads the edges and the clusters from the datasets that it names,
-// and makes one row for each node, each edge and each cluster, which the
-// field kind tells apart.
-func layered(p *params, rows []Row) ([]Row, error) {
+// LayoutEnv is an Env that picks the layout engine of each graph of a
+// render (D44). The transforms zuzu.layered and zuzu.dagre read it.
+type LayoutEnv interface {
+	// Layout returns the engine that lays out each graph of the render, or
+	// nil for the engine of the transform, and the name of the layout that
+	// the render forces or that the spec names with zuzu.layout in its
+	// config, such as elk.stress, or empty. An error stops the transform,
+	// such as a forced layout with no engine in the strict mode.
+	Layout() (graph.Engine, string, error)
+}
+
+// IssueEnv is an Env that handles a feature that does not draw: an error
+// in the strict mode, and an issue of the report in the loose mode. A
+// transform with no IssueEnv returns such a feature as an error.
+type IssueEnv interface {
+	Issue(err error, path, format string, args ...any) error
+}
+
+// layoutWith returns a transform that lays out a graph with an engine, or
+// with the engine that the Env picks. zuzu.layered lays out with
+// graph.Layered, and zuzu.dagre with graph.Dagre.
+func layoutWith(e graph.Engine) transformFunc {
+	return func(p *params, rows []Row) ([]Row, error) {
+		return layered(p, rows, e)
+	}
+}
+
+// layered lays out a graph with an engine (D31, D39). It runs on the rows
+// of the nodes, reads the edges and the clusters from the datasets that it
+// names, and makes one row for each node, each edge and each cluster, which
+// the field kind tells apart. The report names each part of the graph that
+// the engine does not lay out as the graph asks (hard rule 4).
+func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 	str := func(name, def string) (*Accessor, error) {
 		if _, ok := p.t.Param(name); !ok {
 			return FieldAccessor(def), nil
@@ -60,6 +89,16 @@ func layered(p *params, rows []Row) ([]Row, error) {
 	default:
 		return nil, fmt.Errorf("the direction %q: %w", dir, ErrParam)
 	}
+	// The direction of a cluster that lays out on its own in zuzu.dagre.
+	clusterDir, err := p.str("clusterDirection", "")
+	if err != nil {
+		return nil, err
+	}
+	switch clusterDir {
+	case "", graph.TB, graph.BT, graph.LR, graph.RL:
+	default:
+		return nil, fmt.Errorf("the direction %q of the clusters: %w", clusterDir, ErrParam)
+	}
 	num := func(name string, def float64) float64 {
 		if err != nil {
 			return 0
@@ -85,6 +124,11 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		return nil, err
 	}
 	laneEdges, err := p.boolean("laneEdges", false)
+	if err != nil {
+		return nil, err
+	}
+	// The order of the sibling clusters in zuzu.dagre.
+	reverseClusters, err := p.boolean("reverseClusters", false)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +237,10 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		return 0, 0, nil, nil, nil
 	}
-	in := graph.LayoutInput{Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad, Lanes: lanes, LaneEdges: laneEdges}
+	in := graph.LayoutInput{
+		Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad, Lanes: lanes, LaneEdges: laneEdges,
+		ClusterDirection: clusterDir, ReverseClusters: reverseClusters,
+	}
 	text := func(r Row, f *Accessor) string {
 		v := f.Get(r)
 		if v == nil || expr.IsUndefined(v) {
@@ -232,6 +279,15 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		n.Shape = kind
 		n.Width, n.Height = expr.Number(fields["width"].Get(r)), expr.Number(fields["height"].Get(r))
+		if runs, ok := r["runs"].([]any); ok && len(runs) > 0 && r["html"] == nil {
+			// A label in more than one font, such as markdown with bold
+			// and italic, wraps here and draws as a label of HTML.
+			size := sizeOf(r, "fontSize")
+			r["html"] = runsHTML(runs, expr.Number(r["wrap"]), func(t, weight string) float64 {
+				w, _ := sizeAt(t, "", size, weight)
+				return w
+			})
+		}
 		h, ok, err := htmlOf(r, sizeAt, fontSize)
 		if err != nil {
 			return nil, fmt.Errorf("the label of HTML of node %s: %w", n.ID, err)
@@ -511,9 +567,27 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		}
 		in.Clusters = append(in.Clusters, c)
 	}
-	l, err := graph.Lay(in)
+	if le, ok := p.env.(LayoutEnv); ok {
+		picked, algorithm, err := le.Layout()
+		if err != nil {
+			return nil, err
+		}
+		if in.Algorithm = algorithm; picked != nil {
+			engine = picked
+		}
+	}
+	l, err := engine.Lay(in)
 	if err != nil {
 		return nil, fmt.Errorf("laying out the graph: %w: %w", ErrParam, err)
+	}
+	for _, part := range l.Unsupported {
+		ie, ok := p.env.(IssueEnv)
+		if !ok {
+			return nil, vega.Issue{Err: vega.ErrUnsupported, Path: "transform zuzu." + engine.Name(), Message: part}
+		}
+		if err := ie.Issue(vega.ErrUnsupported, "transform zuzu."+engine.Name(), "%s", part); err != nil {
+			return nil, err
+		}
 	}
 	out := make([]Row, 0, len(rows)+len(edges)+len(clusters))
 	for i, r := range rows {
@@ -526,7 +600,8 @@ func layered(p *params, rows []Row) ([]Row, error) {
 		o[as[0]], o[as[1]], o[as[2]], o[as[3]] = np.X, np.Y, np.Width, np.Height
 		o[as[4]], o[as[5]] = float64(np.Rank), float64(np.Order)
 		o["path"] = graph.ShapePath(in.Nodes[i].Shape, np.Width, np.Height)
-		o["textX"], o["textY"] = np.X, np.Y+graph.TextOffset(in.Nodes[i].Shape)
+		dx, dy := graph.TextOffset(in.Nodes[i].Shape, np.Width, np.Height)
+		o["textX"], o["textY"] = np.X+dx, np.Y+dy
 		o["xLabelX"], o["xLabelY"] = np.XLabelX, np.XLabelY
 		o["xLabelWidth"], o["xLabelHeight"] = in.Nodes[i].XLabelWidth, in.Nodes[i].XLabelHeight
 		if m, ok := medias[i]; ok {

@@ -37,6 +37,9 @@ type flowchart struct {
 	wrap     wrapping
 	nodeWrap float64
 	markdown map[string]bool
+	// markdownSrc holds the text of the label of each node as the source
+	// writes it, with the marks of markdown.
+	markdownSrc map[string]string
 	// minLabel is the least width of the label of a node in the pixels of
 	// zuzu, from minNodeWidth, or 0 for none.
 	minLabel float64
@@ -75,13 +78,17 @@ type pendingLink struct {
 	l    *link
 }
 
+// newFlowchart returns the reader of a flowchart, an agentflow diagram or
+// a swimlane diagram. Mermaid 12.3 gives dagre the sibling subgraphs of
+// each in the reverse of the order of the source, which zuzu.dagre reads
+// (D45 part 5).
 func newFlowchart(d *Diagram, strict bool) *flowchart {
 	return &flowchart{
-		d: d, g: &graph.Graph{Directed: true, Direction: graph.TB, Title: d.Title}, issues: &graph.Issues{Strict: strict},
+		d: d, g: &graph.Graph{Directed: true, Direction: graph.TB, Title: d.Title, ReverseClusters: true}, issues: &graph.Issues{Strict: strict},
 		nodes: map[string]*graph.Node{}, classes: map[string]map[string]string{}, nodeClasses: map[string][]string{},
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
-		nodeWrap: scaleWrap(d.Kind, "", nodeWrap), markdown: map[string]bool{}, edgeClasses: map[string][]string{},
+		nodeWrap: scaleWrap(d.Kind, "", nodeWrap), markdown: map[string]bool{}, markdownSrc: map[string]string{}, edgeClasses: map[string][]string{},
 		collapsed: map[string]int{}, animated: map[*graph.Edge]bool{}, animClasses: map[string]int{},
 	}
 }
@@ -846,6 +853,7 @@ func (f *flowchart) nodeRef(sc *scanner) (string, error) {
 		}
 		n.Label = flowLabel(text, f.wrap.html)
 		f.markdown[id] = isMarkdown(text)
+		f.markdownSrc[id] = text
 		n.Shape = d.shape
 		if f.af != nil {
 			n.Shape = agentBracket(d.shape)
@@ -947,6 +955,7 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 		case "label":
 			n.Label = flowLabel(v, f.wrap.html)
 			f.markdown[n.ID] = isMarkdown(v)
+			f.markdownSrc[n.ID] = v
 		case "icon":
 			media.Icon = v
 		case "img":
@@ -1015,20 +1024,20 @@ func (f *flowchart) bare(n *graph.Node) {
 	case "anchor":
 		// A dot in the color of the node, where edges meet.
 		w, h = 2, 2
-		n.Style["fillOpacity"] = "1"
+		n.Solid = true
 	case "sm-circ":
 		// An open circle of 14 pixels, as Mermaid draws it.
 		w, h = 14, 14
 	case "point":
 		// A filled circle of 14 pixels, a junction.
 		w, h = 14, 14
-		n.Style["fillOpacity"] = "1"
+		n.Solid = true
 	case "bar":
 		w, h = 70, 10
 		if d := f.g.Direction; d == graph.LR || d == graph.RL {
 			w, h = 10, 70
 		}
-		n.Style["fillOpacity"] = "1"
+		n.Solid = true
 	case "hourglass":
 		w, h = 30, 30
 	case "bolt":
@@ -1261,6 +1270,9 @@ func (f *flowchart) finish() error {
 	for _, n := range f.g.Nodes {
 		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)
 		n.Wrap = f.wrap.width(f.nodeWrap, f.markdown[n.ID])
+		if f.markdown[n.ID] {
+			n.Runs = styledRuns(f.markdownSrc[n.ID])
+		}
 		if minLabelOf(n) {
 			n.MinLabelWidth = f.minLabel
 		}
@@ -1440,4 +1452,25 @@ func label(s string) string {
 		return m
 	})
 	return strings.TrimSpace(s)
+}
+
+// styledRuns returns the runs of a string of markdown in backquotes, with
+// bold text between two stars and italic text between underscores, and a
+// run "\n" for each new line. It returns nil when no run is bold or
+// italic, so that a plain label keeps one font.
+func styledRuns(src string) []graph.Run {
+	s := unquote(src)
+	if len(s) < 2 || !strings.HasPrefix(s, "`") || !strings.HasSuffix(s, "`") {
+		return nil
+	}
+	s = regexp.MustCompile(`(?i)<br\s*/?>`).ReplaceAllString(s[1:len(s)-1], "\n")
+	runs := markdownRuns(s)
+	if !slices.ContainsFunc(runs, func(r textRun) bool { return r.bold || r.italic }) {
+		return nil
+	}
+	out := make([]graph.Run, len(runs))
+	for i, r := range runs {
+		out[i] = graph.Run{Text: decodeEntities(r.text), Bold: r.bold, Italic: r.italic}
+	}
+	return out
 }

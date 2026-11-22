@@ -518,7 +518,7 @@ func isEmpty(v any) bool {
 // JavaScript.
 func isObject(v any) bool {
 	switch v.(type) {
-	case []any, map[string]any, time.Time, *RegExp, *Color:
+	case []any, map[string]any, time.Time, *RegExp, *Color, Object:
 		return true
 	}
 	return false

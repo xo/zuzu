@@ -280,3 +280,48 @@ func TestRegExpLiteralErrors(t *testing.T) {
 		}
 	}
 }
+
+// testObject is an Object of a map, for the tests.
+type testObject map[string]any
+
+func (o testObject) Get(name string) any {
+	if v, ok := o[name]; ok {
+		return v
+	}
+	return Undefined
+}
+
+// TestItem checks that item reads the Object of the scope, that a property
+// of an Object reads through Get, and that item is undefined without one.
+func TestItem(t *testing.T) {
+	t.Parallel()
+	group := testObject{"width": 80.0, "datum": map[string]any{"k": "a"}}
+	s := &Scope{Item: testObject{"mark": testObject{"group": group}}}
+	for _, c := range []struct {
+		src  string
+		want any
+	}{
+		{"item.mark.group.width / 2", 40.0},
+		{"item.mark.group.datum.k", "a"},
+		{"item.mark.group['width']", 80.0},
+		{"item.mark.nothing == null", true},
+		{"isObject(item.mark)", true},
+		{"'' + item.mark", "[object Object]"},
+	} {
+		p, err := Compile(c.src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := p.Eval(s)
+		if err != nil || got != c.want {
+			t.Errorf("%s = %v, %v, want %v", c.src, got, err, c.want)
+		}
+	}
+	p, err := Compile("item.mark")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := p.Eval(&Scope{}); err != nil || !IsUndefined(got) {
+		t.Errorf("item.mark with no item = %v, %v, want undefined", got, err)
+	}
+}

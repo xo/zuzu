@@ -10,6 +10,7 @@ import (
 
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/vega"
@@ -32,6 +33,9 @@ type itemState struct {
 	// properties that zuzu does not draw, such as the xfocus that a
 	// force reads.
 	values map[string]any
+	// mark is the mark of the item, which an expression reads as
+	// item.mark, or nil.
+	mark *scene.Mark
 }
 
 // newItemState starts an item for a datum.
@@ -42,18 +46,32 @@ func newItemState(datum any) *itemState {
 // encodeItem applies the encodings of a mark to an item, for a datum.
 func (s *scope) encodeItem(enc vega.Encode, st *itemState, datum any, path string) error {
 	it := st.it
+	prev := s.encoding
+	s.encoding = &itemValue{s: s, st: st, mark: st.mark, path: path + "/encode"}
+	defer func() { s.encoding = prev }()
 	for _, set := range encodeSets {
 		props, ok := enc[set]
 		if !ok {
 			continue
 		}
 		for name, prod := range props {
-			v, ok, err := s.production(prod, datum, it)
+			v, named, ok, err := s.production(prod, datum, it)
 			if err != nil {
 				return fmt.Errorf("%s/encode/%s/%s: %w", path, set, name, err)
 			}
 			if !ok {
 				continue
+			}
+			if _, isItem := v.(expr.Object); isItem && name == "tooltip" {
+				// Vega shows each field of the item, which zuzu does not
+				// keep.
+				if err := s.issueOncef(path+"/encode/"+set+"/tooltip", "a tooltip that shows an item of the scene"); err != nil {
+					return err
+				}
+				continue
+			}
+			if named && (name == "fill" || name == "stroke") {
+				v = s.rt.specColor(v)
 			}
 			setProp(st, name, v)
 		}
@@ -62,22 +80,28 @@ func (s *scope) encodeItem(enc vega.Encode, st *itemState, datum any, path strin
 }
 
 // production evaluates the value of a property: the first rule whose test
-// is true. It reports false if no rule applies.
-func (s *scope) production(p vega.Production, datum any, it *scene.Item) (any, bool, error) {
+// is true. It reports false if no rule applies. It also reports whether the
+// spec names the value itself, as a value or a field of its data, and not
+// through a scale or an expression. Such a color flips in the dark mode,
+// and a color of a scale flips with its range (D48 part 1). A color that
+// an expression computes stays, because the expression can read a scale
+// whose range already flipped, or work out its own contrast.
+func (s *scope) production(p vega.Production, datum any, it *scene.Item) (any, bool, bool, error) {
 	for _, r := range p {
 		if r.Test != "" {
-			t, err := s.eval(r.Test, datum)
+			t, err := s.evalItem(r.Test, datum)
 			if err != nil {
-				return nil, false, err
+				return nil, false, false, err
 			}
 			if !expr.Truthy(t) {
 				continue
 			}
 		}
 		v, err := s.valueRef(&r.ValueRef, datum, it)
-		return v, true, err
+		named := r.Signal == "" && r.Scale.IsZero() && (len(r.Value) > 0 || !r.Field.IsZero())
+		return v, named, true, err
 	}
-	return nil, false, nil
+	return nil, false, false, nil
 }
 
 // valueRef evaluates a value reference: a value, a signal or a field,
@@ -87,7 +111,7 @@ func (s *scope) valueRef(r *vega.ValueRef, datum any, it *scene.Item) (any, erro
 	hasBase := true
 	switch {
 	case r.Signal != "":
-		x, err := s.eval(r.Signal, datum)
+		x, err := s.evalItem(r.Signal, datum)
 		if err != nil {
 			return nil, err
 		}
@@ -172,7 +196,7 @@ func (s *scope) valueRef(r *vega.ValueRef, datum any, it *scene.Item) (any, erro
 // value reference.
 func (s *scope) numberRef(v vega.Value, datum any, it *scene.Item) (float64, error) {
 	if v.Signal != "" {
-		x, err := s.eval(v.Signal, datum)
+		x, err := s.evalItem(v.Signal, datum)
 		return expr.Number(x), err
 	}
 	if v.JSON.Kind() == '{' {
@@ -236,7 +260,7 @@ func (s *scope) scaleRef(v vega.Value, datum any) (scale.Scale, error) {
 func (s *scope) fieldRef(f vega.Field, datum any) (any, error) {
 	switch {
 	case f.Signal != "":
-		x, err := s.eval(f.Signal, datum)
+		x, err := s.evalItem(f.Signal, datum)
 		if err != nil {
 			return nil, err
 		}
@@ -277,7 +301,7 @@ func (s *scope) fieldRef(f vega.Field, datum any) (any, error) {
 func (s *scope) fieldName(f vega.Field, datum any) (string, error) {
 	switch {
 	case f.Signal != "":
-		x, err := s.eval(f.Signal, datum)
+		x, err := s.evalItem(f.Signal, datum)
 		return expr.String(x), err
 	case f.Datum != nil || f.Group != nil || f.Parent != nil:
 		x, err := s.fieldRef(f, datum)
@@ -480,6 +504,8 @@ func setProp(st *itemState, name string, v any) {
 		it.Smooth = &b
 	case "clip":
 		it.Clip = expr.Truthy(v)
+	case "strokeForeground":
+		it.StrokeForeground = expr.Truthy(v)
 	case "href":
 		it.Href = str()
 	case "tooltip":
@@ -487,6 +513,25 @@ func setProp(st *itemState, name string, v any) {
 	}
 	// Other properties, such as description and cursor, change nothing that
 	// zuzu draws.
+}
+
+// scalePath applies the scaleX and the scaleY of a path item to its path,
+// as Vega scales a path before it moves it to x and y.
+func scalePath(st *itemState) {
+	sx, okX := st.values["scaleX"]
+	sy, okY := st.values["scaleY"]
+	if (!okX && !okY) || st.it.Path == "" {
+		return
+	}
+	k := func(v any, ok bool) float64 {
+		if !ok || v == nil || expr.IsUndefined(v) {
+			return 1
+		}
+		return expr.Number(v)
+	}
+	if d, err := shape.ScalePath(st.it.Path, k(sx, okX), k(sy, okY)); err == nil {
+		st.it.Path = d
+	}
 }
 
 // tooltipText writes the value of a tooltip as the text that Vega shows

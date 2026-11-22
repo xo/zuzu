@@ -192,14 +192,61 @@ const (
 	collapsedRow   = 28.0
 )
 
-// TextOffset returns how far down from the center of a node of a shape
-// the center of its label goes: up by half the band of a collapsed
-// subgraph, and 0 for every other shape.
-func TextOffset(kind string) float64 {
-	if kind == collapsedGroup {
-		return -collapsedRow / 2
+// TextOffset returns how far right and down from the center of a node of a
+// shape and a size the center of its label goes, so that the label sits in
+// the middle of the body of the shape, where a reader looks for it: clear
+// of the band at the top of a divided process, the band and the strip at
+// the side of internal storage, the tab of a folder and the bar of a
+// browser, on the front sheet of a stack of processes, below the top of a
+// cylinder, a disk and a bucket, and left of the end of a cylinder on its
+// side. A label goes up by half the band of a collapsed subgraph. Every
+// other shape keeps its label in the middle.
+func TextOffset(kind string, w, h float64) (float64, float64) {
+	switch kind {
+	case collapsedGroup:
+		return 0, -collapsedRow / 2
+	case "cylinder", DOTCylinder:
+		return 0, cylinderRadius(h)
+	case "div-rect":
+		return 0, paneBand / 2
+	case "win-pane":
+		return paneBand / 2, paneBand / 2
+	case "st-rect":
+		return -stackOffset, stackOffset
+	case "lin-cyl":
+		return 0, cylinderRadius(h) + linCylGap/2
+	case "h-cyl":
+		return -hcylRadius(h), 0
+	case "bucket":
+		return 0, bucketRadius(h)
+	case "browser":
+		return 0, browserBar / 2
+	case "folder":
+		return 0, folderTab(h) / 2
 	}
-	return 0
+	return 0, 0
+}
+
+// paneBand is the band across the top of a divided process and of internal
+// storage, and the strip at the side of internal storage. linCylGap is the
+// gap between the top of a disk and its second line. browserBar is the bar
+// at the top of a browser.
+const (
+	paneBand   = 8.0
+	linCylGap  = 5.0
+	browserBar = 12.0
+)
+
+// bucketRadius returns the radius up and down of the rim of a bucket of a
+// height, and folderTab the height of the tab of a folder.
+func bucketRadius(h float64) float64 { return math.Min(h*0.1, 8) }
+
+func folderTab(h float64) float64 { return math.Min(8, h/4) }
+
+// cylinderRadius returns the radius up and down of an end of a standing
+// cylinder of a height.
+func cylinderRadius(h float64) float64 {
+	return math.Min(h*0.12, 10)
 }
 
 // hcylRadius is the radius across of an end of a cylinder on its side of
@@ -250,9 +297,9 @@ func morePath(kind string, w, h float64) (string, bool) {
 	case "lin-rect":
 		return rectPath(x, y) + stroke([2]float64{-x + 6, -y}, [2]float64{-x + 6, y}), true
 	case "div-rect":
-		return rectPath(x, y) + stroke([2]float64{-x, -y + 8}, [2]float64{x, -y + 8}), true
+		return rectPath(x, y) + stroke([2]float64{-x, -y + paneBand}, [2]float64{x, -y + paneBand}), true
 	case "win-pane":
-		return rectPath(x, y) + stroke([2]float64{-x, -y + 8}, [2]float64{x, -y + 8}) + stroke([2]float64{-x + 8, -y}, [2]float64{-x + 8, y}), true
+		return rectPath(x, y) + stroke([2]float64{-x, -y + paneBand}, [2]float64{x, -y + paneBand}) + stroke([2]float64{-x + paneBand, -y}, [2]float64{-x + paneBand, y}), true
 	case "tag-rect":
 		t := math.Min(10, h/3)
 		return rectPath(x, y) + stroke([2]float64{x, y - t}, [2]float64{x - t, y}), true
@@ -275,15 +322,15 @@ func morePath(kind string, w, h float64) (string, bool) {
 		p.m(x-r, -y).a(r, y, 0, x-r, y).a(r, y, 1, x-r, -y)
 		return p.String(), true
 	case "lin-cyl":
-		ry := math.Min(h*0.12, 10)
-		at := -y + 2*ry + 5
+		ry := cylinderRadius(h)
+		at := -y + 2*ry + linCylGap
 		return shapePath("cylinder", w, h) + p.m(-x, at).a(x, ry, 0, x, at).a(x, ry, 1, -x, at).String(), true
 	case "paper-tape":
 		k := math.Min(h*0.3, 14)
 		a := 0.3 * k
 		return p.m(-x, -y+a).c(-x/3, -y+a-k, x/3, -y+a+k, x, -y+a).v(y-a).c(x/3, y-a+k, -x/3, y-a-k, -x, y-a).z().String(), true
 	case "bucket":
-		ry, i := math.Min(h*0.1, 8), w/10
+		ry, i := bucketRadius(h), w/10
 		top := -y + ry
 		p.m(-x, top).a(x, ry, 1, x, top).l(x-i, y-ry).a(x-i, ry, 1, -x+i, y-ry).z()
 		p.m(-x, top).a(x, ry, 0, x, top).a(x, ry, 1, -x, top)
@@ -294,7 +341,7 @@ func morePath(kind string, w, h float64) (string, bool) {
 			stroke([2]float64{-x + 14, -y + 12}, [2]float64{-x + 19, -y + 12}), true
 	case "browser":
 		var b strings.Builder
-		b.WriteString(shapePath("rounded", w, h) + stroke([2]float64{-x, -y + 12}, [2]float64{x, -y + 12}))
+		b.WriteString(shapePath("rounded", w, h) + stroke([2]float64{-x, -y + browserBar}, [2]float64{x, -y + browserBar}))
 		for i := range 3 {
 			b.WriteString(circlePath(-x+7+float64(i)*5, -y+6, 1.5))
 		}

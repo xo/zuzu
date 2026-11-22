@@ -164,3 +164,62 @@ func TestFramedCircleDot(t *testing.T) {
 		t.Errorf("the dot has a radius of %v, want 2.5", covered)
 	}
 }
+
+// TestCylinder checks that the front edge of the top of a cylinder runs
+// from right to left with the sweep of the outline, so that the nonzero
+// fill covers the top and the top does not show the background, and that a
+// cylinder of DOT takes the size of a box, as Graphviz draws it, where a
+// cylinder of Mermaid grows by its ends.
+func TestCylinder(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"cylinder", DOTCylinder} {
+		path := ShapePath(kind, 60, 40)
+		_, front, ok := strings.Cut(path, "Z")
+		if !ok || !strings.HasPrefix(front, "M30,") || !strings.Contains(front, " 0 0,1 -30,") {
+			t.Errorf("%s: the front edge of the top is %q, want it from the right to the left with the sweep 1", kind, front)
+		}
+	}
+	bw, bh := NodeSize("rect", 20, 12, 8)
+	if w, h := NodeSize(DOTCylinder, 20, 12, 8); w != bw || h != bh {
+		t.Errorf("a cylinder of DOT is %v by %v, want the size %v by %v of a box", w, h, bw, bh)
+	}
+	if _, h := NodeSize("cylinder", 20, 12, 8); h <= bh {
+		t.Errorf("a cylinder of Mermaid is %v high, want more than the %v of a box", h, bh)
+	}
+	// The label sits in the middle of the body, one radius of the top
+	// below the center of the node.
+	for _, kind := range []string{"cylinder", DOTCylinder} {
+		if _, got := TextOffset(kind, 80, 50); got != cylinderRadius(50) || got <= 0 {
+			t.Errorf("%s: the label is %v below the center, want %v", kind, got, cylinderRadius(50))
+		}
+	}
+	if _, got := TextOffset("rect", 80, 50); got != 0 {
+		t.Errorf("rect: the label is %v below the center, want 0", got)
+	}
+}
+
+// TestTextOffsetOfDecoratedShapes checks that the label of a shape with a
+// band, a strip, a tab, a cap or a stack sits in the middle of the body of
+// the shape: right and down past a band or a strip, left past the end of
+// a cylinder on its side, and up and left onto the front sheet of a stack.
+func TestTextOffsetOfDecoratedShapes(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		kind   string
+		dx, dy float64
+	}{
+		{"div-rect", 0, paneBand / 2},
+		{"win-pane", paneBand / 2, paneBand / 2},
+		{"st-rect", -stackOffset, stackOffset},
+		{"lin-cyl", 0, cylinderRadius(60) + linCylGap/2},
+		{"h-cyl", -hcylRadius(60), 0},
+		{"bucket", 0, bucketRadius(60)},
+		{"browser", 0, browserBar / 2},
+		{"folder", 0, folderTab(60) / 2},
+	} {
+		dx, dy := TextOffset(tt.kind, 120, 60)
+		if dx != tt.dx || dy != tt.dy {
+			t.Errorf("%s: the label moves %v, %v, want %v, %v", tt.kind, dx, dy, tt.dx, tt.dy)
+		}
+	}
+}

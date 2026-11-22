@@ -2,6 +2,7 @@ package mermaid_test
 
 import (
 	"errors"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -143,19 +144,12 @@ func TestXYIssues(t *testing.T) {
 	tests := []struct {
 		src, part string
 	}{
-		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showTick: true\n---\nxychart\nbar [1]", "xyChart.xAxis.showTick"},
-		{"---\nconfig:\n  xyChart:\n    yAxis:\n      showAxisLine: true\n---\nxychart\nbar [1]", "xyChart.yAxis.showAxisLine"},
-		{"---\nconfig:\n  xyChart:\n    xAxis:\n      showAxisLine: true\n---\nxychart\nx-axis 1 --> 5\nbar [1]", "xyChart.xAxis.showAxisLine"},
 		{"---\nconfig:\n  themeVariables:\n    xyChart:\n      titleColor: red\n---\nxychart\nbar [1]", "themeVariables.xyChart.titleColor"},
-		// zuzu draws no ticks, puts the labels 8 from the plot and the title
-		// of an axis at its end, and draws no axis line along numbers.
+		// zuzu puts the labels 8 from the plot and the title of an axis at
+		// its end.
 		{"---\nconfig:\n  xyChart:\n    plotReservedSpacePercent: 60\n---\nxychart\nbar [1]", "xyChart.plotReservedSpacePercent"},
-		{"---\nconfig:\n  xyChart:\n    xAxis:\n      tickLength: 10\n---\nxychart\nbar [1]", "xyChart.xAxis.tickLength"},
-		{"---\nconfig:\n  xyChart:\n    xAxis:\n      tickWidth: 5\n---\nxychart\nbar [1]", "xyChart.xAxis.tickWidth"},
 		{"---\nconfig:\n  xyChart:\n    yAxis:\n      labelPadding: 10\n---\nxychart\nbar [1]", "xyChart.yAxis.labelPadding"},
 		{"---\nconfig:\n  xyChart:\n    yAxis:\n      titlePadding: 10\n---\nxychart\nbar [1]", "xyChart.yAxis.titlePadding"},
-		{"---\nconfig:\n  xyChart:\n    yAxis:\n      axisLineWidth: 5\n---\nxychart\nx-axis [a]\nbar [1]", "xyChart.yAxis.axisLineWidth"},
-		{"---\nconfig:\n  xyChart:\n    xAxis:\n      axisLineWidth: 5\n---\nxychart\nx-axis 1 --> 5\nbar [1]", "xyChart.xAxis.axisLineWidth"},
 	}
 	for _, test := range tests {
 		report, err := compileMermaid(t, test.src, false)
@@ -205,9 +199,33 @@ func TestXYAxes(t *testing.T) {
 	if n := countDrawn(drawn, scene.Rule, func(it drawnItem) bool { return it.role == "axis-domain" }); n != 0 {
 		t.Errorf("%d axis lines draw", n)
 	}
+	// Each axis draws its line and its ticks by default, as in Mermaid and
+	// in Vega (D46).
 	drawn, _ = drawFixture(t, "testdata/xychart/01-sales.mmd")
-	if n := countDrawn(drawn, scene.Rule, func(it drawnItem) bool { return it.role == "axis-domain" }); n != 1 {
-		t.Errorf("%d axis lines draw in a chart of categories, not 1", n)
+	if n := countDrawn(drawn, scene.Rule, func(it drawnItem) bool { return it.role == "axis-domain" }); n != 2 {
+		t.Errorf("%d axis lines draw in a chart of categories, not 2", n)
+	}
+	if n := countDrawn(drawn, scene.Rule, func(it drawnItem) bool { return it.role == "axis-tick" }); n == 0 {
+		t.Error("no tick draws in a chart of categories")
+	}
+	// showTick false hides the ticks of an axis, and tickLength and
+	// tickWidth set their length and their width.
+	src := "---\nconfig:\n  xyChart:\n    xAxis:\n      tickLength: 10\n      tickWidth: 2\n    yAxis:\n      showTick: false\n---\nxychart\nx-axis [a, b]\nbar [1, 2]"
+	if report, err := compileMermaid(t, src, true); err != nil || len(report) != 0 {
+		t.Errorf("%q: the report %v and the error %v", src, report, err)
+	}
+	ticks := 0
+	for _, it := range renderMermaid(t, src) {
+		if it.mark != scene.Rule || it.item.StrokeWidth == nil || *it.item.StrokeWidth != 2 {
+			continue
+		}
+		ticks++
+		if l := math.Hypot(it.item.X2-it.item.X, it.item.Y2-it.item.Y); l != 10 {
+			t.Errorf("a tick is %v long, not 10", l)
+		}
+	}
+	if ticks != 2 {
+		t.Errorf("%d ticks 2 wide draw, not the 2 of the categories", ticks)
 	}
 	// A rotation outside -90 to 90 degrees is 0, as in Mermaid.
 	items = renderMermaid(t, "---\nconfig:\n  xyChart:\n    xAxis:\n      labelRotation: 120\n---\nxychart\nx-axis [a, b]\nbar [1, 2]")

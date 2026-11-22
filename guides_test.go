@@ -38,6 +38,91 @@ func roleTexts(t *testing.T, src, role string, strict bool) ([]string, Report, e
 	return out, report, nil
 }
 
+// TestAxisSignalOfTheDatum checks that a property of an axis whose signal
+// reads the datum takes the datum of each label, tick and grid line, as in
+// vega.js. Before, the signal of flight-passengers ran once with no datum,
+// so that no label showed and every grid line was dashed.
+func TestAxisSignalOfTheDatum(t *testing.T) {
+	t.Parallel()
+	axis := `{"scale": "y", "orient": "left", "grid": true, "values": [0, 5, 10],
+		"labelOpacity": {"signal": "datum.value ? 1 : 0"},
+		"gridDash": {"signal": "datum.value ? [] : [5, 4]"},
+		"tickWidth": {"signal": "datum.index == 0.5 ? 3 : 1"}}`
+	for _, it := range axisItems(t, ``, axis, "axis-label") {
+		v, _ := it.Datum.(map[string]any)["value"].(float64)
+		if want := map[bool]float64{true: 1, false: 0}[v != 0]; it.Opacity == nil || *it.Opacity != want {
+			t.Errorf("the label of %v has the opacity %v, want %v", v, it.Opacity, want)
+		}
+	}
+	for _, it := range axisItems(t, ``, axis, "axis-grid") {
+		v, _ := it.Datum.(map[string]any)["value"].(float64)
+		if dashed := len(it.StrokeDash) > 0; dashed != (v == 0) {
+			t.Errorf("the grid line of %v has the dash %v", v, it.StrokeDash)
+		}
+	}
+	for _, it := range axisItems(t, ``, axis, "axis-tick") {
+		v, _ := it.Datum.(map[string]any)["value"].(float64)
+		if want := map[bool]float64{true: 3, false: 1}[v == 5]; it.StrokeWidth == nil || *it.StrokeWidth != want {
+			t.Errorf("the tick of %v has the width %v, want %v", v, it.StrokeWidth, want)
+		}
+	}
+}
+
+// TestAxisEndTicks checks that an axis with no tickCount puts a tick and a
+// label on both ends of a nice domain, with the precision that its step
+// needs, and that a tickCount of the spec wins (D46).
+func TestAxisEndTicks(t *testing.T) {
+	t.Parallel()
+	spec := func(domain, axis string) string {
+		return `{"width": 240, "height": 100,
+			"scales": [{"name": "x", "type": "linear", "domain": ` + domain + `, "range": "width"}],
+			"axes": [` + axis + `]}`
+	}
+	for _, test := range []struct {
+		domain, axis string
+		want         []string
+	}{
+		{`[0, 45000]`, `{"scale": "x", "orient": "bottom"}`, []string{"0", "15,000", "30,000", "45,000"}},
+		{`[0, 7.5]`, `{"scale": "x", "orient": "bottom"}`, []string{"0.0", "1.5", "3.0", "4.5", "6.0", "7.5"}},
+		{`[0, 45000]`, `{"scale": "x", "orient": "bottom", "tickCount": 5}`, []string{"0", "10,000", "20,000", "30,000", "40,000"}},
+	} {
+		got, _, err := roleTexts(t, spec(test.domain, test.axis), "axis-label", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(got, test.want) {
+			t.Errorf("%s %s: the labels are %q, want %q", test.domain, test.axis, got, test.want)
+		}
+	}
+}
+
+// TestAxisConfigLabels checks that labels: false in the config of the axes
+// hides the labels of an axis, as in rect_mosaic_labelled, and that the
+// labels of the axis win over the config.
+func TestAxisConfigLabels(t *testing.T) {
+	t.Parallel()
+	spec := func(axis string) string {
+		return `{"width": 240, "height": 100, "config": {"axis": {"labels": false}},
+			"scales": [{"name": "x", "type": "linear", "domain": [0, 10], "range": "width"}],
+			"axes": [` + axis + `]}`
+	}
+	for _, test := range []struct {
+		axis string
+		want int
+	}{
+		{`{"scale": "x", "orient": "bottom"}`, 0},
+		{`{"scale": "x", "orient": "bottom", "labels": true}`, 6},
+	} {
+		got, _, err := roleTexts(t, spec(test.axis), "axis-label", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != test.want {
+			t.Errorf("%s: %d labels %q, want %d", test.axis, len(got), got, test.want)
+		}
+	}
+}
+
 // TestGuideNumberFormat checks that a format of numbers without a
 // precision, such as "s", takes the precision that tells two ticks apart,
 // as in Vega, and that the type s takes the SI prefix of the largest end.
@@ -48,7 +133,7 @@ func TestGuideNumberFormat(t *testing.T) {
 		return `{"width": 240, "height": 100,
 			"scales": [
 				{"name": "x", "type": "linear", "domain": [0, 12000000], "range": "width"},
-				{"name": "size", "type": "linear", "domain": [0, 25], "range": [0, 400]}],
+				{"name": "size", "type": "linear", "domain": [0, 25], "range": [4, 400]}],
 			` + guides + `}`
 	}
 	tests := []struct {
@@ -56,9 +141,9 @@ func TestGuideNumberFormat(t *testing.T) {
 		want               []string
 	}{
 		{"axis s", `"axes": [{"scale": "x", "orient": "bottom", "format": "s"}]`, "axis-label",
-			[]string{"0M", "2M", "4M", "6M", "8M", "10M", "12M"}},
+			[]string{"0M", "3M", "6M", "9M", "12M"}},
 		{"axis default", `"axes": [{"scale": "x", "orient": "bottom", "labelOverlap": false}]`, "axis-label",
-			[]string{"0", "2,000,000", "4,000,000", "6,000,000", "8,000,000", "10,000,000", "12,000,000"}},
+			[]string{"0", "3,000,000", "6,000,000", "9,000,000", "12,000,000"}},
 		{"axis %", `"axes": [{"scale": "x", "orient": "bottom", "format": "%", "values": [0, 6000000]}]`, "axis-label",
 			[]string{"0%", "600000000%"}},
 		{"legend s", `"legends": [{"size": "size", "format": "s"}]`, "legend-label",
@@ -419,9 +504,9 @@ func TestAxisLabelAndTitlePlace(t *testing.T) {
 			"axis-label", func(it scene.Item) bool { return it.X == -10 },
 		},
 		{
-			"the tickSize of the config, past which a label keeps the padding of Vega",
+			"the tickSize of the config, past which a label keeps the padding of the look",
 			`"axisY": {"tickSize": 12}`, `{"scale": "y", "orient": "left"}`,
-			"axis-label", func(it scene.Item) bool { return it.X == -14 },
+			"axis-label", func(it scene.Item) bool { return it.X == -15 },
 		},
 		{
 			"a labelPadding below 0, which puts the labels inside the plot",

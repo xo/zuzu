@@ -22,6 +22,14 @@ import (
 // start. An open form draws nothing through fewer than three points. A
 // closed form always moves first and loops back to its start.
 func Curve(interpolate string, pts [][2]float64, move bool, tension float64) (string, bool) {
+	return curve(interpolate, pts, move, tension, false)
+}
+
+// curve is Curve for an item with an orient. A horizontal item, such as an
+// area of orient horizontal, has y as its independent axis, so monotone keeps
+// the monotonicity of x in y, as monotoneY of d3-shape does, where Vega
+// draws monotone so. The other curves do not depend on the orient.
+func curve(interpolate string, pts [][2]float64, move bool, tension float64, horizontal bool) (string, bool) {
 	if len(pts) == 0 {
 		return "", true
 	}
@@ -48,7 +56,7 @@ func Curve(interpolate string, pts [][2]float64, move bool, tension float64) (st
 	case "step", "step-before", "step-after":
 		step(&b, interpolate, pts)
 	case "monotone":
-		monotone(&b, pts)
+		monotone(&b, pts, horizontal)
 	case "basis":
 		basis(&b, pts)
 	case "bundle":
@@ -111,12 +119,28 @@ func step(b *strings.Builder, kind string, pts [][2]float64) {
 }
 
 // monotone draws a cubic curve that keeps the monotonicity of y in x, as
-// described by Steffen and as monotoneX of d3-shape draws it.
-func monotone(b *strings.Builder, pts [][2]float64) {
+// described by Steffen and as monotoneX of d3-shape draws it. With swap, it
+// keeps the monotonicity of x in y, as monotoneY draws it: the curve of the
+// points with x and y swapped, swapped back.
+func monotone(b *strings.Builder, pts [][2]float64, swap bool) {
 	n := len(pts)
 	if n < 3 {
 		lines(b, pts)
 		return
+	}
+	if swap {
+		flipped := make([][2]float64, n)
+		for i, p := range pts {
+			flipped[i] = [2]float64{p[1], p[0]}
+		}
+		pts = flipped
+	}
+	out := func(x1, y1, x2, y2, x, y float64) {
+		if swap {
+			cubic(b, y1, x1, y2, x2, y, x)
+			return
+		}
+		cubic(b, x1, y1, x2, y2, x, y)
 	}
 	sign := func(v float64) float64 {
 		if v < 0 {
@@ -156,7 +180,7 @@ func monotone(b *strings.Builder, pts [][2]float64) {
 	for i := 1; i < n; i++ {
 		x0, y0, x1, y1 := pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]
 		dx := (x1 - x0) / 3
-		cubic(b, x0+dx, y0+dx*t[i-1], x1-dx, y1-dx*t[i], x1, y1)
+		out(x0+dx, y0+dx*t[i-1], x1-dx, y1-dx*t[i], x1, y1)
 	}
 }
 
@@ -462,6 +486,17 @@ func Symbol(name string, size float64) (string, bool) {
 		return "", false
 	}
 	return d, true
+}
+
+// Named reports whether a shape of a symbol is one of the names of Vega,
+// such as "circle", and not the path of an SVG.
+func Named(name string) bool {
+	switch name {
+	case "", "circle", "square", "diamond", "cross", "arrow", "wedge", "triangle", "triangle-up",
+		"triangle-down", "triangle-right", "triangle-left", "stroke":
+		return true
+	}
+	return false
 }
 
 // scalePath multiplies each coordinate of an SVG path by k. The flags and the

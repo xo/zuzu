@@ -144,3 +144,21 @@ func TestCompileBackground(t *testing.T) {
 		t.Errorf("expected no config, got %v %v", spec.Config, err)
 	}
 }
+
+// TestNoteStyle checks that a node that is a note draws with the style of a
+// note of the theme, and a node that is not draws without it (D54).
+func TestNoteStyle(t *testing.T) {
+	t.Parallel()
+	g := &Graph{Nodes: []*Node{{ID: "a", Label: "a"}, {ID: "n", Label: "n", Shape: "note", Note: true}}}
+	spec, err := Compile(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(b), `"`+theme.StyleNote+`"`); got != 1 {
+		t.Errorf("the style %s is on %d marks, want 1", theme.StyleNote, got)
+	}
+}

@@ -13,6 +13,7 @@ import (
 	okagesvg "github.com/xo/okage/svg"
 
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/text"
 )
 
 // update writes the golden files again from the output of the writer. A
@@ -98,7 +99,7 @@ func TestWriteMatchesTheGoldenFiles(t *testing.T) {
 // that the writer uses only the SVG that okage renders (D10).
 func TestOkageRendersEachGoldenFile(t *testing.T) {
 	t.Parallel()
-	r := okagesvg.New(okagesvg.WithBackground(color.White))
+	r := okagesvg.New(okagesvg.WithBackground(color.White), okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()))
 	for _, name := range scenes(t) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -169,7 +170,7 @@ func TestLinksAndTooltipsDrawNothing(t *testing.T) {
 	if strings.Contains(with.String(), "javascript") {
 		t.Errorf("the SVG holds a link with the scheme javascript:\n%s", with.String())
 	}
-	r := okagesvg.New(okagesvg.WithBackground(color.White))
+	r := okagesvg.New(okagesvg.WithBackground(color.White), okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()))
 	a, err := r.Render(with.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -180,5 +181,34 @@ func TestLinksAndTooltipsDrawNothing(t *testing.T) {
 	}
 	if !bytes.Equal(a.Pix, b.Pix) {
 		t.Error("the links and the tooltips change the image")
+	}
+}
+
+// TestGroupClipsToItsCornersAndStrokesOverItsMarks checks that a group with
+// round corners clips its marks to its shape, and that a group with
+// strokeForeground draws its stroke after its marks, as Vega draws a stack
+// of bars that vega-lite.js puts in a group.
+func TestGroupClipsToItsCornersAndStrokesOverItsMarks(t *testing.T) {
+	t.Parallel()
+	bar := scene.Mark{Type: scene.Rect, Items: []scene.Item{{Width: 20, Height: 40, Fill: scene.Paint{Color: "red"}}}}
+	s := &scene.Scene{Width: 40, Height: 60, Root: scene.Mark{Type: scene.Group, Items: []scene.Item{{
+		Width: 40, Height: 60,
+		Items: []scene.Mark{{Type: scene.Group, Items: []scene.Item{{
+			Width: 20, Height: 40, Clip: true, CornerRadius: 10, StrokeForeground: true,
+			Stroke: scene.Paint{Color: "black"}, Items: []scene.Mark{bar},
+		}}}},
+	}}}}
+	var b bytes.Buffer
+	if err := Write(&b, s); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	_, clip, ok := strings.Cut(out, "<clipPath")
+	if !ok || !strings.HasPrefix(clip[strings.Index(clip, ">")+1:], "<path") {
+		t.Errorf("the group does not clip to its corners:\n%s", out)
+	}
+	red, black := strings.Index(out, `fill="red"`), strings.LastIndex(out, `stroke="black"`)
+	if red < 0 || black < red {
+		t.Errorf("the stroke of the group draws before its marks:\n%s", out)
 	}
 }

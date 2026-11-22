@@ -74,8 +74,8 @@ func TestStateExample(t *testing.T) {
 		t.Errorf("expected\n%s\ngot\n%s", exp, s)
 	}
 	for _, n := range g.Nodes {
-		if strings.HasPrefix(n.ID, "root_") && (n.Width != 14 || n.Height != 14 || n.Style["fillOpacity"] != "1") {
-			t.Errorf("%s: expected a filled mark of 14 pixels, got %gx%g %v", n.ID, n.Width, n.Height, n.Style)
+		if strings.HasPrefix(n.ID, "root_") && (n.Width != 14 || n.Height != 14 || !n.Solid) {
+			t.Errorf("%s: expected a solid mark of 14 pixels, got %gx%g %v", n.ID, n.Width, n.Height, n.Solid)
 		}
 	}
 	spec, err := graph.Compile(g)
@@ -300,6 +300,111 @@ func TestStateCompile(t *testing.T) {
 	for _, id := range []string{"root_start", "c"} {
 		if strings.Contains(s, fmt.Sprintf(`"label":%q`, id)) {
 			t.Errorf("expected no label %s", id)
+		}
+	}
+}
+
+// TestStateCompositeAndNotes checks that a composite state draws with a band
+// for its title, that in the default theme the composite states take the
+// categorical colors in turn from the second, and that a note is a note,
+// which draws in the yellow of the scheme (D54, D55).
+func TestStateCompositeAndNotes(t *testing.T) {
+	t.Parallel()
+	g, _ := stateOf(t, `stateDiagram-v2
+    state A {
+        a1
+    }
+    state B {
+        b1
+    }
+    a1: x
+    note right of a1 : a note`)
+	cats := map[string]int{}
+	for _, c := range g.Clusters {
+		if c.ID == "A" || c.ID == "B" {
+			if c.Shape != graph.ClusterState {
+				t.Errorf("the composite %s has the shape %q, want %q", c.ID, c.Shape, graph.ClusterState)
+			}
+			cats[c.ID] = c.Category
+		}
+	}
+	if cats["A"] != 2 || cats["B"] != 3 {
+		t.Errorf("the composites take the colors %v, want A 2 and B 3", cats)
+	}
+	notes := 0
+	for _, n := range g.Nodes {
+		if n.Shape == "note" {
+			notes++
+			if !n.Note {
+				t.Errorf("the note %s is not marked as a note", n.ID)
+			}
+		}
+	}
+	if notes != 1 {
+		t.Errorf("%d notes, want 1", notes)
+	}
+}
+
+// TestPointColors checks that a start takes the color of the one state
+// that it points to, and an end the color of the one state that ends in
+// it: the stroke of its style, its fill, or the color of a composite
+// state. A start to two states, and an end from two states, keep the color
+// of a node (D55).
+func TestPointColors(t *testing.T) {
+	t.Parallel()
+	g, _ := stateOf(t, `stateDiagram-v2
+    classDef calm fill:#9cf
+    [*] --> Other
+    state Other {
+        [*] --> Hot
+        Hot --> [*]
+    }
+    state Calm {
+        [*] --> Cool
+        Cool --> [*]
+    }
+    state Two {
+        [*] --> Hot2
+        [*] --> Hot3
+        Hot2 --> [*]
+        Hot3 --> [*]
+    }
+    Other --> Calm
+    Calm --> Two
+    Two --> [*]
+    style Hot,Hot2,Hot3 stroke:#c00
+    class Cool calm`)
+	nodes := map[string]*graph.Node{}
+	for _, n := range g.Nodes {
+		nodes[n.ID] = n
+	}
+	cats := map[string]int{}
+	for _, c := range g.Clusters {
+		cats[c.ID] = c.Category
+	}
+	if cats["Other"] == 0 || cats["Two"] == 0 {
+		t.Fatal("the composites take no color")
+	}
+	for _, test := range []struct {
+		id, want string
+	}{
+		{"root_start", fmt.Sprintf(" %d", cats["Other"])},
+		{"root_end", fmt.Sprintf(" %d", cats["Two"])},
+		{"Other_start", "#c00 0"},
+		{"Other_end", "#c00 0"},
+		{"Calm_start", "#9cf 0"},
+		{"Calm_end", "#9cf 0"},
+		// Two states of one color still leave the color of a node.
+		{"Two_start", " 0"},
+		{"Two_end", " 0"},
+	} {
+		n := nodes[test.id]
+		if n == nil {
+			t.Errorf("no node %s", test.id)
+			continue
+		}
+		if got := fmt.Sprintf("%s %d", n.Style["stroke"], n.Category); got != test.want || !n.Solid {
+			t.Errorf("%s: %q solid %v, want %q", test.id, got, n.Solid, test.want)
 		}
 	}
 }

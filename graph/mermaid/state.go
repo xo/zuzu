@@ -86,7 +86,9 @@ const pseudo = "[*]"
 // stateGraph reads a state diagram into a graph.
 func stateGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	s := &stateDiagram{
-		d: d, g: &graph.Graph{Directed: true, Direction: graph.TB, Title: d.Title}, issues: &graph.Issues{Strict: strict},
+		// Mermaid 12.3 gives TB to each composite state with no direction
+		// of its own, which zuzu.dagre reads.
+		d: d, g: &graph.Graph{Directed: true, Direction: graph.TB, Title: d.Title, ClusterDirection: graph.TB}, issues: &graph.Issues{Strict: strict},
 		states: map[string]*state{}, composites: map[string]*graph.Cluster{}, descs: map[string][]string{},
 		classes: map[string]map[string]string{}, nodeClasses: map[string][]string{}, nodeStyles: map[string]map[string]string{},
 		scopes: []*scope{{name: "root"}},
@@ -100,7 +102,64 @@ func stateGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	// Mermaid wraps the label of a state, of a note and of a transition. A
 	// state with more descriptions is a record, and does not wrap.
 	wrapGraph(d, s.g, s.wrap)
+	// A composite state draws with a band for its title, as in Mermaid.
+	// In a color theme, each takes the categorical colors in turn, in the
+	// order in which the composite states open (D54).
+	colors := slices.Contains(colorThemes, themeName(d))
+	next := 0
+	for _, c := range s.g.Clusters {
+		if s.composites[c.ID] != c {
+			continue
+		}
+		c.Shape = graph.ClusterState
+		if colors {
+			c.Category = panelColor(next)
+			next++
+		}
+	}
+	s.pointColors()
 	return s.g, s.issues.Report, nil
+}
+
+// pointColors gives each start of the diagram the color of the one state
+// that it points to, and each end the color of the one state that ends in
+// it: the stroke of the style of the state, or else its fill, or else its
+// color, which is the color of a composite state. A start that points to
+// more than one state, and an end that more than one state ends in, keeps
+// the color of a node (D55).
+func (s *stateDiagram) pointColors() {
+	neighbors := map[*state][]string{}
+	for _, e := range s.g.Edges {
+		if st, ok := s.states[e.Source]; ok && st.kind == "start" && !slices.Contains(neighbors[st], e.Target) {
+			neighbors[st] = append(neighbors[st], e.Target)
+		}
+		if st, ok := s.states[e.Target]; ok && st.kind == "end" && !slices.Contains(neighbors[st], e.Source) {
+			neighbors[st] = append(neighbors[st], e.Source)
+		}
+	}
+	for st, ids := range neighbors {
+		if len(ids) != 1 {
+			continue
+		}
+		var style map[string]string
+		category := 0
+		switch c, n := s.composites[ids[0]], s.states[ids[0]]; {
+		case c != nil:
+			style, category = c.Style, c.Category
+		case n != nil:
+			style, category = n.node.Style, n.node.Category
+		}
+		color := style["stroke"]
+		if color == "" {
+			color = style["fill"]
+		}
+		switch {
+		case color != "":
+			st.node.Style["stroke"] = color
+		case category > 0:
+			st.node.Category = category
+		}
+	}
 }
 
 func (s *stateDiagram) add(format string, args ...any) error {
@@ -362,7 +421,7 @@ func (s *stateDiagram) end(kind string) string {
 		shape = "bullseye"
 	}
 	n := &graph.Node{ID: id, Shape: shape, Cluster: sc.cluster, Width: 14, Height: 14,
-		Style: map[string]string{"fillOpacity": "1", "strokeWidth": "0"}}
+		Solid: true, Style: map[string]string{"strokeWidth": "0"}}
 	s.states[id] = &state{node: n, kind: kind}
 	s.g.Nodes = append(s.g.Nodes, n)
 	return id
@@ -442,7 +501,7 @@ func (s *stateDiagram) declare(rest string, lines []Line, i int) error {
 		if d := s.dir(); d == graph.LR || d == graph.RL {
 			st.node.Width, st.node.Height = 10, 70
 		}
-		st.node.Style["fillOpacity"] = "1"
+		st.node.Solid = true
 		return nil
 	}
 	if m := stateOpen.FindStringSubmatch(rest); m != nil {
@@ -647,7 +706,7 @@ func (s *stateDiagram) addNotes() error {
 		default:
 			return fmt.Errorf("a note of %s, which is not a state: %w", nt.of, ErrSyntax)
 		}
-		n := &graph.Node{ID: id, Label: nt.text, Shape: "note", Cluster: cluster, Style: map[string]string{}}
+		n := &graph.Node{ID: id, Label: nt.text, Shape: "note", Note: true, Cluster: cluster, Style: map[string]string{}}
 		e := &graph.Edge{Source: nt.of, Target: id, Head: "none", Style: map[string]string{"strokeDash": "2,3"}}
 		if nt.left {
 			e.Source, e.Target = id, nt.of

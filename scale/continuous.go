@@ -15,18 +15,21 @@ import (
 // symlog, time, utc and sequential. It transforms the domain, for pow, log
 // and symlog, and interpolates the range between the transformed values.
 type continuous struct {
-	typ      string
-	domain   []float64 // as given, after nice and zero
-	tdomain  []float64 // transformed
-	rng      []float64
-	colors   []color.RGBA
-	color    bool
-	interp   string
-	clamp    bool
-	round    bool
-	fwd, inv func(float64) float64
-	base     float64
-	loc      *time.Location
+	typ     string
+	domain  []float64 // as given, after nice and zero
+	tdomain []float64 // transformed
+	rng     []float64
+	colors  []color.RGBA
+	color   bool
+	// interpolator maps a fraction of the domain to a color, for a scheme
+	// of a sequential or a diverging scale. It wins over colors.
+	interpolator func(float64) string
+	interp       string
+	clamp        bool
+	round        bool
+	fwd, inv     func(float64) float64
+	base         float64
+	loc          *time.Location
 }
 
 // newContinuous builds a continuous scale.
@@ -83,7 +86,10 @@ func newContinuous(o Options) (Scale, error) {
 			s.typ = "diverging-" + s.typ
 		}
 	}
-	if isColor(o.Range) {
+	switch {
+	case o.Interpolator != nil && (strings.HasPrefix(s.typ, "sequential-") || strings.HasPrefix(s.typ, "diverging-")):
+		s.color, s.interpolator = true, o.Interpolator
+	case isColor(o.Range):
 		s.color = true
 		for _, c := range o.Range {
 			rgb, _ := color.Parse(expr.String(c))
@@ -92,7 +98,7 @@ func newContinuous(o Options) (Scale, error) {
 		if o.Reverse {
 			slices.Reverse(s.colors)
 		}
-	} else {
+	default:
 		s.rng = numbersOf(o.Range)
 		if len(s.rng) < 2 {
 			s.rng = []float64{0, 1}
@@ -219,6 +225,9 @@ func (s *continuous) Map(v any) any {
 		return expr.Undefined
 	}
 	t := s.fwd(x)
+	if s.interpolator != nil {
+		return s.interpolator(s.fraction(t))
+	}
 	i := s.segment(t)
 	d0, d1 := s.tdomain[i], s.tdomain[i+1]
 	f := 0.5
@@ -275,6 +284,14 @@ func (s *continuous) Domain() []any {
 }
 
 func (s *continuous) Range() []any {
+	if s.interpolator != nil {
+		// The range of a scheme is its color at each end, and at the middle
+		// of a diverging scale.
+		if len(s.tdomain) == 3 {
+			return []any{s.interpolator(0), s.interpolator(0.5), s.interpolator(1)}
+		}
+		return []any{s.interpolator(0), s.interpolator(1)}
+	}
 	if s.color {
 		out := make([]any, len(s.colors))
 		for i, c := range s.colors {
@@ -303,6 +320,39 @@ func (s *continuous) Ticks(count float64) []any {
 		return anys(logTicks(lo, hi, s.base, count))
 	}
 	return anys(Ticks(lo, hi, count))
+}
+
+// fraction returns the place of a transformed value t on the interpolator
+// of a scheme, from 0 to 1. A sequential scale runs from its first value at
+// 0 to its last at 1. A diverging scale puts its middle value at 0.5, with
+// each half of the domain over a half of the scheme. A domain of one value
+// puts every value at 0.5.
+func (s *continuous) fraction(t float64) float64 {
+	d := s.tdomain
+	var f float64
+	if len(d) == 3 {
+		first := t < d[1]
+		if d[1] < d[0] {
+			first = t > d[1]
+		}
+		lo, hi := d[0], d[1]
+		if !first {
+			lo, hi = d[1], d[2]
+		}
+		f = 0.5
+		if hi != lo {
+			f = 0.5 + 0.5*(t-d[1])/(hi-lo)
+		}
+	} else {
+		if d[1] == d[0] {
+			return 0.5
+		}
+		f = (t - d[0]) / (d[1] - d[0])
+	}
+	if s.clamp {
+		f = math.Max(0, math.Min(1, f))
+	}
+	return f
 }
 
 // pad grows a domain so that its ends fall px pixels inside the range.

@@ -94,7 +94,37 @@ func agentflowGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) 
 		return nil, f.issues.Report, err
 	}
 	f.inheritDir()
+	if slices.Contains(colorThemes, themeName(d)) {
+		f.agentColors()
+	}
 	return f.g, f.issues.Report, nil
+}
+
+// agentKinds are the places of the categorical colors that the nodes of an
+// agentflow diagram take by kind, by the shape of zuzu that draws each
+// kind, in the order of the palette of Mermaid 12.3 (D53). An input takes
+// the fourth, because the palette has no cyan and the first flows take the
+// eighth to the tenth.
+var agentKinds = map[string]int{
+	"subroutine": 1, "rounded": 2, "diamond": 3, "lean-r": 4, "lin-doc": 5, "hexagon": 7,
+}
+
+// agentColors gives each node of an agentflow diagram the categorical color
+// of its kind, a connector the sixth, and each flow the colors in turn from
+// the eighth, in the order in which the flows open, as Mermaid colors them
+// in a color theme (D53). A fill or a stroke of a style wins over a color.
+func (f *flowchart) agentColors() {
+	for _, n := range f.g.Nodes {
+		switch {
+		case f.af.connectors[n.ID]:
+			n.Category = 6
+		default:
+			n.Category = agentKinds[n.Shape]
+		}
+	}
+	for i, c := range f.g.Clusters {
+		c.Category = (7+i)%10 + 1
+	}
 }
 
 // agentStmt reads a statement that only an agentflow diagram has: flow,

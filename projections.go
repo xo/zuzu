@@ -1,6 +1,7 @@
 package zuzu
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -26,13 +27,19 @@ var projectionParams = []string{
 	"parallels", "precision", "reflectX", "reflectY",
 }
 
-// knownProjectionParams are the other parameters that Vega reads. The
-// parameters of the projections of d3-geo-projection apply to none of the
-// types that Vega and zuzu have, so they change nothing.
+// knownProjectionParams are the other parameters that Vega reads: fit,
+// extent, size and pointRadius, which the runtime reads apart, and the
+// parameters of the projections of d3-geo-projection.
 var knownProjectionParams = []string{
 	"fit", "extent", "size", "pointRadius", "coefficient", "distance",
 	"fraction", "lobes", "parallel", "radius", "ratio", "spacing", "tilt",
 }
+
+// extendedParams are the parameters of the projections of
+// d3-geo-projection. A type that takes one reads it, or reports it when
+// zuzu does not read it yet. A type that does not take one ignores it, as
+// vega.js does (D52).
+var extendedParams = []string{"coefficient", "distance", "fraction", "lobes", "parallel", "radius", "ratio", "spacing", "tilt"}
 
 // projection returns a projection of this scope or of a scope above, by
 // name.
@@ -102,6 +109,23 @@ func (s *scope) makeProjection(st *projState) (*geo.Projection, error) {
 			continue
 		}
 		if err := p.Set(name, v); err != nil {
+			return nil, fmt.Errorf("%s/%s: %w", st.path, name, err)
+		}
+	}
+	for _, name := range extendedParams {
+		v, err := param(name)
+		if err != nil {
+			return nil, err
+		}
+		if v == nil || !geo.TakesParam(p.Type(), name) {
+			continue
+		}
+		switch err := p.Set(name, v); {
+		case errors.Is(err, geo.ErrParamUnread):
+			if err := s.rt.issue(vega.ErrUnsupported, st.path+"/"+name, "the parameter %s of a projection of the type %s", name, p.Type()); err != nil {
+				return nil, err
+			}
+		case err != nil:
 			return nil, fmt.Errorf("%s/%s: %w", st.path, name, err)
 		}
 	}

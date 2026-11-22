@@ -13,7 +13,8 @@ import (
 
 // guidePart is a part of a guide that the config of Vega styles: the prefix
 // of its properties, such as label in labelColor, the role of its items, and
-// whether it is text or a line.
+// whether it is text or a line. The symbols of a legend are neither, and
+// take symbolProps.
 type guidePart struct {
 	prefix string
 	role   string
@@ -25,14 +26,19 @@ var (
 	axisParts = []guidePart{
 		{"domain", "axis-domain", false}, {"domain", "axis-zero", false},
 		{"label", "axis-label", true}, {"title", "axis-title", true}, {"grid", "axis-grid", false},
+		{"tick", "axis-tick", false},
 	}
 	legendStyleParts = []guidePart{
-		{"label", "legend-label", true}, {"title", "legend-title", true},
+		{"label", "legend-label", true}, {"title", "legend-title", true}, {"symbol", "legend-symbol", false},
 	}
 	titleParts = []guidePart{
 		{"subtitle", "title-subtitle", true}, {"", "title-text", true},
 	}
 )
+
+// opacityEnd is the end of a property of the opacity of a part, such as
+// symbolOpacity.
+const opacityEnd = "Opacity"
 
 // textProps and lineProps map the end of a property of the config, such as
 // Color in labelColor, to the property of an item.
@@ -44,6 +50,12 @@ var (
 	lineProps = map[string]string{
 		"Color": "stroke", "Width": "strokeWidth", "Dash": "strokeDash", "Opacity": "strokeOpacity",
 		"Cap": "strokeCap",
+	}
+	// symbolProps maps the end of a property of the symbols of a legend,
+	// such as FillColor in symbolFillColor.
+	symbolProps = map[string]string{
+		"FillColor": "fill", "StrokeColor": "stroke", "StrokeWidth": "strokeWidth", opacityEnd: "opacity",
+		"Dash": "strokeDash",
 	}
 )
 
@@ -75,8 +87,15 @@ func (rt *runtime) axisConfig(orient string, sc scale.Scale) map[string]any {
 	return out
 }
 
+// datumSignal is a property of a guide whose signal reads the datum of an
+// item, such as a labelOpacity of "datum.value ? 1 : 0". styleGuide
+// evaluates it for each item of its part, with the datum of the item, as
+// Vega does.
+type datumSignal string
+
 // guideProps returns the properties of a guide that style its parts: the
-// config, with the properties that the spec of the guide gives over it.
+// config, with the properties that the spec of the guide gives over it. A
+// signal that reads the datum stays a datumSignal.
 func (s *scope) guideProps(config map[string]any, extra vega.Extra) map[string]any {
 	out := map[string]any{}
 	maps.Copy(out, config)
@@ -89,14 +108,22 @@ func (s *scope) guideProps(config map[string]any, extra vega.Extra) map[string]a
 			// A property of a guide can be a signal, or a value as an
 			// encoding gives it.
 			if sig, ok := m["signal"].(string); ok {
+				if strings.Contains(sig, "datum") {
+					out[k] = datumSignal(sig)
+					continue
+				}
 				x, err := s.eval(sig, nil)
 				if err != nil {
 					continue
 				}
 				v = x
 			} else if x, ok := m["value"]; ok {
-				v = x
+				v = s.rt.specConfig(k, x)
 			}
+		} else {
+			// A color that the guide names flips in the dark mode, as a
+			// color of an encoding does (D48 part 1).
+			v = s.rt.specConfig(k, v)
 		}
 		out[k] = v
 	}
@@ -105,8 +132,8 @@ func (s *scope) guideProps(config map[string]any, extra vega.Extra) map[string]a
 
 // styleGuide applies the properties of the config of a guide to its parts:
 // labelColor to the fill of each label, gridDash to the dash of each grid
-// line, and so on.
-func styleGuide(m *scene.Mark, props map[string]any, parts []guidePart) {
+// line, and so on. A datumSignal takes the datum of each item.
+func (s *scope) styleGuide(m *scene.Mark, props map[string]any, parts []guidePart) {
 	if len(props) == 0 {
 		return
 	}
@@ -128,7 +155,10 @@ func styleGuide(m *scene.Mark, props map[string]any, parts []guidePart) {
 				rest = strings.ToUpper(k[:1]) + k[1:]
 			}
 			table := lineProps
-			if p.text {
+			switch {
+			case p.role == "legend-symbol":
+				table = symbolProps
+			case p.text:
 				table = textProps
 			}
 			prop, ok := table[rest]
@@ -147,7 +177,17 @@ func styleGuide(m *scene.Mark, props map[string]any, parts []guidePart) {
 			it := &m.Items[i]
 			if ps := byRole[m.Role]; ps != nil {
 				st := &itemState{it: it, set: map[string]bool{}}
-				for k, v := range ps {
+				for _, k := range slices.Sorted(maps.Keys(ps)) {
+					v := ps[k]
+					if sig, ok := v.(datumSignal); ok {
+						// A signal that does not evaluate leaves the
+						// property of the look, as guideProps does.
+						x, err := s.eval(string(sig), it.Datum)
+						if err != nil {
+							continue
+						}
+						v = x
+					}
 					setProp(st, k, v)
 				}
 			}
@@ -160,30 +200,26 @@ func styleGuide(m *scene.Mark, props map[string]any, parts []guidePart) {
 }
 
 // namedRange returns the range of the config of the render for a name,
-// such as category, as a list of values, and whether the config has it. A
-// range of the config can also name a scheme.
-func (s *scope) namedRange(name, typ string, n int) ([]any, bool) {
+// such as category, and whether the config has it. The range is a list of
+// values, or a scheme, such as {"scheme": "tableau10"}.
+func (s *scope) namedRange(name string) ([]any, *vega.SchemeRef, bool) {
 	v, ok := s.rt.configObject("range")[name]
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 	switch x := v.(type) {
 	case []any:
-		return x, true
+		return x, nil, true
 	case map[string]any:
 		b, err := json.Marshal(x)
 		if err != nil {
-			return nil, false
+			return nil, nil, false
 		}
 		var ref vega.SchemeRef
 		if json.Unmarshal(b, &ref) != nil {
-			return nil, false
+			return nil, nil, false
 		}
-		count := 0
-		if c, ok := x["count"].(float64); ok {
-			count = int(c)
-		}
-		return s.scheme(&ref, typ, count, n), true
+		return nil, &ref, true
 	}
-	return nil, false
+	return nil, nil, false
 }

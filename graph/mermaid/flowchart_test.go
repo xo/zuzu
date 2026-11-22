@@ -223,10 +223,10 @@ func TestSmallCircles(t *testing.T) {
 	var got []string
 	for _, n := range g.Nodes {
 		kind, _ := graph.ShapeOf(n.Shape)
-		got = append(got, fmt.Sprintf("%s %s %q %vx%v %q", n.ID, kind, n.Label, n.Width, n.Height, n.Style["fillOpacity"]))
+		got = append(got, fmt.Sprintf("%s %s %q %vx%v %v", n.ID, kind, n.Label, n.Width, n.Height, n.Solid))
 	}
-	want := `a point "" 14x14 "1"|b point "" 14x14 "1"|c circle "" 14x14 ""|d circle "" 14x14 ""|` +
-		`e point "" 14x14 "1"|f circle "" 14x14 ""`
+	want := `a point "" 14x14 true|b point "" 14x14 true|c circle "" 14x14 false|d circle "" 14x14 false|` +
+		`e point "" 14x14 true|f circle "" 14x14 false`
 	if s := strings.Join(got, "|"); s != want {
 		t.Errorf("got  %s\nwant %s", s, want)
 	}
@@ -803,5 +803,36 @@ func TestEdgeClass(t *testing.T) {
 	// linkStyle goes over the class, as in Mermaid.
 	if st := g.Edges[0].Style; st["stroke"] != "#0f0" || st["color"] != "white" {
 		t.Errorf("the style of the edge %v", st)
+	}
+}
+
+// TestSubgraphColors checks that in the default theme the subgraphs of a
+// flowchart take the categorical colors in turn from the second, and that
+// in another theme they take none (D55).
+func TestSubgraphColors(t *testing.T) {
+	t.Parallel()
+	const body = "flowchart LR\n  subgraph one\n    a\n  end\n  subgraph two\n    b\n  end\n"
+	for _, test := range []struct {
+		src  string
+		want string
+	}{
+		{body, "one:2 two:3"},
+		{"---\nconfig:\n  theme: forest\n---\n" + body, "one:0 two:0"},
+	} {
+		d, err := Read(test.src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, _, err := Graph(d, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, c := range g.Clusters {
+			got = append(got, fmt.Sprintf("%s:%d", c.ID, c.Category))
+		}
+		if s := strings.Join(got, " "); s != test.want {
+			t.Errorf("the subgraphs take the colors %s, want %s", s, test.want)
+		}
 	}
 }

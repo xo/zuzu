@@ -19,6 +19,7 @@ import (
 	"github.com/xo/zuzu/icons/k8s"
 	"github.com/xo/zuzu/icons/mdi"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -31,8 +32,10 @@ func drawDiagram(t *testing.T, src string, strict bool, opts ...zuzu.RenderOptio
 	if err != nil {
 		return nil, report, err
 	}
+	// The fixtures check the layout, so a source with look: handDrawn
+	// draws in the standard look here.
 	opts = append([]zuzu.RenderOption{
-		zuzu.WithLocation(time.UTC),
+		zuzu.WithLocation(time.UTC), zuzu.WithLook(theme.LookStandard),
 		zuzu.WithIcons("fa", fa.Pack()), zuzu.WithIcons("mdi", mdi.Pack()),
 		zuzu.WithIcons("carbon", carbon.Pack()), zuzu.WithIcons("k8s", k8s.Pack()),
 	}, opts...)

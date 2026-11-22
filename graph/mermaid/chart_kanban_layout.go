@@ -203,7 +203,7 @@ func (l *kbLayout) spec() map[string]any {
 		}
 	}
 	mark("rect", "columns", graph.StyleNode, rect(map[string]any{
-		"fill": color, "stroke": color, "fillOpacity": value(0.12), "strokeOpacity": value(0.5), "cornerRadius": value(6),
+		"fill": map[string]any{"scale": "tint", "field": "key"}, "stroke": color, "strokeOpacity": value(0.5), "cornerRadius": value(6),
 	}))
 	mark("text", "columnLabels", graph.StyleNodeLabel, map[string]any{
 		"x": field("x"), "y": field("y"), "text": field("lines"), "fill": color,
@@ -247,7 +247,7 @@ func (l *kbLayout) spec() map[string]any {
 	for i := range domain {
 		domain[i] = strconv.Itoa(i)
 	}
-	scales := []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}}
+	scales := []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}, graph.TintScale("tint", domain)}
 	if len(l.rows["priorities"]) > 0 {
 		// The compile does not know the mode or the scheme, so a line of
 		// priority takes its color through a scale of one value, which the

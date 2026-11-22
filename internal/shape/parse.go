@@ -4,10 +4,43 @@ import (
 	"errors"
 	"math"
 	"strconv"
+	"strings"
 )
 
 // ErrPath is the error of path data that does not read.
 var ErrPath = errors.New("bad path data")
+
+// ScalePath multiplies each x of path data by sx and each y by sy, as the
+// scaleX and the scaleY of a path mark of Vega do. The path that it returns
+// holds absolute moves, lines and curves, with an arc as cubic curves.
+func ScalePath(d string, sx, sy float64) (string, error) {
+	w := &scaler{sx: sx, sy: sy}
+	err := Parse(d, w)
+	return w.b.String(), err
+}
+
+// scaler is a sink that writes the path that it receives, scaled.
+type scaler struct {
+	sx, sy float64
+	b      strings.Builder
+}
+
+func (w *scaler) MoveTo(x, y float64) { w.b.WriteString("M" + w.pt(x, y)) }
+
+func (w *scaler) LineTo(x, y float64) { w.b.WriteString("L" + w.pt(x, y)) }
+
+func (w *scaler) QuadTo(x1, y1, x, y float64) {
+	w.b.WriteString("Q" + w.pt(x1, y1) + " " + w.pt(x, y))
+}
+
+func (w *scaler) CubicTo(x1, y1, x2, y2, x, y float64) {
+	w.b.WriteString("C" + w.pt(x1, y1) + " " + w.pt(x2, y2) + " " + w.pt(x, y))
+}
+
+func (w *scaler) Close() { w.b.WriteString("Z") }
+
+// pt writes a point, scaled.
+func (w *scaler) pt(x, y float64) string { return pt(x*w.sx, y*w.sy) }
 
 // Sink receives the segments of a path in absolute coordinates. An arc
 // arrives as cubic curves.

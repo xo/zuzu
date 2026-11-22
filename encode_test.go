@@ -91,6 +91,28 @@ func TestAxisOffsetValueRef(t *testing.T) {
 	}
 }
 
+// TestDomainSignalRows makes sure that a signal in the fields of a domain
+// gives a dataset whose field "data" holds the values, as Vega reads it:
+// [{data: 0}] and [10] both add their value to the domain. vega-lite.js
+// writes a date datum this way.
+func TestDomainSignalRows(t *testing.T) {
+	t.Parallel()
+	s := specScene(t, `{"$schema": "https://vega.github.io/schema/vega/v5.json",
+		"width": 100, "height": 100, "padding": 0,
+		"data": [{"name": "rows", "values": [{"v": 5}]}],
+		"scales": [{"name": "x", "type": "linear", "range": "width", "zero": false,
+			"domain": {"fields": [{"data": "rows", "field": "v"}, {"signal": "[{data: 0}]"}, {"signal": "[10]"}]}}],
+		"marks": [{"type": "rule", "name": "r", "from": {"data": "rows"},
+			"encode": {"enter": {"x": {"scale": "x", "field": "v"}, "y": {"value": 0}, "y2": {"value": 10}}}}]}`)
+	m := findMark(&s.Root, "r")
+	if m == nil || len(m.Items) != 1 {
+		t.Fatalf("the rule mark: %+v", m)
+	}
+	if x := m.Items[0].X; x != 50 {
+		t.Errorf("the rule is at x %v, want 50 in the domain 0 to 10", x)
+	}
+}
+
 // TestNestedFieldRef makes sure that the name of a field can itself be a
 // field reference: {"parent": {"datum": "data"}} reads the field of the
 // datum of the group that the field data of the datum names.
@@ -165,6 +187,66 @@ func TestPaintObject(t *testing.T) {
 			t.Errorf("%s: got no gradient, want %q", c.name, c.gradient)
 		case c.gradient != "" && p.Gradient.Type != c.gradient:
 			t.Errorf("%s: the gradient is %q, want %q", c.name, p.Gradient.Type, c.gradient)
+		}
+	}
+}
+
+// TestMarkDataStyle checks that a mark whose data is another mark reads the
+// fill, the size, the shape and the opacity of each item of that mark, as
+// the arc diagram of Vega does.
+func TestMarkDataStyle(t *testing.T) {
+	t.Parallel()
+	s := specScene(t, `{"$schema": "https://vega.github.io/schema/vega/v5.json", "width": 100, "height": 100,
+		"data": [{"name": "rows", "values": [{"v": 1}, {"v": 2}]}],
+		"marks": [
+			{"type": "symbol", "name": "layout", "from": {"data": "rows"}, "encode": {
+				"enter": {"opacity": {"value": 0}},
+				"update": {"x": {"field": "v", "mult": 10}, "size": {"field": "v", "mult": 50}, "fill": {"value": "#123456"}, "shape": {"value": "square"}}}},
+			{"type": "symbol", "name": "copy", "from": {"data": "layout"}, "encode": {
+				"update": {"x": {"field": "x"}, "fill": {"field": "fill"}, "size": {"field": "size"}, "shape": {"field": "shape"}, "opacity": {"field": "opacity", "offset": 1}}}}]}`)
+	var items []scene.Item
+	for _, m := range s.Root.Items[0].Items {
+		if m.Name == "copy" {
+			items = m.Items
+		}
+	}
+	if len(items) != 2 {
+		t.Fatalf("the copy has %d items, want 2", len(items))
+	}
+	for i, it := range items {
+		// The look can draw the items in another order, so the size
+		// that each item wants comes from its x: 10 for each unit of v.
+		want := it.X * 5
+		size, opacity := math.NaN(), math.NaN()
+		if it.Size != nil {
+			size = *it.Size
+		}
+		if it.Opacity != nil {
+			opacity = *it.Opacity
+		}
+		if it.Fill.Color != "#123456" || size != want || it.Shape != "square" || opacity != 1 {
+			t.Errorf("item %d = fill %q, size %v, shape %q, opacity %v, want #123456, %v, square and 1", i, it.Fill.Color, size, it.Shape, opacity, want)
+		}
+	}
+}
+
+// TestEndWithNoStart checks that an item with an x2 and no x sits at x2
+// less its width, as Vega places it, such as the square of a phase of
+// deneb/gantt-chart, which drew at 0 over the names of the tasks, and the
+// same for y2. A symbol has no width, so it sits at x2.
+func TestEndWithNoStart(t *testing.T) {
+	t.Parallel()
+	s := specScene(t, `{"$schema": "https://vega.github.io/schema/vega/v5.json", "width": 200, "height": 100,
+		"marks": [
+			{"type": "symbol", "name": "sq", "encode": {"update": {"x2": {"value": 120}, "y2": {"value": 40}, "shape": {"value": "square"}}}},
+			{"type": "text", "name": "tx", "encode": {"update": {"x2": {"value": 80}, "y": {"value": 10}, "text": {"value": "a"}}}}]}`)
+	for name, want := range map[string][2]float64{"sq": {120, 40}, "tx": {80, 10}} {
+		m := findMark(&s.Root, name)
+		if m == nil || len(m.Items) == 0 {
+			t.Fatalf("no mark %s", name)
+		}
+		if it := m.Items[0]; it.X != want[0] || it.Y != want[1] {
+			t.Errorf("%s is at %v,%v, want %v,%v", name, it.X, it.Y, want[0], want[1])
 		}
 	}
 }

@@ -596,6 +596,18 @@ func clip(n NodePlace, kind string, px, py float64) (float64, float64) {
 	if dx == 0 && dy == 0 {
 		return n.X, n.Y
 	}
+	t := outline(n, kind, dx, dy)
+	if t >= 1 || math.IsNaN(t) {
+		return px, py
+	}
+	return n.X + t*dx, n.Y + t*dy
+}
+
+// outline returns where the line from the center of a node toward the
+// center plus dx, dy meets the border of its shape, as a part of dx, dy:
+// below 1 for a point outside the shape, 1 on its border and above 1
+// inside it.
+func outline(n NodePlace, kind string, dx, dy float64) float64 {
 	hw, hh := n.Width/2, n.Height/2
 	var t float64
 	switch kind {
@@ -616,10 +628,7 @@ func clip(n NodePlace, kind string, px, py float64) (float64, float64) {
 			t = math.Min(t, hh/math.Abs(dy))
 		}
 	}
-	if t >= 1 || math.IsNaN(t) {
-		return px, py
-	}
-	return n.X + t*dx, n.Y + t*dy
+	return t
 }
 
 // end returns the end of an edge at a node: the border of its shape on
@@ -682,6 +691,14 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 			direct[k] = append(direct[k], i)
 		}
 	}
+	// rankH holds the height of each rank, the height of its tallest
+	// vertex.
+	rankH := make([]float64, len(l.layers))
+	for r, ly := range l.layers {
+		for _, v := range ly {
+			rankH[r] = math.Max(rankH[r], l.vs[v].h)
+		}
+	}
 	for i, e := range in.Edges {
 		a, b := ids[e.Source], ids[e.Target]
 		na, nb := out.Nodes[a], out.Nodes[b]
@@ -690,10 +707,29 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 			l.loop(ep, na, in.Nodes[a].Shape, e)
 			continue
 		}
+		// A point of a long edge in a rank between its ends takes a point
+		// at the top and at the bottom of the rank too, so that the
+		// B-spline runs straight across the rank at the x of the point,
+		// in the room that the layout keeps for it, and does not cut
+		// across a node of the rank. at holds the index in pts of each
+		// vertex of the chain.
 		var pts [][2]float64
-		for _, v := range l.chains[i] {
+		chain := l.chains[i]
+		at := make([]int, len(chain))
+		for j, v := range chain {
+			half := rankH[l.vs[v].rank] / 2
+			inner := j > 0 && j < len(chain)-1 && l.vs[v].dummy && !l.flat[i] && half > 0
+			if inner {
+				x, y := tf(l.x[v], l.y[v]-half)
+				pts = append(pts, [2]float64{x, y})
+			}
+			at[j] = len(pts)
 			x, y := tf(l.x[v], l.y[v])
 			pts = append(pts, [2]float64{x, y})
+			if inner {
+				x, y := tf(l.x[v], l.y[v]+half)
+				pts = append(pts, [2]float64{x, y})
+			}
 		}
 		if l.flip[i] {
 			slices.Reverse(pts)
@@ -704,6 +740,20 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 			mx, my := (pts[0][0]+pts[1][0])/2, (pts[0][1]+pts[1][1])/2
 			ox, oy := tf(0, -(math.Max(l.vs[a].h, l.vs[b].h)/2 + l.sep.rank/2))
 			pts = [][2]float64{pts[0], {mx + ox, my + oy}, pts[1]}
+		}
+		if stepCurve(e.Curve) && len(pts) == 2 && !l.flat[i] {
+			// A curve of steps turns at a bend halfway between the ranks,
+			// level with the center of the target, as the route of dagre
+			// does in Mermaid, so the edge comes into the middle of the
+			// side of its target and its arrowhead points along it.
+			p0, p1 := pts[0], pts[1]
+			mid := [2]float64{p1[0], (p0[1] + p1[1]) / 2}
+			if in.Direction == LR || in.Direction == RL {
+				mid = [2]float64{(p0[0] + p1[0]) / 2, p1[1]}
+			}
+			if mid != p0 && mid != p1 {
+				pts = [][2]float64{p0, mid, p1}
+			}
 		}
 		// Edges between the same two nodes spread apart. Straight edges
 		// run side by side, each with ends of its own on the borders, so
@@ -739,11 +789,14 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 			pts[last][0], pts[last][1] = end(nb, in.Nodes[b].Shape, e.TargetPort, pts[last-1])
 		}
 		label := l.label[i]
-		at := slices.Index(l.chains[i], label)
-		if l.flip[i] && at >= 0 {
-			at = len(pts) - 1 - at
+		li := slices.Index(chain, label)
+		if li >= 0 {
+			li = at[li]
+			if l.flip[i] {
+				li = len(pts) - 1 - li
+			}
 		}
-		pts, at = sides(pts, at, na, nb, e, l.sep.rank)
+		pts, li = sides(pts, li, na, nb, e, l.sep.rank)
 		last = len(pts) - 1
 		ep.Points = pts
 		ep.EndX, ep.EndY = pts[last][0], pts[last][1]
@@ -753,7 +806,7 @@ func (l *layout) routes(out *Layout, ids map[string]int, tf func(x, y float64) (
 		if lv := label; lv >= 0 {
 			// A B-spline passes near its middle points, not through them,
 			// so the label sits on the curve where its point pulls it.
-			j := at
+			j := li
 			if j > 0 && j < len(pts)-1 {
 				ep.LabelX = (pts[j-1][0] + 4*pts[j][0] + pts[j+1][0]) / 6
 				ep.LabelY = (pts[j-1][1] + 4*pts[j][1] + pts[j+1][1]) / 6
@@ -852,23 +905,37 @@ func (l *layout) loop(ep *EdgePlace, n NodePlace, kind string, e LayoutEdge) {
 		x0, y0 := out([2]float64{n.X - n.Width/4, n.Y}, [2]float64{n.X - n.Width/4, n.Y - n.Height/2})
 		x1, y1 := out([2]float64{n.X + n.Width/4, n.Y}, [2]float64{n.X + n.Width/4, n.Y - n.Height/2})
 		ep.Points = [][2]float64{{x0, y0}, {x0 - r/2, y0 - r}, {x1 + r/2, y1 - r}, {x1, y1}}
-		ep.EndX, ep.EndY, ep.EndAngle = x1, y1, 90+25
-		ep.StartX, ep.StartY, ep.StartAngle = x0, y0, 90-25
+		ep.EndX, ep.EndY = x1, y1
+		ep.StartX, ep.StartY = x0, y0
 		ep.LabelX, ep.LabelY = n.X, y0-r*1.3-e.LabelHeight/2
 	} else {
 		x0, y0 := out([2]float64{n.X, n.Y - n.Height/4}, [2]float64{n.X + n.Width/2, n.Y - n.Height/4})
 		x1, y1 := out([2]float64{n.X, n.Y + n.Height/4}, [2]float64{n.X + n.Width/2, n.Y + n.Height/4})
 		ep.Points = [][2]float64{{x0, y0}, {x0 + r, y0 - r/2}, {x1 + r, y1 + r/2}, {x1, y1}}
-		ep.EndX, ep.EndY, ep.EndAngle = x1, y1, 180-25
-		ep.StartX, ep.StartY, ep.StartAngle = x0, y0, 180+25
+		ep.EndX, ep.EndY = x1, y1
+		ep.StartX, ep.StartY = x0, y0
 		ep.LabelX, ep.LabelY = x0+r*1.3+e.LabelWidth/2, n.Y
 	}
+	// Each arrowhead lies along the curve where it meets the node: the
+	// curve of loopPath leaves the first point toward the second and comes
+	// into the last from the third.
+	p := ep.Points
+	ep.EndAngle = math.Atan2(p[3][1]-p[2][1], p[3][0]-p[2][0]) * 180 / math.Pi
+	ep.StartAngle = math.Atan2(p[0][1]-p[1][1], p[0][0]-p[1][0]) * 180 / math.Pi
 	ep.Path = loopPath(ep.Points)
 }
 
 // normalize moves every place so that the layout starts at 0, 0, and sets
 // its size.
 func (l *layout) normalize(out *Layout) {
+	normalizeLayout(l.in, out)
+}
+
+// normalizeLayout moves every place of a layout so that it starts at 0, 0,
+// sets its size, and writes the path of each edge: the path of a loop for an
+// edge from a node to itself with four points, and else the curve of the
+// edge.
+func normalizeLayout(in *LayoutInput, out *Layout) {
 	x1, y1, x2, y2 := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
 	add := func(ax, ay, bx, by float64) {
 		x1, y1 = math.Min(x1, ax), math.Min(y1, ay)
@@ -886,12 +953,12 @@ func (l *layout) normalize(out *Layout) {
 		for _, p := range e.Points {
 			add(p[0], p[1], p[0], p[1])
 		}
-		if w := l.in.Edges[i].LabelWidth; w > 0 {
-			h := l.in.Edges[i].LabelHeight
+		if w := in.Edges[i].LabelWidth; w > 0 {
+			h := in.Edges[i].LabelHeight
 			add(e.LabelX-w/2, e.LabelY-h/2, e.LabelX+w/2, e.LabelY+h/2)
 		}
 	}
-	labelBounds(l.in, out, add)
+	labelBounds(in, out, add)
 	if math.IsInf(x1, 1) {
 		return
 	}
@@ -916,10 +983,10 @@ func (l *layout) normalize(out *Layout) {
 		e.EndX, e.EndY, e.StartX, e.StartY = e.EndX-x1, e.EndY-y1, e.StartX-x1, e.StartY-y1
 		e.shiftLabels(-x1, -y1)
 		if len(e.Points) > 0 {
-			if l.in.Edges[i].Source == l.in.Edges[i].Target {
+			if in.Edges[i].Source == in.Edges[i].Target && len(e.Points) == 4 {
 				e.Path = loopPath(e.Points)
 			} else {
-				e.Path = curvePath(l.in.Edges[i].Curve, e.Points)
+				e.Path = curvePath(in.Edges[i].Curve, e.Points)
 			}
 		}
 	}
@@ -966,4 +1033,14 @@ func curvePath(curve string, pts [][2]float64) string {
 	}
 	p, _ := shape.Curve("basis", pts, true, 0)
 	return p
+}
+
+// stepCurve reports whether a curve draws in steps at right angles: step,
+// stepBefore or stepAfter, with the names of Mermaid or of Vega.
+func stepCurve(c string) bool {
+	switch c {
+	case "step", "stepBefore", "stepAfter", "step-before", "step-after":
+		return true
+	}
+	return false
 }

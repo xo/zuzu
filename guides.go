@@ -1,10 +1,12 @@
 package zuzu
 
 import (
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
 	"math"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -15,6 +17,7 @@ import (
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/svg"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -40,13 +43,15 @@ func (s *scope) size() (float64, float64) {
 	return 0, 0
 }
 
-// buildAxes builds the axes of a scope.
+// buildAxes builds the axes of a scope, and moves the title of each axis
+// clear of the labels of the others (D46).
 func (s *scope) buildAxes(path string) ([]scene.Mark, error) {
 	var out []scene.Mark
+	var placed []*layout.Axis
 	for i := range s.spec.Axes {
 		a := &s.spec.Axes[i]
 		p := fmt.Sprintf("%s/axes/%d", path, i)
-		m, err := s.buildAxis(a, p)
+		m, ax, err := s.buildAxis(a, p)
 		if err != nil {
 			var is vega.Issue
 			if isIssue(err, &is) {
@@ -59,20 +64,36 @@ func (s *scope) buildAxes(path string) ([]scene.Mark, error) {
 		}
 		if m != nil {
 			out = append(out, *m)
+			// An encode of the title can place it, and then it stays.
+			if _, ok := a.Encode["title"]; ok {
+				ax = nil
+			}
+			placed = append(placed, ax)
 		}
 	}
+	s.rt.style().ClearTitles(out, placed)
 	return out, nil
 }
 
-// buildAxis resolves an axis and draws it.
-func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
+// buildAxis resolves an axis and draws it. It returns the mark of the axis
+// and the axis as the layout drew it.
+func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, *layout.Axis, error) {
 	sc, err := s.scale(a.Scale)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	orient, err := s.str(a.Orient, "bottom")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	for _, k := range []string{"tickBand", "tickOffset", "tickRound", "tickExtra"} {
+		// The axis does not draw these, so the report names them (hard
+		// rule 4).
+		if _, ok := a.Extra[k]; ok {
+			if err := s.rt.issue(vega.ErrUnsupported, path+"/"+k, "the property %s of an axis", k); err != nil {
+				return nil, nil, err
+			}
+		}
 	}
 	w, h := s.size()
 	cfg := s.rt.axisConfig(orient, sc)
@@ -89,8 +110,13 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	if g, ok := cfg["grid"].(bool); ok && a.Grid == nil {
 		ax.Grid = g
 	}
-	if ax.Labels, err = s.boolean(a.Labels, true); err != nil {
-		return nil, err
+	// The config of the axis can hide the labels too.
+	showLabels, ok := cfg["labels"].(bool)
+	if !ok {
+		showLabels = true
+	}
+	if ax.Labels, err = s.boolean(a.Labels, showLabels); err != nil {
+		return nil, nil, err
 	}
 	// The config of the axis can hide the domain, as it can the grid.
 	showDomain, ok := cfg["domain"].(bool)
@@ -99,37 +125,46 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	}
 	domain, err := s.boolean(a.Domain, showDomain)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ax.Domain = domain
 	if ax.Title, err = s.titleText(a.Title); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	count, err := s.tickCount(a.TickCount, sc, ax)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ax.Count = count
+	if ax.MinStep, err = s.num(a.TickMinStep, 0); err != nil {
+		return nil, nil, err
+	}
+	// An axis whose spec gives no tickCount chooses the step of its
+	// ticks so that both ends of the domain get a tick (D46). The
+	// compiler of Vega-Lite gives each axis of numbers the tickCount of
+	// one tick each 40 pixels, which is the count of the look, so that
+	// tickCount counts as none.
+	ax.EndTicks = a.Values.IsZero() && (a.TickCount.IsZero() || lookCount(a.TickCount))
 	if !a.Values.IsZero() {
 		v, err := s.value(a.Values)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if l, ok := v.([]any); ok {
 			ax.Values = l
 		}
 	}
 	if ax.LabelAngle, err = s.num(a.LabelAngle, configNum(cfg, "labelAngle", 0)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if ax.Offset, err = s.num(a.Offset, 0); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	overlap := !scale.Discrete(sc.Type())
 	if !a.LabelOverlap.IsZero() {
 		v, err := s.value(a.LabelOverlap)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		overlap = expr.Truthy(v)
 	}
@@ -139,7 +174,7 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 		bp = 0.5
 	}
 	if ax.BandPosition, err = s.num(a.BandPosition, bp); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// labelFlush is true for a distance of 1, or a distance, and none by
 	// default, as in Vega.
@@ -148,7 +183,7 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 		v := flush
 		if !a.LabelFlush.IsZero() {
 			if v, err = s.value(a.LabelFlush); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 		switch f := v.(type) {
@@ -162,50 +197,41 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, error) {
 	}
 	// The labels draw at most 180 wide by default, as in Vega.
 	if ax.LabelLimit, err = s.num(a.LabelLimit, configNum(cfg, "labelLimit", 180)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if ax.Format, err = s.labelFormat(sc, a.Format, a.FormatType, ax); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if ax.LabelAlign, err = s.str(a.LabelAlign, configStr(cfg, "labelAlign", "")); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if ax.LabelBaseline, err = s.str(a.LabelBase, configStr(cfg, "labelBaseline", "")); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	props := s.guideProps(cfg, a.Extra)
-	if err := s.labelPadding(ax, a, cfg, props); err != nil {
-		return nil, err
+	if err := s.ticks(ax, a, cfg, props); err != nil {
+		return nil, nil, err
 	}
 	axisProps(ax, props)
 	m := s.rt.style().Axis(ax)
 	// The config and the axis style its parts, over the look of zuzu.
-	styleGuide(&m, props, axisParts)
+	s.styleGuide(&m, props, axisParts)
 	if err := s.guideEncode(&m, a.Encode, axisEncodeParts, axisFrame(ax), path, "an axis"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if a.ZIndex != nil {
 		m.ZIndex = *a.ZIndex
 	}
-	return &m, nil
+	return &m, ax, nil
 }
 
-// labelPadding reads the distance between the labels of an axis and its
-// line. Vega puts a label past the end of its tick, by labelPadding, and a
-// tick is tickSize long, or not there when the axis hides its ticks. The
-// look of zuzu draws no ticks, so the distance of the look holds unless the
-// axis or its config gives a labelPadding or a tickSize. Then the label
-// keeps the distance of Vega, with the defaults of Vega: 2 and 5.
-func (s *scope) labelPadding(ax *layout.Axis, a *vega.Axis, cfg, props map[string]any) error {
-	_, cfgPad := cfg["labelPadding"]
-	size, hasSize := propNum(props, "tickSize")
-	if a.LabelPadding.IsZero() && !cfgPad && !hasSize {
-		return nil
-	}
-	pad, err := s.num(a.LabelPadding, configNum(cfg, "labelPadding", 2))
-	if err != nil {
-		return err
-	}
+// ticks reads the ticks of an axis and the padding of its labels. As in
+// Vega, an axis has ticks unless the axis or its config hides them, and a
+// tick is tickSize long. A label is labelPadding past the end of its tick,
+// or past the line of the axis without ticks. The size of a tick and the
+// padding of a label take the sizes of the look when the axis and its
+// config give none (D46, docs/STYLE.md).
+func (s *scope) ticks(ax *layout.Axis, a *vega.Axis, cfg, props map[string]any) error {
 	cfgTicks, ok := cfg["ticks"].(bool)
 	if !ok {
 		cfgTicks = true
@@ -214,13 +240,18 @@ func (s *scope) labelPadding(ax *layout.Axis, a *vega.Axis, cfg, props map[strin
 	if err != nil {
 		return err
 	}
-	if !hasSize {
-		size = 5
+	ax.Ticks = ticks
+	ax.TickSize = theme.TickSize
+	if size, ok := propNum(props, "tickSize"); ok {
+		ax.TickSize = size
 	}
-	if ticks {
-		pad += size
+	if _, cfgPad := cfg["labelPadding"]; !a.LabelPadding.IsZero() || cfgPad {
+		pad, err := s.num(a.LabelPadding, configNum(cfg, "labelPadding", theme.LabelPadding))
+		if err != nil {
+			return err
+		}
+		ax.LabelPadding = &pad
 	}
-	ax.LabelPadding = &pad
 	return nil
 }
 
@@ -355,26 +386,35 @@ func (s *scope) numberLabel(sc scale.Scale, spec string, ax *layout.Axis) (func(
 		}, nil
 	}
 	dom := sc.Domain()
-	if spec != "" && (scale.Discrete(sc.Type()) || !linearish(sc.Type()) || len(dom) < 2) {
+	if spec != "" && (scale.Discrete(sc.Type()) || !layout.Linear(sc.Type()) || len(dom) < 2) {
 		return format.Number(spec, loc)
 	}
 	lo, hi := 0.0, 1.0
 	if len(dom) >= 2 {
 		lo, hi = expr.Number(dom[0]), expr.Number(dom[len(dom)-1])
 	}
-	return format.Ticks(spec, lo, hi, scale.TickStep(lo, hi, count), loc)
+	step := scale.TickStep(lo, hi, count)
+	if ax != nil {
+		step = ax.TickStep(lo, hi)
+	}
+	return format.Ticks(spec, lo, hi, step, loc)
 }
 
-// linearish reports whether a scale type maps numbers along a line or a
-// curve, so that its ticks are the round numbers of its domain: linear,
-// pow, sqrt and symlog, also as sequential or diverging.
-func linearish(typ string) bool {
-	typ = strings.TrimPrefix(strings.TrimPrefix(typ, "sequential-"), "diverging-")
-	switch typ {
-	case "linear", "pow", "sqrt", "symlog", "sequential":
-		return true
+// lookCount reports whether a tickCount is the one that the compiler of
+// Vega-Lite gives an axis of numbers by default: one tick each 40 pixels of
+// the signal of a width or a height, such as ceil(child_width/40).
+func lookCount(v vega.Value) bool {
+	name, ok1 := strings.CutPrefix(v.Signal, "ceil(")
+	name, ok2 := strings.CutSuffix(name, "/40)")
+	if !ok1 || !ok2 {
+		return false
 	}
-	return false
+	if !strings.HasSuffix(name, "width") && !strings.HasSuffix(name, "height") {
+		return false
+	}
+	return !strings.ContainsFunc(name, func(r rune) bool {
+		return r != '_' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9')
+	})
 }
 
 // timeLabel returns a format of times that names the largest unit that
@@ -452,6 +492,39 @@ func (s *scope) buildLegends(path string) ([]scene.Mark, error) {
 }
 
 // buildLegend resolves a legend and draws it.
+// legendUnread are the properties of a legend of Vega that zuzu reads and
+// does not draw.
+var legendUnread = []string{
+	"cornerRadius", "fillColor", "strokeColor", "padding", "gridAlign", "labelAlign", "labelBaseline",
+	"labelOffset", "labelSeparation", "symbolDashOffset", "symbolOffset", "symbolBaseFillColor",
+	"symbolBaseStrokeColor", "titleAnchor", "titleAlign", "titleBaseline", "titleLimit", "titleLineHeight",
+	"titlePadding", "tickCount", "tickMinStep", "gradientOpacity", "gradientStrokeColor", "gradientStrokeWidth",
+}
+
+// legendUnread reports each property of a legend that zuzu does not draw,
+// so that no property drops without a word (hard rule 4).
+func (s *scope) legendUnread(l *vega.Legend, path string) error {
+	for _, k := range legendUnread {
+		if _, ok := l.Extra[k]; !ok {
+			continue
+		}
+		if err := s.rt.issue(vega.ErrUnsupported, path+"/"+k, "the property %s of a legend", k); err != nil {
+			return err
+		}
+	}
+	if !l.LabelOverlap.IsZero() {
+		if err := s.rt.issue(vega.ErrUnsupported, path+"/labelOverlap", "the property labelOverlap of a legend"); err != nil {
+			return err
+		}
+	}
+	if !l.TitleOrient.IsZero() {
+		if err := s.rt.issue(vega.ErrUnsupported, path+"/titleOrient", "the property titleOrient of a legend"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	lg := &layout.Legend{}
 	get := func(name string) (scale.Scale, error) {
@@ -476,8 +549,14 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	if lg.StrokeDash, err = get(l.StrokeDash); err != nil {
 		return nil, err
 	}
+	if lg.StrokeWidth, err = get(l.StrokeWidth); err != nil {
+		return nil, err
+	}
+	if lg.Opacity, err = get(l.Opacity); err != nil {
+		return nil, err
+	}
 	main := lg.Fill
-	for _, sc := range []scale.Scale{lg.Stroke, lg.Shape, lg.Size, lg.StrokeDash} {
+	for _, sc := range []scale.Scale{lg.Stroke, lg.Shape, lg.Size, lg.StrokeDash, lg.StrokeWidth, lg.Opacity} {
 		if main == nil {
 			main = sc
 		}
@@ -507,6 +586,9 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 		return nil, err
 	}
 	lg.Line = symbol == "stroke"
+	if !lg.Line {
+		lg.SymbolType = symbol
+	}
 	typ := l.Type
 	color := lg.Fill
 	if color == nil {
@@ -547,6 +629,20 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 		return nil, err
 	}
 	lg.Columns = int(math.Max(0, columns))
+	if lg.ClipHeight, err = s.num(l.ClipHeight, configNum(cfg, "clipHeight", 0)); err != nil {
+		return nil, err
+	}
+	if err := s.legendUnread(l, path); err != nil {
+		return nil, err
+	}
+	props := s.guideProps(cfg, l.Extra)
+	legendProps(lg, props)
+	s.legendMarks(l, lg)
+	// A direction or a limit that the spec sets is a property of the
+	// entries, which nested circles cannot show (docs/STYLE.md).
+	_, limited := props["symbolLimit"]
+	_, directed := cfg["direction"]
+	lg.Entries = limited || directed || !l.Direction.IsZero()
 	if lg.Direction == "horizontal" {
 		// The row wraps at the width of the plot area of the group that
 		// holds the legend (docs/STYLE.md). A group that sets no width
@@ -559,7 +655,7 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 		lg.Width = w
 	}
 	m := s.rt.style().Legend(lg)
-	styleGuide(&m, s.guideProps(cfg, l.Extra), legendStyleParts)
+	s.styleGuide(&m, props, legendStyleParts)
 	if err := s.guideEncode(&m, l.Encode, legendParts, nil, path, "a legend"); err != nil {
 		return nil, err
 	}
@@ -570,6 +666,169 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	return &m, nil
 }
 
+// legendProps reads the properties of a legend that the spec or the config
+// of the legend sets and that win over the look (D46, docs/STYLE.md): the
+// limits of its entries and its labels, the size of its symbols, the space
+// between its rows and its columns, and the width of its gradient.
+func legendProps(lg *layout.Legend, props map[string]any) {
+	num := func(name string) (float64, bool) {
+		f, ok := props[name].(float64)
+		return f, ok && f >= 0 && !math.IsInf(f, 0)
+	}
+	if f, ok := num("symbolLimit"); ok && f >= 1 {
+		lg.SymbolLimit = int(f)
+	}
+	if f, ok := num("labelLimit"); ok && f > 0 {
+		lg.LabelLimit = f
+	}
+	if f, ok := num("symbolSize"); ok && f > 0 {
+		lg.SymbolSize = f
+	}
+	if f, ok := num("gradientThickness"); ok && f > 0 {
+		lg.GradientThickness = f
+	}
+	if f, ok := num("rowPadding"); ok {
+		lg.RowPadding = &f
+	}
+	if f, ok := num("columnPadding"); ok {
+		lg.ColumnPadding = &f
+	}
+}
+
+// scaleCall matches a signal that maps one value through a scale, such as
+// scale('color', 'Normal Estimate').
+var scaleCall = regexp.MustCompile(`^\s*scale\(\s*'([^']+)'\s*,\s*'([^']*)'\s*\)\s*$`)
+
+// legendScaleProps are the properties of a mark that a legend names.
+var legendScaleProps = map[string]bool{
+	"fill": true, "stroke": true, "shape": true, "size": true, "strokeDash": true, "opacity": true,
+}
+
+// markRank orders the types of the marks that a legend can name, the one
+// whose shape its symbols take first: a mark with an area, such as the box
+// of a box plot, then a symbol, such as an outlier, then a line, then any
+// other.
+func markRank(typ string) int {
+	switch typ {
+	case "rect", "area", "arc", "shape", "path", "image":
+		return 0
+	case "symbol":
+		return 1
+	case "line", "rule", "trail":
+		return 2
+	}
+	return 3
+}
+
+// legendMarks gives the symbols of a legend the look of the marks that it
+// names, as docs/STYLE.md says: the shape of the mark that reads one of its
+// scales, the first of the highest rank of markRank, a short line for a
+// line, an outline when the mark has no fill, the color of the mark when no
+// scale of the legend gives one, and a short line for each value that a
+// line maps through the scale of color.
+func (s *scope) legendMarks(l *vega.Legend, lg *layout.Legend) {
+	names := map[string]bool{}
+	for _, n := range []string{l.Fill, l.Stroke, l.Shape, l.Size, l.StrokeDash, l.Opacity} {
+		if n != "" {
+			names[n] = true
+		}
+	}
+	var first *vega.Mark
+	var walk func(ms []vega.Mark)
+	walk = func(ms []vega.Mark) {
+		for i := range ms {
+			m := &ms[i]
+			line := m.Type == "line" || m.Type == "trail" || m.Type == "rule"
+			for _, set := range encodeSets {
+				for _, prop := range slices.Sorted(maps.Keys(m.Encode[set])) {
+					for _, r := range m.Encode[set][prop] {
+						if sm := scaleCall.FindStringSubmatch(r.Signal); sm != nil && names[sm[1]] && line {
+							if lg.LineValues == nil {
+								lg.LineValues = map[string]bool{}
+							}
+							lg.LineValues[sm[2]] = true
+						}
+						if r.Scale.IsZero() || !legendScaleProps[prop] || (first != nil && markRank(m.Type) >= markRank(first.Type)) {
+							continue
+						}
+						if name, err := s.str(r.Scale, ""); err == nil && names[name] {
+							first = m
+						}
+					}
+				}
+			}
+			walk(m.Marks)
+		}
+	}
+	walk(s.spec.Marks)
+	lg.Hollow = lg.Fill == nil && lg.Stroke != nil
+	if first == nil {
+		return
+	}
+	fill, hasFill := markLiteral(first, "fill")
+	stroke, hasStroke := markLiteral(first, "stroke")
+	encodes := func(prop string) bool {
+		for _, set := range encodeSets {
+			if len(first.Encode[set][prop]) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+	switch first.Type {
+	case "line", "trail", "rule":
+		lg.Line = lg.Line || (lg.Shape == nil && lg.Size == nil)
+		lg.Hollow = false
+	case "symbol":
+		if lg.SymbolType == "" && !lg.Line {
+			lg.SymbolType = "circle"
+			if sh, ok := markLiteral(first, "shape"); ok {
+				lg.SymbolType = sh
+			}
+		}
+		fallthrough
+	default:
+		// A mark with no fill, or a fill that shows nothing, draws its
+		// outline only.
+		none := hasFill && (fill == "transparent" || fill == "none")
+		lg.Hollow = none || (!encodes("fill") && encodes("stroke"))
+		if lg.Hollow && (first.Type == "shape" || first.Type == "path") && lg.Shape == nil && lg.Size == nil {
+			// A shape with no fill, such as a line of a map, draws as
+			// a line.
+			lg.Line, lg.Hollow = true, false
+		}
+	}
+	switch {
+	case lg.Hollow && hasStroke:
+		lg.Color = stroke
+	case !lg.Hollow && hasFill:
+		lg.Color = fill
+	}
+}
+
+// markLiteral returns the string that the encoding of a mark gives a
+// property with no scale, no field and no signal, such as the value of a
+// fill, and whether it gives one. The update set wins over the enter set,
+// and the last rule, which has no test, wins over the others.
+func markLiteral(m *vega.Mark, prop string) (string, bool) {
+	out, found := "", false
+	for _, set := range encodeSets {
+		for _, r := range m.Encode[set][prop] {
+			if len(r.Value) == 0 || !r.Scale.IsZero() || r.Field.Name != "" || r.Signal != "" {
+				continue
+			}
+			var v any
+			if json.Unmarshal(r.Value, &v) != nil {
+				continue
+			}
+			if str, ok := v.(string); ok {
+				out, found = str, true
+			}
+		}
+	}
+	return out, found
+}
+
 // legendPlace is where a legend goes, which placeGuides reads: its orient,
 // its offset from the plot area, and its place for the orient none.
 type legendPlace struct {
@@ -578,9 +837,7 @@ type legendPlace struct {
 }
 
 // legendParts and axisEncodeParts are the roles of the parts of a legend
-// and of an axis that the encode of a guide names. The look of zuzu draws
-// no ticks on an axis (docs/STYLE.md), so an encode of ticks has nothing to
-// style.
+// and of an axis that the encode of a guide names.
 var (
 	legendParts = map[string]string{
 		"legend": "legend", "title": "legend-title", "labels": "legend-label", "symbols": "legend-symbol",
@@ -588,7 +845,7 @@ var (
 	}
 	axisEncodeParts = map[string]string{
 		"axis": "axis", "title": "axis-title", "labels": "axis-label", "grid": "axis-grid",
-		"domain": "axis-domain", "ticks": "",
+		"domain": "axis-domain", "ticks": "axis-tick",
 	}
 )
 
@@ -732,8 +989,10 @@ func placeGuideItem(typ string, st *itemState, ox, oy float64, flatX, flatY bool
 }
 
 // buildTitle builds the title of a scope. A title of a group stands beyond
-// the guides that the group already drew, such as the labels of its axis.
-func (s *scope) buildTitle(_ string, drawn []scene.Mark) ([]scene.Mark, error) {
+// the marks and the guides that the group already drew, such as the labels
+// of its axis, and follows the properties and the encode that the spec
+// gives it (title.go).
+func (s *scope) buildTitle(path string, drawn []scene.Mark) ([]scene.Mark, error) {
 	t := s.spec.Title
 	if t == nil {
 		return nil, nil
@@ -765,7 +1024,9 @@ func (s *scope) buildTitle(_ string, drawn []scene.Mark) ([]scene.Mark, error) {
 	}
 	lt.Kind = kind
 	def := "start"
-	if kind != "title" {
+	if kind != "title" || s.parent != nil {
+		// The title of a group is at the middle, as in Vega. The look puts
+		// only the title of the chart at the start.
 		def = "middle"
 	}
 	if lt.Anchor, err = s.str(t.Anchor, def); err != nil {
@@ -778,18 +1039,24 @@ func (s *scope) buildTitle(_ string, drawn []scene.Mark) ([]scene.Mark, error) {
 	if lt.Offset, err = s.num(t.Offset, off); err != nil {
 		return nil, err
 	}
+	if !t.Angle.IsZero() {
+		a, err := s.num(t.Angle, 0)
+		if err != nil {
+			return nil, err
+		}
+		lt.Angle = &a
+	}
+	if lt.Align, err = s.str(t.Align, ""); err != nil {
+		return nil, err
+	}
+	if lt.Baseline, err = s.str(t.Baseline, ""); err != nil {
+		return nil, err
+	}
+	shift := 0.0
 	if s.parent != nil {
-		b := layout.Empty()
-		st := s.rt.style()
-		for i := range drawn {
-			if drawn[i].Role != "axis" {
-				continue
-			}
-			mb := st.MarkBounds(&drawn[i])
-			if !mb.IsEmpty() {
-				b.X1, b.Y1 = math.Min(b.X1, mb.X1), math.Min(b.Y1, mb.Y1)
-				b.X2, b.Y2 = math.Max(b.X2, mb.X2), math.Max(b.Y2, mb.Y2)
-			}
+		b := s.contentBounds(drawn)
+		if shift, err = s.titleFrame(t, lt, b); err != nil {
+			return nil, err
 		}
 		if !b.IsEmpty() {
 			switch lt.Orient {
@@ -805,19 +1072,33 @@ func (s *scope) buildTitle(_ string, drawn []scene.Mark) ([]scene.Mark, error) {
 		}
 	}
 	m := s.rt.style().Title(lt)
+	moveTitle(&m, lt.Orient, shift)
+	if s.parent != nil {
+		if err := s.styleGroupTitle(&m, t); err != nil {
+			return nil, err
+		}
+	}
+	// The config of the title styles only the title of the chart. The
+	// properties of the spec style every title, such as the labels of
+	// the headers of a facet.
+	var config map[string]any
 	if kind == "title" && s.parent == nil {
 		m.Name = "title"
-		props := s.guideProps(s.rt.configObject("title"), t.Extra)
-		for k, v := range map[string]vega.Value{"color": t.Color, "font": t.Font, "fontSize": t.FontSize} {
-			if !v.IsZero() {
-				x, err := s.value(v)
-				if err != nil {
-					return nil, err
-				}
-				props[k] = x
+		config = s.rt.configObject("title")
+	}
+	props := s.guideProps(config, t.Extra)
+	for k, v := range map[string]vega.Value{"color": t.Color, "font": t.Font, "fontSize": t.FontSize} {
+		if !v.IsZero() {
+			x, err := s.value(v)
+			if err != nil {
+				return nil, err
 			}
+			props[k] = x
 		}
-		styleGuide(&m, props, titleParts)
+	}
+	s.styleGuide(&m, props, titleParts)
+	if err := s.titleEncode(&m, t, path); err != nil {
+		return nil, err
 	}
 	return []scene.Mark{m}, nil
 }

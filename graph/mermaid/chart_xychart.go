@@ -110,16 +110,14 @@ func xyChart(c *chart) (map[string]any, bool, error) {
 		"xyChart.showDataLabelOutsideBar", "xyChart.titleFontSize", "xyChart.titlePadding",
 		"xyChart.xAxis.labelFontSize", "xyChart.xAxis.titleFontSize",
 		"xyChart.yAxis.labelFontSize", "xyChart.yAxis.titleFontSize",
-		"themeVariables.xyChart.plotColorPalette"}
-	if xa.cats != nil {
-		// zuzu draws an axis line along an axis of categories alone.
-		read = append(read, "xyChart.xAxis.axisLineWidth")
-	}
+		"themeVariables.xyChart.plotColorPalette",
+		"xyChart.xAxis.axisLineWidth", "xyChart.xAxis.tickLength", "xyChart.xAxis.tickWidth",
+		"xyChart.yAxis.axisLineWidth", "xyChart.yAxis.tickLength", "xyChart.yAxis.tickWidth"}
 	// The x axis is at the bottom of a vertical chart, and the y axis at
 	// the bottom of a horizontal one.
 	var xRead, yRead []string
-	xa.guide, xRead = xyShow(cfg, "xAxis", xa.cats != nil, !horizontal)
-	ya.guide, yRead = xyShow(cfg, "yAxis", false, horizontal)
+	xa.guide, xRead = xyShow(cfg, "xAxis", !horizontal)
+	ya.guide, yRead = xyShow(cfg, "yAxis", horizontal)
 	read = append(append(read, xRead...), yRead...)
 	if err := c.unreadSettings(read...); err != nil {
 		return nil, false, err
@@ -301,8 +299,11 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 	// of Vega-Lite in a horizontal chart.
 	for _, a := range []struct{ name, channel string }{{"xAxis", cat}, {"yAxis", val}} {
 		ac := map[string]any{}
-		for from, to := range map[string]string{"labelFontSize": "labelFontSize", "titleFontSize": "titleFontSize", "axisLineWidth": "domainWidth"} {
-			if v, ok := configNumber(cfg, "xyChart", a.name, from); ok && (from != "axisLineWidth" || (a.name == "xAxis" && xa.cats != nil)) {
+		for from, to := range map[string]string{
+			"labelFontSize": "labelFontSize", "titleFontSize": "titleFontSize", "axisLineWidth": "domainWidth",
+			"tickLength": "tickSize", "tickWidth": "tickWidth",
+		} {
+			if v, ok := configNumber(cfg, "xyChart", a.name, from); ok {
 				ac[to] = v
 			}
 		}
@@ -371,13 +372,11 @@ func xyDataLabels(horizontal, outside bool, barEnc map[string]any) map[string]an
 
 // xyShow reads the settings of an axis of an xychart that show or hide its
 // parts, and the rotation of its labels. It returns the properties of the
-// axis of Vega-Lite, and the settings that it reads. zuzu draws an axis line
-// only along an axis of categories, given by line, and no ticks. So
-// showAxisLine false on an axis of numbers, and showTick false, change
-// nothing, and showTick true is an issue. As in Mermaid, only the axis at
-// the bottom, given by bottom, turns its labels by labelRotation, and a
-// rotation outside -90 to 90 degrees is 0.
-func xyShow(cfg map[string]any, name string, line, bottom bool) (map[string]any, []string) {
+// axis of Vega-Lite, and the settings that it reads. An axis draws its line
+// and its ticks by default, as in Mermaid and in Vega (D46). As in Mermaid,
+// only the axis at the bottom, given by bottom, turns its labels by
+// labelRotation, and a rotation outside -90 to 90 degrees is 0.
+func xyShow(cfg map[string]any, name string, bottom bool) (map[string]any, []string) {
 	guide := map[string]any{}
 	var read []string
 	path := "xyChart." + name + "."
@@ -393,12 +392,15 @@ func xyShow(cfg map[string]any, name string, line, bottom bool) (map[string]any,
 			guide["title"] = nil
 		}
 	}
-	if show, ok := configBool(cfg, "xyChart", name, "showTick"); ok && !show {
+	if show, ok := configBool(cfg, "xyChart", name, "showTick"); ok {
 		read = append(read, path+"showTick")
+		if !show {
+			guide["ticks"] = false
+		}
 	}
-	if show, ok := configBool(cfg, "xyChart", name, "showAxisLine"); ok && (line || !show) {
+	if show, ok := configBool(cfg, "xyChart", name, "showAxisLine"); ok {
 		read = append(read, path+"showAxisLine")
-		if line && !show {
+		if !show {
 			guide["domain"] = false
 		}
 	}

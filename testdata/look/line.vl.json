@@ -1,0 +1,20 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "title": "Visits by month",
+  "width": 380,
+  "height": 200,
+  "data": {"values": [
+    {"month": 1, "site": "docs", "visits": 120}, {"month": 2, "site": "docs", "visits": 150},
+    {"month": 3, "site": "docs", "visits": 140}, {"month": 4, "site": "docs", "visits": 190},
+    {"month": 5, "site": "docs", "visits": 230}, {"month": 6, "site": "docs", "visits": 210},
+    {"month": 1, "site": "blog", "visits": 60}, {"month": 2, "site": "blog", "visits": 95},
+    {"month": 3, "site": "blog", "visits": 130}, {"month": 4, "site": "blog", "visits": 110},
+    {"month": 5, "site": "blog", "visits": 150}, {"month": 6, "site": "blog", "visits": 175}
+  ]},
+  "mark": "line",
+  "encoding": {
+    "x": {"field": "month", "type": "quantitative", "title": "Month"},
+    "y": {"field": "visits", "type": "quantitative"},
+    "color": {"field": "site", "type": "nominal"}
+  }
+}

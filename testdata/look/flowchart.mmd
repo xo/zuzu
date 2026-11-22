@@ -1,0 +1,12 @@
+flowchart LR
+  start([Start]) --> read[Read the order]
+  subgraph check [Check]
+    read --> stock{In stock?}
+    stock -- yes --> pack[Pack the box]
+  end
+  subgraph ship [Ship]
+    pack --> label[Print the label]
+    label --> send((Send))
+  end
+  stock -- no --> wait[Wait for stock]
+  wait -.-> stock

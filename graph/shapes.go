@@ -18,6 +18,13 @@ const (
 // between its outline and its inner line.
 const subroutineFrame = 8
 
+// DOTCylinder is the shape of a cylinder of DOT. Graphviz draws a cylinder
+// in the box of any other node, with its ends inside the box, so the
+// cylinder takes the size of a box. Mermaid makes a cylinder taller than
+// its label by its ends, as the shape cylinder does. The reader of DOT
+// gives this name to the shape cylinder.
+const DOTCylinder = "dot-cylinder"
+
 // shapes are the shapes of a node that zuzu draws, by their names in DOT
 // and in Mermaid. A name maps to the shape that draws it.
 var shapes = map[string]string{
@@ -25,7 +32,7 @@ var shapes = map[string]string{
 	"rounded": "rounded", "Mrecord": "rounded", "event": "rounded",
 	"stadium": "stadium", "pill": "stadium", "terminal": "stadium",
 	"subroutine": "subroutine", "subproc": "subroutine", "fr-rect": "subroutine", "framed-rectangle": "subroutine", "subprocess": "subroutine",
-	"cylinder": "cylinder", "cyl": "cylinder", "database": "cylinder", "db": "cylinder",
+	"cylinder": "cylinder", "cyl": "cylinder", "database": "cylinder", "db": "cylinder", DOTCylinder: DOTCylinder,
 	"circle": "circle", "circ": "circle", "sm-circ": "circle", "small-circle": "circle", "start": "circle",
 	"doublecircle": "doublecircle", "dbl-circ": "doublecircle", "double-circle": "doublecircle",
 	"ellipse": "ellipse", "oval": "ellipse",
@@ -131,6 +138,8 @@ func NodeSize(kind string, tw, th, pad float64) (float64, float64) {
 		return w + 2*subroutineFrame, h
 	case "cylinder":
 		return w, h + 12
+	case DOTCylinder:
+		return w, h
 	case "doc":
 		return w, h + 6
 	case "point":
@@ -220,11 +229,14 @@ func shapePath(kind string, w, h float64) string {
 	case "subroutine":
 		return poly([2]float64{-x, -y}, [2]float64{x, -y}, [2]float64{x, y}, [2]float64{-x, y}) +
 			"M" + num(-x+subroutineFrame) + "," + num(-y) + "V" + num(y) + "M" + num(x-subroutineFrame) + "," + num(-y) + "V" + num(y)
-	case "cylinder":
-		ry := math.Min(h*0.12, 10)
+	case "cylinder", DOTCylinder:
+		// The front edge of the top runs the way that the outline runs, so
+		// that the fill of the nonzero rule covers the top, and the top
+		// does not show the background.
+		ry := cylinderRadius(h)
 		return "M" + num(-x) + "," + num(-y+ry) + "A" + num(x) + "," + num(ry) + " 0 0,1 " + num(x) + "," + num(-y+ry) +
 			"V" + num(y-ry) + "A" + num(x) + "," + num(ry) + " 0 0,1 " + num(-x) + "," + num(y-ry) + "Z" +
-			"M" + num(-x) + "," + num(-y+ry) + "A" + num(x) + "," + num(ry) + " 0 0,0 " + num(x) + "," + num(-y+ry)
+			"M" + num(x) + "," + num(-y+ry) + "A" + num(x) + "," + num(ry) + " 0 0,1 " + num(-x) + "," + num(-y+ry)
 	case "circle":
 		return ellipse(x, x)
 	case "doublecircle":
@@ -279,7 +291,7 @@ func shapePath(kind string, w, h float64) string {
 		return "M" + num(-x) + "," + num(-y) + "H" + num(x) + "V" + num(y-a) +
 			"C" + num(x/2) + "," + num(y+a) + " " + num(-x/2) + "," + num(y-3*a) + " " + num(-x) + "," + num(y-a) + "Z"
 	case "folder":
-		t := math.Min(8, h/4)
+		t := folderTab(h)
 		return poly([2]float64{-x, -y}, [2]float64{-x + w*0.4, -y}, [2]float64{-x + w*0.4 + t, -y + t}, [2]float64{x, -y + t}, [2]float64{x, y}, [2]float64{-x, y})
 	case "none":
 		return ""

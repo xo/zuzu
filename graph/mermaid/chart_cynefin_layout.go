@@ -242,15 +242,16 @@ func (l *cyLayout) spec() map[string]any {
 	field := func(f string) map[string]any { return map[string]any{"field": f} }
 	value := func(v any) map[string]any { return map[string]any{"value": v} }
 	// byDomain is the color of the domain of a row: the color that the
-	// source gives to the domain, or the color of the scheme.
-	byDomain := func() any {
+	// source gives to the domain, or the color of the scheme from the scale
+	// named scale, the colors or their solid tints.
+	byDomain := func(scale string) any {
 		var rules []any
 		for _, d := range cyDomains {
 			if s := cfg.colors[d+"Bg"]; s != "" {
 				rules = append(rules, map[string]any{"test": "datum.domain === " + quoteJS(d), "value": s})
 			}
 		}
-		of := map[string]any{"scale": "color", "field": "domain"}
+		of := map[string]any{"scale": scale, "field": "domain"}
 		if len(rules) == 0 {
 			return of
 		}
@@ -306,7 +307,7 @@ func (l *cyLayout) spec() map[string]any {
 		return enc
 	}
 	mark("rect", "domains", style(graph.StyleNode), box(map[string]any{
-		"fill": byDomain(), "fillOpacity": value(0.08), "strokeOpacity": value(0),
+		"fill": byDomain("color"), "fillOpacity": value(0.08), "strokeOpacity": value(0),
 	}))
 	mark("path", "boundaries", style(graph.StyleEdge), path(own(map[string]any{
 		"strokeWidth": value(1.25), "strokeOpacity": value(0.7), "strokeDash": value([]any{6, 4}),
@@ -318,7 +319,7 @@ func (l *cyLayout) spec() map[string]any {
 	// in Mermaid.
 	mark("path", "confusion/confusionBack", style(graph.StyleEdgeLabelBox), path(map[string]any{"fillOpacity": value(0.6)}))
 	mark("path", "confusion", style(graph.StyleNode), path(map[string]any{
-		"fill": byDomain(), "stroke": byDomain(), "fillOpacity": value(0.1), "strokeDash": value([]any{5, 3}),
+		"fill": byDomain("color"), "stroke": byDomain("color"), "fillOpacity": value(0.1), "strokeDash": value([]any{5, 3}),
 	}))
 	mark("text", "names", style(graph.StyleNodeLabel), label(cyNameFont, own(map[string]any{}, "fill", "labelColor")))
 	mark("text", "notes", style(graph.StyleEdgeLabel), label(cyNoteFont, own(map[string]any{}, "fill", "textColor")))
@@ -326,10 +327,10 @@ func (l *cyLayout) spec() map[string]any {
 		"fillOpacity": value(1), "cornerRadius": value(4),
 	}))
 	mark("rect", "items", style(graph.StyleNode), box(map[string]any{
-		"fill": byDomain(), "stroke": byDomain(), "cornerRadius": value(4),
+		"fill": byDomain("tint"), "stroke": byDomain("color"), "cornerRadius": value(4),
 	}))
 	mark("rect", "itemsMore", style(graph.StyleNode), box(map[string]any{
-		"fill": byDomain(), "stroke": byDomain(), "fillOpacity": value(0.06), "cornerRadius": value(4),
+		"fill": byDomain("color"), "stroke": byDomain("color"), "fillOpacity": value(0.06), "cornerRadius": value(4),
 		"strokeDash": value([]any{3, 2}),
 	}))
 	mark("text", "itemLabels", style(graph.StyleNodeLabel), label(cyLabelFont, own(map[string]any{}, "fill", "textColor")))
@@ -349,7 +350,7 @@ func (l *cyLayout) spec() map[string]any {
 		"autosize": "pad",
 		"padding":  map[string]any{"left": pad, "right": pad, "top": pad, "bottom": pad},
 		"data":     data,
-		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": cyScale, "range": "category"}},
+		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": cyScale, "range": "category"}, graph.TintScale("tint", cyScale)},
 		"marks":    marks,
 	}
 }

@@ -150,12 +150,8 @@ func TestEdgesTakeTheTokensOfAnEdge(t *testing.T) {
 func TestLinkStyleWinsOverTheEdge(t *testing.T) {
 	t.Parallel()
 	lines, arrows := edgeItems(t, "flowchart LR\n  a --> b --> c\n  linkStyle 1 stroke:#00ff00,stroke-width:4px")
-	// A flowchart with no theme draws in redux-color, as in Mermaid (D37).
-	scheme, ok := theme.Lookup("mermaid-redux-color")
-	if !ok {
-		t.Fatal("no scheme mermaid-redux-color")
-	}
-	th := theme.New(theme.Light, scheme)
+	// A flowchart with no theme draws in the zuzu scheme (D55).
+	th := theme.New(theme.Light, theme.Zuzu)
 	if len(lines) != 2 || len(arrows) != 2 {
 		t.Fatalf("%d lines and %d arrowheads, want 2 and 2", len(lines), len(arrows))
 	}
@@ -176,6 +172,48 @@ func TestLinkStyleWinsOverTheEdge(t *testing.T) {
 	for _, l := range lines {
 		if want := map[bool]float64{true: 4, false: theme.EdgeWidth}[l.stroke == "#00ff00"]; l.width != want {
 			t.Errorf("the line in %s is %v wide, want %v", l.stroke, l.width, want)
+		}
+	}
+}
+
+// TestArrowheadsDrawOverNodes checks the order of the marks of a graph: the
+// clusters, then the lines of the edges, then the shapes of the nodes, then
+// the arrowheads, so that the tip of an arrowhead sits on the outline of
+// its node, then the labels of the nodes. The lines carry the role
+// scene.RoleEdge, as the arrowheads do, and the clusters scene.RoleCluster,
+// for the look like Excalidraw.
+func TestArrowheadsDrawOverNodes(t *testing.T) {
+	t.Parallel()
+	for _, src := range []string{
+		"flowchart LR\n  subgraph g\n    a[A] --> b[B]\n  end\n",
+		"digraph { subgraph cluster_g { a -> b } }",
+	} {
+		c, _, err := Parse([]byte(src), WithStrict(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, _, err := c.Render(t.Context(), WithLocation(time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cluster, line, node, arrow, label := -1, -1, -1, -1, -1
+		for i, m := range s.Root.Items[0].Items {
+			switch {
+			case m.Role == scene.RoleCluster && cluster < 0:
+				cluster = i
+			case m.Role == scene.RoleEdge && m.Type == scene.Path && line < 0:
+				line = i
+			case m.Role == scene.RoleEdge && m.Type == scene.Symbol && arrow < 0:
+				arrow = i
+			case m.Type == scene.Path && m.Role == "mark" && node < 0:
+				node = i
+			case m.Type == scene.Text && arrow >= 0 && label < 0:
+				label = i
+			}
+		}
+		if cluster < 0 || cluster >= line || line >= node || node >= arrow || arrow >= label {
+			t.Errorf("%q: the cluster, the line, the node, the arrowhead and the label are the marks %d, %d, %d, %d and %d",
+				src, cluster, line, node, arrow, label)
 		}
 	}
 }

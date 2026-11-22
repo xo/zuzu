@@ -299,9 +299,9 @@ func TestC4Layout(t *testing.T) {
 	}
 }
 
-// TestC4External checks that an external element draws in the neutral
-// color muted, at the tint of the other elements, and that each other
-// element takes the color of its kind (D32).
+// TestC4External checks that an external element draws in the solid tint
+// of the neutral color muted, and that each other element takes the solid
+// tint of the color of its kind (D32, D55).
 func TestC4External(t *testing.T) {
 	t.Parallel()
 	src := "C4Container\nPerson_Ext(a, \"A\")\nSystem(b, \"B\")\nSystemDb_Ext(c, \"C\")\nContainer_Ext(d, \"D\")\n" +
@@ -311,13 +311,15 @@ func TestC4External(t *testing.T) {
 		t.Fatalf("the report %v and the error %v", report, err)
 	}
 	th := theme.New(theme.Light, theme.Zuzu)
-	want := map[string]string{"a": th.Muted, "b": th.Category[1], "c": th.Muted, "d": "red", "e": th.Category[2]}
+	want := map[string]string{
+		"a": th.Tint(th.Muted), "b": th.Tint(th.Category[1]), "c": th.Tint(th.Muted), "d": "red", "e": th.Tint(th.Category[2]),
+	}
 	got := map[string]string{}
 	for _, it := range drawnPrefix(items, "elements") {
 		id := datumID(it)
 		got[id] = it.item.Fill.Color
 		if id == "a" || id == "c" {
-			if it.item.Stroke.Color != th.Muted || it.item.FillOpacity == nil || *it.item.FillOpacity != 0.14 {
+			if it.item.Stroke.Color != th.Muted || (it.item.FillOpacity != nil && *it.item.FillOpacity != 1) {
 				t.Errorf("%s: the stroke %s and the opacity %v", id, it.item.Stroke.Color, it.item.FillOpacity)
 			}
 		}

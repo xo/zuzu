@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/graph"
 )
 
 // transforms are the transforms that zuzu runs, by type.
@@ -30,7 +31,8 @@ var transforms = map[string]transformFunc{
 	"countpattern":      countpattern,
 	"dotbin":            dotbin,
 	"force":             force,
-	"zuzu.layered":      layered,
+	"zuzu.layered":      layoutWith(graph.Layered()),
+	"zuzu.dagre":        layoutWith(graph.Dagre()),
 	"zuzu.icon":         iconOf,
 	"label":             label,
 	"geojson":           geojson,

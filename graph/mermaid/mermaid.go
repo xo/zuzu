@@ -62,6 +62,11 @@ type Diagram struct {
 	// Emoji holds the fonts of zuzu.WithEmoji. A kind that lays out when
 	// it compiles measures an emoji with them (D38).
 	Emoji []*text.Fallback
+	// Font is the font of a look drawn by hand, such as Excalifont, which
+	// zuzu.WithLookFont gives when the look of the parse draws by hand, or
+	// nil. A kind that lays out when it compiles measures its text in it,
+	// with IBM Plex Sans for the characters that it does not have (D40).
+	Font *text.Fallback
 	// Now is the time of the render of zuzu.WithNow, or the zero time. A
 	// gantt with the time draws the marker of today, and fills the parts
 	// of a date that its format does not give from it (D38).
@@ -224,10 +229,12 @@ func Read(src string) (*Diagram, error) {
 	return d, nil
 }
 
-// estimate returns a measurer of text with the fonts of Emoji, for a kind
-// that lays out when it compiles.
+// estimate returns a measurer of text with the font of the look and the
+// fonts of Emoji, for a kind that lays out when it compiles.
 func (d *Diagram) estimate() *text.Estimate {
-	return text.NewEstimate(d.Emoji...)
+	e := text.NewEstimate(d.Emoji...)
+	e.SetMain(d.Font)
+	return e
 }
 
 // raw returns the line n of the source as the source gives it, with its
@@ -823,6 +830,14 @@ func readGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	f.inheritDir()
 	if lanesOn(d) {
 		f.lanes()
+	}
+	if slices.Contains(colorThemes, themeName(d)) {
+		// In a color theme, each subgraph and each lane takes the
+		// categorical colors in turn, in the order in which they open, as
+		// Mermaid colors them (D55).
+		for i, c := range f.g.Clusters {
+			c.Category = panelColor(i)
+		}
 	}
 	return f.g, f.issues.Report, nil
 }

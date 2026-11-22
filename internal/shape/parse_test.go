@@ -5,6 +5,8 @@ import (
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/xo/zuzu/scene"
 )
 
 // recorder writes the segments of a path as text, with two decimals.
@@ -58,6 +60,56 @@ func TestParse(t *testing.T) {
 	for _, d := range []string{"L1,1", "M1", "M1,1A1,1 0 2,0 3,3", "M1,1X"} {
 		if err := Parse(d, &recorder{}); err == nil {
 			t.Errorf("%s gives no error", d)
+		}
+	}
+}
+
+// TestScalePath checks that ScalePath scales each x and each y apart, with
+// relative commands and an arc, and keeps an error of the path.
+func TestScalePath(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		d, want string
+		sx, sy  float64
+	}{
+		{"M0,0 C 0,20 0,40 0,60 20,40 40,20 60,0 Z", "M0,0C0,10 0,20 0,30C10,20 20,10 30,0Z", 0.5, 0.5},
+		{"m 60,0 c 0,20 0,40 0,60 H 0", "M120,0C120,60 120,120 120,180L0,180", 2, 3},
+		{"M0,0 Q 10,10 20,0", "M0,0Q10,-10 20,0", 1, -1},
+	} {
+		got, err := ScalePath(c.d, c.sx, c.sy)
+		if err != nil || got != c.want {
+			t.Errorf("ScalePath(%q, %v, %v) = %q, %v, want %q", c.d, c.sx, c.sy, got, err, c.want)
+		}
+	}
+	got, err := ScalePath("M0,0A5,5 0 0,1 10,0", 2, 1)
+	if err != nil || strings.Count(got, "C") != 2 || !strings.HasSuffix(got, "20,0") {
+		t.Errorf("an arc scales to %q, %v, want two cubics that end at 20,0", got, err)
+	}
+	if _, err := ScalePath("L1,1", 2, 2); err == nil {
+		t.Error("a path that does not start with a move gives no error")
+	}
+}
+
+// TestLineBaselines checks that the baselines line-top and line-bottom of
+// Vega are the top and the bottom of a box one line height high around
+// the text, and that the lines of a text at line-bottom go up from it.
+func TestLineBaselines(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		baseline string
+		lines    int
+		want     float64
+	}{
+		{"top", 1, 0.79 * 10},
+		{"line-top", 1, 0.79*10 + 5},
+		{"bottom", 1, -0.21 * 10},
+		{"line-bottom", 1, -0.21*10 - 5},
+		{"line-bottom", 2, -0.21*10 - 5 - 20},
+		{"line-top", 2, 0.79*10 + 5},
+	} {
+		it := &scene.Item{FontSize: 10, LineHeight: 20, Baseline: c.baseline, Text: make(scene.Lines, c.lines)}
+		if got := TextOf(it, nil).Y; math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("%s with %d lines: y = %v, want %v", c.baseline, c.lines, got, c.want)
 		}
 	}
 }

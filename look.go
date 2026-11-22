@@ -28,11 +28,32 @@ func (s *scope) look(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 	d := s.rt.markDefaults(m)
 	var out []scene.Mark
 	if sm.Type == scene.Area {
-		if g, ok := d[theme.Gradient].([]any); ok && len(g) == 2 {
-			areaGradient(sm, expr.Number(g[0]), expr.Number(g[1]))
+		// An opacity that the spec sets wins over the look: the area is a
+		// flat fill at that opacity, with no tint, no gradient and no line
+		// on top (D48 part 5).
+		flat := encodes(m, "opacity") || encodes(m, "fillOpacity")
+		if t := expr.Number(d[theme.Tint]); t > 0 && !flat {
+			// An area with an end of its own is a band, a flat tint of its
+			// color (D48 part 3).
+			for i := range sm.Items {
+				sm.Items[i].FillOpacity = new(t)
+			}
 		}
-		if w := expr.Number(d[theme.TopLine]); w > 0 {
-			out = append(out, topLine(sm, w))
+		if g, ok := d[theme.Gradient].([]any); ok && len(g) == 2 && !flat {
+			if s.rt.drawLook.HandDrawn() {
+				// A look drawn by hand fills an area with one tint,
+				// as Excalidraw fills a shape, so the gradient of this
+				// rule draws as the color of its top (docs/STYLE.md).
+				areaTint(sm, expr.Number(g[0]))
+			} else {
+				areaGradient(sm, expr.Number(g[0]), expr.Number(g[1]))
+			}
+		}
+		if w := expr.Number(d[theme.TopLine]); w > 0 && !flat {
+			// The line clips where its area clips (D48 part 5).
+			line := topLine(sm, w)
+			line.Clip = sm.Clip
+			out = append(out, line)
 		}
 		if expr.Truthy(d[theme.MarkHigh]) {
 			out = append(out, s.markHigh(m, sm)...)
@@ -127,18 +148,20 @@ func (s *scope) endLabel(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 			last = it
 		}
 	}
-	if last == nil || last.Stroke.Color == "" {
+	if last == nil || last.Stroke.Color == "" || faint(last) {
 		return nil
 	}
-	name := expr.String(readField(last.Datum, field))
+	value := readField(last.Datum, field)
+	name := expr.String(value)
 	if s.rt.endLabels[scaleName] == nil {
 		s.rt.endLabels[scaleName] = map[string]bool{}
 	}
 	s.rt.endLabels[scaleName][name] = true
+	text := s.seriesName(scaleName, value)
 	c := last.Stroke.Color
 	dot := scene.Item{X: last.X, Y: last.Y, Shape: "circle", Size: new(36.0), Fill: scene.Paint{Color: c}}
 	label := scene.Item{
-		X: last.X + 7, Y: last.Y, Text: scene.Lines{name}, FontSize: 11, FontWeight: "600",
+		X: last.X + 7, Y: last.Y, Text: scene.Lines{text}, FontSize: 11, FontWeight: "600",
 		Align: "left", Baseline: "middle", Fill: scene.Paint{Color: c},
 		Stroke: scene.Paint{Color: s.rt.theme.Background}, StrokeWidth: new(3.0),
 		Datum: map[string]any{"label": name},
@@ -147,6 +170,29 @@ func (s *scope) endLabel(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 		{Type: scene.Symbol, Role: "zuzu-end-dot", Items: []scene.Item{dot}},
 		{Type: scene.Text, Role: "zuzu-end-label", Items: []scene.Item{label}},
 	}
+}
+
+// seriesName writes the name of a series at the end of its line as the
+// legend of its scale of color writes its label: with the format of that
+// legend, such as the quarter of a date, or else with the format that fits
+// the scale. It writes the value as it is when the scope has no such scale.
+func (s *scope) seriesName(scaleName string, v any) string {
+	sc, err := s.scale(scaleName)
+	if err != nil || sc == nil {
+		return expr.String(v)
+	}
+	var fv, ftv vega.Value
+	for sp := s; sp != nil; sp = sp.parent {
+		if i := slices.IndexFunc(sp.spec.Legends, func(l vega.Legend) bool { return l.Stroke == scaleName }); i >= 0 {
+			fv, ftv = sp.spec.Legends[i].Format, sp.spec.Legends[i].FormatType
+			break
+		}
+	}
+	f, err := s.labelFormat(sc, fv, ftv, nil)
+	if err != nil {
+		return expr.String(v)
+	}
+	return f(v)
 }
 
 // closedLine reports whether a line is closed: its interpolation closes
@@ -220,11 +266,16 @@ func (s *scope) reference(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 }
 
 // numberText writes a number with a thousands separator, with no decimals
-// from 100 up and at most two below.
+// from 100 up and at most two below. A number between -1 and 1 keeps two
+// significant digits, so that a small value, such as a density of 0.001,
+// does not read as 0.
 func (s *scope) numberText(f float64) string {
 	spec := ",.2~f"
-	if math.Abs(f) >= 100 {
+	switch a := math.Abs(f); {
+	case a >= 100:
 		spec = ",.0f"
+	case a > 0 && a < 1:
+		spec = ".2~r"
 	}
 	fn, err := format.Number(spec, *s.rt.locale)
 	if err != nil {
@@ -239,7 +290,10 @@ func (s *scope) numberText(f float64) string {
 func (s *scope) markHigh(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 	yField, _ := s.encodedField(m, "y")
 	xField, xScale := s.encodedField(m, "x")
-	if yField == "" || sm.Items[0].Orient == "horizontal" {
+	if yField == "" || sm.Items[0].Orient == "horizontal" || s.inFacet() || s.rt.specHasText() {
+		// An area in a facet is one of many, and gets no label of its
+		// high, and neither does an area of a spec that draws text of its
+		// own (D48 part 2).
 		return nil
 	}
 	var top *scene.Item
@@ -288,45 +342,257 @@ func (s *scope) markHigh(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 	}
 }
 
-// dodgeLabels moves the names at the ends of lines apart, so that no two
-// overlap, in the marks of a scope and in the groups among them.
-func dodgeLabels(marks []scene.Mark) {
-	type label struct {
-		it  *scene.Item
-		off float64
+// The limits of the names at the ends of lines (D48 part 2): the most
+// series that a view names, the furthest that a name moves from the end
+// of its line to keep clear of another, and the opacity below which a line
+// is context, which gets no name.
+const (
+	maxEndLabels  = 8
+	endLabelShift = 12.0
+	faintLine     = 0.5
+)
+
+// faint reports whether a line is context: its opacity, times the opacity
+// of its stroke, is below faintLine (D48 part 2).
+func faint(it *scene.Item) bool {
+	o := 1.0
+	if it.Opacity != nil {
+		o *= *it.Opacity
 	}
-	var labels []label
-	add := func(m *scene.Mark, off float64) {
-		if m.Role != "zuzu-end-label" {
-			return
-		}
-		for i := range m.Items {
-			labels = append(labels, label{&m.Items[i], off})
+	if it.StrokeOpacity != nil {
+		o *= *it.StrokeOpacity
+	}
+	return o < faintLine
+}
+
+// endName is a name at the end of a line, with the dot before it, and the
+// place of the group that holds them.
+type endName struct {
+	label, dot *scene.Mark
+	dx, dy     float64
+	x1         float64
+}
+
+// item returns the item of the name.
+func (n *endName) item() *scene.Item {
+	return &n.label.Items[0]
+}
+
+// drop removes the name and its dot, and lets the legend name its series.
+func (n *endName) drop(rt *runtime) {
+	name := expr.String(readField(n.item().Datum, "label"))
+	for _, named := range rt.endLabels {
+		delete(named, name)
+	}
+	n.label.Items = nil
+	if n.dot != nil {
+		n.dot.Items = nil
+	}
+}
+
+// fitLabels keeps the annotations of the look only where they fit, as
+// "Annotations" in docs/STYLE.md says (D48 part 2), and returns the marks.
+// A view is a scope with the groups of its series, the groups of a facet
+// that split a mark by a field. In each view, it moves the names at the
+// ends of lines apart, so that no two overlap. A view keeps its names
+// only when the spec draws no text of its own, it names at most
+// maxEndLabels series, no two lines of one color have different names,
+// and no name moves further than endLabelShift. Two lines of one color
+// and one name share one name. At the top scope, it removes the label of
+// the high of an area when more than one area has one.
+func (s *scope) fitLabels(marks []scene.Mark) []scene.Mark {
+	if s.parent == nil && countRole(marks, "zuzu-high-dot") > 1 {
+		marks = withoutRoles(marks, "zuzu-high-dot", "zuzu-high-label")
+	}
+	names := s.viewNames(marks, &s.spec.Marks, 0, 0)
+	if len(names) == 0 {
+		return marks
+	}
+	st := s.rt.style()
+	fit := !s.rt.specHasText()
+	byColor := map[string]*endName{}
+	var kept []*endName
+	for _, n := range names {
+		c := n.item().Fill.Color
+		prev, ok := byColor[c]
+		switch {
+		case !ok:
+			byColor[c] = n
+			kept = append(kept, n)
+		case readField(prev.item().Datum, "label") == readField(n.item().Datum, "label"):
+			// One name names both lines, at the end that is furthest
+			// to the right.
+			gone := n
+			if n.item().X+n.dx > prev.item().X+prev.dx {
+				gone = prev
+				byColor[c] = n
+				kept[slices.Index(kept, prev)] = n
+			}
+			gone.label.Items = nil
+			if gone.dot != nil {
+				gone.dot.Items = nil
+			}
+		default:
+			fit = false
 		}
 	}
-	for i := range marks {
-		add(&marks[i], 0)
-		if marks[i].Type != scene.Group {
-			continue
+	fit = fit && len(kept) <= maxEndLabels
+	if fit {
+		for _, n := range kept {
+			w, _ := st.TextSize(n.item())
+			n.x1 = w
 		}
-		for j := range marks[i].Items {
-			g := &marks[i].Items[j]
-			for k := range g.Items {
-				add(&g.Items[k], g.Y)
+		slices.SortStableFunc(kept, func(a, b *endName) int { return cmp.Compare(a.item().Y+a.dy, b.item().Y+b.dy) })
+		const gap = 12
+		for i := 1; i < len(kept) && fit; i++ {
+			cur := kept[i]
+			y0 := cur.item().Y
+			cx0 := cur.item().X + cur.dx
+			for moved := true; moved; {
+				moved = false
+				for _, prev := range kept[:i] {
+					px0 := prev.item().X + prev.dx
+					py, cy := prev.item().Y+prev.dy, cur.item().Y+cur.dy
+					if px0 < cx0+cur.x1 && cx0 < px0+prev.x1 && math.Abs(cy-py) < gap {
+						cur.item().Y = py + gap - cur.dy
+						moved = true
+					}
+				}
+			}
+			fit = cur.item().Y-y0 <= endLabelShift
+		}
+	}
+	if !fit {
+		for _, n := range names {
+			if len(n.label.Items) > 0 {
+				n.drop(s.rt)
 			}
 		}
 	}
-	if len(labels) < 2 {
-		return
-	}
-	slices.SortStableFunc(labels, func(a, b label) int { return cmp.Compare(a.it.Y+a.off, b.it.Y+b.off) })
-	const gap = 12
-	for i := 1; i < len(labels); i++ {
-		prev, cur := labels[i-1].it.Y+labels[i-1].off, labels[i].it.Y+labels[i].off
-		if cur-prev < gap {
-			labels[i].it.Y = prev + gap - labels[i].off
+	return withoutEmpty(marks)
+}
+
+// viewNames returns the names at the ends of lines in the marks of a view,
+// with the place of the group that holds each: in the marks of the scope,
+// and in the groups of its series, at any depth. specs are the marks of
+// the spec that the marks come from, in order. A group of the series of a
+// mark is a group of a facet with no axes and no style cell, the style of
+// a view of Vega-Lite. Any other group is a view of its own.
+func (s *scope) viewNames(marks []scene.Mark, specs *[]vega.Mark, dx, dy float64) []*endName {
+	var out []*endName
+	var groups []*vega.Mark
+	for i := range *specs {
+		if (*specs)[i].Type == scene.Group {
+			groups = append(groups, &(*specs)[i])
 		}
 	}
+	g := 0
+	for i := range marks {
+		m := &marks[i]
+		switch {
+		case m.Role == "zuzu-end-label" && len(m.Items) == 1:
+			n := &endName{label: m, dx: dx, dy: dy}
+			if i > 0 && marks[i-1].Role == "zuzu-end-dot" {
+				n.dot = &marks[i-1]
+			}
+			out = append(out, n)
+		case m.Type == scene.Group:
+			if g >= len(groups) {
+				continue
+			}
+			vm := groups[g]
+			g++
+			if vm.From == nil || vm.From.Facet == nil || len(vm.Axes) > 0 || slices.Contains(vm.Style.List, "cell") {
+				continue
+			}
+			for j := range m.Items {
+				it := &m.Items[j]
+				out = append(out, s.viewNames(it.Items, &vm.Marks, dx+it.X, dy+it.Y)...)
+			}
+		}
+	}
+	return out
+}
+
+// countRole returns the number of marks of a role, in the groups among
+// the marks too, at any depth.
+func countRole(marks []scene.Mark, role string) int {
+	n := 0
+	for i := range marks {
+		if marks[i].Role == role {
+			n++
+		}
+		if marks[i].Type == scene.Group {
+			for j := range marks[i].Items {
+				n += countRole(marks[i].Items[j].Items, role)
+			}
+		}
+	}
+	return n
+}
+
+// withoutRoles returns the marks without the marks of some roles, in the
+// groups among them too, at any depth.
+func withoutRoles(marks []scene.Mark, roles ...string) []scene.Mark {
+	out := marks[:0]
+	for _, m := range marks {
+		if slices.Contains(roles, m.Role) {
+			continue
+		}
+		if m.Type == scene.Group {
+			for j := range m.Items {
+				m.Items[j].Items = withoutRoles(m.Items[j].Items, roles...)
+			}
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// withoutEmpty returns the marks without the names at the ends of lines
+// and their dots that fitLabels removed, in the groups among them too, at
+// any depth.
+func withoutEmpty(marks []scene.Mark) []scene.Mark {
+	out := marks[:0]
+	for _, m := range marks {
+		if (m.Role == "zuzu-end-label" || m.Role == "zuzu-end-dot") && len(m.Items) == 0 {
+			continue
+		}
+		if m.Type == scene.Group {
+			for j := range m.Items {
+				m.Items[j].Items = withoutEmpty(m.Items[j].Items)
+			}
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// inFacet reports whether the scope is a group of a facet, or inside one.
+func (s *scope) inFacet() bool {
+	for sc := s; sc != nil; sc = sc.parent {
+		for _, d := range sc.data {
+			if d.facet != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// specHasText reports whether the spec draws a text mark of its own, in
+// any scope.
+func (rt *runtime) specHasText() bool {
+	var has func(sc *vega.Scope) bool
+	has = func(sc *vega.Scope) bool {
+		for i := range sc.Marks {
+			if sc.Marks[i].Type == scene.Text || has(&sc.Marks[i].Scope) {
+				return true
+			}
+		}
+		return false
+	}
+	return has(&rt.chart.spec.Scope)
 }
 
 // withAlpha returns a color of CSS with its opacity times a.
@@ -361,20 +627,48 @@ func areaGradient(sm *scene.Mark, top, base float64) {
 	}
 }
 
+// areaTint gives an area the opacity of the top of its gradient, the
+// color of the first stop that areaGradient gives it, in a look drawn by
+// hand, in place of the gradient. The color of the area stays, so that
+// its top line keeps it.
+func areaTint(sm *scene.Mark, top float64) {
+	if sm.Items[0].Fill.Gradient != nil || sm.Items[0].Fill.Color == "" {
+		return
+	}
+	for i := range sm.Items {
+		it := &sm.Items[i]
+		o := top
+		if it.FillOpacity != nil {
+			o *= *it.FillOpacity
+		}
+		it.FillOpacity = &o
+	}
+}
+
 // topLine returns the line along the top of an area, in the color of the
 // area, of a width.
 func topLine(sm *scene.Mark, width float64) scene.Mark {
+	// The line keeps the orient of the area, so that a monotone curve of an
+	// area of orient horizontal follows y, as the area does.
 	first := &sm.Items[0]
 	c := first.Fill.Color
-	if first.Fill.Gradient != nil && len(first.Fill.Gradient.Stops) > 0 {
-		if rgba, ok := color.Parse(first.Fill.Gradient.Stops[0].Color); ok {
+	if g := first.Fill.Gradient; g != nil && len(g.Stops) > 0 {
+		// The line takes the color of the gradient at the edge of the
+		// area that it draws on: the last stop when the gradient runs
+		// toward that edge, as a gradient of a spec from white at the
+		// base to a color at the top does.
+		stop := g.Stops[0]
+		if first.Orient == "horizontal" && g.X2 > g.X1 || first.Orient != "horizontal" && g.Y2 < g.Y1 {
+			stop = g.Stops[len(g.Stops)-1]
+		}
+		if rgba, ok := color.Parse(stop.Color); ok {
 			c = fmt.Sprintf("rgb(%d,%d,%d)", int(math.Round(rgba.R)), int(math.Round(rgba.G)), int(math.Round(rgba.B)))
 		}
 	}
 	line := scene.Mark{Type: scene.Line, Role: "zuzu-area-line", Items: make([]scene.Item, len(sm.Items))}
 	for i, it := range sm.Items {
 		line.Items[i] = scene.Item{
-			X: it.X, Y: it.Y, Defined: it.Defined, Interpolate: it.Interpolate, Tension: it.Tension,
+			X: it.X, Y: it.Y, Defined: it.Defined, Interpolate: it.Interpolate, Tension: it.Tension, Orient: it.Orient,
 			Stroke: scene.Paint{Color: c}, StrokeWidth: &width, StrokeCap: "round", StrokeJoin: "round",
 			Opacity: it.Opacity,
 		}
@@ -386,7 +680,8 @@ func topLine(sm *scene.Mark, width float64) scene.Mark {
 // the box in its color at the fill opacity of the theme, with an outline of
 // 1.5 and round corners of 5, and the whiskers, their ticks and the median
 // in the color of their box, the median 2.5 thick. A part takes the color
-// of the box that holds it.
+// of the box that holds it. A part keeps each property that the spec gives
+// it, which a style that starts with theme.StyleOwn names.
 func boxLook(marks []scene.Mark, styles [][]string, fillOpacity float64) {
 	type box struct {
 		x1, y1, x2, y2 float64
@@ -394,7 +689,8 @@ func boxLook(marks []scene.Mark, styles [][]string, fillOpacity float64) {
 	}
 	var boxes []box
 	for i := range marks {
-		if !slices.Contains(styles[i], "boxplot-box") || marks[i].Type != scene.Rect {
+		st := styles[i]
+		if !slices.Contains(st, "boxplot-box") || marks[i].Type != scene.Rect {
 			continue
 		}
 		for j := range marks[i].Items {
@@ -403,10 +699,18 @@ func boxLook(marks []scene.Mark, styles [][]string, fillOpacity float64) {
 			if c == "" || it.Fill.Gradient != nil {
 				continue
 			}
-			it.FillOpacity = &fillOpacity
-			it.Stroke = scene.Paint{Color: c}
-			it.StrokeWidth = new(1.5)
-			it.CornerRadius = 5
+			if !own(st, "opacity", "fillOpacity") {
+				it.FillOpacity = &fillOpacity
+			}
+			if !own(st, "stroke") {
+				it.Stroke = scene.Paint{Color: c}
+			}
+			if !own(st, "strokeWidth") {
+				it.StrokeWidth = new(1.5)
+			}
+			if !own(st, "cornerRadius") {
+				it.CornerRadius = 5
+			}
 			x, y, w, h := shape.Box(it)
 			boxes = append(boxes, box{x, y, x + w, y + h, c})
 		}
@@ -431,8 +735,14 @@ func boxLook(marks []scene.Mark, styles [][]string, fillOpacity float64) {
 			switch {
 			case slices.Contains(st, "boxplot-rule") && marks[i].Type == scene.Rule:
 				x2, y2 := shape.RuleEnd(it)
-				if c := colorAt((it.X+x2)/2, (it.Y+y2)/2, it.X == x2); c != "" {
+				c := colorAt((it.X+x2)/2, (it.Y+y2)/2, it.X == x2)
+				if c == "" {
+					continue
+				}
+				if !own(st, "color", "stroke") {
 					it.Stroke = scene.Paint{Color: c}
+				}
+				if !own(st, "strokeWidth", "size") {
 					it.StrokeWidth = new(1.5)
 				}
 			case (slices.Contains(st, "boxplot-median") || slices.Contains(st, "boxplot-ticks")) && marks[i].Type == scene.Rect:
@@ -443,9 +753,13 @@ func boxLook(marks []scene.Mark, styles [][]string, fillOpacity float64) {
 				if c == "" {
 					continue
 				}
-				it.Fill = scene.Paint{Color: c}
-				it.Opacity, it.FillOpacity = nil, nil
-				if slices.Contains(st, "boxplot-median") {
+				if !own(st, "color", "fill") {
+					it.Fill = scene.Paint{Color: c}
+				}
+				if !own(st, "opacity", "fillOpacity") {
+					it.Opacity, it.FillOpacity = nil, nil
+				}
+				if slices.Contains(st, "boxplot-median") && !own(st, "thickness") {
 					// The median is a line of 2.5 across the box.
 					if w >= h {
 						it.Y, it.Height, it.Y2 = y+h/2-1.25, 2.5, 0
@@ -456,6 +770,17 @@ func boxLook(marks []scene.Mark, styles [][]string, fillOpacity float64) {
 			}
 		}
 	}
+}
+
+// own reports whether the styles of a mark say that the spec gives it one
+// of some properties, with a style that starts with theme.StyleOwn.
+func own(styles []string, props ...string) bool {
+	for _, p := range props {
+		if slices.Contains(styles, theme.StyleOwn+p) {
+			return true
+		}
+	}
+	return false
 }
 
 // encodedValue returns the constant that the encoding of a mark gives a

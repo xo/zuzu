@@ -2,12 +2,15 @@ package layout
 
 import (
 	"math"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/xo/zuzu/expr"
 
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/theme"
 )
 
 // Axis is an axis, with the settings that the view resolved from the spec.
@@ -22,12 +25,22 @@ type Axis struct {
 	Values []any
 	// Count is the number of ticks the spec asks for, or 0.
 	Count float64
+	// MinStep is the least step between two ticks that the spec asks for,
+	// in the units of the domain, which are milliseconds for times, or 0.
+	MinStep float64
+	// EndTicks chooses a step of the ticks that lands on both ends of a
+	// nice domain, for an axis whose spec gives no tickCount and no values
+	// (D46).
+	EndTicks bool
 	// Format writes the label of a value.
 	Format func(any) string
-	// Grid, Labels and Domain say which parts the spec asks for. A domain
-	// line is drawn only along a band axis.
-	Grid, Labels, Domain bool
-	Title                string
+	// Grid, Labels, Domain and Ticks say which parts the spec asks for:
+	// the grid lines, the labels, the line of the axis and its ticks.
+	Grid, Labels, Domain, Ticks bool
+	// TickSize is the length of a tick, from the line of the axis away
+	// from the plot area. A tick of 0 or less draws nothing.
+	TickSize float64
+	Title    string
 	// LabelAngle turns the labels, in degrees.
 	LabelAngle float64
 	// Overlap drops every other label, in turns, until no two overlap.
@@ -56,9 +69,9 @@ type Axis struct {
 	// TitleAlign and TitleBaseline are the align and the baseline of the
 	// title that the spec gives, or "" for those of the look.
 	TitleAlign, TitleBaseline string
-	// LabelPadding is the distance between the labels and the line of the
-	// axis that the spec gives, or nil for LabelPad of the look. It can be
-	// below 0, which puts the labels inside the plot area.
+	// LabelPadding is the distance between the labels and the end of the
+	// ticks that the spec gives, or nil for the padding of the look. It
+	// can be below 0, which puts the labels inside the plot area.
 	LabelPadding *float64
 	// LabelOffset moves each label along the axis, in pixels.
 	LabelOffset float64
@@ -90,16 +103,73 @@ func (a *Axis) TickCount() float64 {
 	if !scale.Discrete(a.Scale.Type()) {
 		count = math.Min(count, MaxLabels)
 	}
+	if a.MinStep > 0 {
+		// A step of at least MinStep leaves room for one tick more than
+		// the steps that fit in the domain, and for two at least, as Vega
+		// counts them.
+		count = math.Min(count, math.Max(1, math.Floor(a.span()/a.MinStep))+1)
+	}
 	return count
 }
 
-// labelPad returns the distance between the labels and the line of the
-// axis: the one that the spec gives, or LabelPad.
-func (a *Axis) labelPad() float64 {
-	if a.LabelPadding != nil {
-		return *a.LabelPadding
+// TickValues returns the values of the ticks of the axis: the values of
+// the spec, the ticks of its scale, or the ticks that land on both ends of
+// the domain when the axis asks for them.
+func (a *Axis) TickValues() []any {
+	if a.Values != nil {
+		return a.Values
 	}
-	return LabelPad
+	if vals := a.endTicks(); vals != nil {
+		return vals
+	}
+	return a.Scale.Ticks(a.TickCount())
+}
+
+// TickStep returns the step whose precision the labels of the ticks of a
+// scale of numbers from lo to hi need.
+func (a *Axis) TickStep(lo, hi float64) float64 {
+	if a.EndTicks && a.Values == nil && Linear(a.Scale.Type()) {
+		if t, step := scale.EndTicks(lo, hi, a.TickCount(), MaxLabels); t != nil {
+			return step
+		}
+	}
+	return scale.TickStep(lo, hi, a.TickCount())
+}
+
+// span returns the size of the domain of the scale of the axis, in
+// milliseconds for a domain of times, or 0 for a domain that is not of
+// numbers or times.
+func (a *Axis) span() float64 {
+	dom := a.Scale.Domain()
+	if len(dom) < 2 {
+		return 0
+	}
+	num := func(v any) float64 {
+		if t, ok := v.(time.Time); ok {
+			return float64(t.UnixMilli())
+		}
+		return expr.Number(v)
+	}
+	s := math.Abs(num(dom[len(dom)-1]) - num(dom[0]))
+	if math.IsNaN(s) || math.IsInf(s, 0) {
+		return 0
+	}
+	return s
+}
+
+// labelPad returns the distance between the labels and the line of the
+// axis. As in Vega, a label is its padding past the end of its tick, or
+// past the line when the axis has no ticks. The padding is the one that
+// the spec gives, or the one of the look.
+func (a *Axis) labelPad() float64 {
+	pad := theme.LabelPadding
+	if a.LabelPadding != nil {
+		pad = *a.LabelPadding
+	}
+	if a.Ticks {
+		pad += math.Max(0, a.TickSize)
+	}
+	return pad
 }
 
 // vertical reports whether the axis runs up and down.
@@ -107,13 +177,139 @@ func (a *Axis) vertical() bool {
 	return a.Orient == "left" || a.Orient == "right"
 }
 
+// endTicks returns the ticks that land on both ends of the domain of a
+// scale of numbers, or of a scale of time whose domain starts and ends on
+// the start of a year, or nil. A log scale keeps the ticks of its scale,
+// which are the powers of its base, because a nice domain of a log scale
+// starts and ends on a power.
+func (a *Axis) endTicks() []any {
+	dom := a.Scale.Domain()
+	if !a.EndTicks || len(dom) < 2 {
+		return nil
+	}
+	if t0, ok := dom[0].(time.Time); ok {
+		t1, ok := dom[len(dom)-1].(time.Time)
+		if !ok {
+			return nil
+		}
+		return a.yearTicks(t0, t1)
+	}
+	if !Linear(a.Scale.Type()) {
+		return nil
+	}
+	ticks, _ := scale.EndTicks(expr.Number(dom[0]), expr.Number(dom[len(dom)-1]), a.TickCount(), MaxLabels)
+	if ticks == nil {
+		return nil
+	}
+	out := make([]any, len(ticks))
+	for i, t := range ticks {
+		out[i] = t
+	}
+	return out
+}
+
+// yearTicks returns ticks at the start of a year, in a step of whole years
+// that lands on both ends of a domain of time from t0 to t1, or nil when
+// the domain does not start and end on the start of a year, or when the
+// ticks of the scale already land on both ends.
+func (a *Axis) yearTicks(t0, t1 time.Time) []any {
+	std := a.Scale.Ticks(a.TickCount())
+	if len(std) >= 2 && len(std) <= MaxLabels {
+		f, ok0 := std[0].(time.Time)
+		l, ok1 := std[len(std)-1].(time.Time)
+		if ok0 && ok1 && f.Equal(t0) && l.Equal(t1) {
+			return nil
+		}
+	}
+	yearStart := func(t time.Time) bool {
+		return t.Equal(time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location()))
+	}
+	if !yearStart(t0) || !yearStart(t1) {
+		return nil
+	}
+	years, _ := scale.EndTicks(float64(t0.Year()), float64(t1.Year()), a.TickCount(), MaxLabels)
+	if years == nil {
+		return nil
+	}
+	out := make([]any, len(years))
+	for i, y := range years {
+		if y != math.Trunc(y) {
+			return nil
+		}
+		out[i] = time.Date(int(y), 1, 1, 0, 0, 0, 0, t0.Location())
+	}
+	return out
+}
+
+// Linear reports whether a scale type maps numbers along a line or a
+// curve, so that its ticks are the round numbers of its domain: linear,
+// pow, sqrt and symlog, also as sequential or diverging.
+func Linear(typ string) bool {
+	typ = strings.TrimPrefix(strings.TrimPrefix(typ, "sequential-"), "diverging-")
+	switch typ {
+	case "linear", "pow", "sqrt", "symlog", "sequential":
+		return true
+	}
+	return false
+}
+
 // ticks returns the values of the ticks and their positions along the
 // axis.
 func (a *Axis) ticks() ([]any, []float64) {
-	vals := a.Values
-	if vals == nil {
-		vals = a.Scale.Ticks(a.TickCount())
+	return a.place(a.TickValues())
+}
+
+// vegaGridGap is the least space, in pixels, between two grid lines of
+// Vega that an axis draws (D51).
+const vegaGridGap = 10
+
+// gridTicks returns the values and the positions of the grid lines and the
+// ticks of the axis: the ticks that Vega draws, for the tickCount of the
+// axis or for 10, when each label of the look is one of them and they
+// stand at least vegaGridGap apart, and else the labels, vals at pos
+// (D51). Values of the spec and a discrete scale keep the labels.
+func (a *Axis) gridTicks(vals []any, pos []float64) ([]any, []float64) {
+	if a.Values != nil || scale.Discrete(a.Scale.Type()) || len(vals) == 0 {
+		return vals, pos
 	}
+	count := a.Count
+	if count <= 0 {
+		count = 10
+	}
+	if a.MinStep > 0 {
+		count = math.Min(count, math.Max(1, math.Floor(a.span()/a.MinStep))+1)
+	}
+	gv, gp := a.place(a.Scale.Ticks(count))
+	if len(gv) <= len(vals) {
+		return vals, pos
+	}
+	for i := 1; i < len(gp); i++ {
+		if math.Abs(gp[i]-gp[i-1]) < vegaGridGap {
+			return vals, pos
+		}
+	}
+	for _, v := range vals {
+		if !slices.ContainsFunc(gv, func(g any) bool { return sameTick(v, g) }) {
+			return vals, pos
+		}
+	}
+	return gv, gp
+}
+
+// sameTick reports whether two values of ticks are the same: two times at
+// the same instant, or two numbers that differ by less than a billionth.
+func sameTick(a, b any) bool {
+	if ta, ok := a.(time.Time); ok {
+		tb, ok := b.(time.Time)
+		return ok && ta.Equal(tb)
+	}
+	x, y := expr.Number(a), expr.Number(b)
+	return math.Abs(x-y) <= 1e-9*math.Max(1, math.Max(math.Abs(x), math.Abs(y)))
+}
+
+// place returns the values that fall on the axis and their positions along
+// it.
+func (a *Axis) place(vals []any) ([]any, []float64) {
 	bw := a.Scale.Bandwidth()
 	var out []any
 	var pos []float64
@@ -161,10 +357,13 @@ func (s Style) Axis(a *Axis) scene.Mark {
 	t := s.Theme
 	group := scene.Item{}
 	vals, pos := a.ticks()
+	// The grid lines and the ticks stand where Vega draws them, and the
+	// labels at the fewer ticks of the look (D51).
+	gvals, gpos := a.gridTicks(vals, pos)
 	if a.Grid {
 		grid := scene.Mark{Type: scene.Rule, Role: "axis-grid"}
-		for i, p := range pos {
-			it := scene.Item{Stroke: scene.Paint{Color: t.Grid}, StrokeWidth: ptr(1), Datum: map[string]any{"value": vals[i]}}
+		for i, p := range gpos {
+			it := scene.Item{Stroke: scene.Paint{Color: t.Grid}, StrokeWidth: ptr(1), Datum: tickDatum(gvals, i)}
 			if a.vertical() {
 				it.X, it.X2, it.Y, it.Y2 = 0, a.Cross, p, p
 			} else {
@@ -191,23 +390,13 @@ func (s Style) Axis(a *Axis) scene.Mark {
 		labels = s.MarkBounds(&m)
 		group.Items = append(group.Items, m)
 	}
-	// The look of zuzu draws a base line along a band axis, and none along
-	// an axis of numbers (docs/STYLE.md).
-	if a.Domain && scale.Discrete(a.Scale.Type()) {
-		dom := scene.Mark{Type: scene.Rule, Role: "axis-domain"}
-		it := scene.Item{Stroke: scene.Paint{Color: t.Axis}, StrokeWidth: ptr(1)}
-		switch a.Orient {
-		case "bottom":
-			it.X, it.X2, it.Y, it.Y2 = 0, a.Length, a.Cross+a.Offset, a.Cross+a.Offset
-		case "top":
-			it.X, it.X2, it.Y, it.Y2 = 0, a.Length, -a.Offset, -a.Offset
-		case "left":
-			it.X, it.X2, it.Y, it.Y2 = -a.Offset, -a.Offset, 0, a.Length
-		default:
-			it.X, it.X2, it.Y, it.Y2 = a.Cross+a.Offset, a.Cross+a.Offset, 0, a.Length
-		}
-		dom.Items = append(dom.Items, it)
-		group.Items = append(group.Items, dom)
+	// The line and the ticks of an axis are where Vega draws them, in the
+	// color and the widths of the look (D46, docs/STYLE.md).
+	if a.Ticks && a.TickSize > 0 && len(gpos) > 0 {
+		group.Items = append(group.Items, a.tickMarks(t.Axis, gvals, gpos))
+	}
+	if a.Domain {
+		group.Items = append(group.Items, a.domainMark(t.Axis))
 	}
 	if a.Title != "" {
 		group.Items = append(group.Items, s.axisTitle(a, labels))
@@ -215,8 +404,61 @@ func (s Style) Axis(a *Axis) scene.Mark {
 	return scene.Mark{Type: scene.Group, Role: "axis", Items: []scene.Item{group}}
 }
 
-// axisLabels draws the labels of an axis, 8 from the plot area, without
-// those that overlap when the axis asks.
+// tickDatum returns the datum of the grid line, the tick or the label of
+// the value i of vals: the value, and its index from 0 at the first value
+// to 1 at the last, as Vega gives an encode or a signal of an axis.
+func tickDatum(vals []any, i int) map[string]any {
+	return map[string]any{"value": vals[i], "index": float64(i) / float64(max(1, len(vals)-1))}
+}
+
+// tickMarks draws a tick at the place of each value, out from the line of
+// the axis by its tick size.
+func (a *Axis) tickMarks(color string, vals []any, pos []float64) scene.Mark {
+	m := scene.Mark{Type: scene.Rule, Role: "axis-tick"}
+	x0, y0 := a.origin()
+	for i, p := range pos {
+		it := scene.Item{Stroke: scene.Paint{Color: color}, StrokeWidth: ptr(theme.TickWidth), Datum: tickDatum(vals, i)}
+		switch a.Orient {
+		case "bottom":
+			ruleEnds(&it, p, y0, p, y0+a.TickSize)
+		case "top":
+			ruleEnds(&it, p, y0, p, y0-a.TickSize)
+		case "left":
+			ruleEnds(&it, x0, p, x0-a.TickSize, p)
+		default:
+			ruleEnds(&it, x0, p, x0+a.TickSize, p)
+		}
+		m.Items = append(m.Items, it)
+	}
+	return m
+}
+
+// domainMark draws the line of an axis along the range of its scale, as
+// Vega draws it.
+func (a *Axis) domainMark(color string) scene.Mark {
+	r0, r1 := a.rangeEnds()
+	x0, y0 := a.origin()
+	it := scene.Item{Stroke: scene.Paint{Color: color}, StrokeWidth: ptr(theme.DomainWidth)}
+	if a.vertical() {
+		ruleEnds(&it, x0, r0, x0, r1)
+	} else {
+		ruleEnds(&it, r0, y0, r1, y0)
+	}
+	return scene.Mark{Type: scene.Rule, Role: "axis-domain", Items: []scene.Item{it}}
+}
+
+// ruleEnds sets the ends of a rule that runs along x or along y. A rule
+// whose x2 or y2 is 0 ends at its x or its y (scene.Item), so the end at 0
+// of the coordinate that changes goes first.
+func ruleEnds(it *scene.Item, x1, y1, x2, y2 float64) {
+	if (x2 == 0 && x1 != 0) || (y2 == 0 && y1 != 0) {
+		x1, y1, x2, y2 = x2, y2, x1, y1
+	}
+	it.X, it.Y, it.X2, it.Y2 = x1, y1, x2, y2
+}
+
+// axisLabels draws the labels of an axis, past its ticks, without those
+// that overlap when the axis asks.
 func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 	m := scene.Mark{Type: scene.Text, Role: "axis-label"}
 	color := s.Theme.Muted
@@ -256,7 +498,9 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 			it.Baseline = a.LabelBaseline
 		}
 		it.Limit = a.LabelLimit
-		it.Datum = map[string]any{"value": v, "label": str}
+		d := tickDatum(vals, i)
+		d["label"] = str
+		it.Datum = d
 		m.Items = append(m.Items, it)
 	}
 	if a.Overlap {
@@ -338,7 +582,7 @@ func (s Style) dropOverlaps(items []scene.Item) []scene.Item {
 // baseline that the spec gives win over those of the look.
 func (s Style) axisTitle(a *Axis, labels Bounds) scene.Mark {
 	m := scene.Mark{Type: scene.Text, Role: "axis-title"}
-	color := s.Theme.Faint
+	color := s.Theme.Muted
 	gap := float64(titleGap)
 	if a.TitlePadding != nil {
 		gap = *a.TitlePadding
@@ -391,7 +635,7 @@ func (s Style) anchoredTitle(a *Axis, labels Bounds, gap float64) scene.Item {
 	case "middle":
 		at, align = (r0+r1)/2, "center"
 	}
-	color := s.Theme.Faint
+	color := s.Theme.Muted
 	switch a.Orient {
 	case "bottom":
 		return s.label(at, a.titleCross(labels)+gap, a.Title, SmallSize, 400, color, align, "top")
@@ -418,6 +662,18 @@ func (s Style) anchoredTitle(a *Axis, labels Bounds, gap float64) scene.Item {
 // titleCross returns the y of the edge of the labels of a horizontal axis
 // away from the plot area, from which its title keeps its space.
 func (a *Axis) titleCross(labels Bounds) float64 {
+	if !a.Labels {
+		// An axis with no labels keeps no room for them, as in Vega. The
+		// title sits past the ticks.
+		reach := 0.0
+		if a.Ticks {
+			reach = math.Max(0, a.TickSize)
+		}
+		if a.Orient == "top" {
+			return -a.Offset - reach
+		}
+		return a.Cross + a.Offset + reach
+	}
 	if a.Orient == "top" {
 		y := -a.Offset - a.labelPad() - LabelSize
 		if !labels.IsEmpty() {

@@ -1178,6 +1178,7 @@ func (l *seqLayout) spec() map[string]any {
 	field := func(f string) map[string]any { return map[string]any{"field": f} }
 	value := func(v any) map[string]any { return map[string]any{"value": v} }
 	color := map[string]any{"scale": "color", "field": "key"}
+	tint := map[string]any{"scale": "tint", "field": "key"}
 	var marks []any
 	mark := func(name, typ, set, style string, enc map[string]any) {
 		if len(l.rows[set]) == 0 {
@@ -1232,15 +1233,18 @@ func (l *seqLayout) spec() map[string]any {
 	}))
 	mark("messages", "path", "messages", graph.StyleEdge, path(map[string]any{}))
 	mark("messagesDotted", "path", "messagesDotted", graph.StyleEdge, path(map[string]any{"strokeDash": value([]any{4, 3})}))
+	mark("notes", "rect", "notes", cluster, box(map[string]any{"fillOpacity": value(1)}))
+	mark("tabs", "rect", "tabs", cluster, box(map[string]any{"fillOpacity": value(1), "cornerRadius": value(4)}))
+	mark("shapes", "path", "shapes", graph.StyleNode, path(map[string]any{"fill": tint, "stroke": color}))
+	mark("shapeBacks", "path", "shapeBacks", graph.StyleEdgeLabelBox, path(map[string]any{"fillOpacity": value(1)}))
+	mark("shapeFronts", "path", "shapeBacks", graph.StyleNode, path(map[string]any{"fill": tint, "stroke": color}))
+	mark("icons", "path", "icons", graph.StyleNode, path(map[string]any{"fill": tint, "stroke": color, "strokeWidth": value(1.5)}))
+	// The heads of the messages draw over the boxes of the participants,
+	// so that the tip of a message that creates a participant sits on the
+	// outline of its box. The lines of the messages draw under the boxes.
 	mark("heads", "path", "heads", graph.StyleArrow, path(map[string]any{}))
 	mark("openHeads", "path", "openHeads", graph.StyleEdge, path(map[string]any{}))
 	mark("dots", "path", "dots", graph.StyleArrow, path(map[string]any{}))
-	mark("notes", "rect", "notes", cluster, box(map[string]any{"fillOpacity": value(1)}))
-	mark("tabs", "rect", "tabs", cluster, box(map[string]any{"fillOpacity": value(1), "cornerRadius": value(4)}))
-	mark("shapes", "path", "shapes", graph.StyleNode, path(map[string]any{"fill": color, "stroke": color}))
-	mark("shapeBacks", "path", "shapeBacks", graph.StyleEdgeLabelBox, path(map[string]any{"fillOpacity": value(1)}))
-	mark("shapeFronts", "path", "shapeBacks", graph.StyleNode, path(map[string]any{"fill": color, "stroke": color}))
-	mark("icons", "path", "icons", graph.StyleNode, path(map[string]any{"fill": color, "stroke": color, "strokeWidth": value(1.5)}))
 	circle := func(enc map[string]any) map[string]any {
 		enc["x"], enc["y"], enc["size"], enc["shape"] = field("x"), field("y"), field("size"), value("circle")
 		return enc
@@ -1270,7 +1274,7 @@ func (l *seqLayout) spec() map[string]any {
 			"left": l.cfg.marginX, "right": l.cfg.marginX, "top": l.cfg.marginY, "bottom": l.cfg.marginY,
 		},
 		"data":   data,
-		"scales": []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}},
+		"scales": []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}, graph.TintScale("tint", domain)},
 		"marks":  marks,
 	}
 }

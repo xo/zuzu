@@ -28,6 +28,24 @@ type LayoutInput struct {
 	// next rank in a layout in lanes, as the setting
 	// swimlane.ignoreCrossLaneEdges false of Mermaid does.
 	LaneEdges bool
+	// ClusterDirection is the direction of a cluster with no direction of
+	// its own that lays out on its own in zuzu.dagre, or empty. Empty gives
+	// LR inside a graph of TB, and TB inside a graph of any other direction,
+	// as Mermaid 12.3 does for a subgraph of a flowchart. Mermaid gives TB to
+	// each composite state of a state diagram. zuzu.layered does not read
+	// it.
+	ClusterDirection string
+	// ReverseClusters sets each list of sibling clusters in zuzu.dagre in
+	// the reverse of the order of the input, as the wrap of dagre in
+	// Mermaid 12.3 sets the subgraphs of a flowchart (D45 part 5). The
+	// clusters still set from the outer to the inner. zuzu.layered does not
+	// read it.
+	ReverseClusters bool
+	// Algorithm is the layout that the spec names in its config with
+	// zuzu.layout, such as elk.stress, or empty. An engine with more than
+	// one algorithm, such as one of ELK, reads it to choose one. zuzu.layered
+	// and zuzu.dagre do not read it.
+	Algorithm string
 }
 
 // LayoutNode is a node to lay out.
@@ -105,17 +123,25 @@ type LayoutCluster struct {
 	Direction string
 }
 
-// Layout is the result of Lay, with the places in the order of the input.
+// Layout is the result of Lay, and of the Lay of an Engine, with the places
+// in the order of the input.
 type Layout struct {
 	Width, Height float64
 	Nodes         []NodePlace
 	Edges         []EdgePlace
 	Clusters      []ClusterPlace
+	// Unsupported names each part of the input that the engine did not lay
+	// out as the input asks, such as the port of an edge, in words that a
+	// report shows, such as "the port of the edge a -> b, which the layout
+	// leaves out". zuzu.layered names nothing.
+	Unsupported []string
 }
 
 // NodePlace is the place of a node: its center and its size, its rank and
 // its order in the rank. A node in a cluster that lays out on its own has
-// the rank and the order of the layout of that cluster.
+// the rank and the order of the layout of that cluster. An engine that
+// gives no rank and no order, such as the engine of zuzu.dagre, leaves
+// them 0.
 type NodePlace struct {
 	X, Y, Width, Height float64
 	Rank, Order         int

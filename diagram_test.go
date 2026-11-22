@@ -198,7 +198,8 @@ func TestSubgraphTitle(t *testing.T) {
 		t.Errorf("expected the title of two lines to be 11 higher, got %g", d)
 	}
 	// A style and a class on the id of a subgraph style its box and its
-	// title.
+	// title. A class that sets only the fill leaves the outline in the
+	// color that the subgraph takes in turn, the third (D55).
 	s, report, err := svgOf(t, `flowchart LR
   classDef hot fill:#f96,color:#300
   subgraph sub [Styled]
@@ -215,7 +216,7 @@ func TestSubgraphTitle(t *testing.T) {
 	for _, want := range []string{
 		`fill="#fee" stroke="#c00" stroke-width="3" stroke-dasharray="5 5" fill-opacity="1"`,
 		`fill="#900">Styled<`,
-		`fill="#f96" stroke="#cfd5de" stroke-width="1" fill-opacity="1"`,
+		`fill="#f96" stroke="` + theme.New(theme.Light, theme.Zuzu).Category[2] + `" stroke-width="1.25" fill-opacity="1"`,
 		`fill="#300">Classed<`,
 	} {
 		if !strings.Contains(s, want) {

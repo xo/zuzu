@@ -16,6 +16,7 @@ import (
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
 	"github.com/xo/zuzu/geo"
+	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
@@ -40,6 +41,9 @@ type runtime struct {
 	locale    *format.Locale
 	rand      *rand.Rand
 	theme     theme.Theme
+	// flipGrays says that the render flips the lightness of a gray near
+	// black or near white that the spec names (D48 part 1).
+	flipGrays bool
 	// endLabels holds, for each scale of color, the names of the series
 	// that the ends of lines name, so that a legend of that scale can be
 	// left out.
@@ -50,6 +54,10 @@ type runtime struct {
 	// wantW and wantH are the size of the canvas that the autosize fit
 	// asks for, or 0.
 	wantW, wantH float64
+	// fitCanvasW and fitCanvasH are the size of the canvas without what
+	// the autosize fit leaves out, such as a title that is wider than the
+	// chart. NewView compares them with wantW and wantH.
+	fitCanvasW, fitCanvasH float64
 	// config is the config of the theme with the config of the spec over
 	// it (D14).
 	config map[string]any
@@ -60,8 +68,24 @@ type runtime struct {
 	credits []string
 	progs   map[string]*expr.Program
 	root    *scope
+	// itemIssues holds the parts of item that the report has, so that
+	// each goes in it once.
+	itemIssues map[string]bool
 	// measure measures the width of text, for the guides and the bounds.
 	measure *text.Estimate
+	// drawLook is the look of the render, lookSeed the seed of a look
+	// drawn by hand, and lookFont its font, or nil (D40).
+	drawLook theme.Look
+	lookSeed int64
+	lookFont *text.Fallback
+	// engine is the layout engine of the graphs of the render, or nil for
+	// the engine of each transform, and algorithm the name of the layout
+	// that the render forces or that the spec names (D44, D45).
+	// layoutIssue is the issue of a layout with no engine, which the first
+	// graph that lays out reports, or nil.
+	engine      graph.Engine
+	algorithm   string
+	layoutIssue *vega.Issue
 	// err is the first error of a signal that an expression read, which
 	// the interface of expr.Signals cannot return.
 	err error
@@ -94,6 +118,10 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) (*runtime, e
 	if err := rt.look(); err != nil {
 		return nil, err
 	}
+	if err := rt.sketchLook(); err != nil {
+		return nil, err
+	}
+	rt.layoutEngine()
 	// The background of the caller, or else of zuzu.background, is the
 	// background of the theme.
 	if rt.opts.hasBackground && rt.opts.background != "transparent" {
@@ -101,13 +129,15 @@ func newRuntime(ctx context.Context, c *Chart, opts []RenderOption) (*runtime, e
 	}
 	rt.config = rt.theme.Config()
 	rt.endLabels = map[string]map[string]bool{}
+	rt.flipGrays = rt.flipsGrays()
 	for k, raw := range c.spec.Config {
-		if k == theme.ConfigMode || k == theme.ConfigScheme || k == theme.ConfigBackground {
+		switch k {
+		case theme.ConfigMode, theme.ConfigScheme, theme.ConfigBackground, theme.ConfigLook, theme.ConfigLookSeed, graph.ConfigLayout:
 			continue
 		}
 		var v any
 		if err := json.Unmarshal(raw, &v); err == nil {
-			rt.config[k] = mergeConfig(rt.config[k], v)
+			rt.config[k] = mergeConfig(rt.config[k], rt.specConfig(k, v))
 		}
 	}
 	rt.root = rt.newScope(nil, &c.spec.Scope, "", nil)
@@ -212,6 +242,14 @@ func (rt *runtime) issue(err error, path, format string, args ...any) error {
 	return nil
 }
 
+// warnf adds a warning to the report, in either mode. A warning names a
+// part that draws in full in another way, such as the text of a look with
+// no font of its own, which draws in IBM Plex Sans, so the strict mode does
+// not turn it into an error.
+func (rt *runtime) warnf(err error, path, format string, args ...any) {
+	rt.report = append(rt.report, vega.Issue{Err: err, Path: path, Message: fmt.Sprintf(format, args...)})
+}
+
 // compile compiles an expression once.
 func (rt *runtime) compile(src string) (*expr.Program, error) {
 	if p, ok := rt.progs[src]; ok {
@@ -270,8 +308,14 @@ type scope struct {
 	producers map[string]string
 	funcs     map[string]expr.Func
 	// item is the group item of the scope, which a field of the group
-	// reads.
-	item *scene.Item
+	// reads. values holds the properties that its encodings set, and mark
+	// is its mark, or nil for the root group.
+	item   *scene.Item
+	values map[string]any
+	mark   *scene.Mark
+	// encoding is the item that an encoding of the scope fills, which an
+	// expression of the encoding reads as item, or nil.
+	encoding expr.Object
 	// markItems holds the items of each named mark, for a mark whose data
 	// is another mark.
 	markItems map[string][]scene.Item
@@ -493,12 +537,26 @@ func (s *scope) exprScope(datum any) *expr.Scope {
 
 // eval evaluates an expression with a datum.
 func (s *scope) eval(src string, datum any) (any, error) {
+	return s.evalWith(src, datum, nil)
+}
+
+// evalItem evaluates an expression of an encoding, which reads the item
+// that the encoding fills as item.
+func (s *scope) evalItem(src string, datum any) (any, error) {
+	return s.evalWith(src, datum, s.encoding)
+}
+
+// evalWith evaluates an expression with a datum and an item, which can be
+// nil.
+func (s *scope) evalWith(src string, datum any, item expr.Object) (any, error) {
 	p, err := s.rt.compile(src)
 	if err != nil {
 		return nil, err
 	}
 	s.rt.err = nil
-	v, err := p.Eval(s.exprScope(datum))
+	es := s.exprScope(datum)
+	es.Item = item
+	v, err := p.Eval(es)
 	if err == nil && s.rt.err != nil {
 		err = s.rt.err
 	}

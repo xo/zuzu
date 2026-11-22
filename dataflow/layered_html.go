@@ -315,3 +315,79 @@ func compass(side string, b [4]float64) ([]float64, []float64, bool) {
 	}
 	return nil, nil, false
 }
+
+// runsHTML returns the source of a label of HTML that draws the runs of a
+// label in their fonts, bold, italic or plain, such as a string of markdown
+// of Mermaid, with a line break where the words pass the width limit, or
+// where a run "\n" starts a new line. A limit of 0 does not wrap. width
+// measures a word in a weight.
+func runsHTML(runs []any, limit float64, width func(text, weight string) float64) string {
+	type word struct {
+		text         string
+		bold, italic bool
+	}
+	var lines [][]word
+	var line []word
+	used := 0.0
+	space := width(" ", "normal")
+	for _, v := range runs {
+		m, _ := v.(map[string]any)
+		t, _ := m["text"].(string)
+		bold, _ := m["bold"].(bool)
+		italic, _ := m["italic"].(bool)
+		if t == "\n" {
+			lines, line, used = append(lines, line), nil, 0
+			continue
+		}
+		weight := "normal"
+		if bold {
+			weight = "bold"
+		}
+		for i, f := range strings.Split(t, " ") {
+			if f == "" {
+				continue
+			}
+			w := width(f, weight)
+			gap := 0.0
+			if len(line) > 0 {
+				gap = space
+			}
+			if limit > 0 && len(line) > 0 && used+gap+w > limit {
+				lines, line, used, gap = append(lines, line), nil, 0, 0
+			}
+			// A word that starts a run with no space before it joins the
+			// word before it, such as a comma right after a bold word.
+			if i == 0 && len(line) > 0 && !strings.HasPrefix(t, " ") {
+				gap = 0
+				f = "\x00" + f
+			}
+			line = append(line, word{f, bold, italic})
+			used += gap + w
+		}
+	}
+	lines = append(lines, line)
+	esc := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+	var b strings.Builder
+	for i, l := range lines {
+		if i > 0 {
+			b.WriteString("<BR/>")
+		}
+		for j, w := range l {
+			t := w.text
+			joined := strings.HasPrefix(t, "\x00")
+			t = strings.TrimPrefix(t, "\x00")
+			if j > 0 && !joined {
+				b.WriteString(" ")
+			}
+			t = esc.Replace(t)
+			if w.italic {
+				t = "<I>" + t + "</I>"
+			}
+			if w.bold {
+				t = "<B>" + t + "</B>"
+			}
+			b.WriteString(t)
+		}
+	}
+	return b.String()
+}

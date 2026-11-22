@@ -105,3 +105,30 @@ func fromHSL(h, s, l float64) rgb {
 	}
 	return rgb{channel(h+120) * 255, channel(h) * 255, channel(h-120) * 255}
 }
+
+// The bounds of a gray near black or near white, which the dark mode
+// flips (D48 part 1). A color is such a gray when its channels of red,
+// green and blue differ by at most GrayChroma of the full range, and its
+// lightness in HSL is at most GrayDark or at least GrayLight.
+const (
+	GrayChroma = 0.1
+	GrayDark   = 0.3
+	GrayLight  = 0.7
+)
+
+// FlipGray returns a color with each channel from 0 to 255 with its
+// lightness in HSL flipped, from l to 1 - l, and true, when the color is a
+// gray near black or near white. The hue and the saturation stay. It
+// returns the color as it is, and false, for any other color.
+func FlipGray(r, g, b float64) (float64, float64, float64, bool) {
+	hi, lo := math.Max(r, math.Max(g, b)), math.Min(r, math.Min(g, b))
+	if (hi-lo)/255 > GrayChroma {
+		return r, g, b, false
+	}
+	h, s, l := toHSL(rgb{r, g, b})
+	if l > GrayDark && l < GrayLight {
+		return r, g, b, false
+	}
+	c := fromHSL(h, s, 1-l)
+	return c.r, c.g, c.b, true
+}

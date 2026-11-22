@@ -2,12 +2,15 @@ package zuzu
 
 import (
 	"bytes"
+	"encoding/json/v2"
 	"regexp"
 	"strings"
 
 	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/graph/dot"
 	"github.com/xo/zuzu/graph/mermaid"
+	"github.com/xo/zuzu/text"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 	"github.com/xo/zuzu/vegalite"
 )
@@ -133,6 +136,7 @@ func parseDiagram(src []byte, d Dialect, o options) (*Chart, Report, error) {
 			return nil, nil, err
 		}
 		md.Math, md.Emoji, md.Now = o.math, o.emoji, o.now
+		md.Font = parseLookFont(md, o)
 		if mermaid.IsChart(md.Kind) {
 			return mermaidChart(md, o)
 		}
@@ -154,6 +158,7 @@ func parseDiagram(src []byte, d Dialect, o options) (*Chart, Report, error) {
 	}
 	c.opts = o
 	c.report = report
+	c.diagram = true
 	return c, report, nil
 }
 
@@ -185,18 +190,41 @@ func mermaidChart(md *mermaid.Diagram, o options) (*Chart, Report, error) {
 	}
 	c.opts = o
 	c.report = report
+	c.diagram = true
 	return c, report, nil
 }
 
 // addLook puts the mode or the scheme that the theme of a Mermaid diagram
 // asks for in the config of its spec, as zuzu.mode or zuzu.scheme (D32).
 // The runtime takes it where the caller of a render sets no mode or no
-// scheme.
+// scheme. It also puts there the ELK layout that the diagram names, as
+// zuzu.layout (D44).
 func addLook(spec *vega.Spec, md *mermaid.Diagram) {
-	for k, v := range mermaid.Look(md) {
-		if spec.Config == nil {
-			spec.Config = vega.Config{}
+	for _, cfg := range []vega.Config{mermaid.Look(md), mermaid.LayoutConfig(md)} {
+		for k, v := range cfg {
+			if spec.Config == nil {
+				spec.Config = vega.Config{}
+			}
+			spec.Config[k] = v
 		}
-		spec.Config[k] = v
 	}
+}
+
+// parseLookFont returns the font in which a kind of Mermaid that lays out
+// when it compiles measures its text: the font of WithLookFont for the
+// look of the parse, the look of WithLook or else the look of the source,
+// such as look: handDrawn, or nil for the standard look (D40 part 1).
+func parseLookFont(md *mermaid.Diagram, o options) *text.Fallback {
+	l := o.look
+	if !o.hasLook {
+		var name string
+		if raw, ok := mermaid.LookConfig(md)[theme.ConfigLook]; ok {
+			_ = json.Unmarshal(raw, &name)
+		}
+		l = theme.Look(name)
+	}
+	if !l.HandDrawn() {
+		return nil
+	}
+	return o.lookFonts[l]
 }

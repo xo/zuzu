@@ -60,6 +60,15 @@ type Graph struct {
 	// LaneEdges makes an edge between two lanes move its target to the next
 	// rank, as LayoutInput.LaneEdges says.
 	Lanes, LaneEdges bool
+	// ClusterDirection is the direction of a cluster with no direction of
+	// its own that lays out on its own in zuzu.dagre, as
+	// LayoutInput.ClusterDirection says, or empty. A state diagram of
+	// Mermaid gives TB.
+	ClusterDirection string
+	// ReverseClusters sets the sibling clusters in zuzu.dagre in the
+	// reverse of their order, as LayoutInput.ReverseClusters says. The
+	// reader of a flowchart of Mermaid sets it.
+	ReverseClusters bool
 	// BreakWords breaks a word that is wider than the wrap width of its
 	// label between two letters, as the SVG labels of Mermaid do. Otherwise
 	// the word stays whole on a line of its own, and the label is wider
@@ -121,6 +130,20 @@ type Node struct {
 	// record with no text and no cells is a thin empty band, as an empty
 	// compartment of a class is.
 	Stack bool
+	// Note says that the node is a note of Mermaid, such as a note of a
+	// state diagram, which draws in the color of a note of the theme, its
+	// yellow, and not in the color of a node.
+	Note bool
+	// Solid says that the node fills with the color of its outline, not
+	// with its tint, such as the start of a state diagram, a fork bar or a
+	// junction point of a flowchart (D55).
+	Solid bool
+	// Runs are the parts of the label of a node in one font each, bold,
+	// italic or plain, such as the runs of a string of markdown of
+	// Mermaid, or nil for a label in one font. A run with the text "\n"
+	// starts a new line. The layout wraps the runs and draws each in its
+	// font, as a label of HTML.
+	Runs []Run
 	// HTML is the source of a label of HTML of DOT, with no < and > around
 	// it, or empty. The package html of okage reads it and lays it out
 	// (D31).
@@ -289,3 +312,15 @@ type Cluster struct {
 // ClusterPackage is the shape of a cluster that draws as a package of UML:
 // a panel with a tab at its top left that holds the title (D32).
 const ClusterPackage = "package"
+
+// ClusterState is the shape of a cluster that draws as a composite state
+// of a state diagram: a panel with a band across its top that holds the
+// title, in a stronger tint of its color, with a line under the band.
+const ClusterState = "state"
+
+// Run is a part of a label in one font: its text, and whether it is bold
+// or italic.
+type Run struct {
+	Text         string
+	Bold, Italic bool
+}

@@ -15,6 +15,9 @@ type discretizing struct {
 	domain     []any
 	thresholds []float64
 	rng        []any
+	// bins are the edges of the bins of a bin-ordinal scale, both ends
+	// included.
+	bins []float64
 }
 
 // newDiscretizing builds a quantize, a quantile, a threshold or a
@@ -69,6 +72,7 @@ func newDiscretizing(o Options) *discretizing {
 		if len(s.thresholds) == 0 {
 			s.thresholds = d
 		}
+		s.bins = s.thresholds
 		if len(s.thresholds) > 2 {
 			s.thresholds = s.thresholds[1 : len(s.thresholds)-1]
 		}
@@ -104,6 +108,15 @@ func (s *discretizing) Domain() []any       { return s.domain }
 func (s *discretizing) Range() []any        { return s.rng }
 func (s *discretizing) Bandwidth() float64  { return 0 }
 func (s *discretizing) Ticks(float64) []any { return anys(s.thresholds) }
+
+// Bins returns the edges of the bins of a bin-ordinal scale, both ends
+// included, or nil for any other scale.
+func Bins(s Scale) []float64 {
+	if d, ok := s.(*discretizing); ok && d.typ == "bin-ordinal" && len(d.bins) > 2 {
+		return d.bins
+	}
+	return nil
+}
 
 // Thresholds returns the values where a discretizing scale changes from one
 // value of its range to the next.

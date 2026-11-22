@@ -547,9 +547,9 @@ func (p *c4Diagram) spec() map[string]any {
 		}}}
 	})...)
 	marks = append(marks, sigMarks(&data, "elements", elems, graph.PaintKeys(), nil, func() map[string]any {
-		color := map[string]any{"scale": "color", "field": "color"}
 		return map[string]any{"type": "path", "style": []any{graph.StyleNode}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "path": field("path"), "fill": color, "stroke": color,
+			"x": field("x"), "y": field("y"), "path": field("path"),
+			"fill": map[string]any{"scale": "tint", "field": "color"}, "stroke": map[string]any{"scale": "color", "field": "color"},
 		}}}
 	})...)
 	marks = append(marks, sigMarks(&data, "elementsExternal", externals, graph.PaintKeys(), nil, func() map[string]any {
@@ -600,7 +600,7 @@ func (p *c4Diagram) spec() map[string]any {
 		"padding":  8,
 		"autosize": "pad",
 		"data":     data,
-		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": c4Colors, "range": "category"}},
+		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": c4Colors, "range": "category"}, graph.TintScale("tint", c4Colors)},
 		"marks":    marks,
 	}
 }

@@ -2,6 +2,7 @@ package mermaid
 
 import (
 	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"maps"
 	"slices"
@@ -89,6 +90,20 @@ var colorThemes = []string{"redux-color", "redux-dark-color"}
 // part 10). A diagram whose source has no theme that Mermaid 12.3.0 has
 // takes the theme that Mermaid sets in the section of its kind by
 // default, redux-color in a few kinds (D37).
+// sourceTheme returns the theme of Mermaid that the source of a diagram
+// names, in the section of its kind or at the top of its config, or empty
+// for none.
+func sourceTheme(d *Diagram) string {
+	if sec, ok := d.Config[themeSection(d.Kind)].(map[string]any); ok && knownTheme(sec["theme"]) {
+		name, _ := sec["theme"].(string)
+		return name
+	}
+	if name, _ := d.Config["theme"].(string); knownTheme(name) {
+		return name
+	}
+	return ""
+}
+
 func themeName(d *Diagram) string {
 	name, _ := d.Config["theme"].(string)
 	section := themeSection(d.Kind)
@@ -111,32 +126,135 @@ func knownTheme(v any) bool {
 	return ok && slices.Contains(themes, s)
 }
 
-// Look returns the keys of the Vega config that the theme of a diagram
-// asks for (D32): zuzu.mode dark for a theme with dark in its name, and
-// zuzu.scheme with the scheme of zuzu that has the colors of each other
-// theme. The runtime takes each one where the caller of a render sets no
-// mode or no scheme. A theme in the section of the kind, such as
+// Look returns the keys of the Vega config that the theme and the look of
+// a diagram ask for (D32, D40): zuzu.mode dark for a theme with dark in its
+// name, and zuzu.scheme with the scheme of zuzu that has the colors of each
+// other theme. The runtime takes each one where the caller of a render sets
+// no mode or no scheme. A theme in the section of the kind, such as
 // venn.theme, wins over the theme at the top of the config, as in Mermaid
 // 12.3 (D35 part 10). A diagram whose source has no theme that Mermaid
 // 12.3.0 has takes the theme that Mermaid sets in the section of its kind
-// by default, redux-color in a few kinds (D37). Look returns nil for any
-// other diagram with no such theme.
+// by default, redux-color in a few kinds (D37).
+//
+// The look handDrawn gives zuzu.look excalidraw, and handDrawnSeed gives
+// zuzu.lookSeed, as LookConfig says.
 func Look(d *Diagram) vega.Config {
-	name := themeName(d)
+	cfg := LookConfig(d)
+	// A diagram whose source names no theme takes the scheme of zuzu,
+	// though it counts as one in redux-color for the colors of its nodes
+	// (D55).
+	name := sourceTheme(d)
 	if name == "" {
-		return nil
+		return cfg
+	}
+	if cfg == nil {
+		cfg = vega.Config{}
 	}
 	if strings.Contains(name, "dark") {
-		return vega.Config{theme.ConfigMode: jsontext.Value(`"dark"`)}
+		cfg[theme.ConfigMode] = jsontext.Value(`"dark"`)
+	} else {
+		cfg[theme.ConfigScheme] = jsontext.Value(strconv.Quote("mermaid-" + name))
 	}
-	return vega.Config{theme.ConfigScheme: jsontext.Value(strconv.Quote("mermaid-" + name))}
+	return cfg
+}
+
+// mermaidLooks are the looks of Mermaid 12.3.0. classic and neo draw in
+// the standard look of zuzu, and handDrawn in the look like Excalidraw.
+var mermaidLooks = map[string]theme.Look{
+	"classic":   theme.LookStandard,
+	"neo":       theme.LookStandard,
+	"handDrawn": theme.LookExcalidraw,
+}
+
+// LookConfig returns the keys of the Vega config that the look of a
+// diagram asks for (D35 part 12, D40), or nil for none. The look handDrawn
+// gives zuzu.look excalidraw. The looks classic and neo draw in the
+// standard look, and give nothing. As in Mermaid 12.3, the look of the
+// section of the kind, such as flowchart.look, wins over the look at the
+// top of the config, and a value that Mermaid does not have gives way to
+// the other. When neither is a look of Mermaid, zuzu.look takes the value
+// as it is, and the runtime reports it. A handDrawnSeed other than 0 gives
+// zuzu.lookSeed, and a seed of 0, the default of Mermaid, keeps the seed
+// of zuzu, so that the output stays the same (D39 part 6).
+func LookConfig(d *Diagram) vega.Config {
+	var cfg vega.Config
+	set := func(k string, v any) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return
+		}
+		if cfg == nil {
+			cfg = vega.Config{}
+		}
+		cfg[k] = jsontext.Value(b)
+	}
+	var values []any
+	if sec, ok := d.Config[themeSection(d.Kind)].(map[string]any); ok {
+		if v, ok := sec["look"]; ok {
+			values = append(values, v)
+		}
+	}
+	if v, ok := d.Config["look"]; ok {
+		values = append(values, v)
+	}
+	known := false
+	for _, v := range values {
+		s, _ := v.(string)
+		if l, ok := mermaidLooks[s]; ok {
+			known = true
+			if l != theme.LookStandard {
+				set(theme.ConfigLook, string(l))
+			}
+			break
+		}
+	}
+	if !known && len(values) > 0 {
+		set(theme.ConfigLook, values[0])
+	}
+	if v, ok := d.Config["handDrawnSeed"]; ok && v != 0.0 {
+		set(theme.ConfigLookSeed, v)
+	}
+	return cfg
+}
+
+// LayoutConfig returns the key of the Vega config that names the layout of
+// a graph of Mermaid, or nil for none (D44, D45). The key zuzu.layout takes
+// the name of the layout that the diagram sets, dagre or a layout of ELK
+// such as elk or elk.stress. The kind flowchart-elk gives elk. A diagram
+// that sets no layout gives elk, because ELK is the default layout of each
+// kind of graph in Mermaid 12.3, except the swimlane diagram, which lays
+// out in lanes. The runtime draws dagre with zuzu.dagre, and a layout of
+// ELK with the engine of ELK that the caller makes available with
+// zuzu.WithLayoutEngine, or else with zuzu.layered with no issue (D32).
+// Any other layout, such as swimlane, gives nothing.
+func LayoutConfig(d *Diagram) vega.Config {
+	if !isGraph(d.Kind) {
+		return nil
+	}
+	name := sourceLayout(d)
+	switch {
+	case d.Kind == "flowchart-elk":
+		name = "elk"
+	case name == "" && d.Kind != "swimlane-beta":
+		name = "elk"
+	}
+	if name != "dagre" && !slices.Contains(elkLayouts, name) {
+		return nil
+	}
+	b, err := json.Marshal(name)
+	if err != nil {
+		return nil
+	}
+	return vega.Config{graph.ConfigLayout: jsontext.Value(b)}
 }
 
 // hint reports whether a setting of the top level of the config is a hint
 // of a way to draw that zuzu accepts with no issue in every kind (D32):
-// the look handDrawn, which zuzu draws in its own look, an ELK layout and
-// the section elk of its settings, which zuzu draws with zuzu.layered, and
-// the layout dagre, the default of Mermaid.
+// the look handDrawn, which LookConfig reads, an ELK layout and the section
+// elk of its settings, which zuzu draws with the engine of ELK when the
+// caller makes it available and else with zuzu.layered, and the layout
+// dagre, which zuzu draws with zuzu.dagre. LayoutConfig reads the layout.
+// The default layout of Mermaid 12.3 is ELK (D44, D45).
 func hint(k string, v any) bool {
 	switch k {
 	case "look":
@@ -196,13 +314,20 @@ func isGraph(kind string) bool {
 // accepted reports whether zuzu accepts a setting of the config with no
 // issue: a setting that inert names, a theme that Look reads, at the top
 // of the config or in the section of the kind, such as venn.theme, a hint at
-// the top level of the config, such as layout: elk, or a font family with
+// the top level of the config, such as layout: elk, a layout that hint
+// accepts in the section of the kind, such as flowchart.layout: dagre, or
+// a font family with
 // no weight and no style, such as fontFamily: Arial or
 // sequence.actorFontFamily: courier. zuzu draws in IBM Plex Sans only, so the name of a family
 // changes nothing (D32).
 func accepted(kind, path string, v any) bool {
 	if inert(kind, path) || !strings.Contains(path, ".") && hint(path, v) {
 		return true
+	}
+	if path == configSection(kind)+".layout" {
+		// Mermaid 12.3 reads the layout of the section of the kind before
+		// the layout at the top of the config, as LayoutConfig does.
+		return hint("layout", v)
 	}
 	if path == "theme" || path == themeSection(kind)+".theme" {
 		return knownTheme(v)
@@ -233,7 +358,7 @@ func inert(kind, path string) bool {
 	case is("logLevel", "securityLevel", "handDrawnSeed", "architecture.seed", "architecture.randomize", "class.htmlLabels"):
 		// logLevel sets what Mermaid logs, and securityLevel the scripts
 		// and the links of a page. handDrawnSeed seeds the look handDrawn,
-		// which zuzu draws in its own look. The layout of an architecture
+		// and LookConfig reads it. The layout of an architecture
 		// diagram uses no random numbers. Mermaid 12 does not read
 		// class.htmlLabels.
 		return true
@@ -614,4 +739,13 @@ func readStatements(d *Diagram, line *int, acc *[]string, inBody func() bool, bo
 		}
 	}
 	return nil
+}
+
+// panelColor returns the place of the categorical color, from 1, of the
+// panel that opens i-th, from 0, such as a subgraph or a composite state
+// in a color theme. The panels take the second to the tenth colors in
+// turn, so that a panel never takes the first color, the color of the
+// nodes in it (D55).
+func panelColor(i int) int {
+	return i%9 + 2
 }

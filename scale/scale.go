@@ -85,6 +85,11 @@ type Options struct {
 	Interpolate string
 	// Scheme says that the range is a color scheme.
 	Scheme bool
+	// Interpolator maps a fraction of the domain, from 0 to 1, to a color.
+	// A continuous scale of colors that is sequential or diverging maps
+	// through it in place of Range, as a continuous scheme of Vega does.
+	// Any other scale uses Range (D46).
+	Interpolator func(float64) string
 	// Bins are the edges of the bins of a bin-ordinal scale.
 	Bins []float64
 	// Location is the time zone of a time scale.

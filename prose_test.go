@@ -292,7 +292,9 @@ func isMessage(fun ast.Expr) bool {
 // an error or a test gives a person. A comment is one in Go, or a line
 // comment in a YAML file or a git file. AGENTS.md says to follow the skill for
 // all of that text, and D2 says why. The skill itself, under .claude and
-// .agents, comes from elsewhere and is not checked.
+// .agents, comes from elsewhere and is not checked, and neither is a file
+// that a copy of another project holds as its upstream wrote it (D40 part 9,
+// docs/UPSTREAM.md).
 //
 // Text in backticks or in double quotes is not checked, because it is code,
 // a value, or somebody else's words. There is no other exception. If a rule
@@ -300,14 +302,14 @@ func isMessage(fun ast.Expr) bool {
 func TestProseIsSimpleEnglish(t *testing.T) {
 	t.Parallel()
 	var lines []proseLine
-	for _, path := range repoFiles(t, ".md") {
+	for _, path := range ownFiles(t, ".md") {
 		lines = append(lines, markdownProse(path, read(t, path))...)
 	}
-	for _, path := range repoFiles(t, ".go") {
+	for _, path := range ownFiles(t, ".go") {
 		lines = append(lines, goProse(t, path, read(t, path))...)
 	}
 	for _, c := range lineComments {
-		for _, path := range repoFiles(t, c.suffix) {
+		for _, path := range ownFiles(t, c.suffix) {
 			lines = append(lines, commentProse(path, read(t, path), c.marker)...)
 		}
 	}

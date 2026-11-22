@@ -44,7 +44,7 @@ const ArrowSymbolSize = theme.ArrowLength * theme.ArrowLength
 // paintKeys are the keys of a style of a node, an edge or a cluster that
 // a mark encodes, by the name of their field. category comes first, so
 // that a fill or a stroke wins over the color of the category.
-var paintKeys = []string{"category", "fill", "fillOpacity", "stroke", "strokeWidth", "strokeDash"}
+var paintKeys = []string{"category", "fill", "fillOpacity", "stroke", "strokeWidth", "strokeDash", "note", "solid"}
 
 // textKeys are the keys of a style of a label.
 var textKeys = []string{"textColor", "fontSize", "fontWeight", "fontStyle"}
@@ -259,6 +259,14 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if n.HTML != "" {
 			r["html"], r["lines"] = n.HTML, []any{}
 			html = true
+		} else if len(n.Runs) > 0 {
+			// The layout wraps the runs and draws them as a label of HTML.
+			runs := make([]any, len(n.Runs))
+			for j, run := range n.Runs {
+				runs[j] = map[string]any{"text": run.Text, "bold": run.Bold, "italic": run.Italic}
+			}
+			r["runs"], r["lines"] = runs, []any{}
+			html = true
 		}
 		if len(n.Margin) == 2 {
 			r["margin"] = []any{n.Margin[0], n.Margin[1]}
@@ -289,6 +297,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		link(r, n.Href, n.Tooltip)
 		style(r, n.Style)
 		categories = categoryRow(r, n.Category, categories, false)
+		if n.Note {
+			r["note"] = true
+		}
+		if n.Solid {
+			r["solid"] = true
+		}
 		add("node", signature(r, paintKeys, "_paint"))
 		text := signature(r, textKeys, "_text")
 		add("nodeText", text)
@@ -408,11 +422,14 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		edges = append(edges, r)
 	}
-	packages := false
+	packages, states := false, false
 	for _, c := range g.Clusters {
 		r := map[string]any{"key": c.ID, "label": c.Label, "lines": lines(c.Label), "parent": nil}
-		if c.Shape == ClusterPackage {
+		switch c.Shape {
+		case ClusterPackage:
 			r["shape"], packages = ClusterPackage, true
+		case ClusterState:
+			r["shape"], states = ClusterState, true
 		}
 		if c.Parent != "" {
 			r["parent"] = c.Parent
@@ -453,6 +470,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	if g.LaneEdges {
 		layout["laneEdges"] = true
 	}
+	if g.ClusterDirection != "" {
+		layout["clusterDirection"] = g.ClusterDirection
+	}
+	if g.ReverseClusters {
+		layout["reverseClusters"] = true
+	}
 	if g.Math {
 		layout["math"] = true
 		if src := mathSource(g); len(src) > 0 {
@@ -492,12 +515,17 @@ func Compile(g *Graph) (*vega.Spec, error) {
 				categoryEncode(enc)
 				continue
 			}
+			if k == "note" || k == "solid" {
+				// A note and a solid node take a style, not a field.
+				continue
+			}
 			name := k
 			if r, ok := rename[k]; ok {
 				name = r
 			}
 			enc[name] = field(k)
 		}
+		solidEncode(enc, strings.Split(sig, ","))
 	}
 	mark := func(typ, from, sigField, sig string, styles []string, enc map[string]any, rename map[string]string) map[string]any {
 		name := fmt.Sprintf("%s%d", from, len(marks))
@@ -519,23 +547,39 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			filter(panels, "layoutClusters", "datum.shape !== 'package'"),
 			filter("layoutPackages", "layoutClusters", "datum.shape === 'package'"))
 	}
+	cluster := func(m map[string]any) map[string]any {
+		m["role"] = scene.RoleCluster
+		return m
+	}
 	for _, sig := range paints["cluster"] {
-		marks = append(marks, mark("rect", panels, "_paint", sig, []string{StyleCluster}, map[string]any{
+		marks = append(marks, cluster(mark("rect", panels, "_paint", sig, []string{StyleCluster}, map[string]any{
 			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
-		}, nil))
+		}, nil)))
 	}
 	if packages {
 		const tab = "(datum.titleY - datum.y + datum.titleHeight + 4)"
 		signal := func(s string) map[string]any { return map[string]any{"signal": s} }
 		for _, sig := range paints["cluster"] {
-			marks = append(marks, mark("rect", "layoutPackages", "_paint", sig, []string{StyleCluster}, map[string]any{
+			marks = append(marks, cluster(mark("rect", "layoutPackages", "_paint", sig, []string{StyleCluster}, map[string]any{
 				"x": field("x"), "y": field("y"), "width": signal("datum.titleWidth + 2 * (datum.titleX - datum.x)"),
 				"height": signal(tab + " + 6"),
-			}, nil))
-			marks = append(marks, mark("rect", "layoutPackages", "_paint", sig, []string{StyleCluster}, map[string]any{
+			}, nil)))
+			marks = append(marks, cluster(mark("rect", "layoutPackages", "_paint", sig, []string{StyleCluster}, map[string]any{
 				"x": field("x"), "y": signal("datum.y + " + tab), "width": field("width"),
 				"height": signal("datum.height - " + tab),
-			}, nil))
+			}, nil)))
+		}
+	}
+	if states {
+		// A composite state draws a band across the top of its panel, in
+		// the paint of the panel, so the band takes a stronger tint and
+		// its edge draws a line under the title.
+		const band = "(datum.titleY - datum.y + datum.titleHeight + 6)"
+		data = append(data, filter("layoutStates", "layoutClusters", "datum.shape === 'state'"))
+		for _, sig := range paints["cluster"] {
+			marks = append(marks, cluster(mark("rect", "layoutStates", "_paint", sig, []string{StyleCluster}, map[string]any{
+				"x": field("x"), "y": field("y"), "width": field("width"), "height": map[string]any{"signal": band},
+			}, nil)))
 		}
 	}
 	for _, sig := range paints["clusterText"] {
@@ -544,31 +588,11 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}, map[string]string{"textColor": "fill"}))
 	}
 	for _, sig := range paints["edge"] {
-		marks = append(marks, mark("path", "layoutEdges", "_paint", sig, []string{StyleEdge}, map[string]any{
+		m := mark("path", "layoutEdges", "_paint", sig, []string{StyleEdge}, map[string]any{
 			"x": map[string]any{"value": 0}, "y": map[string]any{"value": 0}, "path": field("path"),
-		}, nil))
-	}
-	for _, part := range arrowFields {
-		at := map[bool][3]string{true: {"endX", "endY", "endAngle"}, false: {"startX", "startY", "startAngle"}}[strings.HasPrefix(part, "head")]
-		open := strings.HasSuffix(part, "Open")
-		st := []string{StyleArrow}
-		if open {
-			st = []string{StyleArrowOpen}
-		}
-		for _, sig := range paints[part] {
-			enc := map[string]any{
-				"x": field(at[0]), "y": field(at[1]), "angle": field(at[2]), "shape": field(part), "size": field("arrowSize"),
-			}
-			if sig == "stroke" {
-				enc["stroke"] = field("stroke")
-				if !open {
-					enc["fill"] = field("stroke")
-				}
-			}
-			src := fmt.Sprintf("arrows%d", len(marks))
-			data = append(data, filter(src, "layoutEdges", fmt.Sprintf("datum.%s !== '' && datum._arrow === %q", part, sig)))
-			marks = append(marks, map[string]any{"type": "symbol", "from": map[string]any{"data": src}, "style": st, "encode": map[string]any{"update": enc}})
-		}
+		}, nil)
+		m["role"] = scene.RoleEdge
+		marks = append(marks, m)
 	}
 	data = append(data, filter("edgeLabels", "layoutEdges", "datum.labelWidth > 0"))
 	marks = append(marks, map[string]any{"type": "rect", "from": map[string]any{"data": "edgeLabels"}, "style": []string{StyleEdgeLabelBox}, "encode": map[string]any{"update": map[string]any{
@@ -602,9 +626,18 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	labelMarks("layoutEdges", "tail", "_end", paints["endText"], []string{StyleEdgeLabel}, endRename)
 	labelMarks("layoutEdges", "x", "_text", paints["edgeXText"], []string{StyleEdgeLabel}, map[string]string{"textColor": "fill"})
 	for _, sig := range paints["node"] {
-		marks = append(marks, mark("path", "layoutNodes", "_paint", sig, []string{StyleNode}, map[string]any{
+		styles := []string{StyleNode}
+		if slices.Contains(strings.Split(sig, ","), "note") {
+			styles = append(styles, theme.StyleNote)
+		}
+		m := mark("path", "layoutNodes", "_paint", sig, styles, map[string]any{
 			"x": field("x"), "y": field("y"), "path": field("path"),
-		}, nil))
+		}, nil)
+		if slices.Contains(strings.Split(sig, ","), "solid") {
+			m["style"] = append(styles, theme.StyleNodeSolid)
+			m["role"] = scene.RoleSolid
+		}
+		marks = append(marks, m)
 	}
 	if media {
 		data = append(data,
@@ -640,10 +673,40 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			}}},
 		)
 	}
-	labelMarks("layoutNodes", "x", "_text", paints["nodeXText"], []string{StyleNodeLabel}, map[string]string{"textColor": "fill"})
+	var htmlText []any
 	if html {
-		marks = append(marks, htmlMarks(&data)...)
+		shapes, texts := htmlMarks(&data)
+		marks = append(marks, shapes...)
+		htmlText = texts
 	}
+	// The arrowheads draw over the shapes of the nodes, so that the tip of
+	// each one sits on the outline of its node. The lines of the edges
+	// draw under the nodes, so a line that passes under a node stays
+	// hidden.
+	for _, part := range arrowFields {
+		at := map[bool][3]string{true: {"endX", "endY", "endAngle"}, false: {"startX", "startY", "startAngle"}}[strings.HasPrefix(part, "head")]
+		open := strings.HasSuffix(part, "Open")
+		st := []string{StyleArrow}
+		if open {
+			st = []string{StyleArrowOpen}
+		}
+		for _, sig := range paints[part] {
+			enc := map[string]any{
+				"x": field(at[0]), "y": field(at[1]), "angle": field(at[2]), "shape": field(part), "size": field("arrowSize"),
+			}
+			if sig == "stroke" {
+				enc["stroke"] = field("stroke")
+				if !open {
+					enc["fill"] = field("stroke")
+				}
+			}
+			src := fmt.Sprintf("arrows%d", len(marks))
+			data = append(data, filter(src, "layoutEdges", fmt.Sprintf("datum.%s !== '' && datum._arrow === %q", part, sig)))
+			marks = append(marks, map[string]any{"type": "symbol", "role": scene.RoleEdge, "from": map[string]any{"data": src}, "style": st, "encode": map[string]any{"update": enc}})
+		}
+	}
+	labelMarks("layoutNodes", "x", "_text", paints["nodeXText"], []string{StyleNodeLabel}, map[string]string{"textColor": "fill"})
+	marks = append(marks, htmlText...)
 	for _, sig := range paints["nodeText"] {
 		marks = append(marks, mark("text", "layoutNodes", "_text", sig, []string{StyleNodeLabel}, map[string]any{
 			"x": field("textX"), "y": field("textY"), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
@@ -764,11 +827,12 @@ func fieldRow(r map[string]any, n *Node) {
 }
 
 // htmlMarks returns the marks that draw the labels of HTML that the
-// transform zuzu.layered lays out (D31): their boxes, their rules, the lines
-// of their text, and their runs of text. A row of the layout leaves out
-// each paint that the theme gives, and the field _paint lists the paints
-// that it sets, so a mark for each list draws its rows.
-func htmlMarks(data *[]any) []any {
+// transform zuzu.layered lays out (D31): the shapes, which are their boxes
+// and their rules, and the texts, which are the lines of their text and
+// their runs of text. The arrowheads draw between the two. A row of the
+// layout leaves out each paint that the theme gives, and the field _paint
+// lists the paints that it sets, so a mark for each list draws its rows.
+func htmlMarks(data *[]any) (shapes, texts []any) {
 	field := func(f string) map[string]any { return map[string]any{"field": f} }
 	var marks []any
 	add := func(typ, kind, sig string, styles []string, enc map[string]any, keys ...string) {
@@ -802,6 +866,7 @@ func htmlMarks(data *[]any) []any {
 			"strokeWidth": field("strokeWidth"), "strokeDash": field("strokeDash"),
 		}, "stroke")
 	}
+	n := len(marks)
 	for _, sig := range []string{"", "fill"} {
 		add("rect", "htmlDeco", sig, []string{StyleNodeLabel}, map[string]any{
 			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
@@ -814,7 +879,7 @@ func htmlMarks(data *[]any) []any {
 			"align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "middle"},
 		}, "fill", "font")
 	}
-	return marks
+	return marks[:n], marks[n:]
 }
 
 // mathSource returns the labels of a graph that draw their source in

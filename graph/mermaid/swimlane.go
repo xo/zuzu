@@ -21,21 +21,26 @@ func laneKind(kind string) bool {
 	return false
 }
 
-// laneLayout returns the layout of a diagram: the setting layout of the
-// section of its kind, or else the setting layout at the top of the
-// config, or else swimlane for a swimlane diagram and dagre for the others,
-// as Mermaid 12.3 picks it.
+// laneLayout returns the layout of a diagram: the layout that it sets, or
+// else swimlane for a swimlane diagram and dagre for the others.
 func laneLayout(d *Diagram) string {
-	if s := str(d.Config, configSection(d.Kind), "layout"); s != "" {
-		return s
-	}
-	if s := str(d.Config, "layout"); s != "" {
+	if s := sourceLayout(d); s != "" {
 		return s
 	}
 	if d.Kind == "swimlane-beta" {
 		return "swimlane"
 	}
 	return "dagre"
+}
+
+// sourceLayout returns the layout that a diagram sets: the setting layout
+// of the section of its kind, or else the setting layout at the top of the
+// config, as Mermaid 12.3 picks it, or empty for none.
+func sourceLayout(d *Diagram) string {
+	if s := str(d.Config, configSection(d.Kind), "layout"); s != "" {
+		return s
+	}
+	return str(d.Config, "layout")
 }
 
 // lanesOn reports whether a diagram lays out in lanes: a swimlane diagram

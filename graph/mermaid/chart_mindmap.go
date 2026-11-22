@@ -693,6 +693,7 @@ func mindmapSpec(nodes []*mindmapNode, m text.Measurer) map[string]any {
 	}
 	field := func(f string) map[string]any { return map[string]any{"field": f} }
 	color := map[string]any{"scale": "color", "field": "color"}
+	tint := map[string]any{"scale": "tint", "field": "color"}
 	data := []any{
 		map[string]any{"name": "nodes", "values": rows},
 		filteredData("outlined", "nodes", "datum.shape !== 'default' || datum.depth === 0"),
@@ -706,10 +707,10 @@ func mindmapSpec(nodes []*mindmapNode, m text.Measurer) map[string]any {
 			"stroke": color, "strokeWidth": field("width"),
 		}}},
 		map[string]any{"type": "path", "name": "shapes", "from": map[string]any{"data": "outlined"}, "style": []any{graph.StyleNode}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "path": field("path"), "fill": color, "stroke": color, "strokeWidth": field("strokeWidth"),
+			"x": field("x"), "y": field("y"), "path": field("path"), "fill": tint, "stroke": color, "strokeWidth": field("strokeWidth"),
 		}}},
 		map[string]any{"type": "path", "name": "plainShapes", "from": map[string]any{"data": "plain"}, "style": []any{graph.StyleNode}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "path": field("path"), "fill": color, "strokeOpacity": map[string]any{"value": 0},
+			"x": field("x"), "y": field("y"), "path": field("path"), "fill": tint, "strokeOpacity": map[string]any{"value": 0},
 		}}},
 	}
 	if len(icons) > 0 {
@@ -729,7 +730,7 @@ func mindmapSpec(nodes []*mindmapNode, m text.Measurer) map[string]any {
 		"padding":  8,
 		"autosize": "pad",
 		"data":     data,
-		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": colors, "range": "category"}},
+		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": colors, "range": "category"}, graph.TintScale("tint", colors)},
 		"marks":    marks,
 	}
 }

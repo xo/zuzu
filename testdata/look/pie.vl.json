@@ -1,0 +1,13 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "title": "Time spent",
+  "data": {"values": [
+    {"task": "code", "hours": 18}, {"task": "review", "hours": 7},
+    {"task": "meetings", "hours": 9}, {"task": "docs", "hours": 4}
+  ]},
+  "mark": "arc",
+  "encoding": {
+    "theta": {"field": "hours", "type": "quantitative"},
+    "color": {"field": "task", "type": "nominal"}
+  }
+}

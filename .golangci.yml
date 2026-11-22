@@ -111,6 +111,13 @@ linters:
         - name: receiver-naming
         - name: var-naming
   exclusions:
+    # A copy of another project keeps the code and the comments of its
+    # upstream, which follow the rules of that project and not these. Each
+    # folder in the column path of docs/upstream/upstreams.tsv is here (D39,
+    # D40, docs/UPSTREAM.md).
+    paths:
+      - internal/dagre/
+      - internal/rough/
     rules:
       # A test builds its own values and does not answer to the context rule.
       - path: _test\.go
@@ -126,6 +133,11 @@ formatters:
   enable:
     - gofmt
     - goimports
+  # The same copies as above. gofmt -l still checks them, as CI runs it.
+  exclusions:
+    paths:
+      - internal/dagre/
+      - internal/rough/
   settings:
     goimports:
       local-prefixes:

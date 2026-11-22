@@ -24,8 +24,9 @@ const (
 	TitleSize = 16
 	// SubtitleSize is the size of a subtitle.
 	SubtitleSize = 12.5
-	// LabelPad is the space between a label of an axis and the plot area.
-	LabelPad = 8
+	// LabelPad is the space between a label of an axis and the line of the
+	// axis by default: a tick and the padding of a label (D46).
+	LabelPad = theme.TickSize + theme.LabelPadding
 	// MaxLabels is the most labels that an axis of numbers has.
 	MaxLabels = 6
 )
@@ -193,9 +194,7 @@ func (s Style) itemBounds(typ string, it *scene.Item) Bounds {
 		b.add(it.X-r, it.Y-r)
 		b.add(it.X+r, it.Y+r)
 	case scene.Arc:
-		r := math.Max(it.OuterRadius, it.InnerRadius)
-		b.add(it.X-r, it.Y-r)
-		b.add(it.X+r, it.Y+r)
+		arcBounds(&b, it)
 	case scene.Text:
 		b.union(s.textBounds(it))
 	case scene.Path, scene.Shape:
@@ -204,6 +203,32 @@ func (s Style) itemBounds(typ string, it *scene.Item) Bounds {
 		pathBounds(&b, it)
 	}
 	return b
+}
+
+// arcBounds adds the bounds of an arc: the ends of its inner and outer
+// edges, and each point of the outer edge where it turns at the top, the
+// right, the bottom or the left. An arc that is not a full circle covers
+// only part of its circle, as Vega bounds it. Angle 0 points up, and the
+// angles go clockwise.
+func arcBounds(b *Bounds, it *scene.Item) {
+	a0, a1 := it.StartAngle, it.EndAngle
+	if a1 < a0 {
+		a0, a1 = a1, a0
+	}
+	add := func(a float64) {
+		sin, cos := math.Sincos(a)
+		for _, r := range [2]float64{it.InnerRadius, it.OuterRadius} {
+			b.add(it.X+r*sin, it.Y-r*cos)
+		}
+	}
+	add(a0)
+	add(a1)
+	if a1-a0 >= 2*math.Pi {
+		a1 = a0 + 2*math.Pi
+	}
+	for k := math.Ceil(a0 / (math.Pi / 2)); k*math.Pi/2 < a1; k++ {
+		add(k * math.Pi / 2)
+	}
 }
 
 // pathSink adds the points of a path to bounds, after the rotation and the
@@ -299,10 +324,14 @@ func (s Style) textBounds(it *scene.Item) Bounds {
 		y0 -= extra
 	case "top":
 		y0 = 0
+	case "line-top":
+		y0 = (lh - size) / 2
 	case "middle":
 		y0 = -h / 2
-	case "bottom", "line-bottom":
+	case "bottom":
 		y0 = -h
+	case "line-bottom":
+		y0 = -h - (lh-size)/2
 	}
 	x0 += it.Dx
 	y0 += it.Dy

@@ -107,7 +107,7 @@ func Line(items []scene.Item) (string, bool) {
 		for i, it := range run {
 			pts[i] = [2]float64{it.X, it.Y}
 		}
-		seg, ok := Curve(first.Interpolate, pts, true, first.Tension)
+		seg, ok := curve(first.Interpolate, pts, true, first.Tension, first.Orient == "horizontal")
 		if !ok {
 			return "", false
 		}
@@ -133,11 +133,12 @@ func Area(items []scene.Item) (string, bool) {
 				base[len(run)-1-i] = [2]float64{it.X, it.Y2}
 			}
 		}
-		a, ok := Curve(first.Interpolate, top, true, first.Tension)
+		horizontal := first.Orient == "horizontal"
+		a, ok := curve(first.Interpolate, top, true, first.Tension, horizontal)
 		if !ok {
 			return "", false
 		}
-		b, ok := Curve(first.Interpolate, base, false, first.Tension)
+		b, ok := curve(first.Interpolate, base, false, first.Tension, horizontal)
 		if !ok {
 			return "", false
 		}

@@ -301,9 +301,9 @@ func TestThemes(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Mermaid skips a theme that it does not have, so a flowchart takes the
-	// theme of its section by default (D37).
-	if l := Look(d); string(l["zuzu.scheme"]) != `"mermaid-redux-color"` {
-		t.Errorf("the theme sepia: the look %v, want the default redux-color", l)
+	// scheme of zuzu, as a source with no theme does (D55).
+	if l := Look(d); len(l["zuzu.scheme"]) != 0 {
+		t.Errorf("the theme sepia: the look %v, want the scheme of zuzu", l)
 	}
 }
 
@@ -395,9 +395,9 @@ func TestSectionThemes(t *testing.T) {
 	// and a venn diagram then take the theme of their section by default
 	// (D37), and an XY chart has none.
 	for src, want := range map[string]string{
-		"---\nconfig:\n  classDiagram:\n    theme: forest\n---\nclassDiagram\n  A --> B\n": `"mermaid-redux-color"`,
+		"---\nconfig:\n  classDiagram:\n    theme: forest\n---\nclassDiagram\n  A --> B\n": "",
 		"---\nconfig:\n  xychart:\n    theme: forest\n---\nxychart-beta\n  bar [1, 2]\n":   "",
-		"---\nconfig:\n  pie:\n    theme: forest\n---\nvenn-beta\n  set A\n":               `"mermaid-redux-color"`,
+		"---\nconfig:\n  pie:\n    theme: forest\n---\nvenn-beta\n  set A\n":               "",
 	} {
 		if err := strictCheck(t, src); !errors.Is(err, vega.ErrUnsupported) {
 			t.Errorf("%q: expected an issue, got %v", src, err)
@@ -412,20 +412,20 @@ func TestSectionThemes(t *testing.T) {
 	}
 }
 
-// TestDefaultSectionThemes checks that a diagram of a kind whose section
-// Mermaid 12.3 gives the theme redux-color by default draws in it when its
-// source has no theme, and that a theme of the source wins (D37).
+// TestDefaultSectionThemes checks that a diagram whose source has no theme
+// draws in the scheme of zuzu, though Mermaid 12.3 gives its section the
+// theme redux-color, and that a theme of the source wins (D55).
 func TestDefaultSectionThemes(t *testing.T) {
 	t.Parallel()
 	for src, want := range map[string]string{
-		"flowchart LR\n  A --> B\n":                                     `"mermaid-redux-color"`,
-		"graph LR\n  A --> B\n":                                         `"mermaid-redux-color"`,
-		"sequenceDiagram\n  A->>B: hi\n":                                `"mermaid-redux-color"`,
-		"classDiagram\n  A --> B\n":                                     `"mermaid-redux-color"`,
-		"stateDiagram-v2\n  A --> B\n":                                  `"mermaid-redux-color"`,
-		"erDiagram\n  A ||--o{ B : has\n":                               `"mermaid-redux-color"`,
-		"requirementDiagram\n  requirement r {\n    id: 1\n  }\n":       `"mermaid-redux-color"`,
-		"venn-beta\n  set A\n":                                          `"mermaid-redux-color"`,
+		"flowchart LR\n  A --> B\n":                                     "",
+		"graph LR\n  A --> B\n":                                         "",
+		"sequenceDiagram\n  A->>B: hi\n":                                "",
+		"classDiagram\n  A --> B\n":                                     "",
+		"stateDiagram-v2\n  A --> B\n":                                  "",
+		"erDiagram\n  A ||--o{ B : has\n":                               "",
+		"requirementDiagram\n  requirement r {\n    id: 1\n  }\n":       "",
+		"venn-beta\n  set A\n":                                          "",
 		"pie\n  \"a\" : 1\n":                                            "",
 		"---\nconfig:\n  theme: forest\n---\nflowchart LR\n  A --> B\n": `"mermaid-forest"`,
 		"---\nconfig:\n  theme: neutral\n---\nvenn-beta\n  set A\n":     `"mermaid-neutral"`,

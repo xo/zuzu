@@ -145,7 +145,7 @@ func String(v any) string {
 			}
 		}
 		return strings.Join(parts, ",")
-	case map[string]any:
+	case map[string]any, Object:
 		return "[object Object]"
 	case *Color:
 		return x.String()
@@ -190,7 +190,7 @@ func primitive(v any, hint string) any {
 			return String(x)
 		}
 		return Number(x)
-	case []any, map[string]any, *Color:
+	case []any, map[string]any, *Color, Object:
 		return String(x)
 	}
 	return v

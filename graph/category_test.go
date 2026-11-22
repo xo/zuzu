@@ -29,12 +29,14 @@ func TestCompileCategory(t *testing.T) {
 	}
 	s := string(b)
 	for _, want := range []string{
-		`"scales":[{"name":"zuzu.category","type":"ordinal","domain":[0,1,2],"range":"category"}]`,
-		`"fill":{"field":"category","scale":"zuzu.category"}`,
+		`"scales":[{"name":"zuzu.category","type":"ordinal","domain":[0,1,2],"range":"category"},` +
+			`{"name":"zuzu.categoryTint","type":"ordinal","domain":[0,1,2],"range":"zuzu.tint"}]`,
+		`"fill":{"field":"category","scale":"zuzu.categoryTint"}`,
 		`"stroke":{"field":"category","scale":"zuzu.category"}`,
 		`"_paint":"category,stroke"`, `"stroke":{"field":"stroke"}`,
-		// A cluster draws as a node of its color: a tint and an outline.
-		`"category":1,"fillOpacity":0.14`, `"strokeWidth":1.25`,
+		// A cluster draws as a node of its color: a solid tint and an
+		// outline (D55).
+		`"category":1,"key":"s"`, `"strokeWidth":1.25}`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("expected %s in the spec", want)

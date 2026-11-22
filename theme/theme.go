@@ -7,7 +7,10 @@
 package theme
 
 import (
+	"math"
 	"slices"
+
+	"github.com/xo/zuzu/internal/color"
 )
 
 // Mode is the light or the dark mode.
@@ -32,10 +35,10 @@ type Neutrals struct {
 	Background string // the background of the chart
 	Panel      string // a panel inside the chart, such as a tooltip
 	Text       string // the title, the labels on the data, a value
-	Muted      string // the subtitle, the labels of an axis, a legend
-	Faint      string // the source line, the title of an axis, a guide line
+	Muted      string // the subtitle, the labels and the title of an axis, a legend
+	Faint      string // the source line, the title of a legend, a guide line
 	Grid       string // the grid lines
-	Axis       string // a base line, a border, a guide line of a diagram
+	Axis       string // the line and the ticks of an axis, a base line, a border
 	Edge       string // an edge of a diagram, its arrowheads, a message
 	Band       string // a band behind a group of rows, as it shows over the background
 }
@@ -56,10 +59,24 @@ const (
 	ArrowLength = 8.0
 )
 
+// The sizes of an axis, from "Axes and grids" in docs/STYLE.md. The line
+// and the ticks of an axis are in the color Axis (D46).
+const (
+	// TickSize is the length of a tick, from the line of the axis.
+	TickSize = 5.0
+	// TickWidth is the width of a tick.
+	TickWidth = 1.0
+	// DomainWidth is the width of the line of an axis.
+	DomainWidth = 1.0
+	// LabelPadding is the space between the end of a tick and its label.
+	LabelPadding = 3.0
+)
+
 // The paint of a node of a diagram, from "Marks" in docs/STYLE.md: a tint
 // of its color and an outline.
 const (
-	// NodeTint is the opacity of the fill of a node, a tint of its color.
+	// NodeTint is how far the solid tint of a node goes from the
+	// background to its color (D55).
 	NodeTint = 0.14
 	// NodeOutline is the width of the outline of a node.
 	NodeOutline = 1.25
@@ -257,6 +274,9 @@ type Theme struct {
 	// FillOpacity is the opacity of a tinted fill, such as a box of a box
 	// plot.
 	FillOpacity float64
+	// Note is the color of a note of a diagram: the categorical color whose
+	// hue is nearest the yellow of a note on paper, NoteHue.
+	Note string
 
 	mode Mode
 }
@@ -297,8 +317,52 @@ func New(m Mode, s Scheme) Theme {
 		Up:          cat[s.up],
 		Down:        cat[s.down],
 		FillOpacity: opacity,
+		Note:        nearestHue(cat, NoteHue),
 		mode:        m,
 	}
+}
+
+// Tint returns the solid tint of a color: the color mixed into the
+// background at NodeTint, with no opacity, so that it reads the same over
+// a panel as over the background (D55).
+func (t Theme) Tint(c string) string {
+	return mix(t.Background, c, NodeTint)
+}
+
+// NoteHue is the hue, in degrees, of the yellow of a note on paper, which
+// the color of a note of a diagram comes nearest to.
+const NoteHue = 52.0
+
+// nearestHue returns the color whose hue is nearest a hue, in degrees. A
+// gray, with no hue, comes last.
+func nearestHue(colors []string, hue float64) string {
+	best, bestD := colors[0], math.Inf(1)
+	for _, c := range colors {
+		rgb, ok := color.Parse(c)
+		if !ok {
+			continue
+		}
+		hi, lo := math.Max(rgb.R, math.Max(rgb.G, rgb.B)), math.Min(rgb.R, math.Min(rgb.G, rgb.B))
+		if hi-lo < 1e-9 {
+			continue
+		}
+		var h float64
+		switch hi {
+		case rgb.R:
+			h = math.Mod((rgb.G-rgb.B)/(hi-lo), 6)
+		case rgb.G:
+			h = (rgb.B-rgb.R)/(hi-lo) + 2
+		default:
+			h = (rgb.R-rgb.G)/(hi-lo) + 4
+		}
+		h = math.Mod(h*60+360, 360)
+		d := math.Abs(h - hue)
+		d = math.Min(d, 360-d)
+		if d < bestD {
+			best, bestD = c, d
+		}
+	}
+	return best
 }
 
 // Mode returns the mode of the theme.
@@ -306,23 +370,29 @@ func (t Theme) Mode() Mode {
 	return t.mode
 }
 
+// RampStart is how far the sequential ramp of the theme starts from the
+// background toward its first color, so that the lowest value of a scale
+// shows in both modes (D48 part 4).
+const RampStart = 0.4
+
 // Sequential returns the color at v, from 0 to 1, on the sequential ramp of
-// the theme. The ramp runs from the background through the first color, so
-// that it reads in both modes. It runs on to a lighter color on a dark
-// background, and to a darker color on a light one. A caller that draws
-// another background, such as the background of a spec, sets Background
-// first (D35).
+// the theme. The ramp starts at a tint of the first color, RampStart of the
+// way from the background, and runs through a tint halfway from there to
+// the first color, then through the first color, so that it reads in both
+// modes. It runs on to a lighter color on a dark background, and to a
+// darker color on a light one. A caller that draws another background,
+// such as the background of a spec, sets Background first (D35, D48).
 func (t Theme) Sequential(v float64) string {
 	base := t.Category[0]
 	var stops []string
 	if IsDark(t.Background) {
 		stops = []string{
-			mix(t.Background, base, 0.12), mix(t.Background, base, 0.45), base,
+			mix(t.Background, base, RampStart), mix(t.Background, base, (1+RampStart)/2), base,
 			mix(base, "#ffffff", 0.45), mix(base, "#ffffff", 0.85),
 		}
 	} else {
 		stops = []string{
-			mix(t.Background, base, 0.1), mix(t.Background, base, 0.4), base,
+			mix(t.Background, base, RampStart), mix(t.Background, base, (1+RampStart)/2), base,
 			mix(base, "#000000", 0.35), mix(base, "#000000", 0.6),
 		}
 	}
@@ -342,13 +412,4 @@ func IsDark(background string) bool {
 // to the color of a rise.
 func (t Theme) Diverging(v float64) string {
 	return ramp([]string{t.Down, t.Grid, t.Up}, v)
-}
-
-// Cyclical returns the color at v, from 0 to 1, on the wheel of the theme:
-// the categorical colors in order, with the colors between them mixed, and
-// the last color joined to the first. So 0 and 1 are both the first color
-// (D35).
-func (t Theme) Cyclical(v float64) string {
-	stops := append(slices.Clone(t.Category), t.Category[0])
-	return ramp(stops, v)
 }

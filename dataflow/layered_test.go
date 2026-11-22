@@ -33,3 +33,22 @@ func TestWrapText(t *testing.T) {
 		}
 	}
 }
+
+// TestRunsHTML checks that the runs of a label in more than one font
+// become a label of HTML with each run in its font, that the words wrap at
+// the width limit, that a run with no space before it joins the word
+// before it, and that the text is escaped.
+func TestRunsHTML(t *testing.T) {
+	t.Parallel()
+	run := func(text string, bold, italic bool) any {
+		return map[string]any{"text": text, "bold": bold, "italic": italic}
+	}
+	width := func(s, _ string) float64 { return float64(len(s)) }
+	runs := []any{run("Bold", true, false), run(", and", false, false), run(" italic", false, true), run(" a<b", false, false)}
+	if got, want := runsHTML(runs, 0, width), "<B>Bold</B>, and <I>italic</I> a&lt;b"; got != want {
+		t.Errorf("runsHTML = %q, want %q", got, want)
+	}
+	if got, want := runsHTML(runs, 10, width), "<B>Bold</B>, and<BR/><I>italic</I> a&lt;b"; got != want {
+		t.Errorf("runsHTML with a limit of 10 = %q, want %q", got, want)
+	}
+}

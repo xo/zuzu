@@ -938,6 +938,10 @@ func (p *parser) finish() error {
 		if strings.Contains(a["style"], "rounded") && (n.Shape == "box" || n.Shape == "rect" || n.Shape == "rectangle") {
 			n.Shape = "rounded"
 		}
+		if n.Shape == "cylinder" {
+			// Graphviz draws a cylinder in the box of a node.
+			n.Shape = graph.DOTCylinder
+		}
 	}
 	return nil
 }

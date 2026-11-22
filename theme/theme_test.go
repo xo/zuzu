@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -138,7 +139,7 @@ func TestTheRampStartsFromTheBackground(t *testing.T) {
 	th := New(Light, Zuzu)
 	th.Background = "#111111"
 	base := th.Category[0]
-	if got, want := th.Sequential(0), mix("#111111", base, 0.12); got != want {
+	if got, want := th.Sequential(0), mix("#111111", base, RampStart); got != want {
 		t.Errorf("the ramp starts at %s, want %s", got, want)
 	}
 	if got, want := th.Sequential(1), mix(base, "#ffffff", 0.85); got != want {
@@ -151,8 +152,54 @@ func TestTheRampStartsFromTheBackground(t *testing.T) {
 	}
 	for _, m := range []Mode{Light, Dark} {
 		th := New(m, Zuzu)
-		if got, want := th.Sequential(0), mix(th.Background, th.Category[0], map[Mode]float64{Light: 0.1, Dark: 0.12}[m]); got != want {
+		if got, want := th.Sequential(0), mix(th.Background, th.Category[0], RampStart); got != want {
 			t.Errorf("%s: the ramp starts at %s, want %s", m, got, want)
+		}
+	}
+}
+
+// TestTheTokensOfD48MatchTheStyle checks the start of the ramp and the
+// bounds of a gray that the dark mode flips against their tables in
+// docs/STYLE.md (D48).
+func TestTheTokensOfD48MatchTheStyle(t *testing.T) {
+	t.Parallel()
+	rows := regexp.MustCompile("(?m)^\\| `(rampStart|grayChroma|grayDark|grayLight)` \\| ([0-9.]+) \\|").FindAllStringSubmatch(style(t), -1)
+	got := map[string]string{
+		"rampStart": fmt.Sprint(RampStart), "grayChroma": fmt.Sprint(GrayChroma),
+		"grayDark": fmt.Sprint(GrayDark), "grayLight": fmt.Sprint(GrayLight),
+	}
+	if len(rows) != len(got) {
+		t.Fatalf("docs/STYLE.md has %d rows of these tokens, expected %d", len(rows), len(got))
+	}
+	for _, row := range rows {
+		if got[row[1]] != row[2] {
+			t.Errorf("%s: the package has %s and docs/STYLE.md has %s", row[1], got[row[1]], row[2])
+		}
+	}
+}
+
+// TestAGrayNearBlackOrWhiteFlips checks which colors FlipGray flips, and
+// that it flips the lightness (D48 part 1).
+func TestAGrayNearBlackOrWhiteFlips(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		in, want string
+		ok       bool
+	}{
+		{"#000000", "#ffffff", true},
+		{"#333333", "#cccccc", true},
+		{"#eeeeee", "#111111", true},
+		{"#ffffff", "#000000", true},
+		{"#888888", "#888888", false},
+		{"#ff0000", "#ff0000", false},
+		{"#4682b4", "#4682b4", false},
+		// A tint of blue near white differs by more than GrayChroma.
+		{"#e0e8ff", "#e0e8ff", false},
+	} {
+		in := parse(c.in)
+		r, g, b, ok := FlipGray(in.r, in.g, in.b)
+		if got := (rgb{r, g, b}).hex(); got != c.want || ok != c.ok {
+			t.Errorf("FlipGray(%s) = %s, %v, want %s, %v", c.in, got, ok, c.want, c.ok)
 		}
 	}
 }
@@ -174,27 +221,6 @@ func TestTheDivergingRampRuns(t *testing.T) {
 	}
 }
 
-// TestTheWheelJoinsTheLastColorToTheFirst checks that the wheel passes
-// each categorical color in order, mixes the colors between them, and ends
-// at the first color (D35).
-func TestTheWheelJoinsTheLastColorToTheFirst(t *testing.T) {
-	t.Parallel()
-	for _, m := range []Mode{Light, Dark} {
-		th := New(m, Harbor)
-		for i, c := range th.Category {
-			if got := th.Cyclical(float64(i) / 10); got != c {
-				t.Errorf("%s: Cyclical(%v) = %s, want the color %d, %s", m, float64(i)/10, got, i, c)
-			}
-		}
-		if got := th.Cyclical(1); got != th.Category[0] {
-			t.Errorf("%s: the wheel ends at %s, want the first color %s", m, got, th.Category[0])
-		}
-		if got, want := th.Cyclical(0.95), mix(th.Category[9], th.Category[0], 0.5); got != want {
-			t.Errorf("%s: between the last and the first color: got %s, want %s", m, got, want)
-		}
-	}
-}
-
 // TestTheEdgesTakeTheColorOfAnEdge checks that the styles of an edge and
 // its arrowheads take the color edge, a guide line the color axis, a band
 // the text color, and a muted node the color muted (D32).
@@ -212,7 +238,7 @@ func TestTheEdgesTakeTheColorOfAnEdge(t *testing.T) {
 			{StyleArrowOpen, "stroke", th.Edge},
 			{StyleGuide, "stroke", th.Axis},
 			{StyleBand, "fill", th.Text},
-			{StyleNodeMuted, "fill", th.Muted},
+			{StyleNodeMuted, "fill", th.Tint(th.Muted)},
 			{StyleNodeMuted, "stroke", th.Muted},
 		} {
 			s, _ := styles[c.style].(map[string]any)
@@ -242,6 +268,26 @@ func TestTheSizesOfAnEdgeMatchTheStyle(t *testing.T) {
 	for _, name := range []string{StyleEdge, StyleArrowOpen} {
 		if s, _ := styles[name].(map[string]any); s["strokeWidth"] != EdgeWidth {
 			t.Errorf("the width of %s is %v, want %v", name, s["strokeWidth"], EdgeWidth)
+		}
+	}
+}
+
+// TestTheSizesOfAnAxisMatchTheStyle checks the sizes of the ticks, of the
+// line and of the padding of the labels of an axis against the table of
+// "Axes and grids" in docs/STYLE.md.
+func TestTheSizesOfAnAxisMatchTheStyle(t *testing.T) {
+	t.Parallel()
+	rows := regexp.MustCompile("(?m)^\\| `(tickSize|tickWidth|domainWidth|labelPadding)` \\| ([0-9.]+) \\|").FindAllStringSubmatch(style(t), -1)
+	if len(rows) != 4 {
+		t.Fatalf("docs/STYLE.md has %d rows of the sizes of an axis, expected 4", len(rows))
+	}
+	got := map[string]string{
+		"tickSize": fmt.Sprint(TickSize), "tickWidth": fmt.Sprint(TickWidth),
+		"domainWidth": fmt.Sprint(DomainWidth), "labelPadding": fmt.Sprint(LabelPadding),
+	}
+	for _, row := range rows {
+		if got[row[1]] != row[2] {
+			t.Errorf("%s: the package has %s and docs/STYLE.md has %s", row[1], got[row[1]], row[2])
 		}
 	}
 }
@@ -356,5 +402,27 @@ func TestASchemeBringsItsOwnNeutrals(t *testing.T) {
 	}
 	if dark := New(Dark, mermaidForest); dark.Neutrals != neutrals(Dark) {
 		t.Errorf("the dark forest has %+v, want the neutrals of the dark mode", dark.Neutrals)
+	}
+}
+
+// TestNoteColor checks that the color of a note is the categorical color of
+// the scheme nearest the yellow of a note on paper: the yellow of
+// mermaid-redux-color, and a color of the scheme in every scheme (D54).
+func TestNoteColor(t *testing.T) {
+	t.Parallel()
+	s, ok := Lookup("mermaid-redux-color")
+	if !ok {
+		t.Fatal("no scheme mermaid-redux-color")
+	}
+	if got := New(Light, s).Note; got != "#ffdf20" {
+		t.Errorf("the note of mermaid-redux-color is %s, want its yellow #ffdf20", got)
+	}
+	for _, sc := range schemes() {
+		for _, m := range []Mode{Light, Dark} {
+			th := New(m, sc)
+			if !slices.Contains(th.Category, th.Note) {
+				t.Errorf("%s: the note %s is not a color of the scheme", sc.name, th.Note)
+			}
+		}
 	}
 }

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "title": "Fruit sold by store",
+  "width": 360,
+  "height": 220,
+  "data": {"values": [
+    {"store": "North", "fruit": "apples", "sold": 28},
+    {"store": "North", "fruit": "pears", "sold": 55},
+    {"store": "North", "fruit": "plums", "sold": 43},
+    {"store": "South", "fruit": "apples", "sold": 91},
+    {"store": "South", "fruit": "pears", "sold": 81},
+    {"store": "South", "fruit": "plums", "sold": 53},
+    {"store": "West", "fruit": "apples", "sold": 19},
+    {"store": "West", "fruit": "pears", "sold": 87},
+    {"store": "West", "fruit": "plums", "sold": 52}
+  ]},
+  "mark": "bar",
+  "encoding": {
+    "x": {"field": "store", "type": "nominal"},
+    "xOffset": {"field": "fruit"},
+    "y": {"field": "sold", "type": "quantitative"},
+    "color": {"field": "fruit", "type": "nominal"}
+  }
+}

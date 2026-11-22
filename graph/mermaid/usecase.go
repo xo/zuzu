@@ -831,7 +831,7 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 	}
 	for i, n := range m.notes {
 		t, font := ucText(n.label)
-		g.Nodes = append(g.Nodes, &graph.Node{ID: "note-" + strconv.Itoa(i), Label: t, Shape: "note", Style: fontStyle(font),
+		g.Nodes = append(g.Nodes, &graph.Node{ID: "note-" + strconv.Itoa(i), Label: t, Shape: "note", Note: true, Style: fontStyle(font),
 			Wrap: w.width(wrap, n.label.markdown), MinWidth: scaleWrap(d.Kind, "", cfg.minWidth+20)})
 	}
 	for _, id := range m.byFirst(slices.Collect(maps.Keys(m.jsons))) {

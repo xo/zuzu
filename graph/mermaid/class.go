@@ -634,7 +634,7 @@ func (c *classDiagram) note(rest string) error {
 		return c.errorf("the note %q", rest)
 	}
 	n := &graph.Node{ID: fmt.Sprintf("note%d", c.notes), Label: label(strings.ReplaceAll(text[1:len(text)-1], `\n`, "\n")),
-		Shape: "note", Cluster: c.namespace0(), Style: map[string]string{}}
+		Shape: "note", Note: true, Cluster: c.namespace0(), Style: map[string]string{}}
 	c.notes++
 	c.g.Nodes = append(c.g.Nodes, n)
 	if of != "" {

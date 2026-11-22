@@ -1,10 +1,12 @@
 package zuzu
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/scene"
 )
 
@@ -144,6 +146,81 @@ func TestBoxLook(t *testing.T) {
 	}
 }
 
+// TestBoxParts checks the parts of a box plot of one dimension: the median
+// is a line of 2.5 across the box, and it keeps the color that the spec
+// gives it. Before, the median and the ticks of a box with no y had no
+// height, and drew as dots, and the look painted over the color of the
+// spec.
+func TestBoxParts(t *testing.T) {
+	t.Parallel()
+	s := renderVL(t, `"mark": {"type": "boxplot", "median": {"color": "red"}, "ticks": true},
+		"encoding": {"x": {"field": "b", "type": "quantitative"}}`)
+	var median, ticks []scene.Item
+	for _, m := range marksOf(s, "mark") {
+		if m.Type != scene.Rect || len(m.Items) == 0 {
+			continue
+		}
+		switch it := m.Items[0]; {
+		case it.Fill.Color == "red":
+			median = m.Items
+		case it.Width == 1:
+			ticks = append(ticks, m.Items...)
+		}
+	}
+	if len(median) != 1 || median[0].Width != 2.5 || median[0].Height < 10 {
+		t.Fatalf("the median is %+v, want a red line 2.5 wide across the box", median)
+	}
+	if len(ticks) != 2 || ticks[0].Height < 5 {
+		t.Errorf("the ticks are %+v, want two ticks with a height", ticks)
+	}
+}
+
+// TestRuleToZero checks that a rule that ends at 0, such as a whisker up to
+// the top of the plot, draws from one end to the other. Before, the scene
+// read its end at 0 as no end, and the rule drew as a point.
+func TestRuleToZero(t *testing.T) {
+	t.Parallel()
+	s := renderVega(t, `"width": 100, "height": 100,
+		"marks": [{"type": "rule", "encode": {"enter": {"x": {"value": 10}, "y": {"value": 40}, "y2": {"value": 0}, "stroke": {"value": "red"}}}}]`)
+	it := marksOf(s, "mark")[0].Items[0]
+	x2, y2 := shape.RuleEnd(&it)
+	if lo, hi := math.Min(it.Y, y2), math.Max(it.Y, y2); it.X != 10 || x2 != 10 || lo != 0 || hi != 40 {
+		t.Errorf("the rule runs from (%v, %v) to (%v, %v), want from (10, 0) to (10, 40)", it.X, it.Y, x2, y2)
+	}
+}
+
+// TestRangedBarEnd checks that a bar from one value to another, such as the
+// part of a bar above a line, rounds its end away from zero, its top, as
+// the bar under it does.
+func TestRangedBarEnd(t *testing.T) {
+	t.Parallel()
+	s := renderVL(t, `"transform": [{"filter": "datum.c === 'p'"}, {"calculate": "2", "as": "base"}],
+		"mark": "bar", "encoding": {"x": {"field": "a", "type": "ordinal"}, "y": {"field": "base", "type": "quantitative"}, "y2": {"field": "b"}}`)
+	for _, it := range marksOf(s, "mark")[0].Items {
+		if it.CornerRadiusTopLeft == 0 || it.CornerRadiusBottomLeft != 0 {
+			t.Errorf("a bar from 2 to %v has the corners %v at its top and %v at its bottom, want only its top round",
+				readField(it.Datum, "b"), it.CornerRadiusTopLeft, it.CornerRadiusBottomLeft)
+		}
+	}
+}
+
+// TestAreaGradientLine checks that the line on top of an area with a
+// gradient of the spec takes the color of the gradient at the top.
+func TestAreaGradientLine(t *testing.T) {
+	t.Parallel()
+	s := renderVL(t, `"mark": {"type": "area", "color": {"gradient": "linear", "x1": 1, "y1": 1, "x2": 1, "y2": 0,
+			"stops": [{"offset": 0, "color": "white"}, {"offset": 1, "color": "#006400"}]}},
+		"encoding": {"x": {"field": "a", "type": "quantitative"}, "y": {"field": "b", "type": "quantitative", "aggregate": "sum"}}`)
+	area := marksOf(s, "mark")[0].Items[0]
+	if area.Fill.Gradient == nil || area.Fill.Gradient.Stops[1].Color != "#006400" {
+		t.Fatalf("the area fills with %+v, want the gradient of the spec", area.Fill)
+	}
+	line := marksOf(s, "zuzu-area-line")
+	if len(line) != 1 || line[0].Items[0].Stroke.Color != "rgb(0,100,0)" {
+		t.Errorf("the line on top is %+v, want the color at the top of the gradient", line)
+	}
+}
+
 func TestBubbleOrder(t *testing.T) {
 	t.Parallel()
 	s := renderVL(t, `"mark": "circle",
@@ -166,6 +243,27 @@ func TestLineEnds(t *testing.T) {
 	}
 	if len(marksOf(s, "legend")) != 0 {
 		t.Error("the legend draws although the lines name each series")
+	}
+}
+
+// TestLineEndFormat checks that the name at the end of a line is written
+// with the format of the legend of its color, as the legend writes it.
+// Before, a series of dates was named with the date string of
+// JavaScript.
+func TestLineEndFormat(t *testing.T) {
+	t.Parallel()
+	s := renderVega(t, `"width": 100, "height": 100,
+		"data": [{"name": "d", "values": [{"k": 0, "x": 0, "y": 0}, {"k": 0, "x": 10, "y": 5}]}],
+		"scales": [{"name": "c", "type": "ordinal", "domain": [0], "range": "category"}],
+		"legends": [{"stroke": "c", "format": "%Y", "formatType": "utc"}],
+		"marks": [{"type": "line", "from": {"data": "d"}, "encode": {"enter": {
+			"x": {"field": "x"}, "y": {"field": "y"}, "stroke": {"scale": "c", "field": "k"}}}}]`)
+	labels := marksOf(s, "zuzu-end-label")
+	if len(labels) != 1 || len(labels[0].Items) != 1 {
+		t.Fatalf("%d names at the end of the line, want 1", len(labels))
+	}
+	if got := labels[0].Items[0].Text; len(got) != 1 || got[0] != "1970" {
+		t.Errorf("the name at the end of the line is %q, want 1970", got)
 	}
 }
 
@@ -303,5 +401,36 @@ func TestSankeyLook(t *testing.T) {
 	}
 	if it := marks[1].Items[0]; it.CornerRadius != 3 {
 		t.Errorf("a node has the corner %v, want 3", it.CornerRadius)
+	}
+}
+
+// TestPointRingOfACustomShape checks that a point keeps the ring of
+// docs/STYLE.md when its shape is a name of Vega, and draws without it when
+// its shape is the path of an SVG, such as the star of
+// point_shape_custom, because the ring covers a thin shape.
+func TestPointRingOfACustomShape(t *testing.T) {
+	t.Parallel()
+	const star = "M0,0.2L0.2351,0.3236 0.1902,0.0618 0.3804,-0.1236 0.1175,-0.1618 0,-0.4 -0.1175,-0.1618 -0.3804,-0.1236 -0.1902,0.0618 -0.2351,0.3236 0,0.2Z"
+	for _, tt := range []struct {
+		shape string
+		ring  bool
+	}{{"circle", true}, {star, false}} {
+		s := renderVL(t, `"mark": {"type": "point", "filled": true, "size": 200, "shape": "`+tt.shape+`"},
+			"encoding": {"x": {"field": "a", "type": "quantitative"}, "y": {"field": "b", "type": "quantitative"}}`)
+		n := 0
+		for _, m := range marksOf(s, "mark") {
+			if m.Type != scene.Symbol {
+				continue
+			}
+			for _, it := range m.Items {
+				n++
+				if got := !it.Stroke.IsZero(); got != tt.ring {
+					t.Errorf("shape %.10s: ring %v, want %v", tt.shape, got, tt.ring)
+				}
+			}
+		}
+		if n == 0 {
+			t.Fatalf("shape %.10s: no points", tt.shape)
+		}
 	}
 }

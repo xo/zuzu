@@ -27,6 +27,9 @@ type Scope struct {
 	Datum any
 	// Parent is the datum of the enclosing group, which it reads as parent.
 	Parent any
+	// Item is the item of the scene that an encoding fills, which it reads
+	// as item. Nil reads as undefined, as item does outside an encoding.
+	Item Object
 	// Signals holds the signals of the view. It can be nil.
 	Signals Signals
 	// Functions holds functions beyond the built in ones, such as the
@@ -277,6 +280,14 @@ func eval(n node, s *Scope) (any, error) {
 	return nil, fmt.Errorf("evaluating a node of type %T: %w", n, ErrSyntax)
 }
 
+// Object is a value whose properties an expression reads by name, as
+// obj.prop reads them, such as an item of the scene that the runtime gives
+// as item. Get returns Undefined for a property that the value does not
+// have.
+type Object interface {
+	Get(name string) any
+}
+
 // ErrUnknownName is the error of a name that is neither datum, parent, a
 // constant nor a signal.
 const ErrUnknownName Error = "unknown name"
@@ -294,7 +305,12 @@ func lookup(name string, s *Scope) (any, error) {
 			return Undefined, nil
 		}
 		return s.Parent, nil
-	case "event", "item":
+	case "item":
+		if s == nil || s.Item == nil {
+			return Undefined, nil
+		}
+		return s.Item, nil
+	case "event":
 		return Undefined, nil
 	}
 	if v, ok := constants[name]; ok {
@@ -330,6 +346,8 @@ func get(obj, prop any) any {
 		}
 	case *Color:
 		return o.get(String(prop))
+	case Object:
+		return o.Get(String(prop))
 	case string:
 		if String(prop) == lengthProp {
 			return float64(len(utf16.Encode([]rune(o))))

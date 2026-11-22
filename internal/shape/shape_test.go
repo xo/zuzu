@@ -207,3 +207,41 @@ func TestShapesScaleACustomPath(t *testing.T) {
 		t.Errorf("got %s, want %s", got, want)
 	}
 }
+
+// TestMonotoneOfAHorizontalArea checks that monotone of a horizontal item is
+// monotoneY of d3-shape, the curve of the points with x and y swapped,
+// swapped back, so that an area of orient horizontal does not fold back on
+// itself between points of x that rise and fall.
+func TestMonotoneOfAHorizontalArea(t *testing.T) {
+	t.Parallel()
+	pts := [][2]float64{{120, 0}, {95, 10}, {150, 20}, {80, 30}, {170, 40}}
+	swapped := make([][2]float64, len(pts))
+	for i, p := range pts {
+		swapped[i] = [2]float64{p[1], p[0]}
+	}
+	got, ok := curve("monotone", pts, true, 0, true)
+	if !ok {
+		t.Fatal("no curve")
+	}
+	want, _ := Curve("monotone", swapped, true, 0)
+	// Swap each pair of the path of the swapped points back.
+	pair := regexp.MustCompile(`(-?[\d.e]+),(-?[\d.e]+)`)
+	if back := pair.ReplaceAllString(want, "$2,$1"); got != back {
+		t.Errorf("horizontal monotone\n got %s\nwant %s", got, back)
+	}
+	// Each segment of y stays between its ends, so the curve never turns back
+	// along y.
+	for _, c := range regexp.MustCompile(`C[^C]*`).FindAllString(got, -1) {
+		ys := pair.FindAllStringSubmatch(c, -1)
+		y1, y2, y := pathNum(ys[0][2]), pathNum(ys[1][2]), pathNum(ys[2][2])
+		if y1 > y || y2 > y {
+			t.Errorf("the segment %s turns back along y", c)
+		}
+	}
+}
+
+// pathNum reads a number of a path.
+func pathNum(s string) float64 {
+	v, _ := strconv.ParseFloat(s, 64)
+	return v
+}

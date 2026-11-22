@@ -178,7 +178,7 @@ func (s *scope) buildScale(st *scaleState) (scale.Scale, error) {
 			o.Zero = &z
 		}
 	}
-	if err := s.scaleRange(d, typ, &o); err != nil {
+	if err := s.scaleRange(d, typ, st.path+"/range", &o); err != nil {
 		return nil, fmt.Errorf("%s/range: %w", st.path, err)
 	}
 	return scale.New(o)
@@ -243,6 +243,23 @@ type fieldRef struct {
 	values []any
 }
 
+// signalValues returns the values of a list that a signal in the fields of
+// a domain gives. As in Vega, the list is a dataset whose field "data"
+// holds each value. An object is a row, and any other value is the field
+// "data" of a row of its own, so that [{data: 1}] and [1] give the same
+// values.
+func signalValues(l []any) []any {
+	out := make([]any, len(l))
+	for i, x := range l {
+		if m, ok := x.(map[string]any); ok {
+			out[i] = m["data"]
+			continue
+		}
+		out[i] = x
+	}
+	return out
+}
+
 // dataDomain collects the domain of a scale from the data: the distinct
 // values of a discrete scale, every value of a quantile scale, and the
 // extent of any other.
@@ -276,7 +293,7 @@ func (s *scope) dataDomain(ref *vega.DataRef, typ string) ([]any, error) {
 					return nil, err
 				}
 				l, _ := v.([]any)
-				fr = fieldRef{values: l}
+				fr = fieldRef{values: signalValues(l)}
 			}
 			refs = append(refs, fr)
 		}
@@ -516,14 +533,36 @@ func extentOf(vals []any) []any {
 	return []any{lo, hi}
 }
 
-// scaleRange resolves the range of a scale into the options.
-func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
+// pieces returns the number of colors that a scale that cuts numbers into
+// pieces takes from a ramp, one for each piece, as Vega counts them: one
+// more than the thresholds of a threshold scale, one less than the edges
+// of the bins of a bin-ordinal scale, and 5 for a quantile or a quantize
+// scale. It returns 0 for any other scale.
+func pieces(typ string, o *scale.Options) int {
+	switch typ {
+	case "threshold":
+		return len(o.Domain) + 1
+	case "bin-ordinal":
+		if len(o.Bins) > 1 {
+			return len(o.Bins) - 1
+		}
+	case "quantile", "quantize":
+		return 5
+	}
+	return 0
+}
+
+// scaleRange resolves the range of a scale into the options. path names
+// the range in the spec.
+func (s *scope) scaleRange(d *vega.Scale, typ, path string, o *scale.Options) error {
 	r := d.Range
 	t := s.rt.theme
 	switch {
 	case r.Name != "" && r.Name != "width" && r.Name != "height":
-		if vals, ok := s.namedRange(r.Name, typ, len(o.Domain)); ok {
-			// The range of the config of the spec goes over the theme.
+		// The range of the config of the spec goes over the theme.
+		if vals, ref, ok := s.namedRange(r.Name); ok && ref != nil {
+			return s.scheme(ref, typ, path, o)
+		} else if ok {
 			o.Range = vals
 			return nil
 		}
@@ -559,6 +598,9 @@ func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
 				if typ != "ordinal" {
 					n = max(n-1, 2)
 				}
+				if c := pieces(typ, o); c > 0 {
+					n = c
+				}
 				o.Range = ramp(seq, n)
 			}
 		case "diverging":
@@ -573,6 +615,11 @@ func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
 			if err != nil {
 				return err
 			}
+			if v.Signal == "" {
+				// A color that the range names flips in the dark mode, as
+				// a color of an encoding does (D48 part 1).
+				x = s.rt.specColor(x)
+			}
 			out[i] = x
 		}
 		o.Range = out
@@ -584,16 +631,7 @@ func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
 		l, _ := v.([]any)
 		o.Range = l
 	case r.Scheme != nil:
-		count := 0.0
-		if !r.Scheme.Count.IsZero() {
-			v, err := s.value(r.Scheme.Count)
-			if err != nil {
-				return err
-			}
-			count = number(v, 0)
-		}
-		o.Range = s.scheme(r.Scheme, typ, int(count), len(o.Domain))
-		o.Scheme = true
+		return s.scheme(r.Scheme, typ, path, o)
 	case !r.Step.IsZero():
 		v, err := s.value(r.Step)
 		if err != nil {
@@ -610,47 +648,143 @@ func (s *scope) scaleRange(d *vega.Scale, typ string, o *scale.Options) error {
 	return nil
 }
 
-// scheme returns the colors of a scheme of a range. zuzu draws its own
-// colors (D12): a scheme of categories takes the colors of the theme, a
-// diverging scheme the diverging ramp, a cyclical scheme the wheel of the
-// categorical colors, and any other scheme the sequential ramp (D35).
-func (s *scope) scheme(ref *vega.SchemeRef, typ string, count, n int) []any {
-	t := s.rt.theme
-	name := ""
-	if v, err := s.value(ref.Scheme); err == nil {
-		name = expr.String(v)
+// scheme resolves a scheme of a range into the options, as Vega does
+// (D46). A scheme that Vega names, such as viridis or tableau10, or a list
+// of colors, draws in its own colors, in either mode. A sequential or a
+// diverging scale maps through a continuous scheme, from the first end of
+// its extent to the other, and reverse swaps the ends. Any other scale
+// takes colors of the scheme: each color of a discrete scheme, or as many
+// as the scale needs, and samples of a continuous scheme without its ends.
+// A name that Vega does not have is an issue, and takes the colors of the
+// theme.
+func (s *scope) scheme(ref *vega.SchemeRef, typ, path string, o *scale.Options) error {
+	o.Scheme = true
+	v, err := s.value(ref.Scheme)
+	if err != nil {
+		return err
 	}
-	if categorical[name] || (typ == "ordinal" && count == 0 && !sequential(name)) {
-		return strs(t.Category)
+	count := 0
+	if !ref.Count.IsZero() {
+		c, err := s.value(ref.Count)
+		if err != nil {
+			return err
+		}
+		count = int(number(c, 0))
 	}
-	discrete := scale.Discrete(typ) || typ == "quantize" || typ == "quantile" || typ == "threshold"
-	if cyclical[name] {
-		// A continuous scale with no count takes each categorical color and
-		// the first again, so that it holds every hue of the wheel. A
-		// discrete scale spreads its colors round the wheel, so that the
-		// last is not the first again.
-		switch {
-		case !discrete && count <= 0:
-			return ramp(t.Cyclical, len(t.Category)+1)
-		case !discrete:
-			return ramp(t.Cyclical, count)
-		case count <= 0:
-			count = max(n, 2)
+	var sch scale.Scheme
+	if l, ok := v.([]any); ok {
+		sch = scale.Scheme{Continuous: true, Interpolate: o.Interpolate}
+		for _, c := range l {
+			sch.Colors = append(sch.Colors, expr.String(c))
 		}
-		out := make([]any, count)
-		for i := range out {
-			out[i] = t.Cyclical(float64(i) / float64(count))
+	} else if sch, ok = scale.NamedScheme(expr.String(v)); !ok {
+		if err := s.rt.issue(vega.ErrInvalidSpec, path+"/scheme", "the scheme %q, which Vega does not have", expr.String(v)); err != nil {
+			return err
 		}
-		return out
+		o.Range = s.themeScheme(typ, count, len(o.Domain))
+		return nil
+	}
+	lo, hi := 0.0, 1.0
+	if !ref.Extent.IsZero() {
+		e, err := s.value(ref.Extent)
+		if err != nil {
+			return err
+		}
+		if l, ok := e.([]any); ok && len(l) >= 2 {
+			lo, hi = number(l[0], 0), number(l[len(l)-1], 1)
+		}
+	}
+	// at is the scheme over its extent. A discrete scale reverses its
+	// colors itself, so reverse swaps the ends of the interpolator only.
+	at := func(t float64) string { return sch.At(lo + t*(hi-lo)) }
+	n := len(o.Domain)
+	switch {
+	case !scale.Discrete(typ) && !discretizing(typ):
+		if !sch.Continuous {
+			// A sequential or a diverging scale interpolates between all the
+			// colors, and any other takes one color for each value of the
+			// domain.
+			o.Range = strs(sch.Colors)
+			if !colorRamp(o) {
+				o.Range = o.Range[:min(n, len(o.Range))]
+			}
+			return nil
+		}
+		if o.Reverse {
+			o.Interpolator = func(t float64) string { return sch.At(hi + t*(lo-hi)) }
+		} else {
+			o.Interpolator = at
+		}
+		o.Range = scale.Sample(at, n)
+		return nil
+	case typ == "threshold":
+		n++
+	case typ == "bin-ordinal":
+		if p := pieces(typ, o); p > 0 {
+			n = p
+		} else {
+			n--
+		}
+	case typ == "ordinal":
+		if count > 0 {
+			n = count
+		}
+		if n <= 0 {
+			n = 5
+		}
+	case typ == "quantize" || typ == "quantile":
+		n = 5
+		if count > 0 {
+			n = count
+		}
+	}
+	switch {
+	case sch.Continuous:
+		o.Range = scale.Sample(at, n)
+	case typ == "ordinal":
+		o.Range = strs(sch.Colors)
+	default:
+		o.Range = strs(sch.Colors[:max(0, min(n, len(sch.Colors)))])
+	}
+	return nil
+}
+
+// discretizing reports whether a scale type cuts a continuous domain into
+// the values of a discrete range.
+func discretizing(typ string) bool {
+	switch typ {
+	case "quantize", "quantile", "threshold", "bin-ordinal":
+		return true
+	}
+	return false
+}
+
+// colorRamp reports whether a continuous scale of colors is sequential or
+// diverging, as Vega names it from the count of its domain and its middle.
+// Such a scale interpolates over the whole of its range.
+func colorRamp(o *scale.Options) bool {
+	if o.Type == "time" || o.Type == "utc" {
+		return false
+	}
+	n := len(o.Domain)
+	if !math.IsNaN(o.DomainMid) {
+		n++
+	}
+	return n <= 3
+}
+
+// themeScheme returns the colors of the theme for a scheme that Vega does
+// not have: the categorical colors for an ordinal scale with no count, and
+// the sequential ramp for any other scale.
+func (s *scope) themeScheme(typ string, count, n int) []any {
+	if typ == "ordinal" && count == 0 {
+		return strs(s.rt.theme.Category)
 	}
 	if count <= 0 {
 		count = 9
-		if discrete {
+		if scale.Discrete(typ) || typ == "quantize" || typ == "quantile" || typ == "threshold" {
 			count = max(n, 2)
 		}
-	}
-	if diverging[name] {
-		return ramp(t.Diverging, count)
 	}
 	return ramp(s.rampTheme().Sequential, count)
 }
@@ -679,28 +813,6 @@ func (s *scope) rampTheme() theme.Theme {
 	}
 	t.Background = color.Mix(over, color.RGBA{R: v.R, G: v.G, B: v.B, A: 1}, v.A, "rgb").Hex()
 	return t
-}
-
-// categorical are the schemes of Vega for categories.
-var categorical = map[string]bool{
-	"accent": true, "category10": true, "category20": true, "category20b": true, "category20c": true,
-	"dark2": true, "paired": true, "pastel1": true, "pastel2": true, "set1": true, "set2": true,
-	"set3": true, "tableau10": true, "tableau20": true, "observable10": true,
-}
-
-// diverging are the diverging schemes of Vega.
-var diverging = map[string]bool{
-	"blueorange": true, "brownbluegreen": true, "purplegreen": true, "pinkyellowgreen": true,
-	"purpleorange": true, "redblue": true, "redgrey": true, "redyellowblue": true,
-	"redyellowgreen": true, "spectral": true,
-}
-
-// cyclical are the cyclical schemes of Vega.
-var cyclical = map[string]bool{"rainbow": true, "sinebow": true}
-
-// sequential reports whether a scheme name is not a scheme of categories.
-func sequential(name string) bool {
-	return name != "" && !categorical[name]
 }
 
 // ramp samples n colors of a ramp.

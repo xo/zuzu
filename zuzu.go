@@ -21,6 +21,7 @@ import (
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/icon"
 	"github.com/xo/zuzu/raster"
 	"github.com/xo/zuzu/scale"
@@ -62,10 +63,17 @@ const (
 	// parse has no WithNow, in the strict mode. In the loose mode, now()
 	// gives 0 and the report names the expression once (D38).
 	ErrNoNow Error = "no time of the render"
+	// ErrNoLookFont is the warning of a look drawn by hand when the render
+	// has no font of the look, which WithLookFont gives. The look draws its
+	// text in IBM Plex Sans, so nothing is dropped, and the report holds
+	// the warning in either mode, never an error (D40).
+	ErrNoLookFont Error = "no font of the look"
 )
 
 // Report lists what zuzu did not draw in the loose mode, and what it warns
-// of in either mode (D26).
+// of in either mode (D26). A warning, such as an issue that wraps
+// ErrNoLookFont, draws in full in another way, so the strict mode reports
+// it and does not turn it into an error.
 type Report = vega.Report
 
 // Dialect is the language of a spec.
@@ -113,6 +121,16 @@ type options struct {
 	// lays out when it compiles measures an emoji with, and which a render
 	// with no font of its own draws with (D38).
 	emoji []*text.Fallback
+	// look is the look of WithLook, and hasLook says that the option set
+	// it. lookFonts are the fonts of WithLookFont, by look (D40).
+	look      theme.Look
+	hasLook   bool
+	lookFonts map[theme.Look]*text.Fallback
+	// engines are the engines of WithLayoutEngine, and layout the layout of
+	// WithLayout, which hasLayout says the option set (D45).
+	engines   []graph.Engine
+	layout    string
+	hasLayout bool
 	// now is the time of WithNow, or the zero time.
 	now time.Time
 }
@@ -186,6 +204,9 @@ type Chart struct {
 	// report holds the issues of the compile of a Vega-Lite spec, which
 	// each render reports again.
 	report Report
+	// diagram says that the spec comes from a diagram of DOT or Mermaid,
+	// whose colors the dark mode does not flip (D48 part 1).
+	diagram bool
 }
 
 // Parse reads a Vega or a Vega-Lite spec, or a diagram of DOT or Mermaid
@@ -333,6 +354,16 @@ type renderOptions struct {
 	// set it.
 	scale    float64
 	hasScale bool
+	// look is the look of WithLook, and hasLook says that the option set
+	// it. lookFonts are the fonts of WithLookFont, by look (D40).
+	look      theme.Look
+	hasLook   bool
+	lookFonts map[theme.Look]*text.Fallback
+	// engines are the engines of WithLayoutEngine, and layout the layout of
+	// WithLayout, which hasLayout says the option set (D45).
+	engines   []graph.Engine
+	layout    string
+	hasLayout bool
 }
 
 // WithScale draws the image of Image at a scale, as a ratio of device
@@ -479,29 +510,41 @@ func (c *Chart) NewView(ctx context.Context, opts ...RenderOption) (*View, Repor
 		}
 		wantW, wantH := rt.wantW, rt.wantH
 		// The guides of a smaller plot can take another size, so a render
-		// that misses the size corrects the plot again, twice at most.
+		// that misses the size corrects the plot again, twice at most. A
+		// correction that does not bring the canvas nearer to the size
+		// stops, and the render that came nearest stays.
+		var best *runtime
+		var bestScene *scene.Scene
+		bestMiss := math.Inf(1)
 		for range 3 {
 			again, err := newRuntime(ctx, c, append(slices.Clone(opts), WithSize(fw, fh)))
 			if err != nil {
 				return nil, nil, err
 			}
-			if s, err = again.render(); err != nil {
+			got, err := again.render()
+			if err != nil {
 				return nil, again.report, err
 			}
-			rt = again
 			dw, dh := 0.0, 0.0
 			if wantW > 0 {
-				dw = wantW - s.Width
+				dw = wantW - again.fitCanvasW
 			}
 			if wantH > 0 {
-				dh = wantH - s.Height
+				dh = wantH - again.fitCanvasH
 			}
-			if math.Abs(dw) < 1 && math.Abs(dh) < 1 {
+			miss := math.Abs(dw) + math.Abs(dh)
+			if miss >= bestMiss {
+				break
+			}
+			best, bestScene, bestMiss = again, got, miss
+			if (math.Abs(dw) < 1 && math.Abs(dh) < 1) || (wantW > 0 && fw+dw <= 0) || (wantH > 0 && fh+dh <= 0) {
 				break
 			}
 			fw, fh = fw+dw, fh+dh
 		}
+		rt, s = best, bestScene
 	}
+	rt.sketch(s)
 	return &View{rt: rt, scene: s}, rt.report, nil
 }
 
@@ -535,14 +578,16 @@ func (c *Chart) Render(ctx context.Context, opts ...RenderOption) (*scene.Scene,
 	return v.scene, report, nil
 }
 
-// SVG renders the chart and writes it as SVG.
+// SVG renders the chart and writes it as SVG. In a look drawn by hand, the
+// SVG embeds the font of the look, such as Excalifont, so that a viewer
+// that lacks the font draws the text in it (D43).
 func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Report, error) {
-	s, report, err := c.Render(ctx, opts...)
+	v, report, err := c.NewView(ctx, opts...)
 	if err != nil {
 		return report, err
 	}
 	var b bytes.Buffer
-	if err := svg.Write(&b, s); err != nil {
+	if err := svg.Write(&b, v.scene, svg.WithFont(v.rt.lookFont)); err != nil {
 		return report, err
 	}
 	_, err = w.Write(b.Bytes())
@@ -550,15 +595,17 @@ func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Rep
 }
 
 // Image renders the chart and draws it with the direct renderer of okage
-// (D11). The text draws in the bundled IBM Plex Sans (D16), and the fonts
-// of WithEmoji, and in no font of the system, so that a chart gives the
-// same pixels on every machine. A character that no font has draws nothing
-// (D32). The pixels are premultiplied, as image.RGBA expects.
+// (D11). The text draws in the bundled IBM Plex Sans (D16), the fonts of
+// WithEmoji and the font of a look drawn by hand of WithLookFont, and in
+// no font of the system, so that a chart gives the same pixels on every
+// machine. A character that no font has draws nothing (D32). The pixels
+// are premultiplied, as image.RGBA expects.
 func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, Report, error) {
-	s, report, err := c.Render(ctx, opts...)
+	v, report, err := c.NewView(ctx, opts...)
 	if err != nil {
 		return nil, report, err
 	}
+	s := v.scene
 	var o renderOptions
 	for _, opt := range opts {
 		opt.applyRender(&o)
@@ -572,6 +619,10 @@ func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, R
 		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family),
 	}
 	fallbacks := c.fallbacks(&o)
+	if v.rt.lookFont != nil {
+		// The font of the look draws the text whose family names it.
+		fallbacks = append(slices.Clone(fallbacks), v.rt.lookFont)
+	}
 	for _, f := range fallbacks {
 		fopts = append(fopts, okagesvg.WithFontFile(f.Data()))
 	}

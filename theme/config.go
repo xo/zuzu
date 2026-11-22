@@ -8,10 +8,17 @@ package theme
 // bgcolor of a graph of DOT (D37). The mode follows its lightness, over the
 // mode of the caller and of ConfigMode. A background that the caller gives
 // wins over it.
+//
+// ConfigLook names a Look, such as excalidraw, and ConfigLookSeed is the
+// seed of a look drawn by hand, a whole number (D35 part 12, D40). A
+// Mermaid diagram fills them from its look and its handDrawnSeed. A look
+// that the caller gives wins over ConfigLook.
 const (
 	ConfigMode       = "zuzu.mode"
 	ConfigScheme     = "zuzu.scheme"
 	ConfigBackground = "zuzu.background"
+	ConfigLook       = "zuzu.look"
+	ConfigLookSeed   = "zuzu.lookSeed"
 )
 
 // The styles that the compiler of Vega-Lite names for the color of a mark
@@ -52,6 +59,11 @@ const (
 	// StyleReference is the style of a rule of Vega-Lite across the whole
 	// plot, a reference line.
 	StyleReference = "zuzu.reference"
+	// StyleOwn is the prefix of a style that says that the spec gives a
+	// property to a part of a box plot, an error bar or an error band,
+	// such as zuzu.own.color for "median": {"color": "red"}. The look of
+	// zuzu keeps that property (docs/STYLE.md).
+	StyleOwn = "zuzu.own."
 	// Hierarchy is the property of the config of a rect, a symbol and an
 	// arc that draws the nodes of a hierarchy: a group as a tint of its
 	// color, with its name.
@@ -64,15 +76,21 @@ const (
 	// corners.
 	Sankey = "zuzu.sankey"
 	// StyleNode and the styles after it are the styles of the marks of a
-	// diagram of DOT or Mermaid (D31): a node, a node in the neutral color
+	// diagram of DOT or Mermaid (D31): a node, a solid node, which fills
+	// with the color of its outline (D55), a node in the neutral color
 	// muted, such as an external element of a C4 diagram (D32),
 	// its label, an edge, its arrowheads, filled and open, its label and the
 	// box under the label, a cluster and its title, an icon of one
 	// color, filled and stroked, a guide line, such as a lifeline of a
 	// sequence diagram, and a band behind a group of rows, such as a
 	// section of a gantt.
-	StyleNode         = "zuzu.node"
-	StyleNodeMuted    = "zuzu.node.muted"
+	StyleNode      = "zuzu.node"
+	StyleNodeSolid = "zuzu.node.solid"
+	StyleNodeMuted = "zuzu.node.muted"
+	StyleNote      = "zuzu.note"
+	// RangeTint is the named range of the solid tints of the categorical
+	// colors (D55).
+	RangeTint         = "zuzu.tint"
 	StyleNodeLabel    = "zuzu.nodeLabel"
 	StyleEdge         = "zuzu.edge"
 	StyleArrow        = "zuzu.arrow"
@@ -97,6 +115,10 @@ const (
 	StyleArea = "zuzu.area"
 	// StyleAreaStacked is the style of the layer of a stacked area.
 	StyleAreaStacked = "zuzu.area.stacked"
+	// StyleAreaRanged is the style of an area with an end of its own, y2
+	// or x2, such as a band, which draws as a flat tint of its color with
+	// no line along its top (D48 part 3).
+	StyleAreaRanged = "zuzu.area.ranged"
 	// StyleCurve is the style of a line or an area along x, which draws as
 	// a monotone curve.
 	StyleCurve = "zuzu.curve"
@@ -106,7 +128,15 @@ const (
 	// TopLine is the property of a style of an area that draws a line of
 	// that width along its top.
 	TopLine = "zuzu.topLine"
+	// Tint is the property of a style of an area that fills it with its
+	// color at that opacity, when the spec sets no opacity of its own.
+	Tint = "zuzu.tint"
 )
+
+// RangedTint is the opacity of the tint of an area with an end of its own,
+// as docs/STYLE.md says (D48 part 3). It is the opacity of the top of the
+// gradient of an area from zero.
+const RangedTint = 0.32
 
 // Config returns the theme as a Vega config (D14): the defaults of each
 // kind of mark, in the colors of the theme and with the rules of the marks
@@ -115,9 +145,16 @@ const (
 // Each call returns a new value, which the caller owns.
 func (t Theme) Config() map[string]any {
 	c := t.Category[0]
+	tints := make([]any, len(t.Category))
+	for i, x := range t.Category {
+		tints[i] = t.Tint(x)
+	}
 	return map[string]any{
-		"arc":  map[string]any{"fill": c, "padAngle": 0.01, "cornerRadius": 4, Hierarchy: true, Total: true},
-		"area": map[string]any{"fill": c},
+		// RangeTint is the solid tint of each categorical color, which a
+		// node and a panel of a color take (D55).
+		"range": map[string]any{RangeTint: tints},
+		"arc":   map[string]any{"fill": c, "padAngle": 0.01, "cornerRadius": 4, Hierarchy: true, Total: true},
+		"area":  map[string]any{"fill": c},
 		"line": map[string]any{
 			"stroke": c, "strokeWidth": 2.0, "strokeCap": "round", "strokeJoin": "round", EndLabel: true,
 		},
@@ -136,7 +173,8 @@ func (t Theme) Config() map[string]any {
 			StylePoint:              map[string]any{"stroke": t.Background, "strokeWidth": 1.0},
 			StyleBar + "vertical":   map[string]any{CornerRadiusEnd: 3.0, StackGap: 1.5},
 			StyleBar + "horizontal": map[string]any{CornerRadiusEnd: 3.0, StackGap: 1.5},
-			StyleArea:               map[string]any{Gradient: []any{0.32, 0.02}, TopLine: 2.0, MarkHigh: true},
+			StyleArea:               map[string]any{Gradient: []any{RangedTint, 0.02}, TopLine: 2.0, MarkHigh: true},
+			StyleAreaRanged:         map[string]any{Tint: RangedTint},
 			StyleReference:          map[string]any{Reference: true},
 			// The layers of a stacked area are full colors, with a line of
 			// the background between them.
@@ -144,8 +182,13 @@ func (t Theme) Config() map[string]any {
 			StyleCurve:       map[string]any{"interpolate": "monotone"},
 			// A node is a tint of its color with an outline of 1.25, and an
 			// edge a line of EdgeWidth in the color of an edge (D31, D32).
-			StyleNode:         map[string]any{"fill": c, "fillOpacity": NodeTint, "stroke": c, "strokeWidth": NodeOutline},
-			StyleNodeMuted:    map[string]any{"fill": t.Muted, "fillOpacity": NodeTint, "stroke": t.Muted, "strokeWidth": NodeOutline},
+			StyleNode:      map[string]any{"fill": t.Tint(c), "stroke": c, "strokeWidth": NodeOutline},
+			StyleNodeMuted: map[string]any{"fill": t.Tint(t.Muted), "stroke": t.Muted, "strokeWidth": NodeOutline},
+			// A solid node, such as the start of a state diagram, fills
+			// with the color of its outline (D55).
+			StyleNodeSolid: map[string]any{"fill": c},
+			// A note takes the yellow of the scheme, as a note on paper.
+			StyleNote:         map[string]any{"fill": t.Tint(t.Note), "stroke": t.Note},
 			StyleNodeLabel:    map[string]any{"fill": t.Text, "fontSize": 11.0},
 			StyleEdge:         map[string]any{"stroke": t.Edge, "strokeWidth": EdgeWidth, "strokeCap": "round", "strokeJoin": "round"},
 			StyleArrow:        map[string]any{"fill": t.Edge, "stroke": t.Edge, "strokeWidth": 1.0, "strokeJoin": "round"},

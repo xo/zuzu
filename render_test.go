@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -640,6 +641,27 @@ func TestAutosizeFit(t *testing.T) {
 	}
 	if fit.Width < 199 || fit.Width > 201 {
 		t.Errorf("the fit is %v wide, want 200", fit.Width)
+	}
+}
+
+// TestAutosizeFitWideTitle checks that a title that is wider than the
+// chart does not make the autosize fit shrink the plot area again and
+// again. The plot area gives up only what its axes take.
+func TestAutosizeFitWideTitle(t *testing.T) {
+	t.Parallel()
+	plotWidth := func(title string) float64 {
+		s := renderVega(t, `"width": 300, "height": 200, "padding": 5, "autosize": {"type": "fit", "contains": "padding"},
+			"title": {"text": "`+title+`", "anchor": "start", "frame": "bounds"},
+			"scales": [{"name": "y", "type": "linear", "domain": [0, 1000000], "range": "height"}],
+			"axes": [{"scale": "y", "orient": "left"}]`)
+		return s.Root.Items[0].Width
+	}
+	short := plotWidth("T")
+	if short < 200 || short > 290 {
+		t.Fatalf("the plot area under a short title is %v wide, want from 200 to 290", short)
+	}
+	if wide := plotWidth(strings.Repeat("A wide title ", 8)); math.Abs(wide-short) > 1 {
+		t.Errorf("the plot area under a wide title is %v wide, want %v as under a short title", wide, short)
 	}
 }
 

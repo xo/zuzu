@@ -641,7 +641,7 @@ func (l *gitLayout) spec() map[string]any {
 	})
 	mark("branchBoxes", "rect", "branchBoxes", style(graph.StyleNode), map[string]any{
 		"x": field("x"), "x2": field("x2"), "y": field("y"), "y2": field("y2"),
-		"fill": color, "stroke": color, "cornerRadius": value(4),
+		"fill": map[string]any{"scale": "tint", "field": "key"}, "stroke": color, "cornerRadius": value(4),
 	})
 	mark("branchLabels", "text", "branchLabels", style(graph.StyleNodeLabel), map[string]any{
 		"x": field("x"), "y": field("y"), "text": field("lines"), "align": value("center"), "baseline": value("middle"),
@@ -658,7 +658,7 @@ func (l *gitLayout) spec() map[string]any {
 		"autosize": "pad",
 		"padding":  map[string]any{"left": pad, "right": pad, "top": pad, "bottom": pad},
 		"data":     data,
-		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}},
+		"scales":   []any{map[string]any{"name": "color", "type": "ordinal", "domain": domain, "range": "category"}, graph.TintScale("tint", domain)},
 		"marks":    marks,
 	}
 }

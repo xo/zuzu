@@ -5,6 +5,7 @@ import (
 
 	"github.com/xo/zuzu/layout"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/vega"
 )
 
 // gridLayout places the groups of a scope that has a layout in a grid, as
@@ -12,8 +13,9 @@ import (
 // row headers at the left of each row, the column headers above each
 // column and the column footers below the last row, and the titles beside
 // the headers. A cell takes the full bounds of what it draws, with its
-// axes, so that two cells never overlap.
-func (s *scope) gridLayout(marks []scene.Mark) error {
+// axes, so that two cells never overlap, or only its width and its height
+// with the bounds flush.
+func (s *scope) gridLayout(marks []scene.Mark, path string) error {
 	v, err := s.value(s.spec.Layout)
 	if err != nil {
 		return err
@@ -64,6 +66,9 @@ func (s *scope) gridLayout(marks []scene.Mark) error {
 		}
 	}
 	columns = max(1, min(columns, len(cells)))
+	if err := s.gridIssues(opts, cells, path); err != nil {
+		return err
+	}
 	rows := (len(cells) + columns - 1) / columns
 	// The extent of each cell beyond its box, from its axes and its
 	// titles.
@@ -76,9 +81,20 @@ func (s *scope) gridLayout(marks []scene.Mark) error {
 	right := make([]float64, columns)
 	top := make([]float64, rows)
 	bottom := make([]float64, rows)
+	// The bounds flush give a cell only its width and its height, so that
+	// its titles and its labels reach into the padding, as in Vega.
+	flush := opts["bounds"] == "flush"
 	for i, it := range cells {
 		r, c := i/columns, i%columns
-		b := bounds(it)
+		b := layout.Bounds{X2: it.Width, Y2: it.Height}
+		if !flush {
+			b = bounds(it)
+		} else if t := s.titleTop(it, st); t < 0 {
+			// The look puts the title of a vertical axis above the plot,
+			// where Vega turns it beside the axis, so a flush cell keeps
+			// room for it, and the title does not cover the cell above.
+			b.Y1 = t
+		}
 		left[c] = math.Max(left[c], -math.Min(0, b.X1))
 		right[c] = math.Max(right[c], math.Max(it.Width, b.X2))
 		top[r] = math.Max(top[r], -math.Min(0, b.Y1))
@@ -152,4 +168,71 @@ func (s *scope) gridLayout(marks []scene.Mark) error {
 		s.item.Width, s.item.Height = math.Max(s.item.Width, width), math.Max(s.item.Height, height)
 	}
 	return nil
+}
+
+// gridIssues reports the parts of a layout that the grid does not follow
+// (hard rule 4). The grid aligns each column and each row on its own, as
+// the align each of Vega does. The align all gives the same grid when every
+// cell has the same size, as in a facet, so it goes in the report only when
+// the sizes differ. The align none and center go in the report.
+func (s *scope) gridIssues(opts map[string]any, cells []*scene.Item, path string) error {
+	align := opts["align"]
+	if m, ok := align.(map[string]any); ok {
+		if m["row"] == m["column"] {
+			align = m["row"]
+		}
+	}
+	report := false
+	switch align {
+	case nil, "each":
+	case "all":
+		for _, c := range cells[1:] {
+			if c.Width != cells[0].Width || c.Height != cells[0].Height {
+				report = true
+			}
+		}
+	default:
+		report = true
+	}
+	if report {
+		if err := s.rt.issue(vega.ErrUnsupported, path+"/align", "the align %v of a layout", align); err != nil {
+			return err
+		}
+	}
+	if _, ok := opts["center"]; ok {
+		if err := s.rt.issue(vega.ErrUnsupported, path+"/center", "the center of a layout"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// titleTop returns the top of the highest title of an axis in a cell, in
+// the frame of the cell, or 0 when no title reaches above the cell. It
+// looks into the groups inside the cell, such as the views of a
+// concatenation.
+func (s *scope) titleTop(cell *scene.Item, st layout.Style) float64 {
+	top := 0.0
+	var walk func(marks []scene.Mark, dx, dy float64)
+	walk = func(marks []scene.Mark, dx, dy float64) {
+		for i := range marks {
+			m := &marks[i]
+			if m.Role == "axis-title" {
+				b := st.MarkBounds(m)
+				if !b.IsEmpty() {
+					top = math.Min(top, dy+b.Y1)
+				}
+				continue
+			}
+			if m.Type != scene.Group {
+				continue
+			}
+			for j := range m.Items {
+				g := &m.Items[j]
+				walk(g.Items, dx+g.X, dy+g.Y)
+			}
+		}
+	}
+	walk(cell.Items, 0, 0)
+	return top
 }

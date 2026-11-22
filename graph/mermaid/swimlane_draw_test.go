@@ -107,6 +107,21 @@ func TestSwimlaneFixtures(t *testing.T) {
 				if _, ok := nodes[n.ID]; !ok {
 					t.Errorf("node %s does not draw", n.ID)
 				}
+				if len(n.Runs) > 0 {
+					// A label in more than one font draws each run as a
+					// text of its own.
+					for _, run := range n.Runs {
+						want := strings.TrimSpace(run.Text)
+						if want == "" {
+							continue
+						}
+						got := countDrawn(items, scene.Text, func(it drawnItem) bool { return strings.TrimSpace(it.text) == want })
+						if got == 0 {
+							t.Errorf("node %s: the run %q does not draw", n.ID, want)
+						}
+					}
+					continue
+				}
 				label := strings.ReplaceAll(n.Label, "**", "")
 				if label != "" && textDrawn(items, label) != 1 {
 					t.Errorf("node %s: expected its label %q once, got %d", n.ID, label, textDrawn(items, label))

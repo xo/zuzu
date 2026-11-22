@@ -361,6 +361,39 @@ func TestLayLoopSide(t *testing.T) {
 	}
 }
 
+// TestLayLoopArrows checks that the arrowhead at each end of a loop lies
+// along the curve where the curve meets the node, in each direction, so
+// that the arrowhead sits on the line and does not point off it.
+func TestLayLoopArrows(t *testing.T) {
+	t.Parallel()
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 40, Height: 20}},
+		Edges: []LayoutEdge{{Source: "a", Target: "a"}},
+	}
+	angle := func(to, from [2]float64) float64 {
+		return math.Atan2(to[1]-from[1], to[0]-from[0]) * 180 / math.Pi
+	}
+	near := func(a, b float64) bool {
+		d := math.Mod(math.Abs(a-b), 360)
+		return math.Min(d, 360-d) < 1e-6
+	}
+	for _, dir := range []string{TB, BT, LR, RL} {
+		in.Direction = dir
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e := l.Edges[0]
+		p := e.Points
+		if want := angle(p[3], p[2]); !near(e.EndAngle, want) {
+			t.Errorf("%s: the arrowhead at the end turns to %v, want %v along the curve", dir, e.EndAngle, want)
+		}
+		if want := angle(p[0], p[1]); !near(e.StartAngle, want) {
+			t.Errorf("%s: the arrowhead at the start turns to %v, want %v along the curve", dir, e.StartAngle, want)
+		}
+	}
+}
+
 func TestLayLoopOutline(t *testing.T) {
 	t.Parallel()
 	// The ends of a loop sit on the outline of an ellipse or a circle, not
@@ -523,6 +556,82 @@ func TestLayParallel(t *testing.T) {
 						t.Errorf("%s, back %v: the end %v of edge %d is not on the border of %v", dir, back, end, i, n)
 					}
 				}
+			}
+		}
+	}
+}
+
+// TestLayLongEdgeClearsNodes checks that a long edge crosses a rank between
+// its ends at the place that the layout keeps for it, and not across a node
+// of the rank. A B-spline through one point between the ends cuts the
+// corner toward the line between them, so the route takes a point at the
+// top and at the bottom of the rank too. In dot/31-weights, the edge from a
+// to d passed through c.
+func TestLayLongEdgeClearsNodes(t *testing.T) {
+	t.Parallel()
+	w := func(v float64) *float64 { return &v }
+	in := LayoutInput{
+		Direction: TB,
+		Nodes:     []LayoutNode{{ID: "a", Width: 50, Height: 39}, {ID: "b", Width: 50, Height: 39}, {ID: "c", Width: 50, Height: 39}, {ID: "d", Width: 50, Height: 39}},
+		Edges: []LayoutEdge{{Source: "a", Target: "b", Weight: w(8)}, {Source: "a", Target: "c"}, {Source: "b", Target: "d"},
+			{Source: "c", Target: "d", Weight: w(0)}, {Source: "a", Target: "d"}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := l.Nodes[2]
+	pts := l.Edges[4].Points
+	// The B-spline crosses the rank of c where its point in the rank
+	// pulls it, between the points at the top and the bottom of the rank.
+	var in3 [][2]float64
+	for _, p := range pts {
+		if p[1] >= c.Y-c.Height/2-1e-9 && p[1] <= c.Y+c.Height/2+1e-9 {
+			in3 = append(in3, p)
+		}
+	}
+	if len(in3) != 3 {
+		t.Fatalf("the edge has %d points in the rank of c, want 3: %v", len(in3), pts)
+	}
+	for _, p := range in3 {
+		if p[0] != in3[0][0] {
+			t.Errorf("the points of the edge in the rank of c are %v, want one x", in3)
+		}
+		if math.Abs(p[0]-c.X) <= c.Width/2 {
+			t.Errorf("the edge crosses the rank of c at x %v, inside c from %v to %v", p[0], c.X-c.Width/2, c.X+c.Width/2)
+		}
+	}
+}
+
+// TestLayStepEdges checks that an edge with a curve of steps between two
+// ranks turns at a bend halfway between them, level with the center of its
+// target, so that it comes straight into the middle of the side of its
+// target and its arrowhead points along it, as in diagrams/17-init.
+func TestLayStepEdges(t *testing.T) {
+	t.Parallel()
+	for _, dir := range []string{TB, LR} {
+		in := LayoutInput{
+			Direction: dir,
+			Nodes:     []LayoutNode{{ID: "a", Width: 60, Height: 30}, {ID: "b", Width: 60, Height: 30}, {ID: "c", Width: 60, Height: 30}},
+			Edges:     []LayoutEdge{{Source: "a", Target: "b", Curve: "stepBefore"}, {Source: "a", Target: "c", Curve: "stepBefore"}},
+		}
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for k, e := range l.Edges {
+			n := l.Nodes[k+1]
+			last := e.Points[len(e.Points)-1]
+			if len(e.Points) != 3 {
+				t.Errorf("%s: the edge to %s has %d points, want 3", dir, in.Nodes[k+1].ID, len(e.Points))
+				continue
+			}
+			want, at := 90.0, last[0]-n.X
+			if dir == LR {
+				want, at = 0, last[1]-n.Y
+			}
+			if math.Abs(at) > 1e-6 || math.Abs(e.EndAngle-want) > 1e-6 {
+				t.Errorf("%s: the edge to %s ends %v off the middle at the angle %v, want 0 off at %v", dir, in.Nodes[k+1].ID, at, e.EndAngle, want)
 			}
 		}
 	}

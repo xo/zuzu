@@ -34,10 +34,10 @@ var foreignRef = regexp.MustCompile(`\b(?:dbmeta|okage|transit|usql)(?:'s)?\s+D[
 var bareMention = regexp.MustCompile(`(?:^|[\s` + "`" + `(])((?:docs/)?[A-Z][A-Z_]*\.md)`)
 
 // TestEveryMarkdownLinkResolves walks every document and every Go comment and
-// checks that each file it names exists.
+// checks that each file it names exists. A file of a copy is not read.
 func TestEveryMarkdownLinkResolves(t *testing.T) {
 	t.Parallel()
-	for _, path := range repoFiles(t, ".md", ".go", ".yml") {
+	for _, path := range ownFiles(t, ".md", ".go", ".yml") {
 		body := read(t, path)
 		dir := filepath.Dir(path)
 		for _, m := range markdownLink.FindAllStringSubmatch(body, -1) {
@@ -70,14 +70,15 @@ var generated = map[string]bool{
 
 // TestEveryDecisionReferenceExists checks that a decision named by number is a
 // decision that was written. A reference to a number that nobody wrote is how
-// a reader ends up trusting a rule that does not exist.
+// a reader ends up trusting a rule that does not exist. A file of a copy is
+// not read, because it can name a decision of its own project.
 func TestEveryDecisionReferenceExists(t *testing.T) {
 	t.Parallel()
 	written := make(map[string]bool)
 	for _, d := range decisions(t) {
 		written[d.num] = true
 	}
-	for _, path := range repoFiles(t, ".md", ".go") {
+	for _, path := range ownFiles(t, ".md", ".go") {
 		body := foreignRef.ReplaceAllString(read(t, path), "")
 		for _, m := range decisionRef.FindAllStringSubmatch(body, -1) {
 			if !written[m[1]] {
@@ -350,7 +351,9 @@ func TestTheDocumentsNameNoPerson(t *testing.T) {
 
 // repoFiles returns every file with one of the given extensions. It skips the
 // folders whose name starts with a dot, other than .github, the packages that
-// npm installs, and the test data, which holds the files of other projects.
+// npm installs, the test data, which holds the files of other projects, and
+// the checkouts of the upstreams in the folder upstream, which git ignores
+// (docs/UPSTREAM.md).
 func repoFiles(t *testing.T, exts ...string) []string {
 	t.Helper()
 	var out []string
@@ -361,7 +364,7 @@ func repoFiles(t *testing.T, exts ...string) []string {
 		if d.IsDir() {
 			name := d.Name()
 			if (strings.HasPrefix(name, ".") && name != "." && name != ".github") ||
-				name == "node_modules" || name == "testdata" {
+				name == "node_modules" || name == "testdata" || path == "upstream" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -378,6 +381,103 @@ func repoFiles(t *testing.T, exts ...string) []string {
 		t.Fatal(err)
 	}
 	return out
+}
+
+// ownFiles returns the files of repoFiles that are files of zuzu. It leaves
+// out each file that a copy of another project holds as its upstream wrote
+// it, because its comments follow the rules of that project (D40 part 9). A
+// file that zuzu adds to a copy is kept: the README.md of the copy, and each
+// file whose name starts with zuzu_ (docs/UPSTREAM.md).
+func ownFiles(t *testing.T, exts ...string) []string {
+	t.Helper()
+	copies := copyFolders(t)
+	var out []string
+	for _, path := range repoFiles(t, exts...) {
+		if !isCopied(copies, path) {
+			out = append(out, path)
+		}
+	}
+	return out
+}
+
+// isCopied reports whether a file of the repository is a file of an
+// upstream in one of the folders of a copy.
+func isCopied(copies []string, path string) bool {
+	path = filepath.ToSlash(path)
+	base := filepath.Base(path)
+	if base == "README.md" || strings.HasPrefix(base, "zuzu_") {
+		return false
+	}
+	for _, dir := range copies {
+		if strings.HasPrefix(path, dir+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// copyFolders returns the folders of the copies, from the column path of
+// docs/upstream/upstreams.tsv.
+func copyFolders(t *testing.T) []string {
+	t.Helper()
+	lines := strings.Split(strings.TrimSpace(read(t, filepath.Join("docs", "upstream", "upstreams.tsv"))), "\n")
+	col := -1
+	for i, name := range strings.Split(lines[0], "\t") {
+		if name == "path" {
+			col = i
+		}
+	}
+	if col < 0 {
+		t.Fatal("docs/upstream/upstreams.tsv has no column path")
+	}
+	var out []string
+	for _, line := range lines[1:] {
+		fields := strings.Split(line, "\t")
+		if len(fields) <= col {
+			t.Fatalf("docs/upstream/upstreams.tsv: the row %q has no column path", line)
+		}
+		for dir := range strings.SplitSeq(fields[col], ", ") {
+			out = append(out, strings.TrimSuffix(dir, "/"))
+		}
+	}
+	return out
+}
+
+// TestEveryCopyFollowsTheRules checks the folders of the copies against the
+// rules of docs/UPSTREAM.md. Each folder exists and holds the license of its
+// upstream and a README.md, and each Go file of the upstream opens with a
+// comment that names the project. A folder that is not in the list is not
+// skipped by the other tests, and a folder in the list that does not exist
+// skips nothing.
+func TestEveryCopyFollowsTheRules(t *testing.T) {
+	t.Parallel()
+	copies := copyFolders(t)
+	if len(copies) == 0 {
+		t.Fatal("docs/upstream/upstreams.tsv lists no copy, so this guards nothing")
+	}
+	for _, dir := range copies {
+		for _, name := range []string{"LICENSE", "README.md"} {
+			if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+				t.Errorf("%s: a copy holds %s (docs/UPSTREAM.md)", dir, name)
+			}
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Errorf("%s is in docs/upstream/upstreams.tsv, and it is not a folder: %v", dir, err)
+			continue
+		}
+		for _, e := range entries {
+			path := filepath.Join(dir, e.Name())
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || !isCopied(copies, path) {
+				continue
+			}
+			if !strings.HasPrefix(read(t, path), "// Copied from ") {
+				t.Errorf("%s: a copied file opens with a comment that starts with "+
+					"\"Copied from\" and names the project, the file and the commit "+
+					"(docs/UPSTREAM.md)", path)
+			}
+		}
+	}
 }
 
 // read returns the content of a file of the repository.
