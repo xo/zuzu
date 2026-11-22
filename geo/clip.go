@@ -59,12 +59,17 @@ type interpolator func(from, to *pt, direction int, s stream)
 // clipper clips a geometry on the globe: it keeps the points that are
 // visible, cuts the lines at the edge, and closes the polygons along the
 // edge. visible, newLine and interpolate describe the edge, and start is a
-// point that lies outside it.
+// point that lies outside it. compare orders the crossings along the edge,
+// and is compareAntimeridian if it is nil. outline, if it is set, sends
+// the points of the outline of the sphere, which a projection such as
+// armadillo draws in a shape of its own, instead of the edge of the clip.
 type clipper struct {
 	visible     func(lambda, phi float64) bool
 	newLine     func(s stream) lineClipper
 	interpolate interpolator
+	compare     func(a, b *crossing) float64
 	start       [2]float64
+	outline     func(s stream)
 }
 
 // clipStream is the stream of a clipper.
@@ -140,7 +145,11 @@ func (s *clipStream) polygonEnd() {
 	startInside := polygonContains(s.polygon, s.c.start)
 	if len(s.segments) > 0 {
 		s.startPolygon()
-		rejoin(s.segments, compareAntimeridian, startInside, s.c.interpolate, s.sink)
+		compare := s.c.compare
+		if compare == nil {
+			compare = compareAntimeridian
+		}
+		rejoin(s.segments, compare, startInside, s.c.interpolate, s.sink)
 	} else if startInside {
 		s.startPolygon()
 		s.sink.lineStart()
@@ -155,6 +164,16 @@ func (s *clipStream) polygonEnd() {
 }
 
 func (s *clipStream) sphere() {
+	if s.c.outline != nil {
+		// The outline is a polygon on the globe, which the clip cuts as
+		// any other.
+		s.polygonStart()
+		s.lineStart()
+		s.c.outline(s)
+		s.lineEnd()
+		s.polygonEnd()
+		return
+	}
 	s.sink.polygonStart()
 	s.sink.lineStart()
 	s.c.interpolate(nil, nil, 1, s.sink)

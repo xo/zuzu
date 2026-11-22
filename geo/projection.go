@@ -4,12 +4,38 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 )
 
 // ErrProjection is the error of a projection that zuzu does not know, or
 // of a parameter of a projection that it cannot read.
 var ErrProjection = errors.New("bad projection")
+
+// ErrParamUnread is the error of a parameter that a projection of
+// d3-geo-projection takes and that zuzu does not read yet.
+var ErrParamUnread = errors.New("a parameter of the projection that zuzu does not read")
+
+// takes holds the parameters of d3-geo-projection that each type takes,
+// such as the coefficient of hammer. vega.js passes such a parameter to a
+// projection only when the projection has it, so a type ignores a
+// parameter that it does not take.
+var takes = map[string][]string{
+	"hammer":                          {"coefficient"},
+	"bottomley":                       {"fraction"},
+	"airy":                            {"radius"},
+	"armadillo":                       {"parallel"},
+	"berghaus":                        {"lobes"},
+	"interruptedsinusoidal":           {"lobes"},
+	"interruptedmollweide":            {"lobes"},
+	"interruptedmollweidehemispheres": {"lobes"},
+}
+
+// TakesParam reports whether a projection of a type takes a parameter of
+// d3-geo-projection, such as the coefficient of hammer.
+func TakesParam(typ, name string) bool {
+	return slices.Contains(takes[strings.ToLower(typ)], name)
+}
 
 // Projection maps longitude and latitude, in degrees, to the plane of a
 // chart, and draws GeoJSON objects as paths. Its parameters follow the
@@ -22,6 +48,8 @@ type Projection struct {
 	typ string
 	// usa is set for albersUsa, which joins three projections.
 	usa *albersUSA
+	// lobes is set for an interrupted projection.
+	lobes *interrupted
 
 	raw    rawFunc
 	rawAt  func(y0, y1 float64) rawFunc
@@ -115,12 +143,74 @@ func New(typ string) (*Projection, error) {
 		p.init(stereographicRaw)
 		p.setScale(250)
 		p.setClipAngle(142)
+	case "interruptedsinusoidal":
+		p.interrupt(sansonRaw, sinusoidalLobes)
+		p.setRotate(-20, 0, 0)
+		p.setScale(152.63)
+	case "interruptedmollweide":
+		p.interrupt(mollweideRaw, mollweideLobes)
+		p.setScale(169.529)
+	case "interruptedmollweidehemispheres":
+		p.interrupt(mollweideRaw, hemisphereLobes)
+		p.setRotate(20, 0, 0)
+		p.setScale(169.529)
+	case "polyhedralbutterfly":
+		p.polyhedralButterfly()
+		p.setScale(101.858)
+		p.setCenter(0, 45)
 	case "transversemercator":
 		p.init(transverseMercatorRaw)
 		p.mercator = transverse
 		p.reclip()
 		p.setRotate(0, 0, 90)
 		p.setScale(159.155)
+	case "airy":
+		p.init(airyRaw(halfPi))
+		p.setScale(179.976)
+		p.setClipAngle(147)
+	case "baker":
+		p.init(bakerRaw)
+		p.setScale(112.314)
+	case "bottomley":
+		p.init(bottomleyRaw(0.5))
+		p.setScale(158.837)
+	case "collignon":
+		p.init(collignonRaw)
+		p.setScale(95.6464)
+		p.setCenter(0, 30)
+	case "eckert1":
+		p.init(eckert1Raw)
+		p.setScale(165.664)
+	case "hammer":
+		p.init(hammerRaw(2))
+		p.setScale(169.529)
+	case "littrow":
+		p.init(littrowRaw)
+		p.setScale(144.049)
+		p.setClipAngle(90 - 1e-3)
+	case "wagner6":
+		p.init(wagner6Raw)
+		p.setScale(152.63)
+	case "wiechel":
+		p.init(wiechelRaw)
+		p.setRotate(0, -90, 45)
+		p.setScale(124.75)
+		p.setClipAngle(180 - 1e-3)
+	case "winkel3":
+		p.init(winkel3Raw)
+		p.setScale(158.837)
+	case "guyou":
+		p.init(guyouRaw)
+		p.setScale(151.496)
+	case "peircequincuncial":
+		p.init(peirceRaw)
+		p.setScale(111.48)
+		p.setRotate(-90, -90, 45)
+		p.setClipAngle(180 - 1e-3)
+	case "armadillo":
+		p.armadillo()
+	case "berghaus":
+		p.berghaus()
 	default:
 		return nil, fmt.Errorf("the type %q: %w", typ, ErrProjection)
 	}
@@ -229,6 +319,8 @@ func (p *Projection) Set(name string, v any) error {
 			p.sy = -1
 		}
 		p.recenter()
+	case "coefficient", "fraction", "radius", "lobes", "parallel":
+		return p.setParam(name, v)
 	}
 	return nil
 }
@@ -451,4 +543,34 @@ func (p *Projection) stream(sink stream) stream {
 	return &pointMap{next: s, f: func(x, y float64) (float64, float64) {
 		return x * radians, y * radians
 	}}
+}
+
+// setParam sets a parameter of d3-geo-projection that the type takes: the
+// coefficient of hammer, the fraction of bottomley and the radius of airy,
+// in degrees. A type ignores a parameter that it does not take, as in
+// vega.js. A parameter that the type takes and that zuzu does not read is
+// ErrParamUnread.
+func (p *Projection) setParam(name string, v any) error {
+	if !TakesParam(p.typ, name) {
+		return nil
+	}
+	switch name {
+	case "coefficient":
+		p.raw = hammerRaw(Number(v))
+	case "fraction":
+		p.raw = bottomleyRaw(Number(v))
+	case "radius":
+		p.raw = airyRaw(Number(v) * radians)
+	case "lobes":
+		if strings.EqualFold(p.typ, "berghaus") {
+			return p.setBerghausLobes(v)
+		}
+		return p.readLobes(v)
+	case "parallel":
+		return p.setArmadilloParallel(v)
+	default:
+		return fmt.Errorf("the parameter %s of %s: %w", name, p.typ, ErrParamUnread)
+	}
+	p.recenter()
+	return nil
 }
