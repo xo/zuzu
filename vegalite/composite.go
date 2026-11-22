@@ -8,13 +8,15 @@ import (
 	"strconv"
 
 	"github.com/xo/zuzu/expr"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
 // composite expands a composite mark, boxplot, errorbar or errorband, into
 // a layer of plain marks over aggregated fields, as Vega-Lite documents
-// them. It returns nil for any other spec.
-func composite(s *Spec) (*Spec, error) {
+// them. It returns nil for any other spec. The config of the composite
+// mark, such as config.boxplot, gives the defaults of its properties.
+func composite(s *Spec, cfg map[string]any) (*Spec, error) {
 	switch s.Mark.Type {
 	case "boxplot", "errorbar", "errorband":
 	default:
@@ -27,6 +29,7 @@ func composite(s *Spec) (*Spec, error) {
 			props[k] = v
 		}
 	}
+	props = withConfig(props, cfg)
 	enc := map[string]any{}
 	for k, ch := range s.Encoding {
 		b, err := json.Marshal(ch)
@@ -158,6 +161,49 @@ func composite(s *Spec) (*Spec, error) {
 	return &spec, nil
 }
 
+// withConfig returns the properties of a composite mark over those of its
+// config. A part that both give, such as the median of a box plot, takes
+// the properties of both, and those of the mark win.
+func withConfig(props, cfg map[string]any) map[string]any {
+	if len(cfg) == 0 {
+		return props
+	}
+	out := maps.Clone(cfg)
+	for k, v := range props {
+		part, ok1 := v.(map[string]any)
+		base, ok2 := out[k].(map[string]any)
+		if ok1 && ok2 {
+			merged := maps.Clone(base)
+			maps.Copy(merged, part)
+			v = merged
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// part returns the mark of a part of a composite mark, such as the median
+// of a box plot: its type, its style and its defaults, with the
+// properties that the spec gives the part. Each property that the spec
+// gives adds a style that starts with theme.StyleOwn, so that the look
+// of zuzu keeps it (docs/STYLE.md).
+func part(typ, style string, defaults map[string]any, spec any) map[string]any {
+	mark := map[string]any{"type": typ}
+	maps.Copy(mark, defaults)
+	styles := []any{style}
+	if m, ok := spec.(map[string]any); ok {
+		for _, k := range slices.Sorted(maps.Keys(m)) {
+			if k == "type" || k == "style" {
+				continue
+			}
+			mark[k] = m[k]
+			styles = append(styles, theme.StyleOwn+k)
+		}
+	}
+	mark["style"] = styles
+	return mark
+}
+
 // sortedChannels returns the channels of an encoding in the order of
 // channelOrder, then any others in the order of their names.
 func sortedChannels(enc map[string]any) []string {
@@ -205,6 +251,16 @@ func layerOf(mark map[string]any, others map[string]any, extra map[string]any, k
 	}
 	maps.Copy(enc, extra)
 	return map[string]any{"mark": mark, "encoding": enc}
+}
+
+// merged returns the properties of a part over a base, such as the color
+// of a composite mark, or the base when the spec gives the part none.
+func merged(base map[string]any, part any) map[string]any {
+	out := maps.Clone(base)
+	if m, ok := part.(map[string]any); ok {
+		maps.Copy(out, m)
+	}
+	return out
 }
 
 // position lists the channels that place a mark: the discrete channels of
@@ -281,18 +337,19 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 	color := props["color"]
 	var layers []any
 	if typ == "errorbar" {
-		rule := map[string]any{"type": "rule", "style": "errorbar-rule"}
-		if color == nil {
-			color = "black"
+		// The rule and the ticks take the color of the theme, as the
+		// whiskers of a box plot do, rather than the black of Vega-Lite,
+		// which a dark mode hides (docs/STYLE.md). A color that the spec
+		// gives wins.
+		own := map[string]any{}
+		if color != nil {
+			own["color"] = color
 		}
-		rule["color"] = color
+		rule := part("rule", "errorbar-rule", nil, merged(own, props["rule"]))
 		// The ticks at the ends come before the rule between them.
 		if t, ok := props["ticks"]; ok && t != false {
 			for _, f := range []string{lower, upper} {
-				tick := map[string]any{"type": "tick", "style": "errorbar-ticks", "color": color}
-				if m, ok := t.(map[string]any); ok {
-					maps.Copy(tick, m)
-				}
+				tick := part("tick", "errorbar-ticks", nil, merged(own, t))
 				layers = append(layers, withCalcs(layerOf(tick, others, map[string]any{cont: channelWith(def, f, title)})))
 			}
 		}
@@ -310,19 +367,17 @@ func errorMark(typ, cont, field, title string, def, props, others map[string]any
 		if _, ok := others[other]; !ok {
 			bandType, borderType = "rect", "rule"
 		}
-		band := map[string]any{"type": bandType, "style": "errorband-band", "opacity": 0.3}
+		own := map[string]any{}
 		if color != nil {
-			band["color"] = color
+			own["color"] = color
 		}
+		band := part(bandType, "errorband-band", map[string]any{"opacity": 0.3}, merged(own, props["band"]))
 		layers = append(layers, withCalcs(layerOf(band, others, map[string]any{
 			cont: channelWith(def, lower, title), cont + "2": map[string]any{"field": upper},
 		})))
 		if b, ok := props["borders"]; ok && b != false {
 			for _, f := range []string{lower, upper} {
-				line := map[string]any{"type": borderType, "style": "errorband-borders"}
-				if color != nil {
-					line["color"] = color
-				}
+				line := part(borderType, "errorband-borders", nil, merged(own, b))
 				layers = append(layers, withCalcs(layerOf(line, others, map[string]any{cont: channelWith(def, f, title)})))
 			}
 		}
@@ -389,24 +444,22 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 		list = append(list, extra...)
 		return map[string]any{"aggregate": list, "groupby": groupby}
 	}
+	// Each part takes the properties that the spec gives it, such as
+	// "median": {"color": "red"}.
 	rule := func(from, to string) map[string]any {
-		return layerOf(map[string]any{"type": "rule", "style": "boxplot-rule", "color": "black"}, others, map[string]any{
+		return layerOf(part("rule", "boxplot-rule", map[string]any{"color": "black"}, props["rule"]), others, map[string]any{
 			cont: channelWith(def, from, title), cont + "2": map[string]any{"field": to},
 		}, position...)
 	}
-	boxColor := props["color"]
-	box := map[string]any{"type": "bar", "style": "boxplot-box", "size": size}
-	if boxColor != nil {
-		box["color"] = boxColor
+	own := map[string]any{}
+	if c := props["color"]; c != nil {
+		own["color"] = c
 	}
+	box := part("bar", "boxplot-box", map[string]any{"size": size}, merged(own, props["box"]))
 	boxLayer := layerOf(box, others, map[string]any{
 		cont: channelWith(def, lb, title), cont + "2": map[string]any{"field": ub},
 	})
-	medianMark := map[string]any{"type": "tick", "style": "boxplot-median", "color": "white", "size": size, "thickness": 1}
-	if m, ok := props["median"].(map[string]any); ok {
-		// The median takes the properties that the spec gives it.
-		maps.Copy(medianMark, m)
-	}
+	medianMark := part("tick", "boxplot-median", map[string]any{"color": "white", "size": size, "thickness": 1}, props["median"])
 	median := layerOf(medianMark, others, map[string]any{
 		cont: channelWith(def, mb, title),
 	}, position...)
@@ -414,10 +467,7 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 	var ticks []any
 	if t, ok := props["ticks"]; ok && t != false {
 		for _, f := range []string{lw, uw} {
-			tick := map[string]any{"type": "tick", "style": "boxplot-ticks", "color": "black", "size": size / 2}
-			if m, ok := t.(map[string]any); ok {
-				maps.Copy(tick, m)
-			}
+			tick := part("tick", "boxplot-ticks", map[string]any{"color": "black", "size": size / 2}, t)
 			ticks = append(ticks, layerOf(tick, others, map[string]any{cont: channelWith(def, f, title)}, position...))
 		}
 	}
@@ -440,7 +490,7 @@ func boxplot(cont, field, title string, def, props, others map[string]any, group
 		map[string]any{"op": "q1", "field": field, "as": lb},
 		map[string]any{"op": "q3", "field": field, "as": ub},
 	}, "groupby": groupby}
-	outliers := layerOf(map[string]any{"type": "point", "style": "boxplot-outliers"}, plain, map[string]any{
+	outliers := layerOf(part("point", "boxplot-outliers", nil, props["outliers"]), plain, map[string]any{
 		cont: channelWith(def, field, title),
 	})
 	outliers["transform"] = []any{map[string]any{"filter": "(" + f + " < " + lowFence + ") || (" + f + " > " + highFence + ")"}}

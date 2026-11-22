@@ -4,6 +4,8 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
+	"math"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,6 +32,9 @@ type facetDef struct {
 	// sets it to null, which draws no title and no labels.
 	header map[string]any
 	hidden bool
+	// spacing is the spacing of the channel, the space between its rows
+	// or its columns, or nil when it sets none.
+	spacing any
 	// sortField and sortOp sort the values of the facet by an aggregate of
 	// another field, with the op min when the sort names none.
 	sortField, sortOp string
@@ -77,18 +82,169 @@ func (f *facetDef) title() string {
 	return titleOf(f.def)
 }
 
-// labelText returns the expression of the label of a header, from the
-// reference to the value of the facet. A time unit writes its value in the
-// format of the unit, such as 2012 for a year.
-func (f *facetDef) labelText(ref string) string {
-	if d := f.def; d.units != nil {
+// labelText returns the expression of the label of a header, which reads
+// the value of the facet from the field of the parent group. A time unit
+// writes its value in the format of the unit, such as 2012 for a year. A
+// bin writes its start and its end, such as "1000 – 2000". The labelExpr
+// of the header replaces the text, with datum.value as the value and
+// datum.label as the text.
+func (f *facetDef) labelText() string {
+	d := f.def
+	ref := "parent[" + strconv.Quote(d.out) + "]"
+	var text string
+	// An empty format is no format, as in vega-lite.js.
+	spec, _ := f.header["format"].(string)
+	hasFormat := spec != ""
+	switch {
+	case d.units != nil:
 		fn := "timeFormat"
 		if d.utc {
 			fn = "utcFormat"
 		}
-		return fn + "(" + ref + ", " + strconv.Quote(format.TimeUnitSpecifier(d.units, vlSpecifiers)) + ")"
+		if !hasFormat {
+			spec = format.TimeUnitSpecifier(d.units, vlSpecifiers)
+		}
+		text = fn + "(" + ref + ", " + strconv.Quote(spec) + ")"
+	case d.bin != nil && d.outEnd != "":
+		end := "parent[" + strconv.Quote(d.outEnd) + "]"
+		text = "!isValid(" + ref + ") || !isFinite(+" + ref + ") ? \"null\" : format(" + ref + ", " + strconv.Quote(spec) + ") + \" – \" + format(" + end + ", " + strconv.Quote(spec) + ")"
+	case hasFormat && d.typ == quantitative:
+		text = "format(" + ref + ", " + strconv.Quote(spec) + ")"
+	default:
+		text = "isValid(" + ref + ") ? " + ref + " : \"\"+" + ref
 	}
-	return "isValid(" + ref + ") ? " + ref + " : \"\"+" + ref
+	if e, ok := f.header["labelExpr"].(string); ok {
+		label := "(" + text + ")"
+		text = datumValueRE.ReplaceAllLiteralString(e, ref)
+		text = datumLabelRE.ReplaceAllLiteralString(text, label)
+	}
+	return text
+}
+
+// datumValueRE and datumLabelRE find the names that a labelExpr reads.
+var (
+	datumValueRE = regexp.MustCompile(`\bdatum\.value\b`)
+	datumLabelRE = regexp.MustCompile(`\bdatum\.label\b`)
+)
+
+// labelProps sets the properties of the labels of a header on the title
+// that draws them: labelAngle, labelAlign, labelBaseline and labelPadding.
+// A label turned so that it reads across the side of a row, or along the
+// top of a column, sits on the middle of its line.
+func (f *facetDef) labelProps(t *vega.Title) {
+	if p, ok := f.header["labelPadding"]; ok {
+		t.Offset = lit(p)
+	}
+	if a, ok := f.header["labelAlign"]; ok {
+		t.Align = lit(a)
+	}
+	if b, ok := f.header["labelBaseline"]; ok {
+		t.Baseline = lit(b)
+	}
+	a, ok := f.header["labelAngle"].(float64)
+	if !ok {
+		return
+	}
+	t.Angle = lit(a)
+	if _, ok := f.header["labelBaseline"]; ok {
+		return
+	}
+	side := f.orient("labelOrient")
+	across := math.Mod(a, 180) == 0
+	if (side == "left" || side == "right") == across {
+		t.Baseline = lit("middle")
+	}
+}
+
+// headerProps are the properties of a title of Vega that a header sets,
+// for its labels with the prefix label, such as labelAngle, and for its
+// title with the prefix title. The padding of a header is the offset of the
+// title.
+var headerProps = []string{
+	"angle", "align", "anchor", "baseline", "color", "font", "fontSize", "fontStyle",
+	"fontWeight", "limit", "lineHeight", "offset",
+}
+
+// headerProp returns the property of a title of Vega that a property of a
+// header sets, without its prefix, or "" for none.
+func headerProp(rest string) string {
+	if rest == "Padding" {
+		return "offset"
+	}
+	for _, n := range headerProps {
+		if n != "offset" && strings.ToUpper(n[:1])+n[1:] == rest {
+			return n
+		}
+	}
+	return ""
+}
+
+// styleTitle sets the properties of the header that start with the prefix,
+// label or title, on the title of Vega that draws the labels or the title.
+func (f *facetDef) styleTitle(t *vega.Title, prefix string) {
+	keys := slices.Sorted(maps.Keys(f.header))
+	for _, k := range keys {
+		rest, ok := strings.CutPrefix(k, prefix)
+		if !ok {
+			continue
+		}
+		name := headerProp(rest)
+		if name == "" {
+			continue
+		}
+		v := f.header[k]
+		switch name {
+		case "angle":
+			t.Angle = lit(v)
+		case "align":
+			t.Align = lit(v)
+		case "anchor":
+			t.Anchor = lit(v)
+		case "baseline":
+			t.Baseline = lit(v)
+		case "color":
+			t.Color = lit(v)
+		case "font":
+			t.Font = lit(v)
+		case "fontSize":
+			t.FontSize = lit(v)
+		case "offset":
+			t.Offset = lit(v)
+		default:
+			if t.Extra == nil {
+				t.Extra = vega.Extra{}
+			}
+			t.Extra[name] = mustJSON(v)
+		}
+	}
+}
+
+// headerKeys are the properties of a header that the compiler reads.
+var headerKeys = map[string]bool{"title": true, "labels": true, "orient": true, "labelOrient": true, "titleOrient": true, "labelExpr": true}
+
+// headerIssues reports each property of the header that the compiler does
+// not read, such as format.
+func (c *compiler) headerIssues(f *facetDef, path string) error {
+	keys := slices.Sorted(maps.Keys(f.header))
+	for _, k := range keys {
+		if headerKeys[k] {
+			continue
+		}
+		if k == "format" && (f.def.typ == quantitative || f.def.units != nil || f.def.bin != nil && f.def.outEnd != "") {
+			// The format of a header writes a number, a time or a bin.
+			continue
+		}
+		if rest, ok := strings.CutPrefix(k, "label"); ok && headerProp(rest) != "" {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(k, "title"); ok && headerProp(rest) != "" {
+			continue
+		}
+		if err := c.issue(path, "the property %s of the header of the %s of a facet", k, f.channel); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // labels reports whether the header draws the values of the facet.
@@ -112,6 +268,27 @@ func (f *facetDef) orient(key string) string {
 	return "top"
 }
 
+// facetPadding returns the padding of the layout of a facet: the spacing
+// of the spec or its config, with the spacing that the channel row or
+// column sets in place of its part, as vega-lite.js writes it, such as
+// {"row": 20, "column": 10}.
+func facetPadding(base any, row, column *facetDef) any {
+	if (row == nil || row.spacing == nil) && (column == nil || column.spacing == nil) {
+		return base
+	}
+	r, c := base, base
+	if m, ok := base.(map[string]any); ok {
+		r, c = m["row"], m["column"]
+	}
+	if row != nil && row.spacing != nil {
+		r = row.spacing
+	}
+	if column != nil && column.spacing != nil {
+		c = column.spacing
+	}
+	return map[string]any{"row": r, "column": c}
+}
+
 // readFacet reads the facet of a spec: the operator facet, with a row and
 // a column, or the channels row, column and facet of an encoding. It
 // returns the spec of a cell, which the caller compiles. ok is false when
@@ -123,6 +300,12 @@ func readFacet(s *Spec, repeat map[string]string) (row, column, wrap *facetDef, 
 			return nil, err
 		}
 		f := &facetDef{channel: ch, def: d, sort: "ascending"}
+		if raw, ok := def.Extra["spacing"]; ok {
+			var v any
+			if json.Unmarshal(raw, &v) == nil {
+				f.spacing = v
+			}
+		}
 		if !def.Header.IsZero() {
 			switch h := valueOf(def.Header).(type) {
 			case nil:
@@ -234,6 +417,13 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	if err != nil {
 		return err
 	}
+	for _, f := range []*facetDef{row, column, wrap} {
+		if f != nil {
+			if err := c.headerIssues(f, path); err != nil {
+				return err
+			}
+		}
+	}
 	if s.Data != nil {
 		if src, err = c.source(s.Data, path+"/data"); err != nil {
 			return err
@@ -327,6 +517,9 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	// aggregate of the child, which each cell then makes from its own rows.
 	facetData, cellData := main, fname
 	var cellDatasets []vega.Data
+	// cellNames holds the name in each cell of each dataset that the cell
+	// copies, for the domains of the scales of the cell.
+	var cellNames map[string]string
 	sorted := false
 	for _, f := range []*facetDef{row, column, wrap} {
 		// A list sorts by an index on every row, which needs the rows
@@ -347,6 +540,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			keep = nil
 		}
 		cellDatasets, names = c.copyToCell(before, c.name(src), fname, keep)
+		cellNames = names
 		for i := range child.marks {
 			renameMarkData(&child.marks[i], func(n string) string {
 				if r, ok := names[n]; ok {
@@ -380,6 +574,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		c.shiftNames(childNames, 2, child.marks, sizes.Scales)
 		var names map[string]string
 		cellDatasets, names = c.copyToCell(before, c.name(src), fname, extra)
+		cellNames = names
 		for i := range child.marks {
 			renameMarkData(&child.marks[i], func(n string) string {
 				if r, ok := names[n]; ok {
@@ -396,7 +591,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 			renameData(&child.marks[i], main, cellData)
 		}
 	}
-	cellScales, cellAxes, distinct, sizeSig := c.cellScales(child, indep, sizes, main, cellData, cw, chh)
+	cellScales, cellAxes, distinct, sizeSig := c.cellScales(child, indep, sizes, main, cellData, cellNames, cw, chh)
 	out.Scales = append(out.Scales, sizes.Scales...)
 	out.Signals = append(out.Signals, sizes.Signals...)
 	if !sizes.Width.IsZero() {
@@ -508,7 +703,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	}
 	headerTitle := func(f *facetDef, orient string) *vega.Title {
 		t := &vega.Title{
-			Text:   vega.Value{Signal: f.labelText("parent[" + strconv.Quote(f.def.out) + "]")},
+			Text:   vega.Value{Signal: f.labelText()},
 			Style:  vega.Strings{List: []string{"guide-label"}},
 			Frame:  lit("group"),
 			Offset: lit(10),
@@ -516,6 +711,18 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		if orient != "" {
 			t.Orient = lit(orient)
 		}
+		if a, ok := f.header["labelAngle"].(float64); ok && (orient == "left" || orient == "right") {
+			// A turned label of a row is centered on its row, and a label
+			// that is not turned ends next to the cells.
+			t.Baseline, t.Align = lit("middle"), lit("center")
+			switch math.Mod(math.Mod(a, 360)+360, 360) {
+			case 0:
+				t.Align = lit(map[string]string{"left": "right", "right": "left"}[orient])
+			case 180:
+				t.Align = lit(map[string]string{"left": "left", "right": "right"}[orient])
+			}
+		}
+		f.styleTitle(t, "label")
 		return t
 	}
 	groupTitle := func(f *facetDef) *vega.Title {
@@ -523,6 +730,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 		if o := f.orient("titleOrient"); o != "top" {
 			t.Orient = lit(o)
 		}
+		f.styleTitle(t, "title")
 		return t
 	}
 	headerSort := func(f *facetDef) *vega.Sort {
@@ -686,7 +894,7 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	case column != nil:
 		cols = map[string]any{"signal": "length(data('" + colDomain + "'))"}
 	}
-	out.Layout = lit(map[string]any{"padding": spacing(s, c.cfg.facetSpacing), "columns": cols, "bounds": "full", "align": "all"})
+	out.Layout = lit(map[string]any{"padding": facetPadding(spacing(s, c.cfg.facetSpacing), row, column), "columns": cols, "bounds": "full", "align": "all"})
 	if !c.nested {
 		c.mergeAggregates(out)
 	}
@@ -929,10 +1137,12 @@ type distinctField struct {
 
 // cellScales takes the independent scales of the child of a facet out of
 // the scales of the top level, with their axes, for each cell to make from
-// its own data. A discrete scale with steps sizes each cell by the count
-// of its values, so the signal of the size goes, and the size of a cell
-// comes from that count.
-func (c *compiler) cellScales(child *view, indep map[string]bool, sizes *vega.Spec, main, cellData, cw, chh string) ([]vega.Scale, []vega.Axis, map[string]distinctField, map[string]vega.Production) {
+// its own data. The domain of such a scale reads the datasets of the cell:
+// cellData in place of main, and each dataset that the cell copies by its
+// name in cellNames. A discrete scale with steps sizes each cell by the
+// count of its values, so the signal of the size goes, and the size of a
+// cell comes from that count.
+func (c *compiler) cellScales(child *view, indep map[string]bool, sizes *vega.Spec, main, cellData string, cellNames map[string]string, cw, chh string) ([]vega.Scale, []vega.Axis, map[string]distinctField, map[string]vega.Production) {
 	distinct := map[string]distinctField{}
 	sizeSig := map[string]vega.Production{}
 	if len(indep) == 0 {
@@ -941,6 +1151,9 @@ func (c *compiler) cellScales(child *view, indep map[string]bool, sizes *vega.Sp
 	rename := func(n string) string {
 		if n == main {
 			return cellData
+		}
+		if r, ok := cellNames[n]; ok {
+			return r
 		}
 		return n
 	}
@@ -1173,7 +1386,7 @@ func (c *compiler) facetOfFacet(s *Spec, row, column *facetDef, cell *Spec, out 
 		transform("aggregate", map[string]any{"groupby": []any{field}}),
 	}})
 	label := &vega.Title{
-		Text:  vega.Value{Signal: outer.labelText("parent[" + strconv.Quote(field) + "]")},
+		Text:  vega.Value{Signal: outer.labelText()},
 		Style: vega.Strings{List: []string{"guide-label"}}, Frame: lit("group"), Offset: lit(10),
 	}
 	groupTitle := &vega.Title{Text: lit(title), Style: vega.Strings{List: []string{"guide-title"}}, Offset: lit(10)}
@@ -1181,6 +1394,7 @@ func (c *compiler) facetOfFacet(s *Spec, row, column *facetDef, cell *Spec, out 
 		label.Orient = lit("left")
 		groupTitle.Orient = lit("left")
 	}
+	outer.labelProps(label)
 	sort := &vega.Sort{Field: lit("datum[" + strconv.Quote(field) + "]"), Order: vega.List(outer.sort)}
 	var marks []vega.Mark
 	if title != "" {
@@ -1212,7 +1426,7 @@ func (c *compiler) facetOfFacet(s *Spec, row, column *facetDef, cell *Spec, out 
 	if column != nil {
 		cols = map[string]any{"signal": "length(data('" + domain + "'))"}
 	}
-	out.Layout = lit(map[string]any{"padding": spacing(s, c.cfg.facetSpacing), "columns": cols, "bounds": "full", "align": "all"})
+	out.Layout = lit(map[string]any{"padding": facetPadding(spacing(s, c.cfg.facetSpacing), row, column), "columns": cols, "bounds": "full", "align": "all"})
 	if !c.nested {
 		c.mergeAggregates(out)
 	}

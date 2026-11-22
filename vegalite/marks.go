@@ -1,6 +1,7 @@
 package vegalite
 
 import (
+	"encoding/json/v2"
 	"maps"
 	"slices"
 	"strconv"
@@ -40,12 +41,13 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		}
 	}
 	u.others(e)
+	u.cornerEnd(e)
 	if err := u.markOffsets(e); err != nil {
 		return nil, err
 	}
 	for k, v := range u.props {
 		switch k {
-		case "color", "fill", "stroke", "filled", "orient", "invalid", "type", "style", "tooltip", "point", "line", "clip", "thickness", "binSpacing", "cornerRadiusEnd", "aria", "width", "height", "x", "y", "x2", "y2", "size", "radius", "theta", "theta2", "radius2", "outerRadius", "innerRadius", "xOffset", "yOffset", "x2Offset", "y2Offset":
+		case "color", "fill", "stroke", "filled", "orient", "invalid", "type", "style", "tooltip", "point", "line", "clip", "thickness", "binSpacing", "cornerRadiusEnd", "aria", "width", "height", "x", "y", "x2", "y2", "size", "radius", "theta", "theta2", "radius2", "outerRadius", "innerRadius", "xOffset", "yOffset", "x2Offset", "y2Offset", "minBandSize":
 			continue
 		case "radiusOffset", "thetaOffset":
 			// polar adds them to the place of a mark that is not an arc.
@@ -86,15 +88,23 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		styles = append(styles, theme.StylePoint)
 	case "area":
 		// Vega-Lite stacks an area of one series too, so an area is a
-		// layer of a stack when it splits by a channel.
-		if u.stack != "" && (u.ch["color"] != nil || u.ch["fill"] != nil || len(u.detail) > 0) {
+		// layer of a stack when it splits by a channel. An area with an
+		// end of its own, or whose scale leaves out zero, does not run
+		// from zero, and is a band (D48 part 3).
+		stacked := u.stack != "" && (u.ch["color"] != nil || u.ch["fill"] != nil || len(u.detail) > 0)
+		switch {
+		case u.ch["y2"] != nil || u.ch["x2"] != nil, !stacked && u.zeroOff(u.measure()):
+			styles = append(styles, theme.StyleAreaRanged)
+		case stacked:
 			styles = append(styles, theme.StyleAreaStacked)
-		} else {
+		default:
 			styles = append(styles, theme.StyleArea)
 		}
 	}
-	// A rule with one place across the whole plot is a reference line.
-	if u.mark == "rule" && (u.ch["x"] == nil) != (u.ch["y"] == nil) && u.ch["x2"] == nil && u.ch["y2"] == nil {
+	// A rule with one place across the whole plot is a reference line,
+	// unless the spec gives it a color, a width or a dash of its own, and
+	// so says how it looks (docs/STYLE.md).
+	if u.mark == "rule" && (u.ch["x"] == nil) != (u.ch["y"] == nil) && u.ch["x2"] == nil && u.ch["y2"] == nil && !u.styled() {
 		styles = append(styles, theme.StyleReference)
 	}
 	// A line or an area along x draws as a monotone curve, which keeps the
@@ -136,6 +146,24 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		v.late = append(v.late, func() {
 			if v.scaleType(p) == "band" {
 				r["band"] = 0.5
+				update[p] = prod(r)
+			}
+		})
+	}
+	for _, p := range u.lateOffsets {
+		ref, ok := e[p].(map[string]any)
+		if !ok {
+			continue
+		}
+		off, ok := ref["offset"].(map[string]any)
+		if !ok {
+			continue
+		}
+		v, r, off := u.v, maps.Clone(ref), maps.Clone(off)
+		r["offset"] = off
+		v.late = append(v.late, func() {
+			if s := v.scales[v.key(p+"Offset")]; s != nil && s.discrete && s.typ != "point" {
+				off["band"] = 0.5
 				update[p] = prod(r)
 			}
 		})
@@ -220,8 +248,15 @@ func (u *unit) color(e enc) {
 	// A mark with no color of its own takes the color of the theme, through
 	// a style of its config (D14).
 	var ref map[string]any
-	if c, ok := u.props["color"].(string); ok {
+	switch c := u.props["color"].(type) {
+	case string:
 		ref = map[string]any{"value": c}
+	case map[string]any:
+		// A gradient, such as {"gradient": "linear", "stops": [...]}, is
+		// the color of the mark, and an expression gives it as a signal.
+		if c["gradient"] != nil || c["expr"] != nil {
+			ref = propRef(c)
+		}
 	}
 	if c := u.channelRef("color"); c != nil {
 		ref = c
@@ -239,10 +274,8 @@ func (u *unit) color(e enc) {
 	if (u.mark == "point" || u.mark == "geoshape") && !filled {
 		e.set("fill", map[string]any{"value": "transparent"})
 	}
-	if u.mark == "point" || u.mark == "circle" || u.mark == "square" {
-		if _, ok := u.ch["opacity"]; !ok {
-			e.set("opacity", map[string]any{"value": 0.7})
-		}
+	if (u.mark == "point" || u.mark == "circle" || u.mark == "square") && u.ch["opacity"] == nil {
+		u.reducedOpacity(e)
 	}
 	for _, name := range []string{"fill", "stroke"} {
 		if c := u.channelRef(name); c != nil {
@@ -251,6 +284,61 @@ func (u *unit) color(e enc) {
 			e.set(name, map[string]any{"value": v})
 		}
 	}
+}
+
+// zeroInDomain reports whether the domain of the scale of a channel
+// surely holds zero: the scale and the config do not turn zero off, and
+// the spec gives no domain or end of a domain.
+func (u *unit) zeroInDomain(ch string) bool {
+	sc := u.v.scales[u.v.key(ch)]
+	if sc == nil {
+		return true
+	}
+	for _, k := range []string{"domain", "domainMin", "domainMax"} {
+		if sc.props[k] != nil {
+			return false
+		}
+	}
+	return !u.zeroOff(ch)
+}
+
+// zeroOff reports whether the scale of a channel or the config turns zero
+// off, so that the scale can leave zero out.
+func (u *unit) zeroOff(ch string) bool {
+	if sc := u.v.scales[u.v.key(ch)]; sc != nil {
+		if z, ok := sc.props["zero"].(bool); ok {
+			return !z
+		}
+	}
+	return u.c.cfg != nil && u.c.cfg.zero != nil && !*u.c.cfg.zero
+}
+
+// reducedOpacity gives a point the opacity of 0.7 of vega-lite.js, where
+// neither the mark nor the config of its kind or of every mark sets an
+// opacity or a fill opacity. The opacity of the mark wins, and the mark
+// writes it itself, and so does the opacity of the config, which the
+// compiler does not pass on to the Vega config (D48 part 5).
+func (u *unit) reducedOpacity(e enc) {
+	var marks, mark map[string]any
+	if cfg := u.c.cfg; cfg != nil {
+		marks, mark = cfg.marks[u.mark], cfg.mark
+	}
+	for _, k := range []string{"opacity", "fillOpacity"} {
+		if u.props[k] != nil {
+			return
+		}
+	}
+	for _, k := range []string{"opacity", "fillOpacity"} {
+		if v := marks[k]; v != nil {
+			e.set(k, propRef(v))
+			return
+		}
+		if v := mark[k]; v != nil {
+			e.set(k, propRef(v))
+			return
+		}
+	}
+	e.set("opacity", map[string]any{"value": 0.7})
 }
 
 // channelRef returns the value reference of a channel through its scale,
@@ -273,13 +361,12 @@ func (u *unit) channelRef(name string) map[string]any {
 			base = map[string]any{"value": d.value}
 		}
 	case d.hasDatum:
+		base = d.datumRef()
 		if u.v.addScale(u, scaleName, d, nil) {
-			if sc := u.v.scales[u.v.key(scaleName)]; sc != nil && !slices.Contains(sc.datums, d.datum) {
-				sc.datums = append(sc.datums, d.datum)
+			if sc := u.v.scales[u.v.key(scaleName)]; sc != nil {
+				sc.addDatum(d.datum)
 			}
-			base = map[string]any{"scale": u.v.sn(scaleName), "value": d.datum}
-		} else {
-			base = map[string]any{"value": d.datum}
+			base["scale"] = u.v.sn(scaleName)
 		}
 	case d.isField():
 		fields := []string{d.out}
@@ -291,6 +378,11 @@ func (u *unit) channelRef(name string) map[string]any {
 		} else {
 			base = map[string]any{"field": d.out}
 		}
+	case len(d.cond) > 0:
+		// A channel with conditions alone, such as an opacity that a test
+		// sets, sets the property only where a condition holds, as
+		// vega-lite.js writes it.
+		return u.conditional(d, nil)
 	default:
 		return nil
 	}
@@ -310,12 +402,22 @@ func (u *unit) conditional(d *channelDef, base map[string]any) map[string]any {
 		switch {
 		case c.hasValue:
 			rule["value"] = c.value
+			if m, ok := c.value.(map[string]any); ok && m["expr"] != nil {
+				// A value {"expr": ...} is the value of the expression.
+				delete(rule, "value")
+				rule["signal"] = m["expr"]
+			}
 		case c.field != "":
 			rule["field"] = c.field
 		}
 		rules = append(rules, rule)
 	}
-	return map[string]any{"__rules": append(rules, base)}
+	// With no field and no value, a condition that does not hold leaves
+	// the property unset.
+	if base != nil {
+		rules = append(rules, base)
+	}
+	return map[string]any{rulesKey: rules}
 }
 
 // position sets the position and the size of a mark from its positional
@@ -360,7 +462,7 @@ func (u *unit) polarRef(ch string) map[string]any {
 			ref = map[string]any{"value": v}
 		}
 	case d.hasValue:
-		ref = map[string]any{"value": d.value}
+		ref = propRef(d.value)
 	case u.stack == ch:
 		u.v.addScale(u, ch, d, []string{d.stackName("start"), d.stackName("end")})
 		ref = u.midRef(ch, d.stackName("start"), d.stackName("end"))
@@ -402,11 +504,43 @@ func (u *unit) axis(e enc, ch, size string) error {
 			}
 			e.set(p, map[string]any{"signal": mid, "mult": 0.5, "offset": r})
 			if u.mark == "bar" || u.mark == "rect" || u.mark == "tick" {
-				e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + u.v.sn(ch+"Offset") + "'))"})
+				e.set(size, map[string]any{"signal": "max(" + u.minBandSize() + ", bandwidth('" + u.v.sn(ch+"Offset") + "'))"})
 			}
 			return nil
 		}
+		if v, ok := u.props[ch]; ok {
+			// A position that the mark gives, such as "x": 5, places
+			// each mark there, as vega-lite.js writes it, and its end
+			// too when the mark gives one.
+			e.set(p, posRef(v))
+			if v2, ok := u.props[p2]; ok {
+				e.set(p2, posRef(v2))
+			}
+			return nil
+		}
+		i := 0
+		if ch == "y" {
+			i = 1
+		}
 		switch {
+		case u.mark == "tick" || u.mark == "bar" && (ch == "y" && u.orient == "horizontal" || ch == "x" && u.orient == "vertical"):
+			// A tick, or a bar across its band, with no channel on this
+			// axis is centered in the view. It takes the size that the spec
+			// gives, or else a share of the view: the view less the inner
+			// padding of the bands of a bar, or three quarters of the view
+			// for a tick.
+			e.set(pc, map[string]any{"signal": u.v.sizeName(i), "mult": 0.5})
+			if sz, _ := u.markSize(size); sz != nil {
+				if _, ok := relBand(sz); !ok {
+					e.set(size, propRef(sz))
+					return nil
+				}
+			}
+			share := 0.75
+			if u.mark == "bar" {
+				share = 1 - u.c.cfg.barBandPaddingInner()
+			}
+			e.set(size, map[string]any{"signal": num(share) + " * " + u.v.sizeName(i)})
 		case ch == "x" && (u.mark == "bar" || u.mark == "rect" || u.mark == "rule" && u.ch["y"] != nil && u.ch["x2"] == nil && u.ch["y2"] == nil):
 			if u.mark == "rule" {
 				e.set(p, map[string]any{"value": 0})
@@ -423,29 +557,40 @@ func (u *unit) axis(e enc, ch, size string) error {
 			}
 			e.set(p, map[string]any{"value": 0})
 			e.set(size, map[string]any{"field": map[string]any{"group": "height"}})
-		case ch == "x":
-			e.set(p, map[string]any{"signal": u.v.sizeName(0), "mult": 0.5})
 		default:
-			e.set(p, map[string]any{"signal": u.v.sizeName(1), "mult": 0.5})
+			e.set(p, map[string]any{"signal": u.v.sizeName(i), "mult": 0.5})
 		}
+		return nil
+	}
+	if d.hasValue && u.mark == "tick" && ch == u.measure() {
+		// A tick at a value, such as a tick of an axis drawn by hand, is
+		// as thick as any tick.
+		e.set(pc, propRef(d.value))
+		e.set(size, map[string]any{"value": u.tickThickness()})
 		return nil
 	}
 	if d.hasValue {
-		e.set(p, map[string]any{"value": d.value})
+		e.set(p, propRef(d.value))
 		if d2 != nil && d2.hasValue {
-			e.set(p2, map[string]any{"value": d2.value})
+			e.set(p2, propRef(d2.value))
 		}
 		return nil
 	}
-	discrete := !d.continuous() || (d.units != nil && d.typ != temporal)
+	discrete := d.discrete()
 	if d.bin != nil {
 		u.v.addScale(u, ch, d, []string{d.out, d.outEnd})
-		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.out, "offset": 0.5})
-		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.outEnd, "offset": -0.5})
+		o1, o2, err := u.spanOffsets(ch, d)
+		if err != nil {
+			return err
+		}
+		e.set(p, u.spanRef(ch, d.out, o1))
+		e.set(p2, u.spanRef(ch, d.outEnd, o2))
 		if u.mark != "bar" && u.mark != "rect" {
 			e.set(p, map[string]any{"signal": "scale(\"" + u.v.sn(ch) + "\", 0.5 * " + fieldRef(d.out) + " + 0.5 * " + fieldRef(d.outEnd) + ")"})
 			delete(e, p2)
+			return nil
 		}
+		u.setFromEnd(ch)
 		return nil
 	}
 	if o := u.ch[ch+"Offset"]; o != nil && o.isField() && d.units != nil && d.typ == temporal && u.spans(d) {
@@ -464,7 +609,7 @@ func (u *unit) axis(e enc, ch, size string) error {
 			band = u.v.sn(ch + "Offset")
 		}
 		e.set(pc, r)
-		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + band + "'))"})
+		e.set(size, map[string]any{"signal": "max(" + u.minBandSize() + ", bandwidth('" + band + "'))"})
 		return nil
 	}
 	if d.units != nil && d.typ == temporal && u.spans(d) && u.mark != "bar" && u.mark != "rect" {
@@ -475,7 +620,19 @@ func (u *unit) axis(e enc, ch, size string) error {
 			p0 = b
 		}
 		k := func(x float64) string { return strconv.FormatFloat(x, 'f', -1, 64) }
-		e.set(p, map[string]any{"signal": "scale(\"" + u.v.sn(ch) + "\", " + k(1-p0) + " * " + fieldRef(d.out) + " + " + k(p0) + " * " + fieldRef(d.outEnd) + ")"})
+		at := map[string]any{"signal": "scale(\"" + u.v.sn(ch) + "\", " + k(1-p0) + " * " + fieldRef(d.out) + " + " + k(p0) + " * " + fieldRef(d.outEnd) + ")"}
+		if u.mark == "tick" && ch == u.dimension() {
+			// A tick across the interval is centered on its place, with
+			// the size of a tick on a continuous scale.
+			sz, _ := u.markSize(size)
+			if _, rel := relBand(sz); rel || sz == nil {
+				sz = u.continuousBandSize()
+			}
+			e.set(pc, at)
+			e.set(size, propRef(sz))
+			return nil
+		}
+		e.set(p, at)
 		u.pathDefined(e)
 		return nil
 	}
@@ -496,6 +653,7 @@ func (u *unit) axis(e enc, ch, size string) error {
 			r["offset"], r2["offset"] = 0.5, -0.5
 			e.set(p, r)
 			e.set(p2, r2)
+			u.setFromEnd(ch)
 			return nil
 		}
 		if sz != nil {
@@ -504,14 +662,26 @@ func (u *unit) axis(e enc, ch, size string) error {
 				return err
 			}
 		}
-		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": start, "offset": 0.5})
-		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": end, "offset": -0.5})
+		o1, o2, err := u.spanOffsets(ch, d)
+		if err != nil {
+			return err
+		}
+		e.set(p, u.spanRef(ch, start, o1))
+		e.set(p2, u.spanRef(ch, end, o2))
+		u.setFromEnd(ch)
 		return nil
 	}
 	if u.stack == ch {
 		u.v.addScale(u, ch, d, []string{d.stackName("start"), d.stackName("end")})
 		if sc := u.v.scales[u.v.key(ch)]; sc != nil && u.offset == "normalize" {
 			sc.normalized = true
+		}
+		if b, ok := bandPosition(d); ok && u.mark != "bar" && u.mark != "rect" && u.mark != "area" {
+			// A band position places a mark, such as a label, at that
+			// share of its part of the stack.
+			start, end := fieldRef(d.stackName("start")), fieldRef(d.stackName("end"))
+			e.set(p, map[string]any{"signal": "scale(\"" + u.v.sn(ch) + "\", " + num(1-b) + " * " + start + " + " + num(b) + " * " + end + ")"})
+			return nil
 		}
 		e.set(p, map[string]any{"scale": u.v.sn(ch), "field": d.stackName("end")})
 		e.set(p2, map[string]any{"scale": u.v.sn(ch), "field": d.stackName("start")})
@@ -529,14 +699,52 @@ func (u *unit) axis(e enc, ch, size string) error {
 		return map[string]any{"field": field}
 	}
 	if d.hasDatum {
-		ref = func(string) map[string]any { return map[string]any{"scale": u.v.sn(ch), "value": d.datum} }
+		if sc := u.v.scales[u.v.key(ch)]; hasScale && sc != nil {
+			sc.addDatum(d.datum)
+		}
+		ref = func(string) map[string]any {
+			r := d.datumRef()
+			r["scale"] = u.v.sn(ch)
+			return r
+		}
 	}
 	switch {
-	case discrete && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick"):
-		sz, at := u.markSize(size)
-		if sz == nil && u.mark == "tick" {
-			sz = 5.0
+	case discrete && (u.mark == "bar" || u.mark == "rect") && d2 != nil && d2.isField():
+		// A bar from one band to another, such as a lane of a heat lane,
+		// runs between their middles. On a point scale it runs between
+		// the points.
+		r, r2 := ref(d.out), ref(d2.out)
+		if u.v.scaleType(ch) == "band" {
+			r["band"], r2["band"] = 0.5, 0.5
 		}
+		e.set(p, r)
+		e.set(p2, r2)
+	case discrete && (u.mark == "bar" || u.mark == "rect" || u.mark == "tick"):
+		if d2 != nil && d2.isField() && u.mark != "tick" && u.ch[ch+"Offset"] == nil {
+			// A bar from one band to another runs between their
+			// middles.
+			r, r2 := ref(d.out), ref(d2.out)
+			r["band"], r2["band"] = 0.5, 0.5
+			e.set(p, r)
+			e.set(p2, r2)
+			return nil
+		}
+		if c := u.ch["size"]; c != nil && !c.hasValue && u.mark != "rect" {
+			if r := u.channelRef("size"); r != nil {
+				// The size channel sets the width of a bar or a tick,
+				// around the middle of its band.
+				pr := ref(d.out)
+				if o := u.offsetRef(ch, true); o != nil {
+					pr["offset"] = o
+				} else {
+					pr["band"] = 0.5
+				}
+				e.set(pc, pr)
+				e.set(size, r)
+				return nil
+			}
+		}
+		sz, at := u.markSize(size)
 		if _, ok := relBand(sz); ok && u.ch[ch+"Offset"] != nil {
 			// The bar fills the band of its offset, and the report says
 			// so.
@@ -551,20 +759,11 @@ func (u *unit) axis(e enc, ch, size string) error {
 			r := ref(d.out)
 			r["band"] = (1 - f) / 2
 			e.set(p, r)
-			e.set(size, map[string]any{"signal": "max(0.25, " + num(f) + " * bandwidth('" + u.v.sn(ch) + "'))"})
+			e.set(size, map[string]any{"signal": "max(" + u.minBandSize() + ", " + num(f) + " * bandwidth('" + u.v.sn(ch) + "'))"})
 			return nil
 		}
 		if sz != nil {
 			r := ref(d.out)
-			if u.mark == "tick" {
-				if o := u.offsetRef(ch, false); o != nil {
-					// Ticks fill the band of their offset.
-					r["offset"] = o
-					e.set(p, r)
-					e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + u.v.sn(ch+"Offset") + "'))"})
-					return nil
-				}
-			}
 			if o := u.offsetRef(ch, true); o != nil {
 				r["offset"] = o
 			} else {
@@ -582,11 +781,15 @@ func (u *unit) axis(e enc, ch, size string) error {
 			band = u.v.sn(ch + "Offset")
 		}
 		e.set(p, r)
-		e.set(size, map[string]any{"signal": "max(0.25, bandwidth('" + band + "'))"})
+		e.set(size, map[string]any{"signal": "max(" + u.minBandSize() + ", bandwidth('" + band + "'))"})
 	case discrete && u.v.scaleType(ch) == "band":
 		r := ref(d.out)
-		if o := u.offsetRef(ch, u.v.scaleType(ch+"Offset") != "point"); o != nil {
+		if o := u.offsetRef(ch, false); o != nil {
 			r["offset"] = o
+			// A later layer, such as the box of a box plot, can turn
+			// the points of the offset into bands. The mark then goes
+			// in the middle of the band of its offset.
+			u.lateOffsets = append(u.lateOffsets, p)
 		} else {
 			r["band"] = 0.5
 		}
@@ -599,16 +802,13 @@ func (u *unit) axis(e enc, ch, size string) error {
 		}
 	case u.mark == "tick" && u.measure() == ch:
 		e.set(pc, ref(d.out))
-		thick := 1.0
-		if v, ok := u.props["thickness"].(float64); ok {
-			thick = v
-		}
-		e.set(size, map[string]any{"value": thick})
+		e.set(size, map[string]any{"value": u.tickThickness()})
 		return nil
-	case u.mark == "bar" && ch == u.dimension() && d2 == nil:
-		// A bar on a continuous scale has no band. It is centered on its
-		// value, with the size that the spec gives, or else the
-		// continuousBandSize of the config of the bar.
+	case (u.mark == "bar" || u.mark == "tick") && ch == u.dimension() && d2 == nil:
+		// A bar or a tick on a continuous scale has no band. It is
+		// centered on its value, with the size that the spec gives, or
+		// else the continuousBandSize of the config of the mark, such as
+		// a tick at the end of an error bar over the years.
 		sz, at := u.markSize(size)
 		if _, ok := relBand(sz); ok {
 			// The bar takes the default size, and the report says so.
@@ -631,13 +831,36 @@ func (u *unit) axis(e enc, ch, size string) error {
 			u.late = append(u.late, p)
 		}
 		switch {
+		case d2 != nil && d2.isField() && d.binned && !discrete:
+			// A bar over bins that the data already holds, from its start
+			// to the end of x2, leaves the gap of its binSpacing between
+			// bars, as a bar over the bins of a transform does.
+			o1, o2, err := u.spanOffsets(ch, d)
+			if err != nil {
+				return err
+			}
+			e.set(p, u.spanRef(ch, d.out, o1))
+			e.set(p2, u.spanRef(ch, d2.out, o2))
 		case d2 != nil && d2.isField():
 			e.set(p2, ref(d2.out))
 		case d2 != nil && d2.hasValue:
-			e.set(p2, map[string]any{"value": d2.value})
+			e.set(p2, propRef(d2.value))
+		case u.mark == "area" && u.measure() == ch && hasScale && !u.zeroInDomain(ch):
+			// An area whose scale can leave out zero runs down to the
+			// bottom of its domain, as in vega-lite.js, and not past the
+			// edge of the plot.
+			sn := u.v.sn(ch)
+			e.set(p2, map[string]any{"signal": "scale(" + strconv.Quote(sn) + ", inrange(0, domain(" + strconv.Quote(sn) + ")) ? 0 : domain(" + strconv.Quote(sn) + ")[0])"})
 		case (u.mark == "bar" || u.mark == "area") && u.measure() == ch && hasScale:
 			e.set(p2, map[string]any{"scale": u.v.sn(ch), "value": 0})
-		case u.mark == "rule" && u.ch[ch+"2"] == nil:
+		case u.mark == "rule" && hasScale && !discrete:
+			// A rule on a scale of numbers whose other position is a
+			// field of a discrete scale, such as the stem of a lollipop,
+			// runs from zero, as vega-lite.js draws it.
+			other := map[string]string{"x": "y", "y": "x"}[ch]
+			if o := u.ch[other]; o != nil && o.isField() && o.discrete() && u.ch[other+"2"] == nil {
+				e.set(p2, map[string]any{"scale": u.v.sn(ch), "value": 0})
+			}
 		}
 	}
 	u.pathDefined(e)
@@ -647,9 +870,29 @@ func (u *unit) axis(e enc, ch, size string) error {
 	return nil
 }
 
+// bandPosition returns the band position that a channel gives, if it gives
+// a number.
+func bandPosition(d *channelDef) (float64, bool) {
+	if d.def == nil {
+		return 0, false
+	}
+	b, ok := valueOf(d.def.BandPosition).(float64)
+	return b, ok
+}
+
+// setFromEnd records that the bar of a channel of position spans a bin or
+// a unit of time.
+func (u *unit) setFromEnd(ch string) {
+	if u.fromEnd == nil {
+		u.fromEnd = map[string]bool{}
+	}
+	u.fromEnd[ch] = true
+}
+
 // markOffsets adds the offsets of the mark, such as xOffset, to the offsets
 // of its positions. Vega has no such properties. xOffset moves x, or xc
-// when the mark is centered.
+// when the mark is centered. On a bar that spans a bin or a unit of time,
+// xOffset moves the end of the interval and x2Offset its start.
 func (u *unit) markOffsets(e enc) error {
 	for _, k := range []string{"xOffset", "x2Offset", "yOffset", "y2Offset"} {
 		v, ok := u.props[k]
@@ -657,6 +900,15 @@ func (u *unit) markOffsets(e enc) error {
 			continue
 		}
 		name := strings.TrimSuffix(k, "Offset")
+		if u.fromEnd[name[:1]] {
+			// zuzu writes the start of the interval in x and its end in
+			// x2.
+			if len(name) == 1 {
+				name += "2"
+			} else {
+				name = name[:1]
+			}
+		}
 		ref, _ := e[name].(map[string]any)
 		if ref == nil && len(name) == 1 {
 			ref, _ = e[name+"c"].(map[string]any)
@@ -720,6 +972,143 @@ func (u *unit) markSize(size string) (any, string) {
 	return nil, ""
 }
 
+// spanOffsets returns the offsets of the start and the end of a bar or a
+// rect that spans an interval, a bin or a time unit, along a channel. A bar
+// leaves the gap of its binSpacing between bars, 1 pixel by default, and a
+// rect leaves none. Each end moves half the gap toward the middle of the
+// interval. The range of y runs up, from the height to 0, so its offsets
+// turn around, and so do the offsets of a scale that the spec reverses.
+func (u *unit) spanOffsets(ch string, d *channelDef) (float64, float64, error) {
+	if u.mark != "bar" {
+		return 0, 0, nil
+	}
+	gap, at := any(1.0), ""
+	if v, ok := u.props["binSpacing"]; ok {
+		gap, at = v, u.path+"/mark/binSpacing"
+	} else if u.c.cfg != nil {
+		if v, ok := u.c.cfg.marks[u.mark]["binSpacing"]; ok {
+			gap, at = v, "/config/bar/binSpacing"
+		}
+	}
+	g, ok := gap.(float64)
+	if !ok {
+		// The bar takes the default gap, and the report says so.
+		if err := u.c.issue(at, "the value %v of the property binSpacing", gap); err != nil {
+			return 0, 0, err
+		}
+		g = 1
+	}
+	dir := 1.0
+	if ch == "y" {
+		dir = -1
+	}
+	if d.def != nil && !d.def.Scale.IsZero() {
+		if p, ok := valueOf(d.def.Scale).(map[string]any); ok && p["reverse"] == true {
+			dir = -dir
+		}
+	}
+	return dir * g / 2, -dir * g / 2, nil
+}
+
+// spanRef returns the reference of one end of a bar or a rect over an
+// interval, with its offset when it has one.
+func (u *unit) spanRef(ch, field string, offset float64) map[string]any {
+	r := map[string]any{"scale": u.v.sn(ch), "field": field}
+	if offset != 0 {
+		r["offset"] = offset
+	}
+	return r
+}
+
+// cornerEnd rounds the end of a bar that is away from zero by the
+// cornerRadiusEnd of the spec or of its config, as vega-lite.js does: each
+// corner tests which end of the bar its scaled bounds put at that side. A
+// cornerRadiusEnd of 0 so gives square ends, and the look leaves them. A
+// stack of bars that stackGroup puts in groups rounds its end there
+// instead.
+func (u *unit) cornerEnd(e enc) {
+	r, ok := u.props["cornerRadiusEnd"]
+	if u.mark != "bar" || !ok || u.stackCorners() != nil {
+		return
+	}
+	along := "y"
+	names := [2][2]string{{"cornerRadiusTopLeft", "cornerRadiusTopRight"}, {"cornerRadiusBottomLeft", "cornerRadiusBottomRight"}}
+	if u.orient == "horizontal" {
+		along = "x"
+		names = [2][2]string{{"cornerRadiusTopRight", "cornerRadiusBottomRight"}, {"cornerRadiusTopLeft", "cornerRadiusBottomLeft"}}
+	}
+	a, ok1 := refExpr(e[along])
+	b, ok2 := refExpr(e[along+"2"])
+	if !ok1 || !ok2 {
+		return
+	}
+	// y grows down, so the top of a bar is its least scaled y, and the
+	// right of a horizontal bar its greatest x.
+	tests := [2]string{a + " < " + b, a + " > " + b}
+	if along == "x" {
+		tests = [2]string{a + " > " + b, a + " < " + b}
+	}
+	for i, pair := range names {
+		for _, k := range pair {
+			rule := propRef(r)
+			rule["test"] = tests[i]
+			e.set(k, map[string]any{rulesKey: []any{rule, map[string]any{"value": 0}}})
+		}
+	}
+}
+
+// refExpr returns an expression for the value of a reference of an encode
+// with a scale, such as scale("y", datum["b"]), or false for another kind.
+func refExpr(v any) (string, bool) {
+	ref, ok := v.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	sc, ok := ref["scale"].(string)
+	if !ok || ref["band"] != nil || ref["offset"] != nil {
+		return "", false
+	}
+	if f, ok := ref["field"].(string); ok {
+		return "scale(" + strconv.Quote(sc) + ", " + fieldRef(f) + ")", true
+	}
+	if val, ok := ref["value"]; ok {
+		b, err := json.Marshal(val)
+		if err != nil {
+			return "", false
+		}
+		return "scale(" + strconv.Quote(sc) + ", " + string(b) + ")", true
+	}
+	return "", false
+}
+
+// tickThickness returns the thickness of a tick: the thickness of the mark,
+// or of the config of the tick, or 1.
+func (u *unit) tickThickness() float64 {
+	if v, ok := u.props["thickness"].(float64); ok {
+		return v
+	}
+	if u.c.cfg != nil {
+		if v, ok := u.c.cfg.marks["tick"]["thickness"].(float64); ok {
+			return v
+		}
+	}
+	return 1
+}
+
+// styled reports whether the spec gives a mark a color, a width or a dash
+// of its own, by a property of the mark or by a channel.
+func (u *unit) styled() bool {
+	for _, k := range []string{"color", "stroke", "strokeWidth", "strokeDash", "size"} {
+		if _, ok := u.props[k]; ok {
+			return true
+		}
+		if u.ch[k] != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // relBand returns the share of the band that a size relative to the band,
 // such as {"band": 0.5}, gives.
 func relBand(v any) (float64, bool) {
@@ -729,6 +1118,21 @@ func relBand(v any) (float64, bool) {
 	}
 	f, ok := m["band"].(float64)
 	return f, ok
+}
+
+// minBandSize returns the smallest size of a bar or a rect across a band:
+// the minBandSize of the mark or of the config of the mark, or else 0.25
+// pixels, as vega-lite.js draws it.
+func (u *unit) minBandSize() string {
+	if v, ok := u.props["minBandSize"].(float64); ok {
+		return num(v)
+	}
+	if u.c.cfg != nil {
+		if v, ok := u.c.cfg.marks[u.mark]["minBandSize"].(float64); ok {
+			return num(v)
+		}
+	}
+	return "0.25"
 }
 
 // continuousBandSize returns the size of a bar on a continuous scale that
@@ -854,6 +1258,9 @@ func (u *unit) others(e enc) {
 			e.set("fontSize", map[string]any{"value": s})
 		case "point", "circle", "square":
 			e.set("size", map[string]any{"value": s})
+		case "line", "rule":
+			// The size of a line or a rule is its width.
+			e.set("strokeWidth", map[string]any{"value": s})
 		}
 	}
 	switch u.mark {
@@ -867,7 +1274,18 @@ func (u *unit) others(e enc) {
 	if d := u.ch["text"]; d != nil {
 		switch {
 		case d.hasValue:
-			e.set("text", map[string]any{"value": d.value})
+			ref := propRef(d.value)
+			if len(d.cond) > 0 {
+				ref = u.conditional(d, ref)
+			}
+			e.set("text", ref)
+		case len(d.cond) > 0 && !d.isField():
+			// A text with conditions alone, such as a label on some rows.
+			var base map[string]any
+			if t, ok := u.props["text"]; ok {
+				base = map[string]any{"value": t}
+			}
+			e.set("text", u.conditional(d, base))
 		case d.isField():
 			var ref map[string]any
 			switch d.typ {
@@ -921,24 +1339,92 @@ func (u *unit) offsetRef(ch string, band bool) map[string]any {
 		return nil
 	}
 	if s := u.v.scales[u.v.key(ch+"Offset")]; s != nil {
-		if o.hasDatum && !slices.Contains(s.datums, o.datum) {
-			s.datums = append(s.datums, o.datum)
+		if o.hasDatum {
+			s.addDatum(o.datum)
 		}
 		if s.offset == "" {
 			switch {
 			case u.ch[ch] == nil:
 				s.offset = "center"
+			case !s.discrete:
+				// A continuous offset, such as a random jitter, spans
+				// the band of the position.
 			case u.mark != "bar" && u.mark != "rect" || o.hasDatum:
 				s.offset = "step"
 			}
 		}
+		if !s.discrete {
+			// A continuous offset has no band of its own.
+			band = false
+		}
 	}
 	r := map[string]any{"scale": u.v.sn(ch + "Offset"), "field": o.out}
 	if o.hasDatum {
-		r = map[string]any{"scale": u.v.sn(ch + "Offset"), "value": o.datum}
+		r = o.datumRef()
+		r["scale"] = u.v.sn(ch + "Offset")
 	}
 	if band {
 		r["band"] = 0.5
 	}
 	return r
+}
+
+// unitWidth returns the signal of the width of one unit of time of a channel
+// on its scale of time: the place of a date one unit after 2001-01-01 less
+// the place of 2001-01-01, as vega-lite.js measures it. The smallest unit of
+// the time unit, times its step, is the unit.
+func unitWidth(scale string, c *channelDef) string {
+	// The parts of a date of Vega: year, month (from 0), date, hours,
+	// minutes, seconds and milliseconds.
+	start := [7]int{2001, 0, 1, 0, 0, 0, 0}
+	end := start
+	step := max(int(c.unitStep), 1)
+	smallest := ""
+	for _, u := range []string{"year", "quarter", "month", "week", "date", "day", "dayofyear", "hours", "minutes", "seconds", "milliseconds"} {
+		if slices.Contains(c.units, u) {
+			smallest = u
+		}
+	}
+	switch smallest {
+	case "year":
+		end[0] += step
+	case "quarter":
+		end[1] += 3 * step
+	case "month":
+		end[1] += step
+	case "week":
+		end[2] += 7 * step
+	case "date", "day", "dayofyear":
+		end[2] += step
+	case "hours":
+		end[3] += step
+	case "minutes":
+		end[4] += step
+	case "seconds":
+		end[5] += step
+	default:
+		end[6] += step
+	}
+	fn := "datetime"
+	if c.utc {
+		fn = "utc"
+	}
+	date := func(d [7]int) string {
+		parts := make([]string, len(d))
+		for i, v := range d {
+			parts[i] = strconv.Itoa(v)
+		}
+		return fn + "(" + strings.Join(parts, ", ") + ")"
+	}
+	return "scale('" + scale + "', " + date(end) + ") - scale('" + scale + "', " + date(start) + ")"
+}
+
+// posRef returns the reference of a position that a mark gives: "width" or
+// "height" for that size of the group, as vega-lite.js writes it, and else
+// the value or the expression of the property.
+func posRef(v any) map[string]any {
+	if v == "width" || v == "height" {
+		return map[string]any{"field": map[string]any{"group": v}}
+	}
+	return propRef(v)
 }

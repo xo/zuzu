@@ -65,6 +65,15 @@ type unit struct {
 	// late holds the positions on a point scale that move to the middle
 	// of the band if a later layer turns the scale into bands.
 	late []string
+	// lateOffsets holds the positions moved by a discrete offset that go
+	// to the middle of the band of the offset if the offset ends up with
+	// bands, and not points.
+	lateOffsets []string
+	// fromEnd holds the channels of position, x or y, whose bar spans a
+	// bin or a unit of time. vega-lite.js gives x the end of the interval
+	// and x2 its start, so the property xOffset of the mark moves the end
+	// and x2Offset the start.
+	fromEnd map[string]bool
 }
 
 // unit compiles a single view.
@@ -112,6 +121,13 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 		d, err := readChannel(name, ch.Def(), repeat)
 		if err != nil {
 			return err
+		}
+		if name != "order" && !d.isField() && !d.hasValue && !d.hasDatum && len(d.cond) == 0 {
+			// A channel with no field, value, datum or condition has
+			// nothing to draw, and Vega-Lite drops it. A layer can
+			// inherit one, such as the scale of y without its field.
+			// An order with only a sort still sorts the stack.
+			continue
 		}
 		if err := guideKeys(c, path+"/encoding/"+name, name, d); err != nil {
 			return err
@@ -162,7 +178,8 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 }
 
 // orientation works out which way the marks run: vertical when x is
-// discrete or absent and y is continuous, and horizontal the other way.
+// discrete or absent and y is continuous, and horizontal the other way. A
+// lone channel is the measure when it is quantitative and not binned.
 func (u *unit) orientation() {
 	x, y := u.ch["x"], u.ch["y"]
 	u.orient = "vertical"
@@ -177,7 +194,16 @@ func (u *unit) orientation() {
 			u.orient = "horizontal"
 		}
 	case x != nil && y == nil:
-		if x.continuous() {
+		// A lone x is the measure when it is quantitative and not
+		// binned, and the marks then run across.
+		if x.typ == quantitative && x.bin == nil {
+			u.orient = "horizontal"
+		}
+	case y != nil && x == nil && u.mark == "bar":
+		// A lone y of a bar is the dimension unless it is quantitative
+		// and not binned, and the bars then run across, as Vega-Lite
+		// orients them.
+		if y.typ != quantitative || y.bin != nil {
 			u.orient = "horizontal"
 		}
 	}
@@ -500,6 +526,10 @@ func (u *unit) addListSort(n *dataNode) bool {
 func (u *unit) spans(d *channelDef) bool {
 	pos := d.channel == "x" || d.channel == "y"
 	switch {
+	case pos && u.ch[d.channel+"2"] != nil:
+		// A mark with its own end, such as x2, runs from x to that end
+		// and not over the interval of x.
+		return false
 	case pos && (u.mark == "bar" || u.mark == "rect"):
 		return true
 	case pos && d.def != nil && !d.def.BandPosition.IsZero():
@@ -822,7 +852,7 @@ func (u *unit) invalidFields() []string {
 		return nil
 	}
 	var out []string
-	for _, name := range []string{"x", "y", "theta", "radius", "color", "fill", "stroke", "opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "size", "angle"} {
+	for _, name := range []string{"x", "y", "xOffset", "yOffset", "theta", "radius", "color", "fill", "stroke", "opacity", "fillOpacity", "strokeOpacity", "strokeWidth", "size", "angle"} {
 		d := u.ch[name]
 		if d == nil || !d.isField() || !d.continuous() || d.aggregate == "count" {
 			continue
@@ -911,11 +941,15 @@ func (u *unit) seriesFields() []string {
 	return by
 }
 
+// rulesKey is the key of a value reference that holds a list of rules,
+// such as the conditions of a channel, in place of one reference.
+const rulesKey = "__rules"
+
 // prod makes a production of one value reference, written as JSON. A
-// reference with the key `__rules` is a list of rules.
+// reference with the key rulesKey is a list of rules.
 func prod(v any) vega.Production {
-	if m, ok := v.(map[string]any); ok && m["__rules"] != nil {
-		v = m["__rules"]
+	if m, ok := v.(map[string]any); ok && m[rulesKey] != nil {
+		v = m[rulesKey]
 	}
 	var p vega.Production
 	if err := json.Unmarshal(mustJSON(v), &p); err != nil {
@@ -924,10 +958,10 @@ func prod(v any) vega.Production {
 	return p
 }
 
-// stackGroup puts a stacked bar with round corners in a group for each
-// stack, which clips the bars, so that the corners round the stack and not
-// each bar. The group draws the corners and the stroke of the mark.
-func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
+// stackCorners returns the corners of a stacked bar that stackGroup draws
+// in a group, sorted, or nil when it draws none: the bar does not stack,
+// it has no corner that is not 0, or it has no field across the stack.
+func (u *unit) stackCorners() []string {
 	if u.mark != "bar" || u.stack == "" {
 		return nil
 	}
@@ -937,15 +971,24 @@ func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
 			corners = append(corners, k)
 		}
 	}
-	if len(corners) == 0 {
+	dim := u.ch[u.dimension()]
+	if len(corners) == 0 || u.ch[u.stack] == nil || dim == nil || !dim.isField() {
 		return nil
 	}
 	slices.Sort(corners)
-	measure := u.ch[u.stack]
-	dim := u.ch[u.dimension()]
-	if measure == nil || dim == nil || !dim.isField() {
+	return corners
+}
+
+// stackGroup puts a stacked bar with round corners in a group for each
+// stack, which clips the bars, so that the corners round the stack and not
+// each bar. The group draws the corners and the stroke of the mark.
+func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
+	corners := u.stackCorners()
+	if corners == nil {
 		return nil
 	}
+	measure := u.ch[u.stack]
+	dim := u.ch[u.dimension()]
 	// The axis of the stack, and the axis of the bars.
 	along, across, size := "y", "x", "width"
 	if u.stack == "x" {
@@ -966,12 +1009,21 @@ func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
 	scale := u.v.sn(across)
 	outer := vega.Props{
 		across:      prod(map[string]any{"scale": scale, "field": dim.out}),
-		size:        prod(map[string]any{"signal": "max(0.25, bandwidth('" + scale + "'))"}),
+		size:        prod(map[string]any{"signal": "max(" + u.minBandSize() + ", bandwidth('" + scale + "'))"}),
 		along:       prod(map[string]any{"signal": "min(" + list + ")"}),
 		along + "2": prod(map[string]any{"signal": "max(" + list + ")"}),
 		"clip":      prod(map[string]any{"value": true}),
 	}
 	update := m.Encode["update"]
+	// The place and the size of the bar across its band, such as a band
+	// of 0.5 and an offset of y, go to the group, which draws the bar, as
+	// vega-lite.js writes them.
+	if r, ok := update[across]; ok {
+		outer[across] = r
+	}
+	if r, ok := update[size]; ok {
+		outer[size] = r
+	}
 	for _, k := range corners {
 		if k == "cornerRadiusEnd" {
 			continue
@@ -979,6 +1031,11 @@ func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
 		outer[k] = prod(propRef(u.props[k]))
 		if _, ok := u.c.cfg.marks[u.mark][k]; !ok || u.props[k] != u.c.cfg.marks[u.mark][k] {
 			delete(update, k)
+		} else {
+			// A corner of the config rounds each bar too, so each bar
+			// sets it to 0, as vega-lite.js writes it, and only the
+			// group rounds the stack.
+			update[k] = prod(map[string]any{"value": 0})
 		}
 	}
 	if r, ok := u.props["cornerRadiusEnd"]; ok {
@@ -997,7 +1054,7 @@ func (u *unit) stackGroup(m *vega.Mark) *vega.Mark {
 		}
 		for i, pair := range names {
 			for _, k := range pair {
-				outer[k] = prod(map[string]any{"__rules": []any{map[string]any{"test": tests[i], "value": r}, map[string]any{"value": 0}}})
+				outer[k] = prod(map[string]any{rulesKey: []any{map[string]any{"test": tests[i], "value": r}, map[string]any{"value": 0}}})
 			}
 		}
 	}
@@ -1110,7 +1167,14 @@ var (
 	axisKeys = []string{"title", "grid", "orient", "format", "formatType", "labelAngle", "labelAlign", "labelOverlap",
 		"tickCount", "values", "domain", "labels", "ticks", "offset", "labelBaseline", "labelPadding", "bandPosition",
 		"zindex", "labelExpr"}
-	legendKeys = []string{"title", "orient", "direction", "format", "type", "values", "symbolType", "columns"}
+	legendKeys = append([]string{"title", "orient", "direction", "format", "type", "values", "symbolType", "columns",
+		"clipHeight", "gradientLength", "offset", "legendX", "legendY"}, passedLegendKeys...)
+	// passedLegendKeys are the properties of a legend that pass on to the
+	// Vega legend as they are, which the runtime reads (docs/STYLE.md).
+	passedLegendKeys = []string{"symbolLimit", "labelLimit", "symbolSize", "symbolFillColor", "symbolStrokeColor",
+		"symbolStrokeWidth", "symbolOpacity", "symbolDash", "rowPadding", "columnPadding", "gradientThickness",
+		"labelColor", "labelFont", "labelFontSize", "labelFontStyle", "labelFontWeight", "labelOpacity",
+		"titleColor", "titleFont", "titleFontSize", "titleFontStyle", "titleFontWeight", "titleOpacity"}
 )
 
 // guideKeys reports each property of the axis or the legend of a channel

@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/xo/zuzu/vega"
@@ -122,6 +123,14 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 				Type: "group", Name: cell.prefix + "group",
 				Layout: nested.Layout, Marks: nested.Marks, Title: cell.spec.Title,
 			})
+			// The size that the views of the nested concatenation share
+			// is the size of the chart.
+			if out.Width.IsZero() {
+				out.Width = nested.Width
+			}
+			if out.Height.IsZero() {
+				out.Height = nested.Height
+			}
 			continue
 		}
 		if _, _, _, _, _, ok, _ := readFacet(cell.spec, cell.repeat); ok {
@@ -151,18 +160,37 @@ func (c *compiler) concat(s *Spec, out *vega.Spec, src *dataNode, path string, r
 		v.own, v.sharedPos = own, sharedPos
 		v.common = common.shared
 		v.sizeNames = [2]string{cell.prefix + "width", cell.prefix + "height"}
+		// The views that share the scale of a position share its size,
+		// the width or the height of the whole chart, as vega-lite.js
+		// sizes them.
+		if sharedPos["x"] {
+			v.sizeNames[0] = "width"
+		}
+		if sharedPos["y"] {
+			v.sizeNames[1] = "height"
+		}
 		if err := c.view(cell.spec, v, src, p, cell.repeat); err != nil {
 			return err
 		}
 		inner := &vega.Spec{}
 		v.finish(inner)
 		out.Scales = append(out.Scales, inner.Scales...)
-		out.Signals = append(out.Signals, inner.Signals...)
-		if !inner.Width.IsZero() {
-			out.Signals = append(out.Signals, vega.Signal{Name: v.sizeNames[0], Value: mustJSON(inner.Width.Number)})
+		for _, sig := range inner.Signals {
+			if !slices.ContainsFunc(out.Signals, func(o vega.Signal) bool { return o.Name == sig.Name }) {
+				out.Signals = append(out.Signals, sig)
+			}
 		}
-		if !inner.Height.IsZero() {
-			out.Signals = append(out.Signals, vega.Signal{Name: v.sizeNames[1], Value: mustJSON(inner.Height.Number)})
+		sizes := []*vega.NumberValue{&out.Width, &out.Height}
+		for i, size := range []vega.NumberValue{inner.Width, inner.Height} {
+			switch {
+			case size.IsZero():
+			case v.sizeNames[i] == "width" || v.sizeNames[i] == "height":
+				if sizes[i].IsZero() {
+					*sizes[i] = size
+				}
+			default:
+				out.Signals = append(out.Signals, vega.Signal{Name: v.sizeNames[i], Value: mustJSON(size.Number)})
+			}
 		}
 		group := vega.Mark{
 			Type: "group", Name: cell.prefix + "group", Style: vega.Strings{List: []string{"cell"}},

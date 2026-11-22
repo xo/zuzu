@@ -232,6 +232,165 @@ func TestCompilePositions(t *testing.T) {
 				"xOffset": "",
 			},
 		},
+		{
+			// A bar from one band to another, such as a lane of a heat
+			// lane, runs between the middles of the bands.
+			"bar from band to band", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "bar",
+				"encoding": {"x": {"field": "a", "type": "quantitative"}, "y": {"field": "c"}, "y2": {"field": "d"}}
+			}`, "marks",
+			map[string]string{
+				"y":      `{"scale":"y","field":"c","band":0.5}`,
+				"y2":     `{"scale":"y","field":"d","band":0.5}`,
+				"height": "",
+			},
+		},
+		{
+			// On a point scale the bar runs between the points.
+			"bar from point to point", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "bar",
+				"encoding": {"x": {"field": "c", "type": "ordinal", "scale": {"type": "point"}}, "x2": {"field": "d"}, "y": {"field": "a", "type": "quantitative"}}
+			}`, "marks",
+			map[string]string{
+				"x":     `{"scale":"x","field":"c"}`,
+				"x2":    `{"scale":"x","field":"d"}`,
+				"width": "",
+			},
+		},
+		{
+			// A binned bar leaves a gap of 1 pixel, its binSpacing.
+			"binned bar", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "bar",
+				"encoding": {"x": {"field": "a", "bin": true}, "y": {"aggregate": "count"}}
+			}`, "marks",
+			map[string]string{
+				"x":  `{"scale":"x","field":"bin_maxbins_10_a","offset":0.5}`,
+				"x2": `{"scale":"x","field":"bin_maxbins_10_a_end","offset":-0.5}`,
+			},
+		},
+		{
+			// The range of y runs up, so the gap of a binned y turns
+			// around, and the binSpacing of the spec sets it.
+			"binned y bar with a binSpacing", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": {"type": "bar", "binSpacing": 3},
+				"encoding": {"y": {"field": "a", "bin": true}, "x": {"aggregate": "count"}}
+			}`, "marks",
+			map[string]string{
+				"y":  `{"scale":"y","field":"bin_maxbins_10_a","offset":-1.5}`,
+				"y2": `{"scale":"y","field":"bin_maxbins_10_a_end","offset":1.5}`,
+			},
+		},
+		{
+			// A reversed scale turns the gap around.
+			"binned bar on a reversed scale", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "bar",
+				"encoding": {"x": {"field": "a", "bin": true, "scale": {"reverse": true}}, "y": {"aggregate": "count"}}
+			}`, "marks",
+			map[string]string{
+				"x":  `{"scale":"x","field":"bin_maxbins_10_a","offset":-0.5}`,
+				"x2": `{"scale":"x","field":"bin_maxbins_10_a_end","offset":0.5}`,
+			},
+		},
+		{
+			// A binSpacing of 0, and a rect, leave no gap.
+			"binned bar with no spacing", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": {"type": "bar", "binSpacing": 0},
+				"encoding": {"x": {"field": "a", "bin": true}, "y": {"aggregate": "count"}}
+			}`, "marks",
+			map[string]string{
+				"x":  `{"scale":"x","field":"bin_maxbins_10_a"}`,
+				"x2": `{"scale":"x","field":"bin_maxbins_10_a_end"}`,
+			},
+		},
+		{
+			"bar over a time unit on y", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "bar",
+				"encoding": {"y": {"field": "a", "type": "temporal", "timeUnit": "binnedutcyearmonthdate"}, "x": {"field": "b", "type": "quantitative"}}
+			}`, "marks",
+			map[string]string{
+				"y":  `{"scale":"y","field":"a","offset":-0.5}`,
+				"y2": `{"scale":"y","field":"a_end","offset":0.5}`,
+			},
+		},
+		{
+			// A value that an expression gives is a signal.
+			"rule at an expression", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "rule",
+				"encoding": {"x": {"value": {"expr": "width / 2"}}}
+			}`, "marks",
+			map[string]string{
+				"x": `{"signal":"width / 2"}`,
+			},
+		},
+		{
+			// A tick with no y sits in the middle of the view, three
+			// quarters of its height.
+			"tick with no y", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "tick",
+				"encoding": {"x": {"field": "a", "type": "quantitative"}}
+			}`, "marks",
+			map[string]string{
+				"yc":     `{"signal":"height","mult":0.5}`,
+				"height": `{"signal":"0.75 * height"}`,
+				"y":      "",
+			},
+		},
+		{
+			// A tick on a band fills it, as a bar does.
+			"tick on a band", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "tick",
+				"encoding": {"x": {"field": "a", "type": "quantitative"}, "y": {"field": "c", "type": "ordinal"}}
+			}`, "marks",
+			map[string]string{
+				"y":      `{"scale":"y","field":"c"}`,
+				"height": `{"signal":"max(0.25, bandwidth('y'))"}`,
+			},
+		},
+		{
+			// A tick across a continuous x is centered on its value, 5
+			// pixels wide.
+			"tick on a continuous x", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": "tick",
+				"encoding": {"x": {"field": "a", "type": "temporal"}, "y": {"field": "b", "type": "quantitative"}}
+			}`, "marks",
+			map[string]string{
+				"xc":    `{"scale":"x","field":"a"}`,
+				"width": `{"value":5}`,
+			},
+		},
+		{
+			// A bar with a size and no y sits in the middle of the view.
+			"bar with a size and no y", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": {"type": "bar", "size": 14},
+				"encoding": {"x": {"field": "a", "type": "quantitative"}}
+			}`, "marks",
+			map[string]string{
+				"yc":     `{"signal":"height","mult":0.5}`,
+				"height": `{"value":14}`,
+			},
+		},
+		{
+			// A cornerRadiusEnd of 0 reaches the encode, so the ends are
+			// square.
+			"bar with a cornerRadiusEnd", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": {"type": "bar", "cornerRadiusEnd": 0},
+				"encoding": {"x": {"field": "c", "type": "nominal"}, "y": {"field": "a", "type": "quantitative", "stack": null}}
+			}`, "marks",
+			map[string]string{
+				"cornerRadiusTopLeft":     `[{"test":"scale(\"y\", datum[\"a\"]) < scale(\"y\", 0)","value":0},{"value":0}]`,
+				"cornerRadiusBottomRight": `[{"test":"scale(\"y\", datum[\"a\"]) > scale(\"y\", 0)","value":0},{"value":0}]`,
+			},
+		},
+		{
+			// A gradient is the color of a mark.
+			"area with a gradient", `{"data": {"values": [{"a": 1, "b": 2, "c": "p", "d": "q"}]},
+				"mark": {"type": "area", "color": {"gradient": "linear", "stops": [{"offset": 0, "color": "white"}, {"offset": 1, "color": "red"}]}},
+				"encoding": {"x": {"field": "a", "type": "quantitative"}, "y": {"field": "b", "type": "quantitative"}}
+			}`, "marks",
+			map[string]string{
+				"fill": `{"value":{"gradient":"linear","stops":[{"offset":0,"color":"white"},{"offset":1,"color":"red"}]}}`,
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

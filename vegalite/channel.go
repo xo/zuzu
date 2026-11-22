@@ -31,6 +31,9 @@ type channelDef struct {
 	// field is the field of the data, and typ its type.
 	field string
 	typ   string
+	// name is the field as the spec writes it, which a default title
+	// shows. A nested field keeps its path here, such as a.b.
+	name string
 	// aggregate is the op of an aggregate, such as sum or count.
 	aggregate string
 	// argField is the field whose least or greatest value an argmin or an
@@ -102,6 +105,13 @@ func (c *channelDef) continuous() bool {
 	return false
 }
 
+// discrete reports whether the channel draws on a discrete scale: a type
+// that is not continuous, or a unit of time on a type that is not
+// temporal.
+func (c *channelDef) discrete() bool {
+	return !c.continuous() || (c.units != nil && c.typ != temporal)
+}
+
 // readChannel reads the definition of a channel. repeat names the field of
 // a repeat, for a field {"repeat": "row"}.
 func readChannel(channel string, def *FieldDef, repeat map[string]string) (*channelDef, error) {
@@ -119,6 +129,7 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 				c.field = repeat[r]
 			}
 		}
+		c.name = c.field
 		c.bracket = strings.HasSuffix(c.field, "]")
 		if parts := dataflow.SplitField(c.field); len(parts) > 1 {
 			// A field inside an object becomes a flat field whose name
@@ -239,9 +250,14 @@ func readChannel(channel string, def *FieldDef, repeat map[string]string) (*chan
 			// A continuous scale reads numbers.
 			c.typ = quantitative
 		case c.hasDatum:
-			switch c.datum.(type) {
+			switch x := c.datum.(type) {
 			case float64:
 				c.typ = quantitative
+			case map[string]any:
+				c.typ = nominal
+				if isDateTime(x) {
+					c.typ = temporal
+				}
 			default:
 				c.typ = nominal
 			}
@@ -587,6 +603,16 @@ func timeFloorExpr(units []string, utc bool, f string) string {
 		part("milliseconds", "milliseconds", "0"),
 	}
 	return "time(" + fn + "(" + strings.Join(args, ", ") + "))"
+}
+
+// datumRef returns the value reference of the datum of a channel, with no
+// scale. A date time object, such as {"year": 2006}, is a signal of its
+// date.
+func (c *channelDef) datumRef() map[string]any {
+	if m, ok := c.datum.(map[string]any); ok && isDateTime(m) {
+		return map[string]any{"signal": dateTimeExpr(m)}
+	}
+	return map[string]any{"value": c.datum}
 }
 
 // dateTimeExpr writes a date time object of Vega-Lite, such as {"year":

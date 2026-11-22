@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/xo/zuzu/expr"
@@ -37,15 +39,29 @@ type shared struct {
 	// common holds the scales that the views of a concatenation share, such
 	// as color, and nil when the view shares none.
 	common *shared
-	cfg    *config
-	marks  []vega.Mark
-	scales map[string]*scaleComp
-	order  []string
-	width  vega.Value
-	height vega.Value
+	// sharedAxes holds, for each scale of position that the view shares
+	// with the other views of a concatenation, the titles and the axis
+	// that the channels of the view give.
+	sharedAxes map[string]*scaleComp
+	cfg        *config
+	marks      []vega.Mark
+	scales     map[string]*scaleComp
+	order      []string
+	width      vega.Value
+	height     vega.Value
 	// late holds the changes to the marks that wait until every layer has
 	// set the type of its scales.
 	late []func()
+	// ownLegend holds the channels whose legend each layer keeps for
+	// itself, as an independent resolve of the legends asks.
+	ownLegend map[string]bool
+}
+
+// layerLegend is the legend that a layer keeps for itself: its title, and
+// the color of the mark of the layer, or nil.
+type layerLegend struct {
+	title string
+	color any
 }
 
 // view is a view or a layer of a view, which names its marks with a
@@ -119,10 +135,20 @@ type scaleComp struct {
 	props map[string]any
 	// bins is the signal of the bins of a binned field.
 	bins string
+	// origin is the view of the unit that added the scale first. A scale
+	// that the views of a concatenation share reads its default range
+	// from the positions of that view.
+	origin *view
 	// offset is the range of a scale of an offset: "band" for the band of
-	// the scale of its position, "step" for steps of 20 pixels, and
-	// "center" around the middle of the view when there is no position.
+	// the scale of its position, "step" for steps of 20 pixels, "center"
+	// around the middle of the view when there is no position, and "unit"
+	// for the width of one unit of time on a scale of time.
 	offset string
+	// unitWidth is the signal of the width of one unit of time on the scale
+	// of the position, and unitBand the place of the bars in that unit, from
+	// 0 at its start to 1 at its end, for an offset of "unit".
+	unitWidth string
+	unitBand  float64
 	// datums are the constants of the data that channels put through the
 	// scale, which its domain holds.
 	datums []any
@@ -135,6 +161,11 @@ type scaleComp struct {
 	// titles are the titles of the fields that the scale draws, for its
 	// guide.
 	titles []string
+	// layerLegends are the legends of the layers that keep a legend of
+	// their own, in the order of the layers, and titled says that a
+	// channel gives the title of the scale.
+	layerLegends []layerLegend
+	titled       bool
 	// guide holds the axis or the legend that the spec gives, and noGuide
 	// says that it is null.
 	guide   map[string]any
@@ -175,7 +206,24 @@ func (v *view) scaleType(ch string) string {
 // "scale": null.
 func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bool {
 	if v.common != nil && (!isPositional(name) || v.sharedPos[name]) && !v.own[name] {
-		return (&view{shared: v.common}).addScale(u, name, d, fields)
+		ok := (&view{shared: v.common}).addScale(u, name, d, fields)
+		if s := v.common.scales[name]; s != nil && s.origin == nil {
+			s.origin = v
+		}
+		if ok && (name == "x" || name == "y") {
+			// Each view draws the axis of the shared scale with its own
+			// title and properties.
+			if v.sharedAxes == nil {
+				v.sharedAxes = map[string]*scaleComp{}
+			}
+			g := v.sharedAxes[name]
+			if g == nil {
+				g = &scaleComp{}
+				v.sharedAxes[name] = g
+			}
+			g.takeGuide(name, d)
+		}
+		return ok
 	}
 	var props map[string]any
 	if d.def != nil && !d.def.Scale.IsZero() {
@@ -208,6 +256,13 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 	}
 	if d.bin != nil {
 		s.bins = binPrefix(d.bin) + "_" + varName(d.field) + "_bins"
+	}
+	if !s.discrete && d.def != nil && valueOf(d.def.Sort) == "descending" {
+		// A continuous scale sorted descending runs backward, as
+		// vega-lite.js writes it, unless the scale says otherwise.
+		if _, ok := s.props["reverse"]; !ok {
+			s.props["reverse"] = true
+		}
 	}
 	data := u.c.name(u.data)
 	if idx := u.listSort[name]; idx != "" && u.raw != nil {
@@ -264,6 +319,31 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 			s.sortVal = by
 		}
 	}
+	if v.ownLegend[name] {
+		// Each layer draws a legend of its own, with its own title and
+		// the color of its mark.
+		lg := layerLegend{title: titleOf(d)}
+		if d.def != nil && !d.def.Title.IsZero() {
+			lg.title = ""
+			if x := valueOf(d.def.Title); x != nil {
+				lg.title = titleString(x)
+			}
+		}
+		if c, ok := u.props["color"]; ok {
+			lg.color = c
+		}
+		if c := u.ch["color"]; c != nil && c.def != nil && c.def.Field.IsZero() && !c.def.Value.IsZero() {
+			lg.color = valueOf(c.def.Value)
+		}
+		s.layerLegends = append(s.layerLegends, lg)
+	}
+	s.takeGuide(name, d)
+	return true
+}
+
+// takeGuide adds the title and the axis or the legend that a channel gives
+// to a scale.
+func (s *scaleComp) takeGuide(name string, d *channelDef) {
 	if t := titleOf(d); t != "" && !contains(s.titles, t) {
 		s.titles = append(s.titles, t)
 	}
@@ -284,6 +364,7 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 			}
 		}
 		if !d.def.Title.IsZero() {
+			s.titled = true
 			x := valueOf(d.def.Title)
 			if x == nil {
 				s.titles = []string{""}
@@ -292,7 +373,6 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 			}
 		}
 	}
-	return true
 }
 
 // contains reports whether a list holds a string.
@@ -324,6 +404,10 @@ func isPositional(ch string) bool {
 // titleOf returns the title of a channel, as Vega-Lite writes it: Sum of
 // price, Count of Records, price (binned) or date (month).
 func titleOf(d *channelDef) string {
+	field := d.name
+	if field == "" {
+		field = d.field
+	}
 	switch {
 	case d.aggregate == "count":
 		return "Count of Records"
@@ -333,13 +417,13 @@ func titleOf(d *channelDef) string {
 		if n, ok := names[op]; ok {
 			op = n
 		}
-		return op + " of " + d.field
+		return op + " of " + field
 	case d.bin != nil:
-		return d.field + " (binned)"
+		return field + " (binned)"
 	case d.units != nil:
-		return d.field + " (" + strings.Join(d.units, "-") + ")"
+		return field + " (" + strings.Join(d.units, "-") + ")"
 	}
-	return d.field
+	return field
 }
 
 // scaleTypeOf chooses the type of the scale of a channel from the type of
@@ -442,18 +526,92 @@ func (v *view) dimension(ch, name string, given vega.Value) (vega.NumberValue, [
 		}
 	}
 	s, ok := v.scales[v.key(ch)]
+	if !ok && v.common != nil && v.sharedPos[ch] {
+		// The views of a concatenation share the scale.
+		s, ok = v.common.scales[ch]
+	}
 	if !ok || !s.discrete || s.typ == "ordinal" {
 		if !ok && hasMarkWithout(v, ch) {
 			return vega.Num(step), nil
 		}
 		return vega.Num(continuousSize), nil
 	}
-	inner, outer := s.paddings()
+	inner, outer := v.bandPaddings(s)
 	stepName := v.sn(ch) + "_step"
+	stepSig := vega.Signal{Name: stepName, Value: mustJSON(step)}
+	if off := v.offsetOf(ch); off != nil {
+		// The step goes to the offset, and each band holds the steps of
+		// its offsets, as vega-lite.js sizes a group of bars.
+		oi, oo := off.paddings()
+		stepSig = vega.Signal{Name: stepName, Update: vega.Expr(fmt.Sprintf("%s * bandspace(domain('%s').length, %s, %s) / (1-%s)",
+			num(step), v.sn(ch+"Offset"), num(oi), num(oo), num(inner)))}
+	}
 	return vega.NumberValue{}, []vega.Signal{
-		{Name: stepName, Value: mustJSON(step)},
+		stepSig,
 		{Name: name, Update: vega.Expr(fmt.Sprintf("bandspace(domain('%s').length, %s, %s) * %s", v.sn(ch), num(inner), num(outer), stepName))},
 	}
+}
+
+// offsetOf returns the discrete scale of the offset of a channel of
+// position whose own scale is a band with a step, or nil. Such an offset
+// takes the step of the view, and the band holds its steps, unless the
+// step of the view is "for" the position.
+func (v *view) offsetOf(ch string) *scaleComp {
+	s := v.scales[v.key(ch)]
+	off := v.scales[v.key(ch+"Offset")]
+	size := v.width
+	if ch == "y" {
+		size = v.height
+	}
+	if s == nil || off == nil || !s.discrete || s.typ != "band" || !off.discrete || fixed(size) {
+		return nil
+	}
+	// A step "for" the position is the step of the band, and the offset
+	// fills the band.
+	if m, ok := valueOf(size).(map[string]any); ok && m["for"] == "position" {
+		return nil
+	}
+	return off
+}
+
+// stepOf returns the step of a discrete channel of position: the step of
+// the width or the height, of the config, or 20.
+func (v *view) stepOf(ch string) float64 {
+	step := float64(discreteStep)
+	if v.cfg != nil && v.cfg.step > 0 {
+		step = v.cfg.step
+	}
+	size := v.width
+	if ch == "y" {
+		size = v.height
+	}
+	if m, ok := valueOf(size).(map[string]any); ok {
+		if st, ok := m["step"].(float64); ok {
+			step = st
+		}
+	}
+	return step
+}
+
+// bandPaddings returns the paddings of a band or a point scale, with the
+// paddings of 0.2 that vega-lite.js gives a band of position whose groups
+// an offset splits, offsetBandPaddingInner and offsetBandPaddingOuter of
+// its config.
+func (v *view) bandPaddings(s *scaleComp) (float64, float64) {
+	inner, outer := s.paddings()
+	if (s.channel == "x" || s.channel == "y") && v.scales[v.key(s.channel+"Offset")] != nil && s.typ == "band" {
+		if _, ok := s.props["paddingInner"]; !ok {
+			if _, ok := s.props["padding"]; !ok {
+				inner = 0.2
+			}
+		}
+		if _, ok := s.props["paddingOuter"]; !ok {
+			if _, ok := s.props["padding"]; !ok {
+				outer = 0.2
+			}
+		}
+	}
+	return inner, outer
 }
 
 // sizeName returns the name of the width, for 0, or of the height, for 1.
@@ -500,6 +658,10 @@ func (s *scaleComp) paddings() (float64, float64) {
 		inner, outer = 1, 0.5
 	case s.mark == "rect" || s.channel == "xOffset" || s.channel == "yOffset":
 		inner, outer = 0, 0
+	case s.mark == "tick":
+		// A tick fills its band, which leaves a quarter of a step
+		// between ticks, as vega-lite.js draws them.
+		inner, outer = 0.25, 0.125
 	}
 	if p, ok := s.props["padding"].(float64); ok {
 		inner, outer = p, p
@@ -604,6 +766,8 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 				vals[i] = lit(x)
 			}
 			vs.Range = vega.ScaleRange{Values: vals}
+		case map[string]any:
+			vs.Range = v.fieldRange(s, r)
 		}
 	case s.props["scheme"] != nil:
 		ref := &vega.SchemeRef{}
@@ -631,6 +795,20 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		if x, ok := s.props["rangeMax"]; ok {
 			r[1] = lit(x)
 		}
+		if s.channel == "size" && (s.typ == "quantile" || s.typ == "quantize") && s.props["range"] == nil {
+			// A quantile or a quantize scale of sizes cuts its domain into
+			// four pieces, quantileCount and quantizeCount of the config
+			// of Vega-Lite, so it takes four sizes from end to end.
+			end := func(v vega.Value) string {
+				if v.Signal != "" {
+					return "(" + v.Signal + ")"
+				}
+				return string(v.JSON)
+			}
+			lo, hi := end(r[0]), end(r[1])
+			step := "(" + hi + " - " + lo + ") / 3"
+			vs.Range = vega.ScaleRange{Signal: "sequence(" + lo + ", " + hi + " + " + step + ", " + step + ")"}
+		}
 	}
 	// The other properties.
 	positional := s.channel == "x" || s.channel == "y"
@@ -646,8 +824,10 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		// The padding of a continuous scale is in pixels.
 		vs.Padding = lit(p)
 	}
-	if s.discrete && (s.typ == "band" || s.typ == "point") {
-		inner, outer := s.paddings()
+	if s.discrete && (s.typ == "band" || s.typ == "point") && s.channel != "size" {
+		// The paddings are of a position or an offset. A point scale
+		// of size has none.
+		inner, outer := v.bandPaddings(s)
 		if s.typ == "band" {
 			vs.PaddingInner = lit(inner)
 			vs.PaddingOuter = lit(outer)
@@ -656,7 +836,7 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		}
 	}
 	switch {
-	case s.channel == "size" && s.typ == "quantize", quant && (s.channel == "opacity" || s.channel == "fillOpacity" || s.channel == "strokeOpacity"):
+	case s.channel == "size" && s.typ == "quantize", quant && (s.channel == "opacity" || s.channel == "fillOpacity" || s.channel == "strokeOpacity" || s.channel == "xOffset" || s.channel == "yOffset"):
 		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: false}
 	case quant && (positional || s.channel == "size" || s.channel == "theta" || s.channel == "radius") && s.typ != "log" && !discretizing(s.typ):
 		zero := (s.bins == "" || s.channel == "size") && !s.binned && s.props["domain"] == nil && (!s.dimension || s.zeroKept)
@@ -713,6 +893,43 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 	return vs
 }
 
+// binnedMaxSize returns the signal of the largest size of a point of the
+// size scale s when x and y are both binned, or "" when they are not. A
+// point then fills 95% of the smaller step of the two bins, as vega-lite.js
+// draws it. The size of a point is an area, so the signal is the square of
+// that width.
+func (v *view) binnedMaxSize(s *scaleComp) string {
+	if s.origin != nil {
+		v = s.origin
+	}
+	x, y := v.scales[v.key("x")], v.scales[v.key("y")]
+	if x == nil || y == nil || x.bins == "" || y.bins == "" || x.discrete || y.discrete {
+		return ""
+	}
+	step := func(size, bins string) string {
+		return size + " / ((" + bins + ".stop - " + bins + ".start) / " + bins + ".step)"
+	}
+	return "pow(0.95 * min(" + step(v.sizeName(0), x.bins) + ", " + step(v.sizeName(1), y.bins) + "), 2)"
+}
+
+// fieldRange returns the range {"field": ...} of a scale: the values of that
+// field in the dataset of the domain. Each value goes with the value of the
+// domain on its row, so the range sorts by the domain, as vega-lite.js
+// writes it. A range with no field, or a scale with no field in its
+// domain, keeps the default range.
+func (v *view) fieldRange(s *scaleComp, r map[string]any) vega.ScaleRange {
+	f, ok := r["field"].(string)
+	if !ok || len(s.refs) == 0 {
+		return v.defaultRange(s)
+	}
+	ref := s.refs[0]
+	return vega.ScaleRange{Data: &vega.DataRef{
+		Data:  ref.data,
+		Field: vega.Field{Name: f},
+		Sort:  mustJSON(map[string]any{"op": "min", "field": ref.field}),
+	}}
+}
+
 // dataDomain returns the domain of a scale from the fields of its datasets.
 func (v *view) dataDomain(s *scaleComp) vega.ScaleDomain {
 	if len(s.refs) == 0 {
@@ -720,21 +937,22 @@ func (v *view) dataDomain(s *scaleComp) vega.ScaleDomain {
 			// The constants alone make the domain.
 			ref := &vega.DataRef{}
 			for _, x := range s.datums {
-				ref.Fields = append(ref.Fields, []any{x})
+				ref.Fields = append(ref.Fields, datumField(x))
 			}
 			return vega.ScaleDomain{Data: ref}
 		}
 		return vega.ScaleDomain{}
 	}
 	ref := &vega.DataRef{}
-	same := true
+	// A constant is a list of its own, so the fields name each dataset.
+	same := len(s.datums) == 0
 	for _, r := range s.refs {
 		if r.data != s.refs[0].data {
 			same = false
 		}
 	}
 	switch {
-	case len(s.refs) == 1:
+	case len(s.refs) == 1 && same:
 		ref.Data = s.refs[0].data
 		ref.Field = vega.Field{Name: s.refs[0].field}
 	case same:
@@ -745,6 +963,9 @@ func (v *view) dataDomain(s *scaleComp) vega.ScaleDomain {
 	default:
 		for _, r := range s.refs {
 			ref.Fields = append(ref.Fields, map[string]any{"data": r.data, "field": r.field})
+		}
+		for _, x := range s.datums {
+			ref.Fields = append(ref.Fields, datumField(x))
 		}
 	}
 	if s.discrete && s.typ != "point" || s.discrete {
@@ -847,6 +1068,10 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 			return vega.ScaleRange{Step: vega.Value{Signal: v.sn("x") + "_step"}}
 		}
 		if s.channel == "xOffset" {
+			if v.offsetOf("x") != nil && s.offset == "" {
+				return vega.ScaleRange{Step: lit(v.stepOf("x"))}
+			}
+			v.unitOffset(s, "x")
 			return offsetRange(s, "bandwidth('"+v.sn("x")+"')", "width")
 		}
 		return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: v.sizeName(0)}}}
@@ -855,6 +1080,15 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 			return vega.ScaleRange{Step: vega.Value{Signal: v.sn("y") + "_step"}}
 		}
 		if s.channel == "yOffset" {
+			if v.offsetOf("y") != nil && s.offset == "" {
+				return vega.ScaleRange{Step: lit(v.stepOf("y"))}
+			}
+			v.unitOffset(s, "y")
+			if !s.discrete && s.offset == "" {
+				// A continuous offset runs up the band, as the scale
+				// of y does.
+				return vega.ScaleRange{Values: []vega.Value{{Signal: "bandwidth('" + v.sn("y") + "')"}, lit(0)}}
+			}
 			return offsetRange(s, "bandwidth('"+v.sn("y")+"')", "height")
 		}
 		if s.discrete {
@@ -871,6 +1105,10 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 			return vega.ScaleRange{Name: "ordinal"}
 		case s.discrete:
 			return vega.ScaleRange{Name: "category"}
+		case s.props["domainMid"] != nil:
+			// A middle of the domain asks for a diverging range, as
+			// vega-lite.js gives it.
+			return vega.ScaleRange{Name: "diverging"}
 		case s.typ == "linear" && (s.mark == "rect" || s.mark == "geoshape"):
 			// A linear color of rects or shapes fills a heat map.
 			return vega.ScaleRange{Name: "heatmap"}
@@ -881,13 +1119,31 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 	case "size":
 		switch s.mark {
 		case "bar", "tick":
-			return vega.ScaleRange{Values: []vega.Value{lit(1), lit(20)}}
+			// minBandSize and maxBandSize of the config of the scales:
+			// 2, and the step of the band less 1.
+			dim := "x"
+			if ys, xs := v.scales[v.key("y")], v.scales[v.key("x")]; ys != nil && ys.discrete && (xs == nil || !xs.discrete) {
+				dim = "y"
+			}
+			return vega.ScaleRange{Values: []vega.Value{lit(2), lit(v.stepOf(dim) - 1)}}
 		case "text":
 			return vega.ScaleRange{Values: []vega.Value{lit(8), lit(40)}}
 		case "line", "rule":
 			return vega.ScaleRange{Values: []vega.Value{lit(1), lit(8)}}
+		case "trail":
+			// The size of a trail is its width, as vega-lite.js gives it.
+			return vega.ScaleRange{Values: []vega.Value{lit(1), lit(4)}}
 		}
-		return vega.ScaleRange{Values: []vega.Value{lit(0), lit(361)}}
+		// The smallest point is 4 square pixels, as vega-lite.js writes
+		// it, so that a point of the least value still shows.
+		low := lit(0)
+		if s.mark == "point" || s.mark == "circle" || s.mark == "square" {
+			low = lit(4)
+		}
+		if sig := v.binnedMaxSize(s); sig != "" {
+			return vega.ScaleRange{Values: []vega.Value{low, {Signal: sig}}}
+		}
+		return vega.ScaleRange{Values: []vega.Value{low, lit(361)}}
 	case "opacity", "fillOpacity", "strokeOpacity":
 		return vega.ScaleRange{Values: []vega.Value{lit(0.3), lit(0.8)}}
 	case "strokeWidth":
@@ -907,11 +1163,31 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 // guides adds the axes of the positional scales and the legends of the
 // others.
 func (v *view) guides(out *vega.Spec) {
-	legends := map[string]*vega.Legend{}
-	var legendOrder []string
+	// A channel shares the legend of a channel of the same field, as in
+	// Vega-Lite, unless the two have titles of their own that differ. A
+	// title that a channel gives wins over the title of the field.
+	type legendOf struct {
+		l        *vega.Legend
+		field    string
+		title    string
+		explicit bool
+		layers   []layerLegend
+	}
+	var legends []*legendOf
 	var grids, mains []vega.Axis
+	scales := make([]*scaleComp, 0, len(v.order)+len(v.sharedAxes))
 	for _, name := range v.order {
-		s := v.scales[name]
+		scales = append(scales, v.scales[name])
+	}
+	for _, ch := range []string{"x", "y"} {
+		if g := v.sharedAxes[ch]; g != nil && v.common.scales[ch] != nil {
+			// The shared scale with the axis of this view.
+			s := *v.common.scales[ch]
+			s.guide, s.noGuide, s.titles = g.guide, g.noGuide, g.titles
+			scales = append(scales, &s)
+		}
+	}
+	for _, s := range scales {
 		if s.noGuide {
 			continue
 		}
@@ -929,7 +1205,7 @@ func (v *view) guides(out *vega.Spec) {
 			if s.channel == "y" {
 				other = "x"
 			}
-			if _, ok := v.scales[other]; !ok {
+			if _, ok := v.scales[other]; !ok && v.sharedAxes[other] == nil {
 				other = ""
 			}
 			grid, main := axisOf(s, title, other, v)
@@ -944,17 +1220,33 @@ func (v *view) guides(out *vega.Spec) {
 			if s.field != nil {
 				field = s.field.out
 			}
-			key := field + "|" + title
-			l, ok := legends[key]
-			if !ok {
-				l = &vega.Legend{}
-				legends[key] = l
-				legendOrder = append(legendOrder, key)
-				if title != "" {
-					l.Title = lit(title)
+			_, explicit := s.guide["title"]
+			explicit = explicit || s.titled
+			var lo *legendOf
+			for _, c := range legends {
+				if c.field == field && (c.title == title || !c.explicit || !explicit) {
+					lo = c
+					break
 				}
 			}
-			sn := v.sn(name)
+			switch {
+			case lo == nil:
+				lo = &legendOf{l: &vega.Legend{}, field: field, title: title, explicit: explicit}
+				legends = append(legends, lo)
+				if title != "" {
+					lo.l.Title = lit(title)
+				}
+			case explicit && !lo.explicit:
+				lo.title, lo.explicit, lo.l.Title = title, true, vega.Value{}
+				if title != "" {
+					lo.l.Title = lit(title)
+				}
+			}
+			l := lo.l
+			if len(s.layerLegends) > 1 {
+				lo.layers = s.layerLegends
+			}
+			sn := v.sn(s.name)
 			switch s.channel {
 			case "color", "fill":
 				if s.mark == "line" || s.mark == "rule" || (s.mark == "point" && s.channel == "color") {
@@ -983,7 +1275,9 @@ func (v *view) guides(out *vega.Spec) {
 				case "direction":
 					l.Direction = lit(x)
 				case "format":
-					l.Format = lit(x)
+					if x != "" || s.field == nil || s.field.units == nil {
+						l.Format = lit(x)
+					}
 				case "type":
 					l.Type = expr.String(x)
 				case "values":
@@ -992,6 +1286,28 @@ func (v *view) guides(out *vega.Spec) {
 					l.SymbolType = lit(x)
 				case "columns":
 					l.Columns = lit(x)
+				case "clipHeight":
+					l.ClipHeight = lit(x)
+				case "gradientLength":
+					l.GradientLength = lit(x)
+				case "offset":
+					l.Offset = lit(x)
+				case "legendX":
+					l.LegendX = lit(x)
+				case "legendY":
+					l.LegendY = lit(x)
+				default:
+					if !slices.Contains(passedLegendKeys, k) {
+						continue
+					}
+					b, err := json.Marshal(x)
+					if err != nil {
+						continue
+					}
+					if l.Extra == nil {
+						l.Extra = vega.Extra{}
+					}
+					l.Extra[k] = b
 				}
 			}
 			if l.SymbolType.IsZero() && l.Fill != "" {
@@ -1006,6 +1322,14 @@ func (v *view) guides(out *vega.Spec) {
 			}
 			if l.Format.IsZero() && s.field != nil && s.field.units != nil {
 				l.Format = lit(format.TimeUnitSpecifier(s.field.units, vlSpecifiers))
+				if s.field.typ != temporal && l.FormatType.IsZero() {
+					// The labels of a discrete scale are dates only when
+					// the legend says so. A scale of time says it itself.
+					l.FormatType = lit("time")
+					if s.field.utc {
+						l.FormatType = lit("utc")
+					}
+				}
 			}
 		}
 	}
@@ -1014,8 +1338,30 @@ func (v *view) guides(out *vega.Spec) {
 	slices.SortStableFunc(mains, func(a, b vega.Axis) int { return strings.Compare(a.Scale, b.Scale) })
 	out.Axes = append(out.Axes, grids...)
 	out.Axes = append(out.Axes, mains...)
-	for _, k := range legendOrder {
-		out.Legends = append(out.Legends, *legends[k])
+	for _, lo := range legends {
+		if len(lo.layers) < 2 {
+			out.Legends = append(out.Legends, *lo.l)
+			continue
+		}
+		// Each layer keeps its own legend of the scale, in the color of
+		// its mark.
+		for _, ll := range lo.layers {
+			l := *lo.l
+			l.Title = vega.Value{}
+			if ll.title != "" {
+				l.Title = lit(ll.title)
+			}
+			if ll.color != nil {
+				l.Extra = maps.Clone(l.Extra)
+				if l.Extra == nil {
+					l.Extra = vega.Extra{}
+				}
+				if b, err := json.Marshal(ll.color); err == nil {
+					l.Extra["symbolFillColor"] = b
+				}
+			}
+			out.Legends = append(out.Legends, l)
+		}
 	}
 }
 
@@ -1040,6 +1386,9 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 		main.Title = lit(title)
 	}
 	showGrid := !s.discrete && !s.second
+	if g, ok := v.cfg.gridOf(s.channel); ok && showGrid {
+		showGrid = g
+	}
 	if g, ok := s.guide["grid"].(bool); ok {
 		showGrid = g
 	}
@@ -1056,7 +1405,7 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 			grid.TickCount = vega.Value{Signal: "ceil(" + size + "/40)"}
 		}
 	}
-	if s.discrete && s.channel == "x" && (s.field == nil || s.field.units == nil) {
+	if s.discrete && s.channel == "x" && (s.field == nil || s.field.units == nil) && (v.cfg == nil || !v.cfg.xLabelAngle) {
 		main.LabelAngle = lit(270)
 		main.LabelAlign = lit("right")
 		main.LabelBase = lit("middle")
@@ -1065,6 +1414,17 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 		main.TickCount = vega.Value{Signal: "ceil(" + size + "/40)"}
 		if s.bins != "" {
 			main.TickCount = vega.Value{Signal: "ceil(" + size + "/10)"}
+		}
+		// The ticks of a time unit are at least one unit apart, as
+		// vega-lite.js asks with a tickMinStep, so that two labels of a
+		// format such as %Y do not repeat.
+		if s.field != nil && s.field.units != nil {
+			if step, ok := unitMinStep(s.field.units, s.field.unitStep); ok {
+				main.TickMinStep = step
+				if grid != nil {
+					grid.TickMinStep = step
+				}
+			}
 		}
 		main.LabelOverlap = lit(true)
 		if s.channel == "x" {
@@ -1080,6 +1440,10 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 		if s.field.utc {
 			main.FormatType = lit("utc")
 		}
+	}
+	if s.normalized {
+		// A stack normalized to one shows its shares in percent.
+		main.Format = lit(".0%")
 	}
 	// The keys go in order, so that a labelBaseline of the spec wins over
 	// the one that a labelAngle of 0 sets.
@@ -1104,7 +1468,12 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 				grid.Orient = lit(x)
 			}
 		case "format":
-			main.Format = lit(x)
+			// An empty format of a time unit is no format, as in
+			// vega-lite.js, so the labels keep the format of the unit,
+			// such as Mon for a day.
+			if x != "" || s.field == nil || s.field.units == nil {
+				main.Format = lit(x)
+			}
 		case "formatType":
 			main.FormatType = lit(x)
 		case "labelAngle":
@@ -1176,10 +1545,12 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 
 // axisStyleKeys are the properties of an axis of Vega-Lite that style a
 // part of the axis, which Vega reads with the same name and meaning: the
-// text of the labels and of the title, and the lines of the grid and of the
-// domain. The other keys of passedAxisKey place the labels and the title.
+// text of the labels and of the title, and the lines of the grid, of the
+// domain and of the ticks. The other keys of passedAxisKey place the labels
+// and the title, or size the ticks.
 var axisStyleKeys = map[string][]string{
 	"label": textStyleEnds, "title": textStyleEnds, "grid": lineStyleEnds, "domain": lineStyleEnds,
+	"tick": lineStyleEnds,
 }
 
 // textStyleEnds and lineStyleEnds are the ends of the names of the
@@ -1246,16 +1617,61 @@ func discretizing(typ string) bool {
 	return typ == "quantize" || typ == "quantile" || typ == "threshold"
 }
 
+// unitOffset makes the range of the scale of an offset span one unit of
+// time, when its channel of position has a time unit on a scale of time,
+// which has no band. The bars of a unit sit at the band position of the
+// channel, 0.5 by default, as vega-lite.js places them.
+func (v *view) unitOffset(s *scaleComp, ch string) {
+	p := v.scales[v.key(ch)]
+	if s.offset != "" || p == nil || p.discrete || p.field == nil || len(p.field.units) == 0 {
+		return
+	}
+	s.offset = "unit"
+	s.unitWidth = unitWidth(v.sn(ch), p.field)
+	s.unitBand = 0.5
+	if p.field.def != nil {
+		if b, ok := valueOf(p.field.def.BandPosition).(float64); ok {
+			s.unitBand = b
+		}
+	}
+}
+
 // offsetRange returns the range of the scale of an offset: the band of the
-// position, steps, or the size of the view around its middle.
+// position, steps, the size of the view around its middle, or a share of a
+// unit of time.
 func offsetRange(s *scaleComp, band, size string) vega.ScaleRange {
 	switch s.offset {
 	case "step":
 		return vega.ScaleRange{Step: lit(20)}
 	case "center":
 		return vega.ScaleRange{Values: []vega.Value{{Signal: "-" + size + "/2"}, {Signal: size + "/2"}}}
+	case "unit":
+		// The bars of a unit of time fill 80 percent of it, around the
+		// place of their band, as vega-lite.js draws them.
+		return vega.ScaleRange{Values: []vega.Value{
+			{Signal: num(math.Round((s.unitBand-0.4)*1e9)/1e9) + " * (" + s.unitWidth + ")"},
+			{Signal: num(math.Round((s.unitBand+0.4)*1e9)/1e9) + " * (" + s.unitWidth + ")"},
+		}}
 	}
 	return vega.ScaleRange{Values: []vega.Value{lit(0), {Signal: band}}}
+}
+
+// addDatum adds a constant of the data to the domain of the scale, once.
+// The constant can be a date time object, which == cannot compare.
+func (s *scaleComp) addDatum(x any) {
+	if !slices.ContainsFunc(s.datums, func(y any) bool { return reflect.DeepEqual(x, y) }) {
+		s.datums = append(s.datums, x)
+	}
+}
+
+// datumField returns the entry of the fields of a domain that holds a
+// constant: a list of the value, or a signal for a date time object, as
+// vega-lite.js writes them.
+func datumField(x any) any {
+	if m, ok := x.(map[string]any); ok && isDateTime(m) {
+		return map[string]any{"signal": "[{data: " + dateTimeExpr(m) + "}]"}
+	}
+	return []any{x}
 }
 
 // isDateTime reports whether an object is a date time of Vega-Lite, with a
@@ -1267,4 +1683,41 @@ func isDateTime(m map[string]any) bool {
 		}
 	}
 	return false
+}
+
+// unitMinStep returns the tickMinStep of an axis of a time unit: the
+// length of the smallest of its units, times its step, as the difference
+// of two times, as vega-lite.js writes it.
+func unitMinStep(units []string, step float64) (vega.Value, bool) {
+	// The place of each unit among the arguments of datetime, and how many
+	// of that place one unit holds.
+	places := map[string][2]int{
+		"year": {0, 1}, "quarter": {1, 3}, "month": {1, 1}, "week": {2, 7}, "day": {2, 1}, "date": {2, 1},
+		"dayofyear": {2, 1}, "hours": {3, 1}, "minutes": {4, 1}, "seconds": {5, 1}, "milliseconds": {6, 1},
+	}
+	best := [2]int{-1, 0}
+	for _, u := range units {
+		if p, ok := places[u]; ok && (p[0] > best[0] || (p[0] == best[0] && p[1] < best[1])) {
+			best = p
+		}
+	}
+	if best[0] < 0 {
+		return vega.Value{}, false
+	}
+	if step <= 0 {
+		step = 1
+	}
+	args := []int{2001, 0, 1, 0, 0, 0, 0}
+	start := datetimeCall(args)
+	args[best[0]] += best[1] * int(step)
+	return vega.Value{Signal: datetimeCall(args) + " - " + start}, true
+}
+
+// datetimeCall writes a call of datetime with its arguments.
+func datetimeCall(args []int) string {
+	parts := make([]string, len(args))
+	for i, a := range args {
+		parts[i] = strconv.Itoa(a)
+	}
+	return "datetime(" + strings.Join(parts, ", ") + ")"
 }

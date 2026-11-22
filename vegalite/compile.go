@@ -127,12 +127,46 @@ type config struct {
 	marks map[string]map[string]any
 	// mark is the config of every mark.
 	mark map[string]any
+	// composites holds the config of each composite mark, such as
+	// "boxplot".
+	composites map[string]map[string]any
 	// styles holds each style of the config, by name.
 	styles map[string]map[string]any
 	// facetSpacing and concatSpacing are the default spacing between the
 	// cells of a facet and between the views of a concatenation, or nil
 	// for the default of 20.
 	facetSpacing, concatSpacing any
+	// barPaddingInner is the barBandPaddingInner of the config of the
+	// scales, or nil for the default.
+	barPaddingInner *float64
+	// xLabelAngle says that the config of an axis of x, which passes on to
+	// the Vega config, gives a labelAngle, which wins over the turn of the
+	// labels of a discrete axis of x.
+	xLabelAngle bool
+	// grid holds the grid of the config of the axes of each channel of
+	// position, x or y, when the config gives one: the grid of axisX or
+	// axisY, else the grid of axis.
+	grid map[string]bool
+}
+
+// barBandPaddingInner returns the inner padding of the bands of a bar: the
+// barBandPaddingInner of the config of the scales, or 0.1, the default of
+// Vega-Lite.
+func (c *config) barBandPaddingInner() float64 {
+	if c != nil && c.barPaddingInner != nil {
+		return *c.barPaddingInner
+	}
+	return 0.1
+}
+
+// gridOf returns the grid of the config of the axes of a channel, and
+// whether the config gives one.
+func (c *config) gridOf(ch string) (bool, bool) {
+	if c == nil {
+		return false, false
+	}
+	g, ok := c.grid[ch]
+	return g, ok
 }
 
 // readConfig reads the parts of the config that the compiler follows.
@@ -159,6 +193,12 @@ func readConfig(raw []byte) *config {
 				cfg.marks[k] = x
 			}
 		}
+		cfg.composites = map[string]map[string]any{}
+		for _, k := range []string{"boxplot", "errorbar", "errorband"} {
+			if x, ok := all[k].(map[string]any); ok {
+				cfg.composites[k] = x
+			}
+		}
 		if st, ok := all["style"].(map[string]any); ok {
 			cfg.styles = map[string]map[string]any{}
 			for k, x := range st {
@@ -175,11 +215,32 @@ func readConfig(raw []byte) *config {
 	if z, ok := m.Scale["zero"].(bool); ok {
 		cfg.zero = &z
 	}
+	if p, ok := m.Scale["barBandPaddingInner"].(float64); ok {
+		cfg.barPaddingInner = &p
+	}
 	if st, ok := m.View["step"].(float64); ok {
 		cfg.step = st
 	}
 	cfg.facetSpacing = m.Facet["spacing"]
 	cfg.concatSpacing = m.Concat["spacing"]
+	for _, k := range []string{"axis", "axisX", "axisBottom", "axisTop", "axisBand"} {
+		if x, ok := all[k].(map[string]any); ok {
+			if _, ok := x["labelAngle"]; ok {
+				cfg.xLabelAngle = true
+			}
+		}
+	}
+	for ch, k := range map[string]string{"x": "axisX", "y": "axisY"} {
+		for _, name := range []string{"axis", k} {
+			x, _ := all[name].(map[string]any)
+			if g, ok := x["grid"].(bool); ok {
+				if cfg.grid == nil {
+					cfg.grid = map[string]bool{}
+				}
+				cfg.grid[ch] = g
+			}
+		}
+	}
 	return cfg
 }
 
@@ -200,15 +261,45 @@ func spacing(s *Spec, config any) any {
 // passedConfig are the parts of the config of a spec that the Vega config
 // holds with the same names and meaning: the styles of marks, the guides,
 // the ranges and the background, which the runtime applies, as
-// vega-lite.js passes them on, and the mode, the scheme and the background
-// of the theme that a spec asks for (D32, D37).
+// vega-lite.js passes them on, the mode, the scheme and the background of
+// the theme that a spec asks for, and its look and the seed of the look
+// (D32, D37, D40).
 var passedConfig = []string{
 	"style", "axis", "axisX", "axisY", "axisTop", "axisBottom", "axisLeft", "axisRight", "axisBand",
 	"legend", "title", "range", "background", theme.ConfigMode, theme.ConfigScheme, theme.ConfigBackground,
+	theme.ConfigLook, theme.ConfigLookSeed,
+}
+
+// viewProps are the properties of the view of Vega-Lite that paint the
+// group of a view, its cell: the properties of a mark that a group has.
+var viewProps = []string{
+	"fill", "fillOpacity", "opacity", "stroke", "strokeOpacity", "strokeWidth", "strokeDash",
+	"strokeDashOffset", "strokeCap", "strokeJoin", "strokeMiterLimit", "cornerRadius", "cursor",
+}
+
+// viewStyle returns the properties of a view, of the spec or of the config,
+// that paint its cell, or nil for a view with none.
+func viewStyle(raw []byte) map[string]any {
+	var m map[string]any
+	if len(raw) == 0 || json.Unmarshal(raw, &m) != nil {
+		return nil
+	}
+	var out map[string]any
+	for _, k := range viewProps {
+		if v, ok := m[k]; ok {
+			if out == nil {
+				out = map[string]any{}
+			}
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // styleConfig returns the parts of the config of a spec that pass on to the
-// Vega config, or nil for a config with none.
+// Vega config, or nil for a config with none. The paint of the view of the
+// config goes in the style cell, as vega-lite.js puts it, under a style
+// cell of the spec (D48 part 5).
 func styleConfig(raw []byte) vega.Config {
 	var m map[string]jsontext.Value
 	if len(raw) == 0 || json.Unmarshal(raw, &m) != nil {
@@ -221,6 +312,24 @@ func styleConfig(raw []byte) vega.Config {
 				out = vega.Config{}
 			}
 			out[k] = v
+		}
+	}
+	if cell := viewStyle(m["view"]); cell != nil {
+		var styles map[string]any
+		_ = json.Unmarshal(out["style"], &styles)
+		if styles == nil {
+			styles = map[string]any{}
+		}
+		if own, ok := styles["cell"].(map[string]any); ok {
+			maps.Copy(cell, own)
+		}
+		styles["cell"] = cell
+		b, err := json.Marshal(styles, json.Deterministic(true))
+		if err == nil {
+			if out == nil {
+				out = vega.Config{}
+			}
+			out["style"] = b
 		}
 	}
 	return out
@@ -281,6 +390,15 @@ func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 		return nil, err
 	}
 	v.finish(out)
+	if paint := viewStyle(s.View); paint != nil {
+		// The view of a single view paints the group of the top level, as
+		// in vega-lite.js (D48 part 5).
+		update := vega.Props{}
+		for k, x := range paint {
+			update[k] = prod(map[string]any{"value": x})
+		}
+		out.Encode = vega.Encode{"update": update}
+	}
 	c.mergeAggregates(out)
 	out.Signals = append(out.Signals, c.signals...)
 	out.Data = c.data
@@ -349,12 +467,23 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 		independent := map[string]bool{}
 		if len(s.Resolve) > 0 {
 			var r struct {
-				Scale map[string]string `json:"scale"`
+				Scale  map[string]string `json:"scale"`
+				Legend map[string]string `json:"legend"`
 			}
 			if err := json.Unmarshal(s.Resolve, &r); err == nil {
 				for ch, mode := range r.Scale {
 					if mode == "independent" {
 						independent[ch] = true
+					}
+				}
+				for ch, mode := range r.Legend {
+					if mode == "independent" && !independent[ch] {
+						// The layers share the scale, and each draws
+						// its own legend of it.
+						if v.ownLegend == nil {
+							v.ownLegend = map[string]bool{}
+						}
+						v.ownLegend[ch] = true
 					}
 				}
 			}
@@ -393,7 +522,11 @@ func (c *compiler) view(s *Spec, v *view, src *dataNode, path string, repeat map
 		v.size(s)
 		return nil
 	case s.Mark != nil:
-		expanded, err := composite(s)
+		var cc map[string]any
+		if c.cfg != nil {
+			cc = c.cfg.composites[s.Mark.Type]
+		}
+		expanded, err := composite(s, cc)
 		if err != nil {
 			return c.issue(path+"/mark", "%v", err)
 		}
@@ -443,10 +576,14 @@ func inheritEncoding(l *Spec, parent Encoding) {
 }
 
 // mergeDefs gives a definition of a channel the properties of another that
-// it does not have. It reports false when either has a value, which stands
-// alone.
+// it does not have, as vega-lite.js merges the encoding of a layer: a field
+// or a datum of the layer takes the scale, the legend and the other
+// properties of the channel of its parent, such as the domain and the range
+// of a color that each layer gives as a datum. The field, the datum and the
+// value of the parent do not pass on. It reports false when either has a
+// value, which stands alone.
 func mergeDefs(own, parent FieldDef) (FieldDef, bool) {
-	if !own.Value.IsZero() || !parent.Value.IsZero() || !own.Datum.IsZero() || !parent.Datum.IsZero() {
+	if !own.Value.IsZero() || !parent.Value.IsZero() {
 		return own, false
 	}
 	a, err := json.Marshal(own)
@@ -461,7 +598,12 @@ func mergeDefs(own, parent FieldDef) (FieldDef, bool) {
 	if json.Unmarshal(a, &am) != nil || json.Unmarshal(b, &bm) != nil {
 		return own, false
 	}
+	_, hasField := am["field"]
+	_, hasDatum := am["datum"]
 	for k, v := range bm {
+		if (k == "field" || k == "datum") && (hasField || hasDatum) {
+			continue
+		}
 		if _, ok := am[k]; !ok {
 			am[k] = v
 		}
@@ -805,11 +947,24 @@ func overlay(s *Spec, cfg *config) *Spec {
 	out.Mark, out.Data = nil, nil
 	out.expanded = true
 	out.Layer = []Spec{{Mark: base, overlaid: true}}
+	// A line or a point that the spec gives as an object, such as
+	// "line": {"color": "darkgreen"}, takes its properties.
+	overlayProps := func(k string, props Extra) Extra {
+		var m map[string]jsontext.Value
+		if raw, ok := s.Mark.Props[k]; ok && json.Unmarshal(raw, &m) == nil {
+			for p, v := range m {
+				if p != "type" {
+					props[p] = v
+				}
+			}
+		}
+		return props
+	}
 	if line {
-		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line"}, stackAs: s.Mark.Type})
+		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "line", Props: overlayProps("line", Extra{}), object: true}, stackAs: s.Mark.Type})
 	}
 	if point {
-		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "point", Props: Extra{"filled": []byte("true")}, object: true}, stackAs: s.Mark.Type})
+		out.Layer = append(out.Layer, Spec{Mark: &Mark{Type: "point", Props: overlayProps("point", Extra{"filled": []byte("true")}), object: true}, stackAs: s.Mark.Type})
 	}
 	return &out
 }
