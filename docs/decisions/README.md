@@ -65,10 +65,10 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D49](D049-a-hachure-draws-over-an-underlay-in-the-look.md) | A hachure draws over an underlay in the look | Decided. Amends D40 and D47. Amended by D50 |
 | [D50](D050-a-gradient-draws-as-a-hachure-over-a-tint-in-the-look.md) | A gradient draws as a hachure over a tint in the look | Decided. Amends D47 and D49 |
 | [D51](D051-an-axis-draws-the-grid-of-vega-and-labels-fewer-ticks.md) | An axis draws the grid of Vega and labels fewer ticks | Decided. Amends D46 |
-| [D52](D052-zuzu-draws-the-projections-of-vega-projection-extended.md) | zuzu draws the projections of vega-projection-extended | Decided. Amends D7 |
+| [D52](D052-zuzu-draws-the-projections-of-vega-projection-extended.md) | zuzu draws the projections of vega-projection-extended | Decided. Amends D7. Amended by D58 |
 | [D53](D053-an-agentflow-diagram-colors-its-nodes-by-kind-and-its-flows-in-turn.md) | An agentflow diagram colors its nodes by kind and its flows in turn | Decided. Amends D37. Amended by D54 and D55 |
 | [D54](D054-composite-states-draw-a-title-band-and-notes-take-the-yellow-of-the-scheme.md) | Composite states draw a title band, and notes take the yellow of the scheme | Decided. Amends D53. Amended by D55 and D56 |
 | [D55](D055-mermaid-takes-the-scheme-of-zuzu-and-tints-are-solid.md) | Mermaid takes the scheme of zuzu, and tints are solid | Decided. Amends D31, D37, D53 and D54. Amended by D56 |
 | [D56](D056-a-named-node-takes-the-color-of-the-hash-of-its-name.md) | A named node takes the color of the hash of its name | Decided. Amends D37, D54 and D55 |
 | [D57](D057-zuzu-draws-no-look-like-xkcd-and-phases-0-and-3-are-done.md) | zuzu draws no look like xkcd, and phases 0 and 3 are done | Decided. Amends D22, D32, D39 and D40 |
-| [D58](D058-the-answers-of-2026-11-25-fonts-seeds-labels-schemes-and-known-differences.md) | The answers of 2026-11-25: fonts, seeds, labels, schemes and known differences | Decided. Amends D15, D16, D32, D35 and D40 |
+| [D58](D058-the-answers-of-2026-11-25-fonts-seeds-labels-schemes-and-known-differences.md) | The answers of 2026-11-25: fonts, seeds, labels, schemes and known differences | Decided. Amends D15, D16, D32, D35, D40 and D52 |

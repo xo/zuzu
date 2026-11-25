@@ -1,6 +1,6 @@
 # D52. zuzu draws the projections of vega-projection-extended
 
-Status: Decided. Amends D7.
+Status: Decided. Amends D7. Amended by D58.
 
 On 2026-11-22 the maintainers asked zuzu to draw every projection of
 `vega/projections.vg.json`. Vega itself has the projections of d3-geo,

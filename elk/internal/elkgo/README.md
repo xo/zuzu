@@ -127,7 +127,7 @@ Changes 3 and 4 are marked in the code with a comment that starts with
 
 The adapter compared its graphs with ELK.js 0.12.0, the bundle of Mermaid
 12.3.0, on 21 graphs. Twelve gave the same places, and elk-go differs in
-these places. Each is in `docs/BACKLOG.md`, to offer upstream:
+these places. Each is in `docs/BACKLOG.md`:
 
 1. elk-go places the label of a cluster with `nodeLabels.placement` set to
    `[H_CENTER V_TOP, INSIDE]` at the left and in the middle of the height
@@ -142,4 +142,8 @@ these places. Each is in `docs/BACKLOG.md`, to offer upstream:
    the side less the two margins, and ELK.js spreads them a little wider. A
    port moves by less than one pixel, and a node by up to one pixel.
 3. A cluster with the algorithm radial is larger in elk-go than in ELK.js,
-   and its nodes move by up to 35 pixels.
+   and its nodes move by up to 35 pixels. The cause is that elk-go does not
+   apply `spacing.nodeNode` to a cluster when `spacing.baseValue` is set.
+
+zuzu reported each of them to elk-go on 2026-11-25, as issues 11, 12 and
+13, and offered change 3 as pull request 10.

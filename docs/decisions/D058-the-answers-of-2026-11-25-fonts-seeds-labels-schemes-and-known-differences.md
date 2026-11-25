@@ -1,6 +1,6 @@
 # D58. The answers of 2026-11-25: fonts, seeds, labels, schemes and known differences
 
-Status: Decided. Amends D15, D16, D32, D35 and D40.
+Status: Decided. Amends D15, D16, D32, D35, D40 and D52.
 
 On 2026-11-25 the maintainers answered twelve questions about the items
 that the backlog held after v0.9.0.
@@ -22,8 +22,11 @@ that the backlog held after v0.9.0.
    and Nunito come from variable fonts, which fontTools cuts into those
    six static faces. The option `WithFont` of `Parse` and of a render gives
    a chart one of the fonts, and `text.Estimate` measures each weight and
-   style in its own face of the collection. A scheme does not name a font
-   yet, so that part of D35 part 11 waits in `docs/BACKLOG.md`.
+   style in its own face of the collection. The font of `WithLookFont`
+   wins over it in a look drawn by hand. A look drawn by hand with no font
+   of its own draws in the font of `WithFont`, with no warning. A scheme
+   does not name a font yet, so that part of D35 part 11 waits in
+   `docs/BACKLOG.md`.
 2. The reader of Mermaid reads a weight and a style out of `fontFamily` in
    one place, and gives them to the text of every kind that draws text.
    This replaces the issue that D32 part 5 gives in the kinds other than

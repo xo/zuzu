@@ -25,20 +25,25 @@ without the font of emoji (6).
    the same direction, which the rule nonzero of SVG fills, draw as the
    rule evenodd.
 
-### Offer the fixes of the copy of elk-go upstream
+### Follow what zuzu offered to elk-go
 
-1. Offer changes 3 (fixed seeds, no global `math/rand`) and 4 (no JSON) of
-   `elk/internal/elkgo/README.md` to d2lang/elk-go.
-2. Report that elk-go places a cluster label with
-   `[H_CENTER V_TOP, INSIDE]` at the left and halfway down in DOWN and UP,
-   and keeps no room for it in any direction, where ELK.js 0.12.0 places it
-   at the top in the middle and moves the children down. The adapter works
-   around it, but not for a title wider than its cluster in DOWN or UP (up
-   to 92 px) or a long title of a cluster whose frame draws none.
-3. Report that ports spread with `spacing.portsSurrounding` sit up to 0.67
-   px from where ELK.js puts them, and nodes up to 1 px.
-4. Report that a cluster with the radial algorithm is larger than in
-   ELK.js, and its nodes move up to 35 px.
+On 2026-11-25 zuzu offered these to d2lang/elk-go (D58 part 16), checked
+against its commit `75f6eb7` and ELK.js 0.12.1. When upstream takes one,
+update the copy and drop its change or its work-around.
+
+1. Pull request 10 takes seed 1 when `randomSeed` is 0, which is change 3
+   of `elk/internal/elkgo/README.md`. Change 4, no JSON, is not offered,
+   because upstream moved the codec of JSON out of the typed request in
+   its pull request 6.
+2. Issue 11: the label of a cluster with `[H_CENTER, V_TOP, INSIDE]`
+   is not at the top. The adapter works around it with `reserveTitles`.
+3. Issue 12: the ports of a side with `spacing.portsSurrounding` spread a
+   little narrower than in ELK.js.
+4. Issue 13: `spacing.nodeNode` of a cluster has no effect when
+   `spacing.baseValue` is set. This is the cause of the larger clusters
+   that the radial graph of the adapter showed. With the algorithm radial
+   alone, ELK.js gives a cluster 20 by 20, smaller than its children, and
+   elk-go fits the cluster to them. zuzu did not report that.
 
 ### Fix what the corpus of mermaid-go-renderer found
 
