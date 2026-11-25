@@ -122,10 +122,14 @@ type options struct {
 	// with no font of its own draws with (D38).
 	emoji []*text.Fallback
 	// look is the look of WithLook, and hasLook says that the option set
-	// it. lookFonts are the fonts of WithLookFont, by look (D40).
+	// it. lookFonts are the fonts of WithLookFont, by look (D40). seed is
+	// the seed of WithLookSeed, and hasSeed says that the option set it
+	// (D58).
 	look      theme.Look
 	hasLook   bool
 	lookFonts map[theme.Look]*text.Fallback
+	seed      int64
+	hasSeed   bool
 	// engines are the engines of WithLayoutEngine, and layout the layout of
 	// WithLayout, which hasLayout says the option set (D45).
 	engines   []graph.Engine
@@ -355,10 +359,14 @@ type renderOptions struct {
 	scale    float64
 	hasScale bool
 	// look is the look of WithLook, and hasLook says that the option set
-	// it. lookFonts are the fonts of WithLookFont, by look (D40).
+	// it. lookFonts are the fonts of WithLookFont, by look (D40). seed is
+	// the seed of WithLookSeed, and hasSeed says that the option set it
+	// (D58).
 	look      theme.Look
 	hasLook   bool
 	lookFonts map[theme.Look]*text.Fallback
+	seed      int64
+	hasSeed   bool
 	// engines are the engines of WithLayoutEngine, and layout the layout of
 	// WithLayout, which hasLayout says the option set (D45).
 	engines   []graph.Engine

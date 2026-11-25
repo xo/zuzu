@@ -401,6 +401,36 @@ func axisItems(t *testing.T, config, axis, role string) []scene.Item {
 	return out
 }
 
+// TestAxisLabelTurn checks the key zuzu.labelTurn of an axis: the labels
+// draw flat when each fits the step of its band, and turn when one does
+// not, at the labelFontSize of the axis. A labelAngle of the axis or of its
+// config wins over it (D58 part 4).
+func TestAxisLabelTurn(t *testing.T) {
+	t.Parallel()
+	const turn = `{"scale": "x", "orient": "bottom", "zuzu.labelTurn": 270`
+	tests := []struct {
+		name, config, axis string
+		want               float64
+	}{
+		{"labels that fit", ``, turn + `}`, 0},
+		{"a label that does not fit", ``, turn + `, "format": ".12f"}`, 270},
+		{"a large font", ``, turn + `, "format": ".2f", "labelFontSize": 40}`, 270},
+		{"the angle of the axis", ``, turn + `, "format": ".12f", "labelAngle": 0}`, 0},
+		{"the angle of the config", `"axisX": {"labelAngle": 0}`, turn + `, "format": ".12f"}`, 0},
+	}
+	for _, tt := range tests {
+		labels := axisItems(t, tt.config, tt.axis, "axis-label")
+		if len(labels) != 3 {
+			t.Fatalf("%s: %d labels, want 3", tt.name, len(labels))
+		}
+		for _, it := range labels {
+			if it.Angle != tt.want {
+				t.Errorf("%s: the label %v turns by %v, want %v", tt.name, it.Text, it.Angle, tt.want)
+			}
+		}
+	}
+}
+
 // TestAxisSpecProps checks that the runtime reads the labelAlign, the
 // titleX, the titleY, the titleAngle, the titleAlign and the titleBaseline
 // of an axis, from the axis or from the config, with the axis over the

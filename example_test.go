@@ -190,6 +190,26 @@ func ExampleWithLook() {
 	// Output: true 0
 }
 
+func ExampleWithLookSeed() {
+	ctx := context.Background()
+	src := []byte("flowchart LR\n  A[Spec] --> B[Scene]")
+	look := zuzu.WithLook(theme.LookExcalidraw)
+	font := zuzu.WithLookFont(theme.LookExcalidraw, excalifont.Font())
+	chart, _, err := zuzu.Parse(src, look, font, zuzu.WithLookSeed(7))
+	if err != nil {
+		log.Fatal(err)
+	}
+	draw := func(opts ...zuzu.RenderOption) string {
+		var buf bytes.Buffer
+		if _, err := chart.SVG(ctx, &buf, opts...); err != nil {
+			log.Fatal(err)
+		}
+		return buf.String()
+	}
+	fmt.Println(draw() == draw(zuzu.WithLookSeed(7)), draw() == draw(zuzu.WithLookSeed(8)))
+	// Output: true false
+}
+
 func ExampleWithLoader() {
 	ctx := context.Background()
 	src := []byte(`{
@@ -228,5 +248,5 @@ Jun,Rome,22
 		log.Fatal(err)
 	}
 	fmt.Println(img.Bounds().Dx(), img.Bounds().Dy(), len(report))
-	// Output: 361 241 0
+	// Output: 361 231 0
 }

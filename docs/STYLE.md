@@ -349,6 +349,21 @@ message of text keeps 5, as Mermaid sets a formula on the line.
    of the bands, and one of `center` in their middle, as in Vega. The look
    does not round the places, so an axis rounds them only when the spec
    or its config sets `tickRound`.
+9. A label of a discrete x axis draws flat when each label fits the step
+   of its band, and turns by 270 degrees when one label does not fit
+   (D58). The rule holds in the standard look and in the look like
+   Excalidraw. The step is the distance between the middles of two bands
+   next to each other, or the length of the axis when it has one band. A
+   label fits when its width and `labelGap` together are not more than
+   the step. The package `text` measures the width at the size of the
+   labels, 11 by default, in the font of the look. A label wider than its
+   `labelLimit` counts at that limit. A turned label ends at its tick, as
+   in Vega-Lite. A `labelAngle` that the spec gives, in the axis or in its
+   config, such as `axis`, `axisX`, `axisBand` or `axisDiscrete`, wins
+   over this rule. vega-lite.js turns the labels of a nominal or ordinal
+   x axis with no time unit when the spec gives no angle. In that case
+   the compiler of zuzu gives the axis the key `zuzu.labelTurn`, 270, in
+   place of the turn, and the layout of the axis picks the angle.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -356,6 +371,7 @@ message of text keeps 5, as Mermaid sets a formula on the line.
 | `tickWidth` | 1 | the width of a tick |
 | `domainWidth` | 1 | the width of the line of an axis |
 | `labelPadding` | 3 | the space between the end of a tick and its label |
+| `labelGap` | 4 | the least space between two flat labels of a discrete x axis, which rule 9 keeps |
 
 So a label is 8 from the line of its axis by default, as before D46.
 `axis` is lighter than `muted`, so the line and the ticks frame the plot

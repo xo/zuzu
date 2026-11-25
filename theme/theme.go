@@ -70,6 +70,10 @@ const (
 	DomainWidth = 1.0
 	// LabelPadding is the space between the end of a tick and its label.
 	LabelPadding = 3.0
+	// LabelGap is the least space between two flat labels of a discrete
+	// axis. A label that does not fit the step of its band with this space
+	// turns the labels of a discrete x axis (D58 part 4).
+	LabelGap = 4.0
 )
 
 // The paint of a node of a diagram, from "Marks" in docs/STYLE.md: a tint

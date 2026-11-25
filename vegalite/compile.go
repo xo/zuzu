@@ -162,6 +162,13 @@ type config struct {
 	// the Vega config, gives a labelAngle, which wins over the turn of the
 	// labels of a discrete axis of x.
 	xLabelAngle bool
+	// discreteLabelAngle holds the labelAngle of the configs of a discrete
+	// axis of x that the Vega config does not have, by the type of its
+	// scale, band or point: axisDiscrete, axisBand or axisPoint, then
+	// axisXDiscrete, axisXBand or axisXPoint, the last one first. The angle
+	// goes on the axis, as vega-lite.js puts it there, and wins over the
+	// turn of the labels (D58 part 4).
+	discreteLabelAngle map[string]any
 	// grid holds the grid of the config of the axes of each channel of
 	// position, x or y, when the config gives one: the grid of axisX or
 	// axisY, else the grid of axis.
@@ -265,6 +272,19 @@ func readConfig(raw []byte) *config {
 		if x, ok := all[k].(map[string]any); ok {
 			if _, ok := x["labelAngle"]; ok {
 				cfg.xLabelAngle = true
+			}
+		}
+	}
+	for _, typ := range []string{"band", "point"} {
+		kind := strings.ToUpper(typ[:1]) + typ[1:]
+		for _, k := range []string{"axisDiscrete", "axis" + kind, "axisXDiscrete", "axisX" + kind} {
+			if x, ok := all[k].(map[string]any); ok {
+				if a, ok := x["labelAngle"]; ok {
+					if cfg.discreteLabelAngle == nil {
+						cfg.discreteLabelAngle = map[string]any{}
+					}
+					cfg.discreteLabelAngle[typ] = a
+				}
 			}
 		}
 	}

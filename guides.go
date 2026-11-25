@@ -203,6 +203,13 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, *layout.Axis,
 		return nil, nil, err
 	}
 	props := s.guideProps(cfg, a.Extra)
+	// The key zuzu.labelTurn of the compiler of Vega-Lite turns the labels
+	// only when one does not fit its band, and a labelAngle of the axis or
+	// of its config wins over it (D58 part 4).
+	if _, ok := cfg["labelAngle"]; !ok && a.LabelAngle.IsZero() {
+		ax.LabelTurn, _ = propNum(props, theme.LabelTurn)
+		ax.LabelFontSize, _ = propNum(props, "labelFontSize")
+	}
 	if err := s.ticks(ax, a, cfg, props); err != nil {
 		return nil, nil, err
 	}

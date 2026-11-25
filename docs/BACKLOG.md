@@ -27,14 +27,6 @@ zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
    path with bridges, so a hole stays empty, but subpaths that overlap in
    the same direction, which the rule nonzero of SVG fills, draw as the
    rule evenodd.
-2. Only `zuzu.lookSeed` and `handDrawnSeed` set the seed. No option of
-   the caller sets it.
-3. Vega-Lite turns the labels of a discrete x axis by 270 degrees, and
-   the compiler of zuzu passes it on (`axisOf` in `vegalite/view.go`), in
-   the standard look and in the look like Excalidraw alike, as in
-   `testdata/look/bar.vl.json`. Drawing them flat when each label fits
-   its band is a change to the standard look and needs a rule in
-   `docs/STYLE.md` first.
 
 ### Offer the fixes of the copy of elk-go upstream
 

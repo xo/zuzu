@@ -209,6 +209,9 @@ func TestLookOfMermaid(t *testing.T) {
 	if got, _ := draw("  look: handDrawn\n  handDrawnSeed: 1\n"); got != hand {
 		t.Error("handDrawnSeed: 1 draws other than the seed of zuzu, which is 1")
 	}
+	if got, _ := draw("  look: handDrawn\n  handDrawnSeed: 7\n", WithLookSeed(1)); got != hand {
+		t.Error("the seed of the render does not win over handDrawnSeed")
+	}
 }
 
 // TestLookOfTheSpec checks the keys zuzu.look and zuzu.lookSeed of the
@@ -251,6 +254,22 @@ func TestLookOfTheSpec(t *testing.T) {
 	}
 	if got := draw(withConfig(`{"zuzu.look": "excalidraw", "zuzu.lookSeed": 1}`), nil); got != byOption {
 		t.Error("zuzu.lookSeed 1 draws other than the seed of zuzu, which is 1")
+	}
+	look := WithLook(theme.LookExcalidraw)
+	if got := draw(src, []Option{look, WithLookSeed(42)}); got != seeded {
+		t.Error("WithLookSeed 42 of the parse draws other than zuzu.lookSeed 42")
+	}
+	if got := draw(src, []Option{look}, WithLookSeed(42)); got != seeded {
+		t.Error("WithLookSeed 42 of the render draws other than zuzu.lookSeed 42")
+	}
+	if got := draw(withConfig(`{"zuzu.lookSeed": 42}`), []Option{look, WithLookSeed(1)}); got != byOption {
+		t.Error("the seed of the parse does not win over zuzu.lookSeed")
+	}
+	if got := draw(src, []Option{look, WithLookSeed(42)}, WithLookSeed(1)); got != byOption {
+		t.Error("the seed of the render does not win over the seed of the parse")
+	}
+	if got := draw(src, []Option{look}, WithLookSeed(0)); got != byOption {
+		t.Error("WithLookSeed 0 draws other than the seed of zuzu, which is 1")
 	}
 }
 

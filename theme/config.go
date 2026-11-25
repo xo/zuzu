@@ -47,6 +47,12 @@ const (
 	// largest first, when the symbols have sizes, so that the small ones
 	// stay on top.
 	LargestFirst = "zuzu.largestFirst"
+	// LabelTurn is the property of an axis that the compiler of Vega-Lite
+	// gives a discrete x axis in place of the labelAngle of 270 that
+	// vega-lite.js gives it. The labels draw flat when each fits the step
+	// of its band, and turn by its angle when one does not (D58 part 4). A
+	// labelAngle of the axis or of its config wins over it.
+	LabelTurn = "zuzu.labelTurn"
 	// EndLabel is the property of the config of a line that names its
 	// series at its last point, with a dot.
 	EndLabel = "zuzu.endLabel"

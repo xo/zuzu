@@ -42,6 +42,35 @@ func (l lookOption) applyRender(o *renderOptions) {
 	o.look, o.hasLook = l.look, true
 }
 
+// WithLookSeed sets the seed of a look drawn by hand, which picks the
+// strokes of each shape (D40 part 6, D58 part 3). It wins over the seed
+// that the spec asks for with zuzu.lookSeed in its config, such as
+// handDrawnSeed of a Mermaid diagram. A seed of 0 is theme.SketchSeed. The
+// standard look draws no strokes by hand, and the seed changes nothing in
+// it.
+//
+// It is an option of Parse too, as WithLook is. The chart keeps the seed,
+// and each render of it that gives no seed of its own uses the seed. When
+// both give a seed, the seed of the render wins.
+func WithLookSeed(seed int64) SharedOption {
+	return lookSeedOption{seed: seed}
+}
+
+// lookSeedOption is the option of WithLookSeed.
+type lookSeedOption struct {
+	seed int64
+}
+
+// applyParse satisfies Option.
+func (l lookSeedOption) applyParse(o *options) {
+	o.seed, o.hasSeed = l.seed, true
+}
+
+// applyRender satisfies RenderOption.
+func (l lookSeedOption) applyRender(o *renderOptions) {
+	o.seed, o.hasSeed = l.seed, true
+}
+
 // WithLookFont gives a parse or a render the font of a look drawn by hand.
 // The package text/excalifont gives the font of the look like Excalidraw,
 // Excalifont:
@@ -99,9 +128,10 @@ func (c *Chart) lookFont(o *renderOptions, l theme.Look) *text.Fallback {
 
 // sketchLook sets the look of the render, its seed and its font. The look
 // of the render wins over the look of the parse, which wins over
-// zuzu.look in the config of the spec (D40 part 1). A look that zuzu does
-// not have and a seed that is not a whole number are issues. A look drawn
-// by hand with no font is a warning.
+// zuzu.look in the config of the spec (D40 part 1). The seed follows the
+// same order, over zuzu.lookSeed (D58 part 3). A look that zuzu does not
+// have and a seed that is not a whole number are issues. A look drawn by
+// hand with no font is a warning.
 func (rt *runtime) sketchLook() error {
 	rt.drawLook, rt.lookSeed = theme.LookStandard, theme.SketchSeed
 	cfg := rt.chart.spec.Config
@@ -132,7 +162,12 @@ func (rt *runtime) sketchLook() error {
 	default:
 		rt.drawLook = l
 	}
-	if raw, ok := cfg[theme.ConfigLookSeed]; ok {
+	switch raw, ok := cfg[theme.ConfigLookSeed]; {
+	case rt.opts.hasSeed:
+		rt.lookSeed = rt.opts.seed
+	case rt.chart.opts.hasSeed:
+		rt.lookSeed = rt.chart.opts.seed
+	case ok:
 		var seed float64
 		err := json.Unmarshal(raw, &seed)
 		switch {

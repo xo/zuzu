@@ -12,6 +12,7 @@ import (
 
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -1402,6 +1403,34 @@ func (v *view) guides(out *vega.Spec) {
 // uses for its guides.
 var vlSpecifiers = map[string]string{"year-month": "%b %Y ", "year-month-date": "%b %d, %Y "}
 
+// labelTurn sets the angle of the labels of a discrete axis of x.
+// vega-lite.js turns them by 270 degrees when the field has no time unit
+// and neither the axis nor its config gives a labelAngle. zuzu gives the
+// axis the key zuzu.labelTurn in place of that turn, so that its labels
+// draw flat when each fits its band (D58 part 4). A labelAngle of a config
+// that the Vega config does not have, such as axisDiscrete, goes on the
+// axis, as vega-lite.js puts it there.
+func labelTurn(s *scaleComp, v *view, main *vega.Axis) {
+	if _, ok := s.guide["labelAngle"]; ok {
+		return
+	}
+	if v.cfg != nil {
+		if a, ok := v.cfg.discreteLabelAngle[s.typ]; ok {
+			main.LabelAngle = lit(a)
+			if f, ok := a.(float64); ok && f == 0 {
+				main.LabelBase = lit("top")
+			}
+			return
+		}
+		if v.cfg.xLabelAngle {
+			return
+		}
+	}
+	if s.field == nil || s.field.units == nil {
+		setExtra(main, theme.LabelTurn, lit(270))
+	}
+}
+
 // axisOf returns the axes of a positional scale: an axis of grid lines for
 // a continuous scale, and the axis of labels, as Vega-Lite writes them.
 func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis, main vega.Axis) {
@@ -1438,10 +1467,8 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 			grid.TickCount = vega.Value{Signal: "ceil(" + size + "/40)"}
 		}
 	}
-	if s.discrete && s.channel == "x" && (s.field == nil || s.field.units == nil) && (v.cfg == nil || !v.cfg.xLabelAngle) {
-		main.LabelAngle = lit(270)
-		main.LabelAlign = lit("right")
-		main.LabelBase = lit("middle")
+	if s.discrete && s.channel == "x" {
+		labelTurn(s, v, &main)
 	}
 	if !s.discrete {
 		main.TickCount = vega.Value{Signal: "ceil(" + size + "/40)"}

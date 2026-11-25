@@ -43,6 +43,14 @@ type Axis struct {
 	Title    string
 	// LabelAngle turns the labels, in degrees.
 	LabelAngle float64
+	// LabelTurn is the angle to which the labels of a discrete axis turn
+	// when one label does not fit the step of its band, or 0 to keep
+	// LabelAngle. With a LabelAngle of 0, the labels draw flat when each
+	// fits (D58 part 4).
+	LabelTurn float64
+	// LabelFontSize is the size of the labels that the spec gives, which
+	// LabelTurn measures them at, or 0 for LabelSize.
+	LabelFontSize float64
 	// Overlap drops every other label, in turns, until no two overlap.
 	Overlap bool
 	// Offset moves the axis away from the plot area.
@@ -523,6 +531,10 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 	// A label stays in the middle of its band, where the bandPosition of
 	// the axis puts its tick and its grid line, as in Vega.
 	shift := a.Scale.Bandwidth() * (0.5 - a.BandPosition)
+	angle := a.LabelAngle
+	if angle == 0 && a.LabelTurn != 0 && !s.labelsFit(a, vals, pos) {
+		angle = a.LabelTurn
+	}
 	for i, v := range vals {
 		str := a.Format(v)
 		if str == "" {
@@ -546,9 +558,9 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 		default:
 			it = s.label(a.Cross+a.Offset+pad, at, str, LabelSize, 400, color, "left", "middle")
 		}
-		if a.LabelAngle != 0 {
-			it.Angle = a.LabelAngle
-			turnLabel(&it, a.Orient, a.LabelAngle)
+		if angle != 0 {
+			it.Angle = angle
+			turnLabel(&it, a.Orient, angle)
 		} else if a.LabelFlush >= 0 {
 			flush(&it, a, pos[i])
 		}
@@ -568,6 +580,33 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 		m.Items = s.dropOverlaps(m.Items)
 	}
 	return m
+}
+
+// labelsFit reports whether each label of a discrete axis fits the step of
+// its band, with the gap of theme.LabelGap, as docs/STYLE.md measures it:
+// the width of the label in the font of the look at the size of the
+// labels, up to its limit (D58 part 4). The step is the least distance
+// between two places next to each other, or the length of the axis for
+// one place.
+func (s Style) labelsFit(a *Axis, vals []any, pos []float64) bool {
+	step := a.Length
+	for i := 1; i < len(pos); i++ {
+		step = math.Min(step, math.Abs(pos[i]-pos[i-1]))
+	}
+	size := a.LabelFontSize
+	if size <= 0 {
+		size = LabelSize
+	}
+	for _, v := range vals {
+		w := s.width(size, 400, a.Format(v))
+		if a.LabelLimit > 0 {
+			w = math.Min(w, a.LabelLimit)
+		}
+		if w+theme.LabelGap > step {
+			return false
+		}
+	}
+	return true
 }
 
 // flush aligns a label at an end of its axis with that end: the first label

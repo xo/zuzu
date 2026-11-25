@@ -167,8 +167,8 @@ such a link as an issue, and the item has no link.
 An option is a functional option named `With...`, and the caller owns every
 value it gives (okage D20). There are two kinds, so that an option given in
 the wrong place does not compile. `WithEmoji`, `WithLook`,
-`WithLookFont`, `WithLayoutEngine` and `WithLayout` are of both kinds (D38,
-D40, D44, D45). Each returns a `SharedOption`, which is an `Option` and a
+`WithLookSeed`, `WithLookFont`, `WithLayoutEngine` and `WithLayout` are of
+both kinds (D38, D40, D44, D45, D58). Each returns a `SharedOption`, which is an `Option` and a
 `RenderOption`.
 
 `Option` applies when a spec is parsed and compiled:
@@ -181,6 +181,7 @@ D40, D44, D45). Each returns a `SharedOption`, which is an `Option` and a
 | `WithMath(*text.MathFont)` | none, so the math of KaTeX in a label of Mermaid draws its source | the font of math, from the package `text/math`, which draws a formula of a label as math (D36) |
 | `WithEmoji(*text.Fallback)` | none, so an emoji measures as nothing | the font of the emoji, which a kind of Mermaid that lays out when it compiles, such as a sequence, a pie or a mindmap, measures an emoji with. The chart keeps it, and a render that gives no font of its own draws with it (D38) |
 | `WithLook(theme.Look)` | `zuzu.look` of the spec, then `theme.LookStandard` | the look, such as `theme.LookExcalidraw`, in which a kind of Mermaid that lays out when it compiles measures its text. The chart keeps it, and a render that gives no look of its own draws in it (D40) |
+| `WithLookSeed(int64)` | `zuzu.lookSeed` of the spec, then `theme.SketchSeed` | the seed of a look drawn by hand. The chart keeps it, and a render that gives no seed of its own draws with it (D58) |
 | `WithLookFont(theme.Look, *text.Fallback)` | none | the font of a look drawn by hand, such as Excalifont of the package `text/excalifont`, which a kind of Mermaid that lays out when it compiles measures its text in when the parse draws in that look. The chart keeps it (D40) |
 | `WithLayoutEngine(graph.Engine)` | the built in engines, `layered` and `dagre` | a layout engine that a graph can lay out with, under its name, such as the engine `elk` of `elk.Layout()`. It forces nothing. The chart keeps it (D45) |
 | `WithLayout(name string)` | the layout of the source | the layout that each graph of the chart lays out with, such as `dagre` or `elk.stress`, over the layout of the source. The chart keeps it, and a render that forces no layout of its own lays out with it (D45) |
@@ -209,6 +210,7 @@ D40, D44, D45). Each returns a `SharedOption`, which is an `Option` and a
 | `WithIconLoader(IconLoader)` | none | how a render loads an icon that no pack holds (D31) |
 | `WithEmoji(*text.Fallback)` | the font of `WithEmoji` of `Parse`, then none, so an emoji draws nothing | the font of the emoji, from the package `text/emoji`, which draws an emoji in color (D32). `Parse` accepts it too, and the font of the render wins over the font of `Parse` (D38) |
 | `WithLook(theme.Look)` | the look of `WithLook` of `Parse`, then `zuzu.look` of the spec, then `theme.LookStandard` | the look in which the chart draws, as "Looks" says (D40) |
+| `WithLookSeed(int64)` | the seed of `WithLookSeed` of `Parse`, then `zuzu.lookSeed` of the spec, then `theme.SketchSeed` | the seed of a look drawn by hand, as "Looks" says (D58) |
 | `WithLookFont(theme.Look, *text.Fallback)` | the font of `WithLookFont` of `Parse` for the look, then none, so the look draws its text in IBM Plex Sans | the font of a look drawn by hand, as "Looks" says (D40) |
 | `WithLayoutEngine(graph.Engine)` | the engines of `WithLayoutEngine` of `Parse` | a layout engine that a graph can lay out with, as "Layouts" says. An engine of the render wins over an engine of `Parse` with the same name (D45) |
 | `WithLayout(name string)` | the layout of `WithLayout` of `Parse`, then the layout of the source | the layout that each graph lays out with, as "Layouts" says. An empty name forces no layout (D45) |
@@ -257,10 +259,14 @@ draws its text in Excalifont. zuzu draws no other look by hand (D57).
    it, and its default, 0, keeps the seed 1. The same source, seed and
    fonts give the same bytes on the same architecture (D41).
    `theme.ConfigLookSeed` names the key.
-3. A look that zuzu does not have, and a seed that is not a whole number,
+3. `WithLookSeed` of a render wins over `WithLookSeed` of `Parse`, which
+   wins over `zuzu.lookSeed`, as the looks of rule 1 do (D58). A seed of 0
+   is the seed 1, `theme.SketchSeed`. The seed changes nothing in the
+   standard look.
+4. A look that zuzu does not have, and a seed that is not a whole number,
    are issues, as a mode that zuzu does not have is. The render then draws
    in the standard look, or with the seed 1.
-4. `WithLookFont` gives the font of a look, by look, as `WithEmoji` gives
+5. `WithLookFont` gives the font of a look, by look, as `WithEmoji` gives
    the font of the emoji. The look like Excalidraw measures its text in
    the font, with IBM Plex Sans for each character that the font does not
    have, so each label fits its box. The SVG names the family of the font
@@ -268,10 +274,12 @@ draws its text in Excalifont. zuzu draws no other look by hand (D57).
    `Image` draws with the font. Without the font, the look draws its text
    in IBM Plex Sans, and the report warns of it with `ErrNoLookFont`, in
    the strict mode too. A font for the standard look changes nothing.
-5. `Parse` takes both options, because a kind of Mermaid that lays out when
-   it compiles measures its text then. The look of `Parse` is the look of
-   `WithLook`, or else the look of the source. A render that gives another
-   look draws in it, with the layout of the parse.
+6. `Parse` takes `WithLook` and `WithLookFont`, because a kind of Mermaid
+   that lays out when it compiles measures its text then. The look of
+   `Parse` is the look of `WithLook`, or else the look of the source. A
+   render that gives another look draws in it, with the layout of the
+   parse. `Parse` takes `WithLookSeed` too, and the chart keeps the seed
+   for each render, as it keeps the look.
 
 ```go
 font := zuzu.WithLookFont(theme.LookExcalidraw, excalifont.Font())

@@ -568,7 +568,7 @@ it.
 `handDrawnSeed` seeds the lines of the look, as `zuzu.lookSeed`. Its
 default, 0, gives a random seed in Mermaid, and the seed 1 of zuzu, so that
 the same source draws the same bytes (D39 part 6). A seed that is not a
-whole number is an issue.
+whole number is an issue. `WithLookSeed` of the caller wins over it (D58).
 
 `layout` picks the layout of a graph, as in Mermaid 12.3 (D45). zuzu
 accepts it with no issue in every kind, in the config or at the top of the

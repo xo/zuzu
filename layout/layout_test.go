@@ -280,6 +280,52 @@ func TestAxisTitleClearsTurnedLabels(t *testing.T) {
 	}
 }
 
+// TestLabelTurnFitsTheBand checks the rule 9 of "Axes and grids" in
+// docs/STYLE.md: the labels of a discrete axis with a LabelTurn draw flat
+// when each fits the step of its band with the gap of theme.LabelGap, and
+// turn when one does not. A LabelAngle wins over the turn (D58 part 4).
+func TestLabelTurnFitsTheBand(t *testing.T) {
+	t.Parallel()
+	st := style()
+	short := []any{"a", "b", "c"}
+	long := []any{"a", "a long label", "c"}
+	tests := []struct {
+		name   string
+		domain []any
+		length float64
+		turn   float64
+		angle  float64
+		want   float64
+	}{
+		{"short labels", short, 60, 270, 0, 0},
+		{"a long label", long, 60, 270, 0, 270},
+		{"a long label in a wide band", long, 300, 270, 0, 0},
+		{"no turn", long, 60, 0, 0, 0},
+		{"an angle of the spec", short, 60, 270, 45, 45},
+	}
+	for _, tt := range tests {
+		sc := newScale(t, "band", tt.domain, []any{0.0, tt.length})
+		m := st.Axis(&Axis{
+			Orient: "bottom", Scale: sc, Length: tt.length, Cross: 100, Labels: true, BandPosition: 0.5,
+			LabelAngle: tt.angle, LabelTurn: tt.turn, Format: expr.String,
+		})
+		for _, it := range find(m, "axis-label").Items {
+			if it.Angle != tt.want {
+				t.Errorf("%s: the label %v turns by %v, want %v", tt.name, it.Text, it.Angle, tt.want)
+			}
+		}
+	}
+	// A label as wide as the step less the gap still fits.
+	step := st.width(LabelSize, 400, "abc") + theme.LabelGap
+	a := &Axis{Length: 2 * step, Format: expr.String}
+	if !st.labelsFit(a, []any{"abc", "abc"}, []float64{0, step}) {
+		t.Error("a label as wide as the step less the gap does not fit")
+	}
+	if st.labelsFit(a, []any{"abc", "abc"}, []float64{0, step - 0.5}) {
+		t.Error("a label wider than the step less the gap fits")
+	}
+}
+
 // TestAxisTitleWithNoLabels checks that the title of a horizontal axis
 // with no labels keeps no room for them, as in Vega, so that it sits past
 // the ticks, or at the axis when it has no ticks either, as the top axis of

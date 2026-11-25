@@ -274,17 +274,18 @@ func TestTheSizesOfAnEdgeMatchTheStyle(t *testing.T) {
 }
 
 // TestTheSizesOfAnAxisMatchTheStyle checks the sizes of the ticks, of the
-// line and of the padding of the labels of an axis against the table of
-// "Axes and grids" in docs/STYLE.md.
+// line, of the padding of the labels and of the gap between flat labels of
+// an axis against the table of "Axes and grids" in docs/STYLE.md.
 func TestTheSizesOfAnAxisMatchTheStyle(t *testing.T) {
 	t.Parallel()
-	rows := regexp.MustCompile("(?m)^\\| `(tickSize|tickWidth|domainWidth|labelPadding)` \\| ([0-9.]+) \\|").FindAllStringSubmatch(style(t), -1)
-	if len(rows) != 4 {
-		t.Fatalf("docs/STYLE.md has %d rows of the sizes of an axis, expected 4", len(rows))
+	rows := regexp.MustCompile("(?m)^\\| `(tickSize|tickWidth|domainWidth|labelPadding|labelGap)` \\| ([0-9.]+) \\|").FindAllStringSubmatch(style(t), -1)
+	if len(rows) != 5 {
+		t.Fatalf("docs/STYLE.md has %d rows of the sizes of an axis, expected 5", len(rows))
 	}
 	got := map[string]string{
 		"tickSize": fmt.Sprint(TickSize), "tickWidth": fmt.Sprint(TickWidth),
 		"domainWidth": fmt.Sprint(DomainWidth), "labelPadding": fmt.Sprint(LabelPadding),
+		"labelGap": fmt.Sprint(LabelGap),
 	}
 	for _, row := range rows {
 		if got[row[1]] != row[2] {

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -515,6 +516,55 @@ func TestAxisConfigAndTimeUnit(t *testing.T) {
 	}
 	if n == 0 {
 		t.Error("no axis of x")
+	}
+}
+
+// TestLabelTurnOfADiscreteAxis checks that a discrete axis of x takes the
+// key zuzu.labelTurn in place of the labelAngle of 270 of vega-lite.js,
+// and that a labelAngle of the axis or of its config wins over it. The
+// angle of a config that the Vega config does not have, such as
+// axisDiscrete, goes on the axis, as vega-lite.js puts it (D58 part 4).
+func TestLabelTurnOfADiscreteAxis(t *testing.T) {
+	t.Parallel()
+	spec := func(x, config string) string {
+		return `{"data": {"values": [{"a": "x", "b": 1}]}, "mark": "bar",
+			"encoding": {"x": {"field": "a", "type": "nominal"` + x + `}, "y": {"field": "b", "type": "quantitative"}},
+			"config": {` + config + `}}`
+	}
+	tests := []struct {
+		name, spec string
+		turn       bool
+		angle      string
+	}{
+		{"no angle", spec("", ""), true, ""},
+		{"the angle of the axis", spec(`, "axis": {"labelAngle": 45}`, ""), false, "45"},
+		{"the angle of axisX", spec("", `"axisX": {"labelAngle": 0}`), false, ""},
+		{"the angle of axisBand", spec("", `"axisBand": {"labelAngle": 0}`), false, "0"},
+		{"the angle of axisDiscrete", spec("", `"axisDiscrete": {"labelAngle": 0}`), false, "0"},
+		{"the angle of axisXDiscrete over axisDiscrete", spec("", `"axisDiscrete": {"labelAngle": 0}, "axisXDiscrete": {"labelAngle": 30}`), false, "30"},
+		{"the angle of axisPoint on a band", spec("", `"axisPoint": {"labelAngle": 0}`), true, ""},
+		{"a time unit", `{"data": {"values": [{"a": "2006-01-01", "b": 1}]}, "mark": "bar",
+			"encoding": {"x": {"field": "a", "timeUnit": "month", "type": "ordinal"}, "y": {"field": "b", "type": "quantitative"}}}`, false, ""},
+	}
+	for _, tt := range tests {
+		out := compile(t, tt.spec)
+		n := 0
+		for _, a := range out.Axes {
+			if a.Scale != "x" || (a.Grid != nil && *a.Grid) {
+				continue
+			}
+			n++
+			turn, ok := a.Extra[theme.LabelTurn]
+			if ok != tt.turn || (ok && string(turn) != "270") {
+				t.Errorf("%s: the axis of x has zuzu.labelTurn %s, want it %v", tt.name, turn, tt.turn)
+			}
+			if got := string(a.LabelAngle.JSON); got != tt.angle {
+				t.Errorf("%s: the axis of x has the labelAngle %q, want %q", tt.name, got, tt.angle)
+			}
+		}
+		if n != 1 {
+			t.Errorf("%s: %d axes of x with labels, want 1", tt.name, n)
+		}
 	}
 }
 
