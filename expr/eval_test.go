@@ -325,3 +325,33 @@ func TestItem(t *testing.T) {
 		t.Errorf("item.mark with no item = %v, %v, want undefined", got, err)
 	}
 }
+
+// TestNumberReadsIntegersInABase checks that Number reads a string as
+// Number() of JavaScript does, with the prefixes 0x, 0o and 0b.
+func TestNumberReadsIntegersInABase(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   string
+		want float64
+	}{
+		{"0x1F", 31},
+		{" 0X10 ", 16},
+		{"0b00", 0},
+		{"0B101", 5},
+		{"0o17", 15},
+		{"0O7", 7},
+		{"0x10000000000000001", 18446744073709551616},
+		{"0x", math.NaN()},
+		{"0b2", math.NaN()},
+		{"-0x10", math.NaN()},
+		{"0x1_0", math.NaN()},
+		{"0", 0},
+		{"007", 7},
+	}
+	for _, tt := range tests {
+		got := Number(tt.in)
+		if got != tt.want && (!math.IsNaN(got) || !math.IsNaN(tt.want)) {
+			t.Errorf("Number(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}

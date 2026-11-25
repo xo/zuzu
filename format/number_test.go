@@ -47,6 +47,9 @@ func TestNumberSpecial(t *testing.T) {
 		{",.0f", math.NaN(), "NaN"},
 		{".1f", math.Inf(1), "Infinity"},
 		{".1f", math.Inf(-1), "−Infinity"},
+		{"d", math.Inf(1), "∞"},
+		{",d", math.Inf(1), "∞"},
+		{"d", math.Inf(-1), "−∞"},
 		{",d", math.Copysign(0, -1), "0"},
 		{"+,d", 0, "+0"},
 	}

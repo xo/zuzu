@@ -90,13 +90,40 @@ type Program struct {
 	root node
 }
 
+// CompileOption is an option of Compile.
+type CompileOption func(*compileOptions)
+
+// compileOptions are the options of Compile.
+type compileOptions struct {
+	known map[string]bool
+}
+
+// Known names functions that the scope of the evaluation gives, such as the
+// functions that a caller adds with WithFunction, so that an expression can
+// call them. Compile reports a call of any other function that is neither
+// built in nor given by the runtime.
+func Known(names ...string) CompileOption {
+	return func(o *compileOptions) {
+		if o.known == nil {
+			o.known = map[string]bool{}
+		}
+		for _, n := range names {
+			o.known[n] = true
+		}
+	}
+}
+
 // Compile parses an expression.
-func Compile(src string) (*Program, error) {
+func Compile(src string, opts ...CompileOption) (*Program, error) {
+	var o compileOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	n, err := parse(src)
 	if err != nil {
 		return nil, err
 	}
-	if err := check(n, src); err != nil {
+	if err := check(n, src, o.known); err != nil {
 		return nil, err
 	}
 	return &Program{src: src, root: n}, nil
@@ -154,50 +181,50 @@ var runtimeFuncs = map[string]bool{
 	"bandspace": true, "copy": true, "domain": true, "range": true, "gradient": true,
 	"geoArea": true, "geoBounds": true, "geoCentroid": true, "geoShape": true,
 	"pluck": true, "vlSelectionTest": true, "vlSelectionResolve": true,
-	"treePath": true, "treeAncestors": true, "containerSize": true, "screen": true,
+	"vlSelectionIdTest": true, "treePath": true, "treeAncestors": true, "containerSize": true, "screen": true,
 	"windowSize": true, "inScope": true, "info": true, "warn": true, "debug": true,
 }
 
-// check reports a call of a function that is neither built in nor given by
-// the runtime, as Vega reports it when it parses.
-func check(n node, src string) error {
+// check reports a call of a function that is neither built in, given by
+// the runtime, nor known, as Vega reports it when it parses.
+func check(n node, src string, known map[string]bool) error {
 	switch x := n.(type) {
 	case call:
-		if _, ok := builtins[x.name]; !ok && !runtimeFuncs[x.name] && x.name != "if" {
+		if _, ok := builtins[x.name]; !ok && !runtimeFuncs[x.name] && !known[x.name] && x.name != "if" {
 			return fmt.Errorf("parsing %q: %s: %w", src, x.name, ErrUnknownFunction)
 		}
 		for _, a := range x.args {
-			if err := check(a, src); err != nil {
+			if err := check(a, src, known); err != nil {
 				return err
 			}
 		}
 	case member:
-		if err := check(x.obj, src); err != nil {
+		if err := check(x.obj, src, known); err != nil {
 			return err
 		}
-		return check(x.prop, src)
+		return check(x.prop, src, known)
 	case unary:
-		return check(x.x, src)
+		return check(x.x, src, known)
 	case binary:
-		if err := check(x.x, src); err != nil {
+		if err := check(x.x, src, known); err != nil {
 			return err
 		}
-		return check(x.y, src)
+		return check(x.y, src, known)
 	case cond:
 		for _, c := range []node{x.test, x.yes, x.no} {
-			if err := check(c, src); err != nil {
+			if err := check(c, src, known); err != nil {
 				return err
 			}
 		}
 	case array:
 		for _, e := range x.elems {
-			if err := check(e, src); err != nil {
+			if err := check(e, src, known); err != nil {
 				return err
 			}
 		}
 	case object:
 		for _, v := range x.vals {
-			if err := check(v, src); err != nil {
+			if err := check(v, src, known); err != nil {
 				return err
 			}
 		}

@@ -2,6 +2,7 @@ package expr
 
 import (
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -65,12 +66,12 @@ func Number(v any) float64 {
 		if s == "" {
 			return 0
 		}
-		if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
-			n, err := strconv.ParseInt(s[2:], 16, 64)
-			if err != nil {
-				return nan()
+		if len(s) > 2 && s[0] == '0' {
+			// A string can be an integer in hexadecimal, octal or binary,
+			// with no sign.
+			if base := radix(s[1]); base > 0 {
+				return radixNumber(s[2:], base)
 			}
-			return float64(n)
 		}
 		switch s {
 		case jsInfinity, "+" + jsInfinity:
@@ -97,6 +98,34 @@ func Number(v any) float64 {
 		}
 	}
 	return nan()
+}
+
+// radix returns the base that a letter after a 0 gives an integer in a
+// string, or 0 for no base.
+func radix(c byte) int {
+	switch c {
+	case 'x', 'X':
+		return 16
+	case 'o', 'O':
+		return 8
+	case 'b', 'B':
+		return 2
+	}
+	return 0
+}
+
+// radixNumber reads the digits of an integer in a base, rounded to the
+// nearest number, or NaN if a digit is not one of the base.
+func radixNumber(digits string, base int) float64 {
+	if strings.ContainsAny(digits, "+-_") {
+		return nan()
+	}
+	n, ok := new(big.Int).SetString(digits, base)
+	if !ok {
+		return nan()
+	}
+	f, _ := new(big.Float).SetInt(n).Float64()
+	return f
 }
 
 // Truthy reports whether a value is true in a condition, as JavaScript
@@ -267,6 +296,18 @@ func strictEqual(x, y any) bool {
 		return ok && a.Equal(b)
 	}
 	return false
+}
+
+// StrictEqual is === of JavaScript, with dates equal at the same time. An
+// array or an object is never equal.
+func StrictEqual(x, y any) bool {
+	return strictEqual(x, y)
+}
+
+// Compare is < and > of JavaScript. It returns -1, 0 or 1, and false when
+// the values do not compare, such as with NaN.
+func Compare(x, y any) (int, bool) {
+	return compare(x, y)
 }
 
 // compare is < and > of JavaScript. It returns -1, 0 or 1, and false when

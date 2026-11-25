@@ -261,6 +261,11 @@ func formatType(typ string, x float64, p int) (string, int) {
 		return strings.ToUpper(radix(x, 16)), 0
 	case "d":
 		r := math.Round(x)
+		if math.IsInf(r, 0) {
+			// An infinite number writes as ∞, as vega.js writes it with
+			// the type d.
+			return "∞", 0
+		}
 		if r >= 1e21 {
 			return strconv.FormatFloat(r, 'f', 0, 64), 0
 		}
