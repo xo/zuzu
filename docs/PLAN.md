@@ -146,7 +146,7 @@ short word, and an exported name does not repeat its package.
 | `internal/dagre` | the copy of dagro, dagre 3.1.1 in Go, which the transform `zuzu.dagre` lays out with. Its package keeps the name `dagro` of upstream (D39, D44, D45, docs/UPSTREAM.md) |
 | `elk` | a separate module under EPL-2.0: the layout engine of ELK, which a caller makes available to zuzu with `WithLayoutEngine`, the adapter that maps the graph and the options of Mermaid onto ELK in `elk/internal/adapter`, and the copy of elk-go in `elk/internal/elkgo` (D39 part 13, D44, D45) |
 | `internal/sketch` | the pass from scene to scene that draws a look drawn by hand with `internal/rough`, which `Render` runs after the layout (D39, D40) |
-| `theme` | the modes and the color schemes, and the Vega config they make (D14, D15) |
+| `theme` | the modes and the color schemes, and the Vega config they make (D14, D15, D58) |
 | `svg` | the SVG writer |
 | `raster` | the direct okage renderer (D11) |
 | `internal/shape` | the geometry of the items as path data, which `svg` writes and `raster` parses, so that both draw the same shapes |
@@ -186,8 +186,12 @@ The module also embeds files that are not Go packages:
 | IBM Plex Mono 2.3 in `text/mono`, Inter 4.001 in `text/humanist`, IBM Plex Serif 2.6 in `text/serif` and Nunito 3.602 in `text/rounded`, each one collection in WOFF2 of the weights 400, 500 and 600, upright and italic | SIL Open Font License 1.1. IBM Plex reserves the name Plex | the monospace, the humanist sans, the serif and the rounded sans, each in a package that a caller imports (D35 part 11, D58) |
 | the colors of the named schemes of Vega 6.4.0, as Go values in `scale/schemes_data.go` | BSD-3-Clause for vega-scale 8.1.3, ISC for d3-scale-chromatic 3.1.1, and Apache 2.0 for the colors of ColorBrewer, in `scale/LICENSE-schemes.txt` | a scheme that a spec names draws in its own colors (D46) |
 
-The color schemes are Go values in `theme/theme.go`, and the module embeds
-no file of a scheme (D33).
+The color schemes are Go values in `theme/theme.go` and `theme/schemes.go`,
+and the module embeds no file of a scheme (D33). The colors of the schemes
+in `theme/schemes.go` come from the styles of `github.com/xo/transit/styles`,
+which only the test module requires (D58). They are under MIT, BSD-2-Clause,
+BSD-3-Clause or Apache 2.0, and `theme/licenses/` holds the license of each
+source.
 
 The module also holds copies of Go code from other projects, which
 `docs/UPSTREAM.md` lists with their licenses: rough-go under MIT in
@@ -340,12 +344,13 @@ in either mode. [`STYLE.md`](STYLE.md) holds the tokens of both. The
 `theme` of a source of Mermaid selects the dark mode or a scheme with the
 colors of that theme, unless the caller gives a mode or a scheme (D32).
 
-Many more schemes come from the same upstream themes that the package
-`styles` of transit draws from: the styles of chroma and the popular editor
-themes, each at a pinned commit and under a license that MIT allows (D15). A
-scheme from an editor theme brings the background and the text colors of
-that theme for each mode. The targets show two prototypes, `catppuccin` and
-`solarized`.
+Many more schemes come from the styles of the package `styles` of transit:
+the styles of chroma and the popular editor themes, each with its source
+and under a license that MIT allows (D15, D58). The command
+`test/cmd/schemes` writes them. A scheme from a style brings the background
+and the text of that style for its mode, and a family of a light and a dark
+style brings them for both modes. [`SCHEMES.md`](SCHEMES.md) lists them.
+The targets draw two of the families, `catppuccin` and `solarized`.
 
 Both parts become one Vega `config` object (D14). The config of Vega already
 holds every default that a theme sets: the background, the fonts, the axes,

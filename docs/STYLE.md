@@ -197,17 +197,94 @@ These rules say which colors flip:
 
 ### Schemes from upstream themes
 
-Many more schemes come from the upstream themes that the package `styles` of
-transit draws from (D15). Such a scheme brings the neutrals of its theme for
-each mode, and its categorical colors are the accents of the theme. The
-targets show two prototypes:
+Many more schemes come from the styles of the package `styles` of transit,
+which colors source code (D15, D58). A style holds the colors of a theme of
+chroma, of Pygments or of an editor, with its source and its license. The
+command `test/cmd/schemes` of the test module reads the styles of the
+version of `github.com/xo/transit/styles` that `test/go.mod` requires. It
+writes the schemes as Go values in `theme/schemes.go`, the license file of
+each source in `theme/licenses/`, and the table of the schemes in
+[`SCHEMES.md`](SCHEMES.md). Do not edit these files. Change the command or
+the version, and run the command again. A test of the test module fails when
+the files differ from the files that the command writes.
 
-| Scheme | Light mode | Dark mode | Source |
-| --- | --- | --- | --- |
-| `catppuccin` | Latte | Mocha | `github.com/catppuccin/palette` at `07d02aa`, MIT |
-| `solarized` | light | dark | `github.com/altercation/solarized` at `62f656a`, MIT |
+These rules make a scheme from a style:
 
-[`targets/licenses/`](targets/licenses/) holds the license of each source.
+1. A style is one mode. It is dark when its background is dark, as
+   `theme.IsDark` says, and light otherwise. A style with no background
+   draws on white, as Pygments draws it. A style with no text color takes
+   `text` of zuzu for its mode.
+2. Each style is a scheme with the name of the style. A family is a light
+   style and a dark style of one theme, such as `catppuccin-latte` and
+   `catppuccin-mocha`. A family is also a scheme, with the name of the
+   family, and it takes each mode from its style. A table in the command
+   names the two styles of each family. When the natural name of a family
+   is the name of one of its styles, such as `github`, `gruvbox`,
+   `monokai`, `night-owl` or `tomorrow`, the family takes the name. That
+   style is then a scheme only as a part of the family.
+3. A scheme takes `bg` and `text` of its mode from the default entry of
+   its style. Each other neutral mixes `text` into `bg` in RGB, by the
+   share of the table below. `band` follows `text`, as "Modes" says. The
+   shares are those that the neutrals of zuzu have between `bg` and
+   `text`, rounded to two places.
+4. In the mode that a style does not have, the scheme keeps the neutrals of
+   zuzu for that mode. Its colors lift for the dark mode, as the colors of
+   a scheme without dark colors do. For the light mode, they darken by the
+   inverse: the lightness in HSL falls by the factor 0.7 to the power 0.45,
+   as the method `darker` of d3-color gives.
+5. The categorical colors are the foreground colors of the captures of the
+   style. A use of a color is a capture with that foreground. The colors go
+   in the order of their uses, the most used first. A tie goes to the color
+   whose hex value sorts first.
+6. These colors are left out: a gray, whose chroma in CIE LCh is below
+   `upstreamChroma`, a color whose contrast with `bg` is below
+   `upstreamContrast`, and a color nearer than `upstreamDistance` to
+   `text`, because the text draws the labels. A color nearer than
+   `upstreamDistance` to a color before it is left out too. The distance
+   is CIE76, the distance in CIELAB. The scheme keeps at most ten colors,
+   the most used.
+7. The first color is the most used. Each next color is the most used one
+   whose hue in CIE LCh differs from the hue of the color before it by
+   `upstreamHueStep` degrees or more. If none does, it is the one whose
+   hue differs most.
+8. A style with fewer than four colors, such as `bw`, is not a scheme, and
+   neither is a family with such a style. `SCHEMES.md` lists the styles
+   that the command leaves out.
+9. The color of a rise is the color nearest `riseColor`, the green of
+   CSS. The color of a fall is the other color nearest `fallColor`, the
+   crimson of CSS. The distance is in the plane of a* and b* of CIELAB. It
+   leaves out the lightness, so that the light and the dark style of a
+   family take the same hue. The fall looks for crimson and not for the
+   red of CSS, because in that plane an orange is often nearer `#ff0000`
+   than the red of a theme is.
+10. A scheme with fewer than ten colors gets the rest mixed toward the
+    text color, as "Color schemes" says.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `upstreamChroma` | 18 | the least chroma in CIE LCh of a color that is not a gray |
+| `upstreamContrast` | 1.8 | the least contrast ratio of WCAG 2.1 of a color with `bg` |
+| `upstreamDistance` | 15 | the least distance in CIELAB of a color from `text` and from a color before it |
+| `upstreamHueStep` | 90 | the difference of hue in degrees that the next color looks for |
+| `riseColor` | `#008000` | the color that the color of a rise is nearest |
+| `fallColor` | `#dc143c` | the color that the color of a fall is nearest |
+
+The shares of `text` in `bg` that make the other neutrals of a scheme from
+a style, in the light mode and in the dark mode:
+
+| Share | Light | Dark |
+| --- | --- | --- |
+| `panel` | 0.04 | 0.04 |
+| `muted` | 0.67 | 0.68 |
+| `faint` | 0.42 | 0.46 |
+| `grid` | 0.07 | 0.08 |
+| `axis` | 0.19 | 0.19 |
+| `edge` | 0.82 | 0.82 |
+
+The targets draw two families, `catppuccin` and `solarized`. The command
+also writes their values to `targets/schemes.json`, which
+`targets/gen-targets.mjs` reads. Both come from styles of chroma, under the
+license in `theme/licenses/chroma/COPYING`.
 
 ### Schemes from the themes of Mermaid
 

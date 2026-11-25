@@ -12,8 +12,8 @@
 //
 //	node gen-targets.mjs
 //
-// It reads ../survey/data.js and writes svg/<name>-<light|dark>.svg and
-// index.html.
+// It reads ../survey/data.js and schemes.json, and writes
+// svg/<name>-<light|dark>.svg and index.html.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import * as d3 from "d3";
 import { sankey as d3sankey, sankeyLinkHorizontal } from "d3-sankey";
@@ -50,6 +50,29 @@ const ARROW_LENGTH = 8;
 // NODE_TINT is how far the solid tint of a node goes from the background to
 // its color, with no opacity (D55).
 const NODE_TINT = 0.14;
+// SHARES are the shares of the text in the background that make the other
+// neutrals of a scheme from a style of transit, for each mode
+// (docs/STYLE.md).
+const SHARES = {
+  light: { panel: 0.04, muted: 0.67, faint: 0.42, grid: 0.07, axis: 0.19, edge: 0.82 },
+  dark: { panel: 0.04, muted: 0.68, faint: 0.46, grid: 0.08, axis: 0.19, edge: 0.82 },
+};
+// UPSTREAM holds the families of schemes.json, which test/cmd/schemes
+// writes from the styles of transit.
+const UPSTREAM = JSON.parse(readFileSync(new URL("schemes.json", import.meta.url), "utf8"));
+// upstream returns a family of schemes.json with the neutrals of each mode:
+// its background and its text, and the text mixed into the background by
+// the shares for each other neutral. Each mode has its own colors and its
+// own rise and fall.
+function upstream(name) {
+  const f = UPSTREAM[name], modes = {};
+  for (const mode of ["light", "dark"]) {
+    const { bg, text, cat, up, down } = f[mode];
+    const mixed = Object.fromEntries(Object.entries(SHARES[mode]).map(([k, v]) => [k, d3.color(d3.interpolateRgb(bg, text)(v)).formatHex()]));
+    modes[mode] = { bg, text, ...mixed, cat, up, down };
+  }
+  return { source: [f.light.source, f.dark.source].join(" and "), up: f.light.up, down: f.light.down, modes };
+}
 // Each scheme gives ten categorical colors for the light mode, the index of
 // the color for a rise and a fall, and, if it wants, its own colors for the
 // dark mode. Without them, the dark mode lifts each light color.
@@ -71,39 +94,13 @@ const SCHEMES = {
     cat: ["#d9480f", "#f08c00", "#e8590c", "#c2255c", "#f59f00", "#862e9c", "#a61e4d", "#e67700", "#5f3dc4", "#94d82d"],
     up: 9, down: 3,
   },
-  // A scheme from an upstream theme brings its own neutrals for each mode,
-  // from the palette of that theme. The colors come from the upstream file
-  // at the commit named in source, and licenses/ holds its license. The
-  // categorical colors are the accents of the theme, ordered so that
-  // neighbors differ in hue (D15).
-  catppuccin: {
-    source: "github.com/catppuccin/palette 07d02aa110ef9eb7e7427afca5c73ba9cf7f8ebd palette.json, MIT",
-    up: 1, down: 3,
-    modes: {
-      light: {
-        bg: "#eff1f5", panel: "#e6e9ef", text: "#4c4f69", muted: "#6c6f85", faint: "#9ca0b0", grid: "#dce0e8", axis: "#bcc0cc", edge: "#7c7f93",
-        cat: ["#1e66f5", "#40a02b", "#df8e1d", "#d20f39", "#04a5e5", "#8839ef", "#fe640b", "#179299", "#ea76cb", "#7287fd"],
-      },
-      dark: {
-        bg: "#1e1e2e", panel: "#181825", text: "#cdd6f4", muted: "#a6adc8", faint: "#6c7086", grid: "#313244", axis: "#45475a", edge: "#7f849c",
-        cat: ["#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8", "#89dceb", "#cba6f7", "#fab387", "#94e2d5", "#f5c2e7", "#b4befe"],
-      },
-    },
-  },
-  solarized: {
-    source: "github.com/altercation/solarized 62f656a02f93c5190a8753159e34b385588d5ff3 README.md, MIT",
-    up: 1, down: 3,
-    modes: {
-      light: {
-        bg: "#fdf6e3", panel: "#eee8d5", text: "#586e75", muted: "#657b83", faint: "#93a1a1", grid: "#eee8d5", axis: "#93a1a1", edge: "#839496",
-        cat: ["#268bd2", "#859900", "#b58900", "#dc322f", "#2aa198", "#6c71c4", "#cb4b16", "#d33682"],
-      },
-      dark: {
-        bg: "#002b36", panel: "#073642", text: "#93a1a1", muted: "#839496", faint: "#586e75", grid: "#073642", axis: "#586e75", edge: "#657b83",
-        cat: ["#268bd2", "#859900", "#b58900", "#dc322f", "#2aa198", "#6c71c4", "#cb4b16", "#d33682"],
-      },
-    },
-  },  // A scheme from a light theme of Mermaid 12.3.0, which the theme of a
+  // A family from the styles of transit brings its own background and text
+  // for each mode (D58). The command test/cmd/schemes of the test module
+  // writes their values to schemes.json, and theme/licenses holds their
+  // licenses. upstream() mixes the other neutrals from them.
+  catppuccin: upstream("catppuccin"),
+  solarized: upstream("solarized"),
+  // A scheme from a light theme of Mermaid 12.3.0, which the theme of a
   // Mermaid diagram selects (D32), brings the text and the line color of
   // its theme for the light mode. docs/STYLE.md says how its colors come from
   // the theme variables, and licenses/mermaid.txt holds the license.
@@ -149,7 +146,8 @@ function theme(mode, scheme = "zuzu") {
   // A scheme can also bring some neutrals for a mode and keep its colors,
   // as a scheme from a theme of Mermaid does.
   const s = SCHEMES[scheme], own = s.modes?.[mode], part = s.neutrals?.[mode];
-  const m = { ...MODES[mode], ...(own || {}), ...(part || {}), name: mode };
+  const { cat: _cat, up: _up, down: _down, ...ownNeutrals } = own || {};
+  const m = { ...MODES[mode], ...ownNeutrals, ...(part || {}), name: mode };
   // A band behind a group of rows is the text at an opacity of 0.06 over
   // the background, so a scheme with its own neutrals gets its own band.
   if (own || part) m.band = d3.color(d3.interpolateRgb(m.bg, m.text)(BAND)).formatHex();
@@ -172,8 +170,9 @@ function theme(mode, scheme = "zuzu") {
   // muted to the color of a rise, so that a mark near the middle still
   // shows. A scheme that a spec names draws in its own colors, so the theme
   // holds no ramp for it (D46).
-  const div = [cat[s.down], m.muted, cat[s.up]];
-  return { ...m, scheme, cat, seq, div, up: cat[s.up], down: cat[s.down] };
+  const up = own?.up ?? s.up, down = own?.down ?? s.down;
+  const div = [cat[down], m.muted, cat[up]];
+  return { ...m, scheme, cat, seq, div, up: cat[up], down: cat[down] };
 }
 const THEMES = { light: theme("light"), dark: theme("dark") };
 const PAD = 24;
@@ -1282,7 +1281,7 @@ figcaption a { color: inherit; }
     <p>The look that zuzu aims for, at the quality of nivo and visx, in the light and the dark mode, drawn from real data. These are targets and not output of zuzu. docs/STYLE.md holds the rules they follow, and gen-targets.mjs draws them.</p>
   </header>
   ${TIER.map((name, i) => `<section><h2>${name}</h2>${cards(i)}</section>`).join("\n  ")}
-  <section id="schemes"><h2>Color schemes</h2><p>A theme is a mode and a color scheme. The same charts in each scheme, in both modes. The chart does not change, only the scheme. catppuccin and solarized come from the palettes of those editor themes, and bring their own background and text colors. The schemes named mermaid- come from the light themes of Mermaid, and bring their text and line colors.</p>${schemeCards}</section>
+  <section id="schemes"><h2>Color schemes</h2><p>A theme is a mode and a color scheme. The same charts in each scheme, in both modes. The chart does not change, only the scheme. catppuccin and solarized come from the styles of those editor themes in transit, and bring their own background and text colors. The schemes named mermaid- come from the light themes of Mermaid, and bring their text and line colors.</p>${schemeCards}</section>
 </main>
 </body>
 </html>

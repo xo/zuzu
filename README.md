@@ -170,7 +170,10 @@ img, report, err := chart.Image(ctx,
 | <img src="docs/readme/bar.png" alt="The bar chart in the light mode" width="358"/> | <img src="docs/readme/bar-dark-ember.png" alt="The bar chart in the dark mode with warm colors" width="358"/> |
 
 `theme.Schemes` returns the names of the schemes, and `theme.Lookup` finds
-one by its name. [`docs/STYLE.md`](docs/STYLE.md) describes each one.
+one by its name. [`docs/STYLE.md`](docs/STYLE.md) describes each one. Most
+schemes come from the styles of editor themes, such as `catppuccin`,
+`solarized`, `gruvbox` and `tokyonight`, and
+[`docs/SCHEMES.md`](docs/SCHEMES.md) lists them.
 
 ## The hand-drawn look
 
@@ -289,6 +292,7 @@ send live charts to a web browser and draw the results of a query for
 | [`docs/decisions/`](docs/decisions/README.md) | every decision, one file each, with an index |
 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | the work that is known and not done |
 | [`docs/STYLE.md`](docs/STYLE.md) | the rules and the tokens of the look, the modes and the color schemes |
+| [`docs/SCHEMES.md`](docs/SCHEMES.md) | the color schemes from the styles of editor themes, with their colors and their sources |
 | [`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) | the parts of DOT and of Mermaid that zuzu reads |
 | [`docs/targets/`](docs/targets/README.md) | the target SVGs that show the look zuzu aims for |
 | [`docs/survey/`](docs/survey/README.md) | the survey of other libraries, and the page that compares them |

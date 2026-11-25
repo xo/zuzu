@@ -47,7 +47,7 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | working on text, fonts or the measurement of a label | "Text" in [docs/PLAN.md](docs/PLAN.md), then D11, D16, D32 and D34 |
 | working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12, D14, D35, D37, D39 and D40 |
 | changing or adding a target SVG | [docs/targets/README.md](docs/targets/README.md), then D13 |
-| adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15 and D33 |
+| adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15, D33 and D58. [docs/SCHEMES.md](docs/SCHEMES.md) lists the schemes that `test/cmd/schemes` writes |
 | choosing or adding a font | D16, then D32, D34, D35, D36 and D58 |
 | naming a package | D21 |
 | deciding whether zuzu supports a feature of Vega | "The Vega subset" in [docs/PLAN.md](docs/PLAN.md), then D6 and D7 |
@@ -164,6 +164,7 @@ The repository holds these files:
 | `docs/BACKLOG.md` | the work that is known and not done |
 | `docs/decisions/` | the decisions, one file each, with an index |
 | `docs/STYLE.md` | the rules and the tokens of the look (D12, D14) |
+| `docs/SCHEMES.md` | the schemes from the styles of transit, which `test/cmd/schemes` writes (D58) |
 | `docs/DIAGRAMS.md` | the parts of DOT and of Mermaid that zuzu reads (D31) |
 | `docs/zuzu.svg` | the logo of zuzu, which `README.md` shows |
 | `docs/readme/` | the images of `README.md`, which `TestTheReadmeImagesAreDrawn` draws with `-update` from the examples in `example_test.go` |
@@ -185,7 +186,7 @@ The repository holds these files:
 | `internal/color/` | the colors of CSS and their color spaces, which `scale` and `expr` share |
 | `layout/` | the axes, the legends and the titles in the look of zuzu, and the bounds of a scene (D12) |
 | `scene/` | the scene graph and its JSON form (D8) |
-| `theme/` | the modes and the color schemes (D14) |
+| `theme/` | the modes and the color schemes (D14), with the schemes from the styles of transit in `theme/schemes.go` and the license of each source in `theme/licenses/`, which `test/cmd/schemes` writes (D58) |
 | `svg/` | the SVG writer, with its golden files in `svg/testdata` (D10) |
 | `raster/` | the direct okage renderer (D11) |
 | `internal/shape/` | the geometry of the items as path data, which `svg` and `raster` share |

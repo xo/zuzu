@@ -10,7 +10,8 @@ real data. The targets are not output of zuzu, and they can change.
 | `index.html` | the gallery, which the script writes: every target in the light and the dark mode, side by side, and four charts in each of the thirteen color schemes |
 | `svg/<chart>-light.svg`, `svg/<chart>-dark.svg` | the targets in the default scheme |
 | `svg/<chart>-<scheme>-<mode>.svg` | four charts in each of the other twelve schemes (D14, D15, D32) |
-| `licenses/` | the license of each upstream theme that a scheme takes its colors from (D15) |
+| `licenses/` | the license of the themes of Mermaid, which the schemes named `mermaid-` take their colors from (D32) |
+| `schemes.json` | the values of the schemes `catppuccin` and `solarized`, which `test/cmd/schemes` writes from the styles of transit. Their licenses are in `../../theme/licenses/` (D58) |
 | `gen-targets.mjs` | the script that writes the targets and the gallery |
 | `package.json` | the packages of the script, with pinned versions |
 

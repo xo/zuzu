@@ -48,11 +48,22 @@ func ramp(stops []string, v float64) string {
 	return mix(stops[i], stops[i+1], pos-float64(i))
 }
 
-// brighter lifts the lightness of a color in HSL by the factor (1/0.7)^k, as
-// the brighter method of d3-color does.
-func brighter(s string, k float64) string {
+// lift is the k of the methods brighter and darker of d3-color that moves a
+// color of a scheme from one mode to the other.
+const lift = 0.45
+
+// brighter lifts the lightness of a color in HSL by the factor
+// (1/0.7)^lift, as the brighter method of d3-color does.
+func brighter(s string) string {
 	h, sat, l := toHSL(parse(s))
-	return fromHSL(h, sat, l*math.Pow(1/0.7, k)).hex()
+	return fromHSL(h, sat, l*math.Pow(1/0.7, lift)).hex()
+}
+
+// darker lowers the lightness of a color in HSL by the factor 0.7^lift, as
+// the darker method of d3-color does.
+func darker(s string) string {
+	h, sat, l := toHSL(parse(s))
+	return fromHSL(h, sat, l*math.Pow(0.7, lift)).hex()
 }
 
 // toHSL converts a color to hue in degrees, saturation and lightness.

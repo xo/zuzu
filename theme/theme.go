@@ -4,6 +4,12 @@
 // The mode sets the neutral colors: the background, the text, the grid and the
 // axes. The scheme sets the colors of the data. docs/STYLE.md holds the tokens
 // of both, and a test checks that this package holds the same values.
+//
+// Besides the schemes of zuzu and of the themes of Mermaid, the package holds
+// a scheme for each style of the package styles of transit, and for each
+// family of a light and a dark style (D58). The command test/cmd/schemes of
+// the test module writes them to schemes.go, with the license of each source
+// in the folder licenses. docs/SCHEMES.md lists them.
 package theme
 
 import (
@@ -100,26 +106,56 @@ func neutrals(m Mode) Neutrals {
 	}
 }
 
-// over returns the neutrals with each field that own sets in place of its
-// own. A band that own does not set is its text at BandOpacity over its
+// shares are the shares of the text in the background that make the
+// neutrals other than the background and the text of a scheme that brings
+// its own background (docs/STYLE.md).
+type shares struct {
+	panel, muted, faint, grid, axis, edge float64
+}
+
+// sharesOf returns the shares of a mode, from "Schemes from upstream themes"
+// in docs/STYLE.md.
+func sharesOf(m Mode) shares {
+	if m == Dark {
+		return shares{panel: 0.04, muted: 0.68, faint: 0.46, grid: 0.08, axis: 0.19, edge: 0.82}
+	}
+	return shares{panel: 0.04, muted: 0.67, faint: 0.42, grid: 0.07, axis: 0.19, edge: 0.82}
+}
+
+// over returns the neutrals of a mode with each field that own sets in
+// place of its own. When own sets the background, each other neutral that
+// it does not set mixes the text into the background by the share of the
+// mode. A band that own does not set is the text at BandOpacity over the
 // background, as docs/STYLE.md says.
-func (n Neutrals) over(own Neutrals) Neutrals {
+func (n Neutrals) over(own Neutrals, m Mode) Neutrals {
 	if own == (Neutrals{}) {
 		return n
 	}
 	out := n
+	if own.Background != "" {
+		out.Background = own.Background
+	}
+	if own.Text != "" {
+		out.Text = own.Text
+	}
+	sh := sharesOf(m)
 	for _, f := range []struct {
-		dst *string
-		src string
+		dst   *string
+		src   string
+		share float64
 	}{
-		{&out.Background, own.Background}, {&out.Panel, own.Panel}, {&out.Text, own.Text},
-		{&out.Muted, own.Muted}, {&out.Faint, own.Faint}, {&out.Grid, own.Grid},
-		{&out.Axis, own.Axis}, {&out.Edge, own.Edge}, {&out.Band, own.Band},
+		{&out.Panel, own.Panel, sh.panel}, {&out.Muted, own.Muted, sh.muted},
+		{&out.Faint, own.Faint, sh.faint}, {&out.Grid, own.Grid, sh.grid},
+		{&out.Axis, own.Axis, sh.axis}, {&out.Edge, own.Edge, sh.edge},
 	} {
-		if f.src != "" {
+		switch {
+		case f.src != "":
 			*f.dst = f.src
+		case own.Background != "":
+			*f.dst = mix(out.Background, out.Text, f.share)
 		}
 	}
+	out.Band = own.Band
 	if own.Band == "" {
 		out.Band = mix(out.Background, out.Text, BandOpacity)
 	}
@@ -129,14 +165,26 @@ func (n Neutrals) over(own Neutrals) Neutrals {
 // Scheme is a color scheme: the colors of the data. A scheme from an
 // upstream theme can also bring neutrals of its own for a mode (D15).
 type Scheme struct {
-	name  string
+	name string
+	// light and dark hold the colors of each mode. A scheme from a style of
+	// transit has one of the two, or both for a family (D58).
 	light []string
 	dark  []string
-	up    int
-	down  int
+	// up and down are the indices of the colors of a rise and a fall.
+	up   int
+	down int
+	// darkUp and darkDown are the indices of the colors of a rise and a fall
+	// among the dark colors of a family, which come from another style. A
+	// rise and a fall are never one color, so when the two are equal, up
+	// and down hold in both modes.
+	darkUp   int
+	darkDown int
 	// own holds the neutrals of the scheme for each mode, by the mode. An
 	// empty field keeps the neutral of the mode.
 	own [2]Neutrals
+	// licenses names the license files of the sources of a scheme from a
+	// style of transit, in the folder licenses of this package.
+	licenses []string
 }
 
 // Name returns the name of the scheme, such as zuzu.
@@ -240,24 +288,39 @@ var (
 	}
 )
 
-// schemes returns the schemes that zuzu ships, in the order of docs/STYLE.md.
-func schemes() []Scheme {
+// builtin returns the schemes of zuzu and of the themes of Mermaid, in the
+// order of docs/STYLE.md.
+func builtin() []Scheme {
 	return []Scheme{
 		Zuzu, Pastel, Harbor, Ember,
 		mermaidDefault, mermaidBase, mermaidNeutral, mermaidForest, mermaidNeo, mermaidRedux, mermaidReduxColor,
 	}
 }
 
-// Lookup returns the scheme with a name.
-func Lookup(name string) (Scheme, bool) {
-	i := slices.IndexFunc(schemes(), func(s Scheme) bool { return s.name == name })
-	if i < 0 {
-		return Scheme{}, false
-	}
-	return schemes()[i], true
+// schemes returns the schemes that zuzu ships: those of builtin, then those
+// from the styles of transit, sorted by their names.
+func schemes() []Scheme {
+	return append(builtin(), upstream[:]...)
 }
 
-// Schemes returns the names of the schemes, in the order of docs/STYLE.md.
+// Lookup returns the scheme with a name.
+func Lookup(name string) (Scheme, bool) {
+	for _, s := range builtin() {
+		if s.name == name {
+			return s, true
+		}
+	}
+	for i := range upstream {
+		if upstream[i].name == name {
+			return upstream[i], true
+		}
+	}
+	return Scheme{}, false
+}
+
+// Schemes returns the names of the schemes: those of zuzu and of the themes
+// of Mermaid in the order of docs/STYLE.md, then those from the styles of
+// transit, sorted by their names, as docs/SCHEMES.md lists them.
 func Schemes() []string {
 	var names []string
 	for _, s := range schemes() {
@@ -287,27 +350,15 @@ type Theme struct {
 
 // New returns the theme of a mode and a scheme. A scheme without its own
 // dark colors lifts each light color for the dark mode, and a scheme with
-// fewer than ten colors gets the rest mixed toward the text color. A
-// neutral that the scheme brings for the mode replaces that of the mode.
+// only dark colors darkens each for the light mode. A scheme with fewer
+// than ten colors gets the rest mixed toward the text color. A neutral that
+// the scheme brings for the mode replaces that of the mode.
 func New(m Mode, s Scheme) Theme {
 	if s.name == "" {
 		s = Zuzu
 	}
-	own := s.own[0]
-	if m == Dark {
-		own = s.own[1]
-	}
-	n := neutrals(m).over(own)
-	cat := slices.Clone(s.light)
-	if m == Dark {
-		if s.dark != nil {
-			cat = slices.Clone(s.dark)
-		} else {
-			for i, c := range cat {
-				cat[i] = brighter(c, 0.45)
-			}
-		}
-	}
+	n := neutrals(m).over(s.own[m], m)
+	cat, up, down := s.colors(m)
 	for i := len(cat); i < 10; i++ {
 		cat = append(cat, mix(cat[i%len(cat)], n.Text, 0.4))
 	}
@@ -318,12 +369,40 @@ func New(m Mode, s Scheme) Theme {
 	return Theme{
 		Neutrals:    n,
 		Category:    cat,
-		Up:          cat[s.up],
-		Down:        cat[s.down],
+		Up:          cat[up],
+		Down:        cat[down],
 		FillOpacity: opacity,
 		Note:        nearestHue(cat, NoteHue),
 		mode:        m,
 	}
+}
+
+// colors returns the categorical colors of the scheme for a mode, and the
+// indices of the colors of a rise and a fall among them. The dark mode
+// lifts the light colors of a scheme without dark colors, and the light
+// mode darkens the dark colors of a scheme without light colors, by the
+// same factor (docs/STYLE.md).
+func (s Scheme) colors(m Mode) ([]string, int, int) {
+	switch {
+	case m == Dark && s.dark != nil:
+		if s.darkUp != s.darkDown {
+			return slices.Clone(s.dark), s.darkUp, s.darkDown
+		}
+		return slices.Clone(s.dark), s.up, s.down
+	case m == Dark:
+		cat := make([]string, len(s.light))
+		for i, c := range s.light {
+			cat[i] = brighter(c)
+		}
+		return cat, s.up, s.down
+	case s.light == nil:
+		cat := make([]string, len(s.dark))
+		for i, c := range s.dark {
+			cat[i] = darker(c)
+		}
+		return cat, s.up, s.down
+	}
+	return slices.Clone(s.light), s.up, s.down
 }
 
 // Tint returns the solid tint of a color: the color mixed into the

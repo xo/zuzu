@@ -111,10 +111,10 @@ func TestEveryThemeHasTenColors(t *testing.T) {
 func TestTheDarkModeLiftsALightColor(t *testing.T) {
 	t.Parallel()
 	// d3.hsl("#e8a87c").brighter(0.45).formatHex() in d3 7.9.0
-	if got, want := brighter("#e8a87c", 0.45), "#f1cbb1"; got != want {
+	if got, want := brighter("#e8a87c"), "#f1cbb1"; got != want {
 		t.Errorf("brighter: got %s, want %s", got, want)
 	}
-	if got := New(Dark, Pastel).Category[0]; got != brighter("#e8a87c", 0.45) {
+	if got := New(Dark, Pastel).Category[0]; got != brighter("#e8a87c") {
 		t.Errorf("the dark pastel scheme starts with %s", got)
 	}
 }

@@ -15,6 +15,7 @@ read it and the oracle, which a user of zuzu never imports (D5, D17).
 | `raster/` | the test that compares the direct renderer with okage on the corpus, with the bundled fonts (D11). It needs the references |
 | `cmd/rasterbench/` | the tool that times each step of the image of each spec, through SVG and directly (D11) |
 | `cmd/inventory/` | the tool that writes the inventory |
+| `cmd/schemes/` | the tool that writes the color schemes from the styles of transit, with their licenses and `docs/SCHEMES.md`, as "Schemes from upstream themes" in `docs/STYLE.md` says (D58) |
 | `cmd/targets/` | the tool that compares the SVG writer with the targets and writes `docs/targets/compare.html` (D13) |
 | `cmd/wasm/` | a program that imports zuzu, so that CI can build it with TinyGo (D29) |
 | `cmd/conform/` | the tool that compares zuzu with the references (D17) |
@@ -48,6 +49,25 @@ go run ./cmd/inventory
 
 On 2026-11-10 it listed 679 specs. 540 of them are in the first target: they
 bind no event and the corpus holds all of their data (D7).
+
+## Write the color schemes
+
+The command reads the styles of the version of
+`github.com/xo/transit/styles` that `go.mod` requires. Run this in this
+folder:
+
+```bash
+go run ./cmd/schemes
+```
+
+It writes `theme/schemes.go`, `theme/licenses/`, `docs/SCHEMES.md` and
+`docs/targets/schemes.json`, and prints the styles that it leaves out. On
+2026-11-25, with v0.7.8, it wrote 176 schemes, 30 of them families, and
+left out 9 styles. `TestTheGeneratedFilesAreInStep` fails when the files in
+the repository differ from those that the command writes. The command
+imports the package `theme`, so `theme/schemes.go` must exist before it
+runs. To start from nothing, write a `theme/schemes.go` that holds
+`var upstream = [...]Scheme{}`.
 
 ## Write the references
 

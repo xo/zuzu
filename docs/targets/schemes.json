@@ -1,0 +1,75 @@
+{
+  "catppuccin": {
+    "dark": {
+      "style": "catppuccin-mocha",
+      "source": "chroma v2.27.0 styles/catppuccin-mocha.xml (MIT)",
+      "bg": "#1e1e2e",
+      "text": "#cdd6f4",
+      "cat": [
+        "#fab387",
+        "#89b4fa",
+        "#f38ba8",
+        "#89dceb",
+        "#cba6f7",
+        "#a6e3a1",
+        "#f9e2af"
+      ],
+      "up": 5,
+      "down": 2
+    },
+    "light": {
+      "style": "catppuccin-latte",
+      "source": "chroma v2.27.0 styles/catppuccin-latte.xml (MIT)",
+      "bg": "#eff1f5",
+      "text": "#4c4f69",
+      "cat": [
+        "#fe640b",
+        "#04a5e5",
+        "#d20f39",
+        "#1e66f5",
+        "#40a02b",
+        "#8839ef",
+        "#df8e1d",
+        "#179299",
+        "#dc8a78"
+      ],
+      "up": 4,
+      "down": 2
+    }
+  },
+  "solarized": {
+    "dark": {
+      "style": "solarized-dark",
+      "source": "chroma v2.27.0 styles/solarized-dark.xml (MIT)",
+      "bg": "#002b36",
+      "text": "#93a1a1",
+      "cat": [
+        "#268bd2",
+        "#719e07",
+        "#dc322f",
+        "#2aa198",
+        "#cb4b16",
+        "#b58900"
+      ],
+      "up": 1,
+      "down": 2
+    },
+    "light": {
+      "style": "solarized-light",
+      "source": "chroma v2.27.0 styles/solarized-light.xml (MIT)",
+      "bg": "#fdf6e3",
+      "text": "#586e75",
+      "cat": [
+        "#268bd2",
+        "#cb4b16",
+        "#2aa198",
+        "#d33682",
+        "#859900",
+        "#dc322f"
+      ],
+      "up": 4,
+      "down": 5
+    }
+  },
+  "version": "github.com/xo/transit/styles v0.7.8"
+}

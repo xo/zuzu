@@ -72,18 +72,6 @@ diagrams with its original renderer and with zuzu, side by side. On
 its cause is not known yet.
 
 1. Vega:
-   - The interrupted and polyhedral projections of D52 leave the meridian
-     at ±180° and a strip of 1e-6 radians along each cut out of their clip.
-     d3-geo-projection draws the meridian at -180° along the west edge of
-     the first lobe or face. zuzu does not, because the same place on the
-     sphere cannot belong to both edges of one ring.
-   - The parameter `lobes` of an interrupted projection reads only the
-     longitudes of the three points of each lobe. A latitude other than 0
-     and ±90 changes nothing, and the report says so.
-   - If a spec sets `clipAngle` on `armadillo` or `berghaus`, zuzu clips
-     with that circle and draws the circle as the sphere. d3-geo-projection
-     keeps the torus or the star as the sphere. No spec of the corpus sets
-     it.
    - An expression of an encoding reads `item` as the scene graph of Vega
      gives it: `item.datum`, and `item.mark` with its marktype, name, role
      and group. zuzu does not give the properties that the encodings of the
@@ -123,18 +111,6 @@ A text on a leaf of a treemap takes the style `zuzu.edgeLabelBox` for the
 color of the background. A style of text on a color is cleaner.
 
 ## Themes
-
-### Write the tool that converts upstream themes into schemes
-
-D15 calls for a tool that reads the upstream palette of each theme at a pinned
-commit and writes a scheme for each, with its license file. D33 says that a
-scheme is a Go value in `theme/theme.go`, so the tool writes Go values. The
-schemes `catppuccin` and `solarized`, which exist only in
-`docs/targets/gen-targets.mjs`, move into the package `theme` too. The first
-sources are the styles of chroma and the editor themes that transit D98
-lists. Each theme with a license that MIT does not allow stays out. The two
-prototypes in the targets, `catppuccin` and `solarized`, show the mapping
-from a palette to the tokens of a scheme.
 
 ### Let a scheme name a font
 

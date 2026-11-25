@@ -91,6 +91,9 @@ linters:
         # A name of the grammar of Vega, such as left, linear or utc, reads
         # best as itself, as the spec writes it.
         - '^[a-z][a-zA-Z0-9-]*$'
+        # A color reads best as its hex value, as docs/STYLE.md and the
+        # schemes that test/cmd/schemes writes give it.
+        - '^#[0-9a-f]{6}$'
     errcheck:
       exclude-functions:
         - (*os.File).Close
