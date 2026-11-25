@@ -1,0 +1,10 @@
+// A node whose edges in and out weigh the same moves to the rank with the
+// fewest nodes that its edges allow, as the balance of the ranks of dot
+// does: x goes to the first rank.
+digraph {
+	a -> b -> c
+	x -> c [weight=0]
+	p -> q -> r -> s
+	p -> s
+	y -> s [weight=0]
+}

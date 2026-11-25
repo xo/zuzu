@@ -1,0 +1,12 @@
+// A group in braces lies the other way from the fields around it, at every
+// depth, also when the ranks run across. \l puts a line at the left, and \r
+// at the right.
+digraph {
+	rankdir=LR
+	node [shape=record]
+	a [label="{<in> in|<out> out}"]
+	b [label="<t> top|{left|{<c> one\l|two\r}|right}|bottom"]
+	c [label="a long line\l|short\r|middle"]
+	a:out -> b:c
+	b:t -> c
+}

@@ -1,0 +1,9 @@
+// An edge with a list of colors draws a line in each color: side by side
+// when no color has a fraction, and one after another along the edge when
+// a color has one.
+digraph {
+	a -> b [color="red:blue"]
+	a -> c [color="red:green:blue", penwidth=2]
+	b -> d [color="red;0.3:blue"]
+	c -> d [color="orange;0.5:purple;0.25:black"]
+}

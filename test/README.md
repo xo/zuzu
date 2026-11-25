@@ -179,7 +179,7 @@ seconds. The flags are these:
 | `-j n` | draws this many sources at the same time, half of the processors by default |
 | `-look name` | draws each source of zuzu in this look, such as `excalidraw`, rather than in the look of the source. Without it, a Mermaid diagram with `look: handDrawn` draws in the look like Excalidraw, with Excalifont (D40) |
 | `-handdrawn=false` | leaves out the row drawn by hand. By default, each row also shows the source drawn by hand, below a dashed line: the original of a Mermaid diagram drawn by `mmdc` with `look: handDrawn` and `handDrawnSeed: 1`, and the source drawn by zuzu in each look drawn by hand, in the light and the dark mode (D40) |
-| `-layouts=false` | leaves out the row of layouts. By default, each diagram also shows its layouts, below a dashed line: the original, the original of a Mermaid diagram drawn by `mmdc` with `layout: dagre`, and zuzu with `zuzu.layered`, `zuzu.dagre` and `zuzu.elk`, each forced with `zuzu.WithLayout`. Each layout of a Mermaid diagram names its error of the places of the nodes against the original of its layout: `zuzu.dagre` against dagre, and the others against the default original, which is ELK in Mermaid 12.3 (D44, D45). The tool reads the places of an original with `cmd/mmdcref`, which does not add the offset of a cluster that dagre lays out on its own, so the error of `zuzu.dagre` is too high for such a diagram (`docs/BACKLOG.md`) |
+| `-layouts=false` | leaves out the row of layouts. By default, each diagram also shows its layouts, below a dashed line: the original, the original of a Mermaid diagram drawn by `mmdc` with `layout: dagre`, and zuzu with `zuzu.layered`, `zuzu.dagre` and `zuzu.elk`, each forced with `zuzu.WithLayout`. Each layout of a Mermaid diagram names its error of the places of the nodes against the original of its layout: `zuzu.dagre` against dagre, and the others against the default original, which is ELK in Mermaid 12.3 (D44, D45). The tool reads the places of an original with `cmd/mmdcref`, which adds the offset of each nested `<g class="root">`, the group that Mermaid draws for a cluster that dagre lays out on its own |
 
 The page has a tab for each front end, with the count of the sources, of
 the errors on each side and of the sources with report lines. Each row
@@ -254,7 +254,7 @@ The script differs from `mmdc` in three ways:
    diagrams with `layout: elk.mrtree`. The script then writes the error.
    `mmdc` fails the same way with that config.
 
-## Write the cases of the expressions, the formats and the schemes
+## Write the cases of the expressions, the formats, the schemes and the domains
 
 The tests of the packages `expr` and `format` compare zuzu with vega.js and
 d3 on cases that two scripts write. Run these in this folder after
@@ -272,12 +272,34 @@ The time zone is New York, so that the cases of local time cross a change
 of the clock. `oracle/exprs.mjs` reads the expressions from
 `expr/testdata/exprs.txt`.
 
+The test `TestFuncsOracle` in the package `zuzu` compares the functions of
+expressions that read the view, such as `gradient`, `copy`, `geoShape`,
+`treePath` and `vlSelectionTest`, with vega.js. `oracle/funcs-cases.mjs`
+writes the cases in `testdata/funcs/cases.json` in the root, with random
+shapes from a fixed seed. `oracle/funcs.mjs` reads them, and writes what
+vega.js returns in `testdata/funcs/oracle.json`. Run these in this folder:
+
+```bash
+node oracle/funcs-cases.mjs ../testdata/funcs/cases.json
+TZ=UTC node oracle/funcs.mjs ../testdata/funcs
+```
+
 The tests of the named schemes in the package `zuzu` compare each scheme of
 vega.js, and some scales with a scheme, with zuzu (D46). Run this in this
 folder to write their cases in `testdata/schemes.json`:
 
 ```bash
 node oracle/schemes.mjs ../testdata
+```
+
+A test of the package `zuzu` compares the domains that vega.js sorts from
+values of mixed types, such as strings and numbers, with zuzu. JavaScript
+compares a string and a number as two numbers, so the order depends on the
+sort of V8, which zuzu does in the same way. Run this in this folder to
+write the cases in `testdata/domains.json`:
+
+```bash
+node oracle/domains.mjs ../testdata
 ```
 
 ## Check the diagrams and the icons

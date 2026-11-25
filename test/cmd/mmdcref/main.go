@@ -104,7 +104,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	s := string(b)
+	s := flatten(string(b))
 	ref := Ref{Nodes: []Node{}, Edges: []Edge{}, Clusters: []Cluster{}}
 	ids := map[string]bool{}
 	if strings.Contains(s, `aria-roledescription="classDiagram"`) || strings.Contains(s, `aria-roledescription="er"`) {
