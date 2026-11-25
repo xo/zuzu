@@ -195,6 +195,39 @@ func TestNamedShapes(t *testing.T) {
 	}
 }
 
+func TestPersonAndBPMNShapes(t *testing.T) {
+	t.Parallel()
+	src := `flowchart LR
+  a@{ shape: person, label: "Customer" }
+  b@{ shape: bpmn-start, label: "Start" }
+  c@{ shape: bpmn-gateway, label: "Check" }
+  d@{ shape: bpmn-end, label: "End" }
+  e@{ shape: bpmn-data-store }
+  f@{ shape: bpmn-end }
+  style f stroke-width:1px`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("expected no issues, got %v", report)
+	}
+	var got []string
+	for _, n := range g.Nodes {
+		got = append(got, fmt.Sprintf("%s %s %s", n.ID, n.Shape, n.Style["strokeWidth"]))
+	}
+	// The ring of an end event is 3.4 wide, as in Mermaid, unless a
+	// style sets it.
+	want := `a person |b bpmn-start |c bpmn-gateway |d bpmn-end 3.4|e bpmn-data-store |f bpmn-end 1`
+	if s := strings.Join(got, "|"); s != want {
+		t.Errorf("got  %s\nwant %s", s, want)
+	}
+}
+
 func TestSmallCircles(t *testing.T) {
 	t.Parallel()
 	// f-circ, junction, sm-circ and start draw as circles of 14 pixels
@@ -835,5 +868,68 @@ func TestSubgraphColors(t *testing.T) {
 		if s := strings.Join(got, " "); s != test.want {
 			t.Errorf("the subgraphs take the colors %s, want %s", s, test.want)
 		}
+	}
+}
+
+// TestPropsAfterBrackets checks that a node of a flowchart reads its
+// properties after its brackets, as a["A"]@{ shape: cyl }, and properties
+// in @{ and } over more lines, one property on each, as Mermaid does.
+func TestPropsAfterBrackets(t *testing.T) {
+	t.Parallel()
+	src := "flowchart LR\n  a[\"Store A\"]@{ shape: cyl } --> b@{\n    shape: doc\n    label: \"Two\"\n  }\n  b --> c(\"C\")\n"
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, report, err := Graph(d, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the error %v and the report %v", err, report)
+	}
+	var got []string
+	for _, n := range g.Nodes {
+		got = append(got, fmt.Sprintf("%s %s %q", n.ID, n.Shape, n.Label))
+	}
+	if want := `a cyl "Store A"|b doc "Two"|c rounded "C"`; strings.Join(got, "|") != want {
+		t.Errorf("got  %s\nwant %s", strings.Join(got, "|"), want)
+	}
+	if len(g.Edges) != 2 {
+		t.Errorf("%d edges, want 2", len(g.Edges))
+	}
+}
+
+// TestNodeInInnermostSubgraph checks that a node lies in the first subgraph
+// to end that names it, as in Mermaid: the inner of two nested subgraphs
+// that both name it, and the first of two sibling subgraphs.
+func TestNodeInInnermostSubgraph(t *testing.T) {
+	t.Parallel()
+	src := `flowchart TB
+  subgraph outer
+    x --> y
+    subgraph inner
+      x
+    end
+  end
+  subgraph s1
+    z
+  end
+  subgraph s2
+    z --> w
+  end
+  v --> x`
+	d, err := Read(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, _, err := Graph(d, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, n := range g.Nodes {
+		got[n.ID] = n.Cluster
+	}
+	want := map[string]string{"x": "inner", "y": "outer", "z": "s1", "w": "s2", "v": ""}
+	if !maps.Equal(got, want) {
+		t.Errorf("the subgraphs %v, want %v", got, want)
 	}
 }

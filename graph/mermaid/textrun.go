@@ -41,6 +41,24 @@ func (l textLine) String() string {
 // weight above 600 (D16).
 const boldWeight = 600
 
+// keepSpaces returns a text with each space of a run of two spaces or
+// more turned into a space that does not break, so that the run keeps its
+// width in SVG and in the image, where a run of spaces collapses into one.
+// It is for a text that Mermaid draws with its spaces, in white-space pre
+// or with xml:space preserve.
+func keepSpaces(s string) string {
+	if !strings.Contains(s, "  ") {
+		return s
+	}
+	b := []rune(s)
+	for i, r := range b {
+		if r == ' ' && (i > 0 && (b[i-1] == ' ' || b[i-1] == '\u00a0') || i+1 < len(b) && b[i+1] == ' ') {
+			b[i] = '\u00a0'
+		}
+	}
+	return string(b)
+}
+
 // lineBreak matches the tag br of a label.
 var lineBreak = regexp.MustCompile(`(?i)<br\s*/?>`)
 

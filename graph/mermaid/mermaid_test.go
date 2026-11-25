@@ -3,6 +3,7 @@ package mermaid
 import (
 	"encoding/json/v2"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -271,6 +272,45 @@ func TestFrontMatterTitle(t *testing.T) {
 		}
 		if spec.Title.Text != test.exp {
 			t.Errorf("%q: expected the title %q, got %q", test.src, test.exp, spec.Title.Text)
+		}
+	}
+}
+
+func TestCommentsByKind(t *testing.T) {
+	t.Parallel()
+	// Each line after the keyword, as the reader keeps it. A kind of
+	// jison keeps a %% in the middle of a line as text where its text
+	// tokens run to the end of the line.
+	tests := []struct {
+		src  string
+		kind string
+		want []string
+	}{
+		{"sequenceDiagram%% c\n  participant A %% c\n  A->>B: 50%% off\n  %% a line", "sequenceDiagram",
+			[]string{"participant A %% c", "A->>B: 50%% off"}},
+		{"gantt\n  section S %% y\n  Task 50%% a : t1, 2024-01-01, 3d", "gantt",
+			[]string{"section S %% y", "Task 50%% a : t1, 2024-01-01, 3d"}},
+		{"journey\n  section S\n    Go 50%% x: 5: Me", "journey", []string{"section S", "Go 50%% x: 5: Me"}},
+		{"mindmap\n  root %% c", "mindmap", []string{"root %% c"}},
+		{"stateDiagram-v2\n  a --> bb %% c\n  a --> b : 50%% off", "stateDiagram-v2", []string{"a --> bb", "a --> b : 50%% off"}},
+		{"classDiagram\n  class A %% c\n  A : +int x %% y", "classDiagram", []string{"class A", "A : +int x %% y"}},
+		{"zenuml\n  A->B: 50%% off", "zenuml", []string{"A->B: 50%% off"}},
+		{"flowchart LR %% c\n  a --> b %% c\n  b[\"x %% y\"]", "flowchart", []string{"a --> b", `b["x %% y"]`}},
+	}
+	for _, tt := range tests {
+		d, err := Read(tt.src)
+		if err != nil {
+			t.Fatalf("%q: %v", tt.src, err)
+		}
+		if d.Kind != tt.kind {
+			t.Errorf("%q: the kind %q, want %q", tt.src, d.Kind, tt.kind)
+		}
+		var got []string
+		for _, l := range d.Lines {
+			got = append(got, l.Text)
+		}
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("%q:\ngot  %q\nwant %q", tt.src, got, tt.want)
 		}
 	}
 }

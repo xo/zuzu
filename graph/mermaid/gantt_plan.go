@@ -45,6 +45,9 @@ type gantt struct {
 	rightPadding  *float64
 	// width is the width of the time axis.
 	width float64
+	// namesLeft is how far left of the time axis the names of the
+	// sections start, or 0 for a gantt with no names of sections.
+	namesLeft float64
 
 	tasks []*ganttTask
 	byID  map[string]*ganttTask

@@ -112,12 +112,18 @@ func sankeyChart(c *chart) (map[string]any, bool, error) {
 	// label of a node in a layer before the layer of the largest node at
 	// its left, as Mermaid does.
 	labelStyle := []any{"zuzu.nodeLabel"}
+	const outlinedReach = 1e6
 	labels := map[string]any{"type": "zuzu.sankeylabels", "extent": []any{[]any{0, 0}, []any{width, height}}, "fontSize": 11, "fontWeight": "600"}
 	switch s, _ := cfg["labelStyle"].(string); s {
 	case "", "legacy":
 	case "outlined":
 		labelStyle = append(labelStyle, "zuzu.halo")
 		labels["side"] = "layer"
+		// Mermaid draws an outlined label past the edges of the chart, at
+		// the left of a node in the first layer, so the labels take an
+		// extent with no edge that a label reaches, and the image grows
+		// to hold them.
+		labels["extent"] = []any{[]any{-outlinedReach, 0}, []any{width + outlinedReach, height}}
 	default:
 		if err := c.add("the setting sankey.labelStyle %s", s); err != nil {
 			return nil, false, err

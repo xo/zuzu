@@ -522,9 +522,9 @@ func TestSequenceAccessibility(t *testing.T) {
 }
 
 // TestTextInItsBox checks that the lines of a note center on its box, and
-// that the title of a box of participants lies in the box. The baseline
-// middle centers the block of lines on the y of the text, and the baseline
-// bottom puts the last line at y, as in Vega, so a note or a title of
+// that the title of a box of participants lies in the box. The text draws
+// its first line on its baseline and the others below it, as in Vega, so
+// the layout gives a text the y of its first line, and a note or a title of
 // three lines does not draw its first line above its box.
 func TestTextInItsBox(t *testing.T) {
 	t.Parallel()
@@ -543,7 +543,8 @@ func TestTextInItsBox(t *testing.T) {
 		kind, _ := l.datum["kind"].(string)
 		b := boxes[kind]
 		mid := (seqNum(b.datum, "y") + seqNum(b.datum, "y2")) / 2
-		if y := seqNum(l.datum, "y"); math.Abs(y-mid) > 0.01 {
+		// The three lines of 14.3 center one line below the first.
+		if y := seqNum(l.datum, "y") + 14.3; math.Abs(y-mid) > 0.01 {
 			t.Errorf("%s: the text centers at %g, want the middle of the box, %g", kind, y, mid)
 		}
 	}
@@ -553,8 +554,9 @@ func TestTextInItsBox(t *testing.T) {
 	if len(box) != 1 || len(title) != 1 {
 		t.Fatalf("%d boxes and %d titles, want 1 and 1", len(box), len(title))
 	}
-	// The title is three lines of 14.3, at the size 11 of its font.
-	if top, y := seqNum(box[0].datum, "y"), seqNum(title[0].datum, "y"); y-3*14.3 < top {
-		t.Errorf("the title ends at %g, so its first line starts above the top of its box, %g", y, top)
+	// The title is three lines of 14.3, at the size 11 of its font, and its
+	// first line ends at its y.
+	if top, y := seqNum(box[0].datum, "y"), seqNum(title[0].datum, "y"); y-14.3 < top {
+		t.Errorf("the first line of the title ends at %g, so it starts above the top of its box, %g", y, top)
 	}
 }

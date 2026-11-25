@@ -185,8 +185,16 @@ func Read(src string) (*Diagram, error) {
 		}
 		if d.Kind == "" {
 			f := strings.Fields(t)
+			// A comment can follow the keyword with no space, as in
+			// sequenceDiagram%% a comment.
+			if c := strings.Index(f[0], "%%"); c > 0 {
+				f[0] = f[0][:c]
+			}
 			d.Kind = strings.TrimSuffix(f[0], ";")
 			d.Header = strings.TrimSpace(strings.TrimPrefix(t, f[0]))
+			if c := strings.Index(d.Header, "%%"); c >= 0 && !inQuotes(d.Header, c) {
+				d.Header = strings.TrimSpace(d.Header[:c])
+			}
 			// A git graph can start with gitGraph and a colon.
 			if d.Kind == "gitGraph:" {
 				d.Kind, d.Header = "gitGraph", strings.TrimSpace(":"+d.Header)
@@ -200,7 +208,7 @@ func Read(src string) (*Diagram, error) {
 			continue
 		}
 		// A comment runs to the end of the line.
-		if c := strings.Index(t, "%%"); c >= 0 && !inQuotes(t, c) {
+		if c := commentAt(d.Kind, t); c >= 0 {
 			t = strings.TrimSpace(t[:c])
 		}
 		indent := 0
@@ -326,6 +334,30 @@ func themeSection(kind string) string {
 	default:
 		return s
 	}
+}
+
+// commentAt returns where a comment starts in a line of a kind of
+// diagram, after its keyword, or -1 for none. A whole line of comment
+// drops before. In most kinds, a comment starts at a %% out of double
+// quotes. The lexer of a kind of jison cuts a comment only where a token
+// can start, so in a kind whose text tokens run to the end of the line, a
+// %% in the middle of a line is text: in a sequence diagram, a gantt, a
+// journey and a mindmap anywhere, and in a state diagram, a class diagram
+// and a ZenUML diagram after a colon, in the text of a label or a message.
+func commentAt(kind, t string) int {
+	c := strings.Index(t, "%%")
+	if c < 0 || inQuotes(t, c) {
+		return -1
+	}
+	switch kind {
+	case "sequenceDiagram", "gantt", "journey", "mindmap":
+		return -1
+	case "stateDiagram", "stateDiagram-v2", "classDiagram", "classDiagram-v2", "zenuml":
+		if strings.Contains(t[:c], ":") {
+			return -1
+		}
+	}
+	return c
 }
 
 // inQuotes reports whether a place of a line is inside double quotes.
@@ -755,7 +787,31 @@ func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 		return g, report, err
 	}
 	familyStyle(g, str(d.Config, "fontFamily"))
+	g.ELK = elkSettings(d)
 	return g, report, nil
+}
+
+// elkSettings returns the settings of the section elk of the config, by
+// their names, for the engine of ELK, or nil. A section that is not a map
+// gives nil. The section is a hint, as "hint" says, so the engine of ELK
+// names each setting that it does not read.
+func elkSettings(d *Diagram) map[string]string {
+	m, ok := d.Config["elk"].(map[string]any)
+	if !ok || len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		switch x := v.(type) {
+		case string:
+			out[k] = x
+		case float64:
+			out[k] = strconv.FormatFloat(x, 'f', -1, 64)
+		default:
+			out[k] = fmt.Sprint(x)
+		}
+	}
+	return out
 }
 
 // reportUnread reports each part of the front matter that zuzu does not

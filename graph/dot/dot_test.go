@@ -69,16 +69,29 @@ func TestHTMLLabel(t *testing.T) {
 	if c := g.Clusters[0]; c.Label != "Box" || c.HTML != "Box" {
 		t.Errorf("cluster: %q %q", c.Label, c.HTML)
 	}
-	// The href of a cell and the unknown color.
+	// The unknown color. The href of a cell draws, as a link of the cell.
 	var msgs []string
 	for _, is := range report {
 		msgs = append(msgs, is.Message)
 	}
-	if len(report) != 2 {
-		t.Errorf("expected 2 issues, got %q", msgs)
+	if len(report) != 1 {
+		t.Errorf("expected 1 issue, got %q", msgs)
 	}
 	if _, _, err := Parse(src, true); err == nil {
 		t.Error("expected an error in the strict mode")
+	}
+}
+
+func TestHTMLLinks(t *testing.T) {
+	t.Parallel()
+	// A link of a table or a cell is no issue, and one with a scheme that
+	// zuzu does not write is.
+	_, report, err := Parse(`digraph { a [shape=none, label=<<table href="https://t" tooltip="tt"><tr><td title="c">x</td><td href="javascript:alert(1)">y</td></tr></table>>] }`, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 1 || !strings.Contains(report[0].Message, "javascript:alert(1)") {
+		t.Errorf("expected the link of javascript as one issue, got %v", report)
 	}
 }
 
@@ -208,5 +221,21 @@ func TestPolygon(t *testing.T) {
 	}
 	if len(msgs) != 2 || msgs[0] != "the sides x" || msgs[1] != "the attribute orientation of a node of the shape box" {
 		t.Errorf("got the issues %q", msgs)
+	}
+}
+
+// TestRankdirUnknown checks that a rankdir that Graphviz does not have is an
+// issue, and draws TB.
+func TestRankdirUnknown(t *testing.T) {
+	t.Parallel()
+	g, report, err := Parse("digraph { rankdir=XY; a -> b }", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Direction != "TB" || len(report) != 1 {
+		t.Errorf("the direction %s and the report %v, want TB and one issue", g.Direction, report)
+	}
+	if _, _, err := Parse("digraph { rankdir=XY; a -> b }", true); err == nil {
+		t.Error("expected an error in the strict mode")
 	}
 }

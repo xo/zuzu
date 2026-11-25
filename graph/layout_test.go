@@ -195,6 +195,48 @@ func TestLayClusterDirection(t *testing.T) {
 	}
 }
 
+func TestLayNestedClusterDirection(t *testing.T) {
+	t.Parallel()
+	// In a graph LR, the cluster outer lays out TB, and the cluster inner
+	// in it, with no direction, lays out LR, as ELK lays out a subgraph of
+	// Mermaid with no direction.
+	in := LayoutInput{
+		Direction: LR,
+		Nodes: []LayoutNode{
+			{ID: "x", Cluster: "outer", Width: 20, Height: 20},
+			{ID: "a", Cluster: "inner", Width: 20, Height: 20}, {ID: "b", Cluster: "inner", Width: 20, Height: 20},
+		},
+		Edges: []LayoutEdge{{Source: "a", Target: "b"}, {Source: "x", Target: "inner"}},
+		Clusters: []LayoutCluster{
+			{ID: "outer", Direction: TB, TitleWidth: 10, TitleHeight: 12},
+			{ID: "inner", Parent: "outer", TitleWidth: 10, TitleHeight: 12},
+		},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkRules(t, "nested", in, l)
+	x, a, b := l.Nodes[0], l.Nodes[1], l.Nodes[2]
+	if a.Y != b.Y || a.X >= b.X {
+		t.Errorf("expected a left of b, got %v and %v", a, b)
+	}
+	if x.Y >= l.Clusters[1].Y {
+		t.Errorf("expected x above inner, got %v and %v", x, l.Clusters[1])
+	}
+	// An edge from x to a, inside outer, crosses the box of inner, so
+	// outer and inner lay out with the graph, LR.
+	in.Edges[1].Target = "a"
+	if l, err = Lay(in); err != nil {
+		t.Fatal(err)
+	}
+	checkRules(t, "crossed", in, l)
+	x, a, b = l.Nodes[0], l.Nodes[1], l.Nodes[2]
+	if x.X >= a.X || a.X >= b.X {
+		t.Errorf("expected x, a and b from the left to the right, got %v, %v and %v", x, a, b)
+	}
+}
+
 func TestLayRanks(t *testing.T) {
 	t.Parallel()
 	in := LayoutInput{
@@ -325,6 +367,48 @@ func TestLayZeroWeight(t *testing.T) {
 	// When every edge into c weighs 0, c has no median, and the layout
 	// still places it.
 	lay(new(0.0), new(0.0))
+}
+
+// TestLayBalance checks the balance of the ranks of dot: a node whose edges
+// in and out weigh the same moves to the rank with the fewest nodes that
+// its edges allow, in a graph with no cluster.
+func TestLayBalance(t *testing.T) {
+	t.Parallel()
+	in := LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 20, Height: 20}, {ID: "b", Width: 20, Height: 20}, {ID: "c", Width: 20, Height: 20}, {ID: "x", Width: 20, Height: 20}},
+		Edges: []LayoutEdge{{Source: "a", Target: "b"}, {Source: "b", Target: "c"}, {Source: "x", Target: "c", Weight: new(0.0)}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := []int{l.Nodes[0].Rank, l.Nodes[1].Rank, l.Nodes[2].Rank, l.Nodes[3].Rank}; !slices.Equal(got, []int{0, 1, 2, 0}) {
+		t.Errorf("expected the ranks 0, 1, 2 and 0, as in dot, got %v", got)
+	}
+	checkRules(t, TB, in, l)
+	// A node with a heavier edge out stays where network simplex puts it.
+	in.Edges[2].Weight = nil
+	if l, err = Lay(in); err != nil {
+		t.Fatal(err)
+	}
+	if r := l.Nodes[3].Rank; r != 1 {
+		t.Errorf("expected x in the rank 1, got %d", r)
+	}
+	// dot does not balance a graph with a cluster.
+	in.Edges[2].Weight = new(0.0)
+	in.Nodes[0].Cluster = "k"
+	in.Clusters = []LayoutCluster{{ID: "k"}}
+	if l, err = Lay(in); err != nil {
+		t.Fatal(err)
+	}
+	if r := l.Nodes[3].Rank; r != 1 {
+		t.Errorf("expected x in the rank 1 in a graph with a cluster, got %d", r)
+	}
+	// The balance keeps the minlen of each edge.
+	ranks := rankNodes(3, []redge{{u: 0, v: 1, minlen: 2, weight: 1}, {u: 2, v: 1, minlen: 1, weight: 0}}, true)
+	if !slices.Equal(ranks, []int{0, 2, 0}) {
+		t.Errorf("expected the ranks 0, 2 and 0, got %v", ranks)
+	}
 }
 
 func TestLayLoopSide(t *testing.T) {
@@ -634,5 +718,52 @@ func TestLayStepEdges(t *testing.T) {
 				t.Errorf("%s: the edge to %s ends %v off the middle at the angle %v, want 0 off at %v", dir, in.Nodes[k+1].ID, at, e.EndAngle, want)
 			}
 		}
+	}
+}
+
+// TestLayClusterTitleRoom checks that the box of a cluster holds its title
+// and its padding in each direction, and that in LR the title of a
+// cluster, which lies outside its left border across the ranks, does not
+// cover the cluster or the node before it.
+func TestLayClusterTitleRoom(t *testing.T) {
+	t.Parallel()
+	const titleW, pad = 300.0, 12.0
+	for _, dir := range []string{TB, BT, LR, RL} {
+		in := LayoutInput{
+			Direction: dir,
+			Nodes:     []LayoutNode{{ID: "b", Width: 40, Height: 20}, {ID: "a", Cluster: "c", Width: 40, Height: 20}},
+			Edges:     []LayoutEdge{{Source: "b", Target: "a"}},
+			Clusters:  []LayoutCluster{{ID: "c", TitleWidth: titleW, TitleHeight: 14}},
+		}
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkRules(t, dir, in, l)
+		if c := l.Clusters[0]; c.Width < titleW+2*pad-0.01 {
+			t.Errorf("%s: the box is %g wide, want at least %g for the title", dir, c.Width, titleW+2*pad)
+		}
+	}
+	// Two clusters side by side in LR, and a node beside a nested cluster,
+	// keep a gap.
+	in := LayoutInput{
+		Direction: LR,
+		Nodes: []LayoutNode{
+			{ID: "a", Cluster: "one", Width: 40, Height: 20}, {ID: "b", Cluster: "one", Width: 40, Height: 20},
+			{ID: "c", Cluster: "two", Width: 40, Height: 20}, {ID: "d", Cluster: "two", Width: 40, Height: 20},
+		},
+		Edges:    []LayoutEdge{{Source: "a", Target: "b"}, {Source: "c", Target: "d"}},
+		Clusters: []LayoutCluster{{ID: "one", TitleWidth: 20, TitleHeight: 14}, {ID: "two", TitleWidth: 20, TitleHeight: 14}},
+	}
+	l, err := Lay(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, two := l.Clusters[0], l.Clusters[1]
+	if one.Y > two.Y {
+		one, two = two, one
+	}
+	if one.Y+one.Height > two.Y {
+		t.Errorf("the boxes overlap: %v and %v", one, two)
 	}
 }

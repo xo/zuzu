@@ -148,8 +148,6 @@ func TestXYIssues(t *testing.T) {
 		// zuzu puts the labels 8 from the plot and the title of an axis at
 		// its end.
 		{"---\nconfig:\n  xyChart:\n    plotReservedSpacePercent: 60\n---\nxychart\nbar [1]", "xyChart.plotReservedSpacePercent"},
-		{"---\nconfig:\n  xyChart:\n    yAxis:\n      labelPadding: 10\n---\nxychart\nbar [1]", "xyChart.yAxis.labelPadding"},
-		{"---\nconfig:\n  xyChart:\n    yAxis:\n      titlePadding: 10\n---\nxychart\nbar [1]", "xyChart.yAxis.titlePadding"},
 	}
 	for _, test := range tests {
 		report, err := compileMermaid(t, test.src, false)
@@ -226,6 +224,29 @@ func TestXYAxes(t *testing.T) {
 	}
 	if ticks != 2 {
 		t.Errorf("%d ticks 2 wide draw, not the 2 of the categories", ticks)
+	}
+	// labelPadding and titlePadding of an axis move its labels and its
+	// title away from it.
+	place := func(pad string) (float64, float64) {
+		src := "---\nconfig:\n  xyChart:\n    xAxis:\n" + pad + "---\nxychart\nx-axis \"Cats\" [a, b]\nbar [1, 2]"
+		if report, err := compileMermaid(t, src, true); err != nil || len(report) != 0 {
+			t.Errorf("%q: the report %v and the error %v", src, report, err)
+		}
+		var label, title float64
+		for _, it := range renderMermaid(t, src) {
+			switch {
+			case it.mark == scene.Text && it.text == "a":
+				label = it.item.Y
+			case it.mark == scene.Text && it.text == "Cats":
+				title = it.item.Y
+			}
+		}
+		return label, title
+	}
+	l0, t0 := place("      showTick: true\n")
+	l1, t1 := place("      labelPadding: 20\n      titlePadding: 30\n")
+	if l1 <= l0 || t1-l1 <= t0-l0 {
+		t.Errorf("with the paddings the label is at %v and the title at %v, and without at %v and %v", l1, t1, l0, t0)
 	}
 	// A rotation outside -90 to 90 degrees is 0, as in Mermaid.
 	items = renderMermaid(t, "---\nconfig:\n  xyChart:\n    xAxis:\n      labelRotation: 120\n---\nxychart\nx-axis [a, b]\nbar [1, 2]")

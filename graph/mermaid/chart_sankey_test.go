@@ -236,6 +236,42 @@ func TestSankeyLabelsApart(t *testing.T) {
 	}
 }
 
+// TestSankeyOutlinedPastEdge checks that an outlined label of a node in
+// the first layer draws at the left of its node, past the left edge of the
+// chart, and a label of the last layer at the right of its node, past the
+// right edge, as Mermaid draws them.
+func TestSankeyOutlinedPastEdge(t *testing.T) {
+	t.Parallel()
+	src := "---\nconfig:\n  sankey:\n    labelStyle: outlined\n---\nsankey\nAlpha source,Bravo,10\nCharlie source,Bravo,30\nBravo,Delta,25\nBravo,Echo,15\n"
+	items, _, err := drawDiagram(t, src, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, it := range items {
+		if it.mark != scene.Text {
+			continue
+		}
+		x0, _ := it.datum["x0"].(float64)
+		x1, _ := it.datum["x1"].(float64)
+		switch it.datum["key"] {
+		case "Alpha source", "Charlie source":
+			seen++
+			if it.item.Align != "right" || it.item.X != x0-6 || strings.HasSuffix(it.text, "…") {
+				t.Errorf("the label %q is at %v, %s, and its node at %v", it.text, it.item.X, it.item.Align, x0)
+			}
+		case "Delta", "Echo":
+			seen++
+			if it.item.Align != "left" || it.item.X != x1+6 {
+				t.Errorf("the label %q is at %v, %s, and its node at %v", it.text, it.item.X, it.item.Align, x1)
+			}
+		}
+	}
+	if seen != 4 {
+		t.Errorf("expected 4 labels, got %d", seen)
+	}
+}
+
 func TestSankeyGradient(t *testing.T) {
 	t.Parallel()
 	items, _ := drawFixture(t, "testdata/sankey/07-gradient.mmd")

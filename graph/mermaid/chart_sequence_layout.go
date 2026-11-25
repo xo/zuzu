@@ -508,7 +508,10 @@ func (l *seqLayout) plainRow(set, kind string, lines []string, f text.Font, x, y
 	case "right":
 		x0 = x - w
 	}
-	row := map[string]any{"kind": kind, "x": x, "y": y, "lines": lineRows(lines), "align": align, "baseline": baseline, "text": strings.Join(lines, " ")}
+	// The layout places the lines as a block at y, and the text draws its
+	// first line on its baseline, so the row takes the y of that line.
+	fy := graph.FirstLine(y, len(lines), lh(f), baseline)
+	row := map[string]any{"kind": kind, "x": x, "y": fy, "lines": lineRows(lines), "align": align, "baseline": baseline, "text": strings.Join(lines, " ")}
 	l.add(set, row, x0, x0+w, y+h)
 }
 
@@ -810,13 +813,20 @@ func (l *seqLayout) message(k int, e seqEvent, y float64, start, end []float64) 
 	if len(lines) == 0 {
 		lineY = y + l.gap() + 4
 	}
+	// Mermaid sets a message with math with its formula on the line, and
+	// keeps no line of text above it, as it keeps for a message of text.
+	above := 5.0
+	if l.hasMath(f, lines) {
+		above = mathAbove
+		lineY = y + math.Max(l.gap()+4-lh(f), 4) + th + above
+	}
 	created := l.ps[j].created == k
 	destroyFrom, destroyTo := l.ps[i].destroyed == k, l.ps[j].destroyed == k
 	if created || destroyFrom || destroyTo {
 		lineY = math.Max(lineY, y+8+l.hh/2)
 	}
 	if i == j {
-		return l.self(e, lines, lineY)
+		return l.self(e, lines, lineY, above)
 	}
 	if e.activate {
 		l.activate(e.to, lineY)
@@ -867,7 +877,7 @@ func (l *seqLayout) message(k int, e seqEvent, y float64, start, end []float64) 
 	case "right":
 		lx, align = math.Max(fx, tx)-12, "right"
 	}
-	l.textRow("messageLabels", "message", lines, f, lx, lineY-5, align, "bottom")
+	l.textRow("messageLabels", "message", lines, f, lx, lineY-above, align, "bottom")
 	if e.deactivate {
 		l.deactivate(e.from, lineY)
 	}
@@ -894,8 +904,9 @@ func (l *seqLayout) message(k int, e seqEvent, y float64, start, end []float64) 
 }
 
 // self draws a message from a participant to itself: a loop at the right
-// of its lifeline. It returns the y below it.
-func (l *seqLayout) self(e seqEvent, lines []string, lineY float64) float64 {
+// of its lifeline, with the bottom of its label above the space above. It
+// returns the y below it.
+func (l *seqLayout) self(e seqEvent, lines []string, lineY, above float64) float64 {
 	cx := l.cx[l.idx[e.from]]
 	sx := l.attach(e.from, cx+1)
 	if e.activate {
@@ -935,11 +946,20 @@ func (l *seqLayout) self(e seqEvent, lines []string, lineY float64) float64 {
 	if l.numbers {
 		lx += 10
 	}
-	l.textRow("messageLabels", "message", lines, l.cfg.messageFont, lx, lineY-5, "left", "bottom")
+	l.textRow("messageLabels", "message", lines, l.cfg.messageFont, lx, lineY-above, "left", "bottom")
 	if e.deactivate {
 		l.deactivate(e.from, endY)
 	}
 	return endY
+}
+
+// mathAbove is the space between the line of a message and the bottom of
+// its label of math, which Mermaid sets on the line.
+const mathAbove = 2.0
+
+// hasMath reports whether a line of a label holds math.
+func (l *seqLayout) hasMath(f text.Font, lines []string) bool {
+	return slices.ContainsFunc(lines, func(s string) bool { return l.mathLine(f, s) != nil })
 }
 
 // headLength is the length of an arrowhead, and headWidth half its width,
@@ -1062,6 +1082,26 @@ func (l *seqLayout) comment(e seqEvent, y float64) float64 {
 	}
 	f := l.cfg.noteFont
 	top := y + l.gap()*0.6
+	if e.commentRuns != nil {
+		// The Markdown of the comment draws each run in its font, at its
+		// offset in its line.
+		lines := wrapRuns(e.commentRuns, f.Size, f.Weight, 0, l.m)
+		for i, line := range lines {
+			ly := top + float64(i)*lh(f)
+			for _, r := range line.runs {
+				style := "normal"
+				if r.italic || f.Italic {
+					style = "italic"
+				}
+				l.add("commentRuns", map[string]any{
+					"kind": "comment", "x": x + 4 + r.x, "y": ly, "lines": lineRows([]string{r.text}),
+					"align": "left", "baseline": "top", "text": r.text,
+					"fontWeight": textFont(f.Size, f.Weight, r).Weight, "fontStyle": style,
+				}, x+4+r.x, x+4+r.x+r.w, ly+lh(f))
+			}
+		}
+		return top + float64(len(lines))*lh(f) + 4 - l.gap()
+	}
 	l.textRow("comments", "comment", e.comment, f, x+4, top, "left", "top")
 	_, h := l.size(f, e.comment)
 	return top + h + 4 - l.gap()
@@ -1264,6 +1304,11 @@ func (l *seqLayout) spec() map[string]any {
 	texts("messageLabels", graph.StyleNodeLabel, l.cfg.messageFont)
 	texts("noteLabels", graph.StyleNodeLabel, l.cfg.noteFont)
 	texts("comments", graph.StyleEdgeLabel, l.cfg.noteFont)
+	mark("commentRuns", "text", "commentRuns", graph.StyleEdgeLabel, map[string]any{
+		"x": field("x"), "y": field("y"), "text": field("lines"), "align": field("align"), "baseline": field("baseline"),
+		"fontSize": value(l.cfg.noteFont.Size), "fontWeight": field("fontWeight"), "fontStyle": field("fontStyle"),
+		"lineHeight": value(lh(l.cfg.noteFont)),
+	})
 	texts("numberLabels", graph.StyleEdgeLabel, numberFont)
 	texts("actorLabels", graph.StyleNodeLabel, l.cfg.actorFont)
 	// Each participant takes the color of the hash of its id (D56).

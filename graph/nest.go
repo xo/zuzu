@@ -8,9 +8,13 @@ import (
 
 // Lay lays out a graph in ranks (D31). A cluster with a direction of its
 // own, or a cluster that an edge names, lays out on its own when no edge
-// links a node inside it to a node outside it, as in Mermaid. Its layout
-// then takes the place of one node, of its size, in the layout that holds
-// it. An edge to any other cluster ends at the box of the cluster: the
+// links a node inside it to a node outside it, as in Mermaid. So does a
+// cluster with no direction inside a cluster with a direction of its own,
+// in the direction LR, as ELK lays out such a subgraph of Mermaid. A
+// cluster that holds an edge between a node in it and a node in a cluster
+// inside it lays out with the layout that holds it, as in Mermaid with
+// ELK. The layout of a cluster on its own then takes the place of one
+// node, of its size, in the layout that holds it. An edge to any other cluster ends at the box of the cluster: the
 // layout takes it to the first node of the cluster, and the route stops at
 // the box. A layout in lanes lays out as LayoutInput.Lanes says.
 func Lay(in LayoutInput) (*Layout, error) {
@@ -184,13 +188,42 @@ func newNest(in *LayoutInput) (*nest, error) {
 		}
 		return within(n.parent[-1-e], c)
 	}
+	// crossed says whether a cluster is the innermost cluster that holds
+	// both ends of an edge whose ends lie in different clusters. As in
+	// Mermaid with ELK, such a cluster lays out with the layout that holds
+	// it, together with the clusters inside it.
+	crossed := make([]bool, nc)
+	for _, e := range in.Edges {
+		a, b := end(e.Source), end(e.Target)
+		if n.parentOf(a, ncl) == n.parentOf(b, ncl) {
+			continue
+		}
+		if c := n.common(n.chainOf(a, ncl), n.chainOf(b, ncl)); c >= 0 {
+			crossed[c] = true
+		}
+	}
+	// The clusters go from the outer to the inner, so that a cluster finds
+	// the cluster that holds it.
+	order := make([]int, nc)
+	for c := range nc {
+		order[c] = c
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return n.depth[a] - n.depth[b] })
 	n.ends = make([][2]int, len(in.Edges))
 	n.clip = make([][2]int, len(in.Edges))
 	external := make([]bool, nc)
 	n.boxed = make([]bool, nc)
+	// own says whether a boxed cluster lays out in a direction of its
+	// own: its direction, or LR for a cluster with no direction inside
+	// such a cluster, as ELK lays out a subgraph that Mermaid gives no
+	// direction. A cluster that is boxed only because an edge names it
+	// takes the direction of the layout that holds it.
+	own := make([]bool, nc)
 	for {
-		for c := range nc {
-			n.boxed[c] = !external[c] && anchor[c] >= 0 && (in.Clusters[c].Direction != "" || named[c])
+		for _, c := range order {
+			p := n.parent[c]
+			own[c] = in.Clusters[c].Direction != "" || p >= 0 && n.boxed[p] && own[p]
+			n.boxed[c] = !external[c] && !crossed[c] && anchor[c] >= 0 && (own[c] || named[c])
 		}
 		for i, e := range in.Edges {
 			for k, id := range []string{e.Source, e.Target} {
@@ -230,22 +263,54 @@ func newNest(in *LayoutInput) (*nest, error) {
 		n.cscope[c] = boxedAt(n.parent[c])
 	}
 	n.dir = make([]string, nc)
-	// The clusters go from the outer to the inner, so that a cluster finds
-	// the direction of the one that holds it.
-	order := make([]int, nc)
-	for c := range nc {
-		order[c] = c
-	}
-	slices.SortStableFunc(order, func(a, b int) int { return n.depth[a] - n.depth[b] })
 	for _, c := range order {
 		if n.boxed[c] {
 			n.dir[c] = in.Clusters[c].Direction
-			if n.dir[c] == "" {
+			switch {
+			case n.dir[c] != "":
+			case own[c]:
+				n.dir[c] = LR
+			default:
 				n.dir[c] = n.dirOf(n.cscope[c])
 			}
 		}
 	}
 	return n, nil
+}
+
+// parentOf returns the cluster that holds an end of an edge, a node i or
+// a cluster -1-c, or -1 for none.
+func (n *nest) parentOf(x int, ncl []int) int {
+	if x >= 0 {
+		return ncl[x]
+	}
+	return n.parent[-1-x]
+}
+
+// chainOf returns the clusters from an end of an edge out to the top: the
+// cluster that holds a node, or a cluster itself, and each cluster that
+// holds it.
+func (n *nest) chainOf(x int, ncl []int) []int {
+	c := -1 - x
+	if x >= 0 {
+		c = ncl[x]
+	}
+	var chain []int
+	for ; c >= 0; c = n.parent[c] {
+		chain = append(chain, c)
+	}
+	return chain
+}
+
+// common returns the first cluster of a chain that the other chain holds
+// too, or -1 for none.
+func (n *nest) common(a, b []int) int {
+	for _, c := range a {
+		if slices.Contains(b, c) {
+			return c
+		}
+	}
+	return -1
 }
 
 // dirOf returns the direction of a boxed cluster, or of the graph for -1.
@@ -422,8 +487,20 @@ func (n *nest) lay() (*Layout, error) {
 		Nodes: make([]NodePlace, len(in.Nodes)), Edges: make([]EdgePlace, len(in.Edges)), Clusters: make([]ClusterPlace, len(in.Clusters)),
 	}
 	n.place(root, 0, 0, out)
+	var cut []bool
 	for i := range in.Edges {
-		n.clipEdge(i, out)
+		if n.clipEdge(i, out) {
+			if cut == nil {
+				cut = make([]bool, len(in.Edges))
+			}
+			cut[i] = true
+		}
+	}
+	if cut != nil {
+		// The labels at the ends of a route that the box of a cluster cut
+		// go to new places, which keep off the nodes and the labels of the
+		// whole layout.
+		placeEndLabels(in, out, cut)
 	}
 	return out, nil
 }
@@ -482,11 +559,12 @@ func (n *nest) path(i int, pts [][2]float64) string {
 }
 
 // clipEdge stops the route of an edge at the box of the cluster at each of
-// its ends that names a cluster that is not boxed.
-func (n *nest) clipEdge(i int, out *Layout) {
+// its ends that names a cluster that is not boxed. It reports whether it
+// cut the route.
+func (n *nest) clipEdge(i int, out *Layout) bool {
 	ep := &out.Edges[i]
 	if len(ep.Points) < 2 || n.ends[i][0] == n.ends[i][1] {
-		return
+		return false
 	}
 	changed := false
 	if c := n.clip[i][1]; c >= 0 {
@@ -503,7 +581,7 @@ func (n *nest) clipEdge(i int, out *Layout) {
 		}
 	}
 	if !changed {
-		return
+		return false
 	}
 	pts := ep.Points
 	last := len(pts) - 1
@@ -512,7 +590,7 @@ func (n *nest) clipEdge(i int, out *Layout) {
 	ep.StartX, ep.StartY = pts[0][0], pts[0][1]
 	ep.StartAngle = math.Atan2(pts[0][1]-pts[1][1], pts[0][0]-pts[1][0]) * 180 / math.Pi
 	ep.Path = n.path(i, pts)
-	placeEnds(n.in.Edges[i], ep)
+	return true
 }
 
 // cutAtBox cuts a route where it first enters a box, and returns false

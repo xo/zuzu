@@ -211,8 +211,13 @@ func (l *tlLayout) rect(kind, id, key string, b tlBox, x, y, w, h float64) {
 	l.rows[kind+"s"] = append(l.rows[kind+"s"], map[string]any{
 		"id": id, "key": key, "x": x, "y": y, "x2": x + w, "y2": y + h,
 	})
+	f := tlBoldFont
+	if kind == "event" {
+		f = tlFont
+	}
 	l.rows[kind+"Labels"] = append(l.rows[kind+"Labels"], map[string]any{
-		"id": id, "key": key, "x": x + w/2, "y": y + h/2, "lines": anyStrings(b.lines),
+		"id": id, "key": key, "x": x + w/2, "y": graph.FirstLine(y+h/2, len(b.lines), lh(f), "middle"),
+		"lines": anyStrings(b.lines),
 	})
 }
 

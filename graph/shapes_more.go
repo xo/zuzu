@@ -199,10 +199,16 @@ const (
 // the side of internal storage, the tab of a folder and the bar of a
 // browser, on the front sheet of a stack of processes, below the top of a
 // cylinder, a disk and a bucket, and left of the end of a cylinder on its
-// side. A label goes up by half the band of a collapsed subgraph. Every
-// other shape keeps its label in the middle.
+// side. A label goes up by half the band of a collapsed subgraph, down to
+// the middle of the body of a person, and under the figure of a shape of
+// BPMN. Every other shape keeps its label in the middle.
 func TextOffset(kind string, w, h float64) (float64, float64) {
+	if _, fh, ok := figureSize(kind); ok {
+		return 0, figureTextOffset(fh, h)
+	}
 	switch kind {
+	case person:
+		return 0, personTextOffset(w, h)
 	case collapsedGroup:
 		return 0, -collapsedRow / 2
 	case "cylinder", DOTCylinder:

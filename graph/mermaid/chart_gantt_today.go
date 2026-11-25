@@ -22,20 +22,37 @@ func ganttToday(now time.Time) time.Time {
 	return time.Date(y, mo, d, h, mi, s, now.Nanosecond(), time.UTC)
 }
 
+// ganttMargin is the margin of Mermaid at each side of the time axis of a
+// gantt, 75 pixels, in the pixels of zuzu.
+const ganttMargin = 75.0 * wrapSize / 14
+
 // todayLayer returns the layer of the marker of today, or nil when the gantt
 // draws none: a rule across the chart at the time of the render, as Mermaid
 // draws it (D38). The time axis runs from lo to hi. Outside the axis,
-// Mermaid draws the marker in the margin or past the edge of the image.
-// zuzu draws no marker there, so that the marker does not stretch the
-// axis. The rule draws in the width of an edge of a diagram, edgeWidth of
-// docs/STYLE.md, and in the color of a fall of the scheme, as Mermaid
-// draws it red. The style of todayMarker goes over it.
+// Mermaid draws the marker in its margin of 75 pixels at each side of the
+// axis, or past the edge of the image, where it does not show. zuzu draws
+// the marker in the margin too, at its place in pixels, so that it does
+// not stretch the axis, and draws no marker past the margin. The rule
+// draws in the width of an edge of a diagram, edgeWidth of docs/STYLE.md,
+// and in the color of a fall of the scheme, as Mermaid draws it red. The
+// style of todayMarker goes over it.
 func (g *gantt) todayLayer(lo, hi time.Time, x map[string]any) (map[string]any, error) {
 	if g.c.d.Now.IsZero() || g.todayMarker == "off" {
 		return nil, nil
 	}
 	if g.today.Before(lo) || g.today.After(hi) {
-		return nil, nil
+		span := ganttMillis(lo, hi)
+		if span <= 0 {
+			return nil, nil
+		}
+		px := g.width * ganttMillis(lo, g.today) / span
+		if g.backward() {
+			px = g.width - px
+		}
+		if px < -ganttMargin || px > g.width+ganttMargin {
+			return nil, nil
+		}
+		x = map[string]any{"value": px}
 	}
 	mark := map[string]any{"type": "rule", "style": graph.StyleEdge}
 	if err := g.todayStyle(mark); err != nil {

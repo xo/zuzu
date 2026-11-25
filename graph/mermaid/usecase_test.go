@@ -425,19 +425,20 @@ func TestUsecaseRotate(t *testing.T) {
 			}
 		}
 	}
-	// role, the default, draws as before: no element takes a color.
-	for _, src := range []string{
-		"---\nconfig:\n  usecase:\n    colorScheme: role\n---\n" + body,
-		body,
+	// With role, the default, in a color theme, only the system
+	// boundaries take the colors of their hash, as with rotate. In any
+	// other theme, no element takes a color.
+	for src, want := range map[string]string{
+		"---\nconfig:\n  usecase:\n    colorScheme: role\n---\n" + body: "B=0 A=0 U2=0 U1=0 U3=0 U4=0 note-0=0 J=0 S2=5 S1=2",
+		body: "B=0 A=0 U2=0 U1=0 U3=0 U4=0 note-0=0 J=0 S2=5 S1=2",
+		"---\nconfig:\n  theme: default\n---\n" + body: "B=0 A=0 U2=0 U1=0 U3=0 U4=0 note-0=0 J=0 S2=0 S1=0",
 	} {
 		g, report := stateOf(t, src)
 		if len(report) != 0 {
 			t.Errorf("expected no issue, got %v", report)
 		}
-		for _, c := range ucCategories(g) {
-			if !strings.HasSuffix(c, "=0") {
-				t.Errorf("%q: expected no color, got %s", src, c)
-			}
+		if got := strings.Join(ucCategories(g), " "); got != want {
+			t.Errorf("%q:\ngot  %s\nwant %s", src, got, want)
 		}
 	}
 }

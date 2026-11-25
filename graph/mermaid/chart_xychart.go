@@ -112,7 +112,9 @@ func xyChart(c *chart) (map[string]any, bool, error) {
 		"xyChart.yAxis.labelFontSize", "xyChart.yAxis.titleFontSize",
 		"themeVariables.xyChart.plotColorPalette",
 		"xyChart.xAxis.axisLineWidth", "xyChart.xAxis.tickLength", "xyChart.xAxis.tickWidth",
-		"xyChart.yAxis.axisLineWidth", "xyChart.yAxis.tickLength", "xyChart.yAxis.tickWidth"}
+		"xyChart.yAxis.axisLineWidth", "xyChart.yAxis.tickLength", "xyChart.yAxis.tickWidth",
+		"xyChart.xAxis.labelPadding", "xyChart.xAxis.titlePadding",
+		"xyChart.yAxis.labelPadding", "xyChart.yAxis.titlePadding"}
 	// The x axis is at the bottom of a vertical chart, and the y axis at
 	// the bottom of a horizontal one.
 	var xRead, yRead []string
@@ -301,7 +303,7 @@ func (c *chart) xySpec(title string, horizontal bool, xa, ya *xyAxis, plots []*x
 		ac := map[string]any{}
 		for from, to := range map[string]string{
 			"labelFontSize": "labelFontSize", "titleFontSize": "titleFontSize", "axisLineWidth": "domainWidth",
-			"tickLength": "tickSize", "tickWidth": "tickWidth",
+			"tickLength": "tickSize", "tickWidth": "tickWidth", "labelPadding": "labelPadding", "titlePadding": "titlePadding",
 		} {
 			if v, ok := configNumber(cfg, "xyChart", a.name, from); ok {
 				ac[to] = v

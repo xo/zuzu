@@ -8,12 +8,14 @@ import (
 
 // textMiddle returns how far the middle of the first line of a text of n
 // lines, of a size and a line height, is from the y of the text, for a
-// baseline of Vega, as the writers place it: the middle of a line is
-// where a line with the baseline middle has its y.
+// baseline of Vega, as the layout places a block of lines at y: its first
+// line for the baseline top, its middle for middle, and its last line for
+// any other baseline. The middle of a line is where a line with the
+// baseline middle has its y.
 func textMiddle(baseline string, n int, size, lineH float64) float64 {
 	// The offsets of the baselines from the alphabetic baseline, as
-	// fractions of the size, and how far up the first line of more lines
-	// moves, in lines, as internal/shape has them.
+	// fractions of the size, as the writers have them, and how far up the
+	// first line of the block is, in lines.
 	off, up := -0.21, 1.0
 	switch baseline {
 	case "top":

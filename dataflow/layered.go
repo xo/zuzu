@@ -132,6 +132,21 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The order of the nodes and the clusters, and the settings of the
+	// section elk of the config of Mermaid, for the engine of ELK.
+	order, err := p.strings("order")
+	if err != nil {
+		return nil, err
+	}
+	var settings map[string]string
+	if v, ok, err := p.raw("elk"); err != nil {
+		return nil, err
+	} else if m, isMap := v.(map[string]any); ok && isMap {
+		settings = make(map[string]string, len(m))
+		for k, s := range m {
+			settings[k] = expr.String(s)
+		}
+	}
 	as, err := p.as("x", "y", "width", "height", "rank", "order")
 	if err != nil {
 		return nil, err
@@ -239,7 +254,7 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 	}
 	in := graph.LayoutInput{
 		Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad, Lanes: lanes, LaneEdges: laneEdges,
-		ClusterDirection: clusterDir, ReverseClusters: reverseClusters,
+		ClusterDirection: clusterDir, ReverseClusters: reverseClusters, Order: order, ELK: settings,
 	}
 	text := func(r Row, f *Accessor) string {
 		v := f.Get(r)
@@ -319,6 +334,7 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 			}
 		}
 		label := fields["label"].Get(r)
+		unwrapped := label
 		var nm *mathLabel
 		if _, ok := records[i]; !ok && htmls[i] == nil {
 			if nm, err = maths.of(label, sizeOf(r, "fontSize"), weightOf(r)); err != nil {
@@ -398,6 +414,13 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 		if xm != nil {
 			xmaths[i] = xm
 		}
+		if b, ok := r["boxed"].(bool); ok && b {
+			// The strip of the box is as high as the label on one line,
+			// with no wrap, as Mermaid measures the title of the box of
+			// a note.
+			n.Boxed = true
+			_, n.BoxTitle = measureRow(r, unwrapped)
+		}
 		in.Nodes = append(in.Nodes, n)
 	}
 	index := map[string]int{}
@@ -467,12 +490,27 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 		if c, ok := r["curve"].(string); ok {
 			e.Curve = c
 		}
+		// An end with an arrowhead names it, and an end with none names
+		// none.
+		marker := func(v any) bool {
+			s, ok := v.(string)
+			return ok && s != "" && s != "none"
+		}
+		e.HeadMarker, e.TailMarker = marker(r["head"]), marker(r["tail"])
 		size, endSize := sizeOf(r, "fontSize"), sizeOf(r, "endFontSize")
 		if _, ok := r["endFontSize"]; !ok {
 			endSize = size
 		}
 		hs := map[string]*htmlLabel{}
 		ms := map[string]*mathLabel{}
+		if runs, ok := r["runs"].([]any); ok && len(runs) > 0 && r["html"] == nil {
+			// A label in more than one font wraps here and draws as a
+			// label of HTML, as the label of a node.
+			r["html"] = runsHTML(runs, expr.Number(r["wrap"]), func(t, weight string) float64 {
+				w, _ := sizeAt(t, "", size, weight)
+				return w
+			})
+		}
 		if src, ok := r["html"].(string); ok && src != "" {
 			h, err := layHTML(src, sizeAt, size)
 			if err != nil {
@@ -540,6 +578,9 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 		}
 		if d, ok := r["direction"].(string); ok {
 			c.Direction = d
+		}
+		if a, ok := r["algorithm"].(string); ok {
+			c.Algorithm = a
 		}
 		// A title is in the weight 600, unless a style of the source
 		// sets its weight.
@@ -627,6 +668,13 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 			o["path"], fs = rec.rows(r, np, in.Nodes[i].Shape, padding, fontSize)
 			out = append(out, fs...)
 		}
+		// The text of a label of more lines draws its first line at the
+		// middle of that line, and the others below it, so the text takes
+		// the y of its first line, and the box of the label the y of its
+		// middle.
+		size := sizeOf(r, "fontSize")
+		o["textLineY"] = graph.FirstLine(expr.Number(o["textY"]), graph.LineCount(o["lines"]), size, "middle")
+		o["xLabelLineY"] = graph.FirstLine(np.XLabelY, graph.LineCount(o["xLines"]), size, "middle")
 	}
 	for i, r := range edges {
 		o := clone(r)
@@ -650,6 +698,8 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 		}
 		o["points"] = pts
 		out = append(out, o)
+		out = append(out, colorLines(o)...)
+		size, endSize := sizeOf(r, "fontSize"), sizeOf(r, "endFontSize")
 		hs := edgeHTMLs[i]
 		// The labels at the ends take the color of the ends, and the
 		// others the color of the label of the edge.
@@ -680,6 +730,12 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 				out = append(out, ml.rows(mathBase(r, color), "edge", l.x, l.y, false, false)...)
 			}
 		}
+		// The text of each label takes the y of its first line, as the
+		// text of a node does.
+		o["labelLineY"] = graph.FirstLine(ep.LabelY, graph.LineCount(o["lines"]), size, "middle")
+		o["headLabelLineY"] = graph.FirstLine(ep.HeadLabelY, graph.LineCount(o["headLines"]), endSize, "middle")
+		o["tailLabelLineY"] = graph.FirstLine(ep.TailLabelY, graph.LineCount(o["tailLines"]), endSize, "middle")
+		o["xLabelLineY"] = graph.FirstLine(ep.XLabelY, graph.LineCount(o["xLines"]), size, "middle")
 	}
 	for i, r := range clusters {
 		o := clone(r)
@@ -713,6 +769,56 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 		out = append(out, h.rows(Row{"key": "title"}, h.lay.Width/2, -h.lay.Height/2-8, "")...)
 	}
 	return out, nil
+}
+
+// colorLines draws an edge of more than one color, whose row lists its
+// colors in strokes and their weights in weights, as graph.ColorLines
+// says. The row of the edge takes the path of its own color: the first of
+// lines side by side, and the last of lines one after another, the color
+// of its arrowheads. It returns a row of the kind edgeLine for each other
+// color, which the paint _linePaint of the edge draws. A line is 2 pixels
+// from the next, as in Graphviz, or the width of the line when it is
+// wider.
+func colorLines(o Row) []Row {
+	list, ok := o["strokes"].([]any)
+	if !ok || len(list) < 2 {
+		return nil
+	}
+	var weights []float64
+	if ws, ok := o["weights"].([]any); ok {
+		for _, w := range ws {
+			weights = append(weights, expr.Number(w))
+		}
+	}
+	gap := math.Max(2, expr.Number(o["strokeWidth"]))
+	// The lines side by side end at the arrowheads.
+	size := expr.Number(o["arrowSize"])
+	tail := graph.ArrowLength(strOf(o["tail"]), size)
+	head := graph.ArrowLength(strOf(o["head"]), size)
+	paths := graph.ColorLines(strOf(o["path"]), len(list), weights, gap, tail, head)
+	if paths == nil {
+		return nil
+	}
+	own := 0
+	if weights != nil {
+		own = len(list) - 1
+	}
+	o["path"] = paths[own]
+	var out []Row
+	for k, c := range list {
+		if k == own {
+			continue
+		}
+		l := Row{"kind": "edgeLine", "key": o["key"], "path": paths[k], "stroke": c, "_paint": o["_linePaint"]}
+		for _, f := range []string{"strokeWidth", "strokeDash"} {
+			if v, ok := o[f]; ok {
+				l[f] = v
+			}
+		}
+		copyLink(l, o)
+		out = append(out, l)
+	}
+	return out
 }
 
 // media is the icon or the image of a node, which the transform zuzu.icon

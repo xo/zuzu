@@ -27,6 +27,10 @@ type stateDiagram struct {
 	// descs holds the descriptions of each state, simple or composite.
 	descs map[string][]string
 	notes []*stateNote
+	// order holds the ids of the states, the composite states, the
+	// regions and the notes in the order in which Mermaid gives them to
+	// its layouts: each where a line first names it.
+	order []string
 	// classes, nodeClasses and nodeStyles are the classes and the styles,
 	// as in a flowchart.
 	classes     map[string]map[string]string
@@ -49,10 +53,12 @@ type state struct {
 	kind string
 }
 
-// stateNote is a note of a state.
+// stateNote is a note of a state. edge is the number of the transitions
+// before its line, where its edge goes among them, as in Mermaid.
 type stateNote struct {
 	of, text string
 	left     bool
+	edge     int
 }
 
 // scope is the root, a composite state or a region: each has its own
@@ -403,7 +409,15 @@ func (s *stateDiagram) ref(id string) *state {
 	st := &state{node: n}
 	s.states[id] = st
 	s.g.Nodes = append(s.g.Nodes, n)
+	s.seen(id)
 	return st
+}
+
+// seen adds an id to the order of the layout, unless it is there.
+func (s *stateDiagram) seen(id string) {
+	if !slices.Contains(s.order, id) {
+		s.order = append(s.order, id)
+	}
 }
 
 // end returns the id of the start or the end of the current scope, made
@@ -422,6 +436,7 @@ func (s *stateDiagram) end(kind string) string {
 		Solid: true, Style: map[string]string{"strokeWidth": "0"}}
 	s.states[id] = &state{node: n, kind: kind}
 	s.g.Nodes = append(s.g.Nodes, n)
+	s.seen(id)
 	return id
 }
 
@@ -530,6 +545,8 @@ func (s *stateDiagram) open(id string, lines []Line, i int) error {
 		}
 		s.composites[id] = c
 		s.g.Clusters = append(s.g.Clusters, c)
+		// A state that a line named before keeps its place in the order.
+		s.seen(id)
 	}
 	s.scopes = append(s.scopes, &scope{name: id, cluster: id})
 	if regions(lines, i) {
@@ -571,6 +588,7 @@ func (s *stateDiagram) openRegion(parent string) {
 	id := fmt.Sprintf("divider-id-%d", s.regions)
 	c := &graph.Cluster{ID: id, Parent: parent, Style: map[string]string{"strokeDash": dashed}}
 	s.g.Clusters = append(s.g.Clusters, c)
+	s.seen(id)
 	s.scopes = append(s.scopes, &scope{name: id, cluster: id, region: true})
 }
 
@@ -625,12 +643,15 @@ func (s *stateDiagram) note(lines []Line, i int) (int, error) {
 		}
 		text = strings.Join(body, "\n")
 	}
+	// Mermaid gives the box of the note and the note to its layouts at
+	// the line of the note, before the state when the note names it first.
+	s.seen(m[2] + "----note")
 	if m[2] != pseudo {
 		s.ref(m[2])
 	}
 	// Mermaid keeps one note for each state, the last.
 	s.notes = slices.DeleteFunc(s.notes, func(n *stateNote) bool { return n.of == m[2] })
-	s.notes = append(s.notes, &stateNote{of: m[2], text: label(text), left: m[1] == "left"})
+	s.notes = append(s.notes, &stateNote{of: m[2], text: label(text), left: m[1] == "left", edge: len(s.g.Edges)})
 	return i, nil
 }
 
@@ -690,8 +711,12 @@ func (s *stateDiagram) finish() error {
 // the right, and from a note on the left to the state, so a note on the
 // right comes in the rank after its state, and a note on the left in the
 // rank before it. The note keeps a neighbor in the layout, which holds it
-// close to its state.
+// close to its state. The line goes among the transitions where the note
+// is in the source, and the note lies in a box of its own for ELK, as
+// Mermaid gives them to its layouts.
 func (s *stateDiagram) addNotes() error {
+	var edges []*graph.Edge
+	next := 0
 	for _, nt := range s.notes {
 		id := nt.of + "----note"
 		var of *graph.Node
@@ -704,7 +729,7 @@ func (s *stateDiagram) addNotes() error {
 		default:
 			return fmt.Errorf("a note of %s, which is not a state: %w", nt.of, ErrSyntax)
 		}
-		n := &graph.Node{ID: id, Label: nt.text, Shape: "note", Note: true, Cluster: cluster, Style: map[string]string{}}
+		n := &graph.Node{ID: id, Label: nt.text, Shape: "note", Note: true, Boxed: true, Cluster: cluster, Style: map[string]string{}}
 		e := &graph.Edge{Source: nt.of, Target: id, Head: "none", Style: map[string]string{"strokeDash": "2,3"}}
 		if nt.left {
 			e.Source, e.Target = id, nt.of
@@ -717,7 +742,14 @@ func (s *stateDiagram) addNotes() error {
 			}
 		}
 		s.g.Nodes = slices.Insert(s.g.Nodes, at, n)
-		s.g.Edges = append(s.g.Edges, e)
+		// Mermaid keeps the last note of a state, so the notes are not
+		// always in the order of their lines.
+		edge := max(nt.edge, next)
+		edges = append(edges, s.g.Edges[next:edge]...)
+		edges = append(edges, e)
+		next = edge
 	}
+	s.g.Edges = append(edges, s.g.Edges[next:]...)
+	s.g.Order = s.order
 	return nil
 }

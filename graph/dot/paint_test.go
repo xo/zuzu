@@ -98,7 +98,9 @@ func TestHTMLRecord(t *testing.T) {
 	if c.HTML == "" || c.Fields != nil {
 		t.Errorf("node c: %q %v", c.HTML, c.Fields)
 	}
-	if !d.Stack || len(d.Fields) != 2 {
+	// A plain group in braces is one field that holds its fields, which
+	// lie the other way.
+	if d.Stack || len(d.Fields) != 1 || len(d.Fields[0].Fields) != 2 {
 		t.Errorf("node d: %v %v", d.Stack, d.Fields)
 	}
 	// The line in two fonts and the font color of e.

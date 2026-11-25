@@ -69,6 +69,15 @@ type Graph struct {
 	// reverse of their order, as LayoutInput.ReverseClusters says. The
 	// reader of a flowchart of Mermaid sets it.
 	ReverseClusters bool
+	// Order holds the ids of the nodes and the clusters in the order in
+	// which Mermaid 12.3 gives them to its layouts, as LayoutInput.Order
+	// says, or nil. The reader of a state diagram sets it, because Mermaid
+	// gives a composite state and a note among the states, in the order of
+	// the source.
+	Order []string
+	// ELK holds the settings of the section elk of the config of Mermaid,
+	// as LayoutInput.ELK says, or nil.
+	ELK map[string]string
 	// BreakWords breaks a word that is wider than the wrap width of its
 	// label between two letters, as the SVG labels of Mermaid do. Otherwise
 	// the word stays whole on a line of its own, and the label is wider
@@ -134,6 +143,10 @@ type Node struct {
 	// state diagram, which draws in the color of a note of the theme, its
 	// yellow, and not in the color of a node.
 	Note bool
+	// Boxed puts the node in a box of its own for the engine of ELK, as
+	// LayoutNode.Boxed says. Mermaid 12.3 puts each note of a state
+	// diagram in such a box.
+	Boxed bool
 	// Solid says that the node fills with the color of its outline, not
 	// with its tint, such as the start of a state diagram, a fork bar or a
 	// junction point of a flowchart (D55).
@@ -216,8 +229,16 @@ type Field struct {
 	// at the left of its column.
 	Cells []string
 	// Align puts each line of the text at the left of the field, l, or at
-	// its center, the default.
+	// its center, the default. It can also hold one letter for each line,
+	// l, c or r for the left, the center or the right, as the \l, \n and
+	// \r of a record of DOT. The last letter holds for the lines after it.
 	Align string
+	// Fields are the fields of a group in braces of a record of DOT, in the
+	// place of Text, or nil. They lie the other way from the fields around
+	// the group: one under another in a record whose fields lie side by
+	// side, and side by side in a record whose fields lie one under
+	// another. A group can hold groups.
+	Fields []Field
 	// Fonts holds the font of each line of the text, or of each cell of
 	// a row of cells, or nil for the font of the node. A cell draws no
 	// line under it.
@@ -242,6 +263,9 @@ type Edge struct {
 	// it, or empty. It draws in the place of Label, and Label holds its
 	// text.
 	HTML string
+	// Runs are the parts of the label in one font each, as Node.Runs
+	// says, or nil for a label in one font. Label holds their text.
+	Runs []Run
 	// HeadLabel and TailLabel are the labels at the head and at the tail of
 	// the edge, such as the cardinality of an association, or empty. Each
 	// sits beside the edge, near its end. XLabel is a label beside the
@@ -275,6 +299,15 @@ type Edge struct {
 	ArrowSize float64
 	// Style holds the paint of the edge, as Node.Style does.
 	Style map[string]string
+	// Strokes are the colors of an edge of more than one color, as a list
+	// of colors of DOT, such as red:blue, gives them, or nil. Each color
+	// draws a line of its own, as ColorLines says. Weights holds the weight
+	// of each color, as `a:b;0.3` gives it, -1 for a color with no weight,
+	// or nil for a list with no weight, whose lines lie side by side. The
+	// stroke of Style is the color of the arrowheads: the first color, or
+	// the last of colors one after another.
+	Strokes []string
+	Weights []float64
 	// Curve is the interpolation of the route, or empty for basis.
 	Curve string
 	// Wrap is the width in pixels at which the label wraps, as Node.Wrap,
@@ -307,6 +340,9 @@ type Cluster struct {
 	// Shape is the shape of the cluster: empty for a panel, or
 	// ClusterPackage.
 	Shape string
+	// Algorithm is the layout of ELK of the cluster alone, as
+	// LayoutCluster.Algorithm says, such as elk.box, or empty.
+	Algorithm string
 }
 
 // ClusterPackage is the shape of a cluster that draws as a package of UML:

@@ -346,6 +346,46 @@ func TestStateCompositeAndNotes(t *testing.T) {
 	}
 }
 
+// TestStateLayoutOrder checks the order in which a state diagram gives its
+// states, composite states, regions and notes to the engine of ELK, as
+// Mermaid 12.3 gives them to its layouts: each where a line first names it,
+// a note at its line and before its state when it names the state first.
+// The edge of a note goes among the transitions at the line of the note,
+// and the note lies in a box of its own.
+func TestStateLayoutOrder(t *testing.T) {
+	t.Parallel()
+	g, report := stateOf(t, `stateDiagram-v2
+    a : first
+    note right of a : one
+    a --> b
+    note left of c : two
+    state A {
+        [*] --> x
+        --
+        y
+    }
+    b --> c`)
+	if len(report) != 0 {
+		t.Errorf("expected no issue, got %v", report)
+	}
+	want := []string{"a", "a----note", "b", "c----note", "c", "A", "divider-id-1", "divider-id-1_start", "x", "divider-id-2", "y"}
+	if !slices.Equal(g.Order, want) {
+		t.Errorf("expected the order\n%v\ngot\n%v", want, g.Order)
+	}
+	var edges []string
+	for _, e := range g.Edges {
+		edges = append(edges, e.Source+">"+e.Target)
+	}
+	if want := []string{"a>a----note", "a>b", "c----note>c", "divider-id-1_start>x", "b>c"}; !slices.Equal(edges, want) {
+		t.Errorf("expected the edges %v, got %v", want, edges)
+	}
+	for _, n := range g.Nodes {
+		if n.Boxed != n.Note {
+			t.Errorf("the node %s is boxed %t, want %t", n.ID, n.Boxed, n.Note)
+		}
+	}
+}
+
 // TestPointColors checks that a start takes the color of the one state
 // that it points to, and an end the color of the one state that ends in
 // it: the stroke of its style, its fill, or the color of a composite

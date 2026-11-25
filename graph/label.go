@@ -201,29 +201,27 @@ func ends(ep *EdgePlace) (head, headIn, headRight, tail, tailIn, tailRight [2]fl
 	return
 }
 
-// placeEnds sets the places of the labels at the ends of an edge to the
-// first place that endPlaces gives, with no check of what they cover.
-func placeEnds(e LayoutEdge, ep *EdgePlace) {
-	if len(ep.Points) < 2 {
-		return
-	}
-	head, headIn, headRight, tail, tailIn, tailRight := ends(ep)
-	if e.HeadLabelWidth > 0 {
-		c := endPlaces(head, headIn, headRight, e.HeadLabelWidth, e.HeadLabelHeight, e.LabelDistance, e.LabelAngle)[0]
-		ep.HeadLabelX, ep.HeadLabelY = c[0], c[1]
-	}
-	if e.TailLabelWidth > 0 {
-		c := endPlaces(tail, tailIn, tailRight, e.TailLabelWidth, e.TailLabelHeight, e.LabelDistance, e.LabelAngle)[0]
-		ep.TailLabelX, ep.TailLabelY = c[0], c[1]
-	}
-}
-
 // placeLabels places the labels that take no space in the ranks: the
 // labels at the ends of each edge, the xlabel of each edge, and the
 // xlabel of each node, as dot does after its layout. Each label goes at
 // the first of a few places where it covers no node, no other label and no
 // edge, or else at the place that covers the least.
 func placeLabels(in *LayoutInput, out *Layout) {
+	placeLabelsOf(in, out, nil)
+}
+
+// placeEndLabels places the labels at the ends of the edges that only
+// marks again, as placeLabels does, where they cover no node and no other
+// label of the layout, if they can.
+func placeEndLabels(in *LayoutInput, out *Layout, only []bool) {
+	placeLabelsOf(in, out, only)
+}
+
+// placeLabelsOf is placeLabels for all the labels when only is nil, and
+// else for the labels at the ends of the edges that only marks. The other
+// labels then keep their places, and the labels that it places keep off
+// them.
+func placeLabelsOf(in *LayoutInput, out *Layout, only []bool) {
 	var boxes []rect
 	for _, n := range out.Nodes {
 		boxes = append(boxes, rectAt([2]float64{n.X, n.Y}, n.Width, n.Height))
@@ -236,6 +234,30 @@ func placeLabels(in *LayoutInput, out *Layout) {
 	routes := make([][][2]float64, len(out.Edges))
 	for i, ep := range out.Edges {
 		routes[i] = smooth(ep.Points)
+	}
+	if only != nil {
+		// The labels that stay are in the way of the others.
+		for i, e := range in.Edges {
+			ep := out.Edges[i]
+			if !only[i] {
+				for _, l := range [][4]float64{
+					{ep.HeadLabelX, ep.HeadLabelY, e.HeadLabelWidth, e.HeadLabelHeight},
+					{ep.TailLabelX, ep.TailLabelY, e.TailLabelWidth, e.TailLabelHeight},
+				} {
+					if l[2] > 0 {
+						boxes = append(boxes, rectAt([2]float64{l[0], l[1]}, l[2], l[3]))
+					}
+				}
+			}
+			if e.XLabelWidth > 0 {
+				boxes = append(boxes, rectAt([2]float64{ep.XLabelX, ep.XLabelY}, e.XLabelWidth, e.XLabelHeight))
+			}
+		}
+		for i, n := range in.Nodes {
+			if n.XLabelWidth > 0 {
+				boxes = append(boxes, rectAt([2]float64{out.Nodes[i].XLabelX, out.Nodes[i].XLabelY}, n.XLabelWidth, n.XLabelHeight))
+			}
+		}
 	}
 	index := make(map[string]int, len(in.Nodes))
 	for i, n := range in.Nodes {
@@ -324,19 +346,27 @@ func placeLabels(in *LayoutInput, out *Layout) {
 	}
 	for i, e := range in.Edges {
 		ep := &out.Edges[i]
-		if len(ep.Points) < 2 {
+		if len(ep.Points) < 2 || only != nil && !only[i] {
 			continue
 		}
 		head, headIn, headRight, tail, tailIn, tailRight := ends(ep)
-		if w, h := e.HeadLabelWidth, e.HeadLabelHeight; w > 0 {
+		// A label that the engine placed keeps its place, and the labels
+		// placed after it keep off it.
+		switch w, h := e.HeadLabelWidth, e.HeadLabelHeight; {
+		case w > 0 && ep.HeadPlaced:
+			boxes = append(boxes, rectAt([2]float64{ep.HeadLabelX, ep.HeadLabelY}, w, h))
+		case w > 0:
 			c := pickEnd(head, headIn, headRight, w, h, e.LabelDistance, e.LabelAngle, e.Target)
 			ep.HeadLabelX, ep.HeadLabelY = c[0], c[1]
 		}
-		if w, h := e.TailLabelWidth, e.TailLabelHeight; w > 0 {
+		switch w, h := e.TailLabelWidth, e.TailLabelHeight; {
+		case w > 0 && ep.TailPlaced:
+			boxes = append(boxes, rectAt([2]float64{ep.TailLabelX, ep.TailLabelY}, w, h))
+		case w > 0:
 			c := pickEnd(tail, tailIn, tailRight, w, h, e.LabelDistance, e.LabelAngle, e.Source)
 			ep.TailLabelX, ep.TailLabelY = c[0], c[1]
 		}
-		if w, h := e.XLabelWidth, e.XLabelHeight; w > 0 {
+		if w, h := e.XLabelWidth, e.XLabelHeight; w > 0 && only == nil {
 			m, d := middle(routes[i])
 			// Beside the middle on each side, and then farther out, past
 			// what is beside the edge.
@@ -363,7 +393,7 @@ func placeLabels(in *LayoutInput, out *Layout) {
 	}
 	for i, n := range in.Nodes {
 		w, h := n.XLabelWidth, n.XLabelHeight
-		if !(w > 0) {
+		if !(w > 0) || only != nil {
 			continue
 		}
 		np := &out.Nodes[i]
@@ -402,4 +432,36 @@ func (e *EdgePlace) shiftLabels(dx, dy float64) {
 	e.HeadLabelX, e.HeadLabelY = e.HeadLabelX+dx, e.HeadLabelY+dy
 	e.TailLabelX, e.TailLabelY = e.TailLabelX+dx, e.TailLabelY+dy
 	e.XLabelX, e.XLabelY = e.XLabelX+dx, e.XLabelY+dy
+}
+
+// FirstLine returns the y of the first line of a text of n lines, lh
+// apart, that a layout places by y as a block: the middle of the block for
+// the baseline middle, and its bottom for the baselines alphabetic and
+// bottom. The writers draw the first line of a text on its baseline and
+// the other lines below it, as Vega draws them, so a layout gives the
+// text this y. A text at the baseline top, or of one line, keeps y.
+func FirstLine(y float64, n int, lh float64, baseline string) float64 {
+	if n < 2 {
+		return y
+	}
+	extra := lh * float64(n-1)
+	switch baseline {
+	case "middle":
+		return y - extra/2
+	case "", "alphabetic", "bottom", "line-bottom":
+		return y - extra
+	}
+	return y
+}
+
+// LineCount returns the count of the lines of a text that a row holds as a
+// list of lines, such as the lines of a label, or 1 for any other value.
+func LineCount(v any) int {
+	switch l := v.(type) {
+	case []any:
+		return len(l)
+	case []string:
+		return len(l)
+	}
+	return 1
 }

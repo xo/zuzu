@@ -103,6 +103,25 @@ func ArrowPaths(kind string) (string, string) {
 	return filled.String(), open.String()
 }
 
+// ArrowLength returns the length of an arrowhead of a kind along its edge,
+// for a symbol of a size, as ArrowPaths draws it: a shape of normal is as
+// long as the square root of the size. none is 0 long.
+func ArrowLength(kind string, size float64) float64 {
+	if kind == "none" {
+		return 0
+	}
+	parts, ok := arrowParts(kind)
+	if !ok {
+		parts = []arrowPart{{base: "normal"}}
+	}
+	units := 0.0
+	for _, p := range parts {
+		_, length, _ := p.path(0)
+		units += length
+	}
+	return units / 2 * math.Sqrt(size)
+}
+
 // path returns the path of a shape with its tip at x, its length, and
 // whether it goes with the open shapes.
 func (p arrowPart) path(x float64) (string, float64, bool) {

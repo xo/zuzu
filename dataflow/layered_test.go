@@ -51,4 +51,10 @@ func TestRunsHTML(t *testing.T) {
 	if got, want := runsHTML(runs, 10, width), "<B>Bold</B>, and<BR/><I>italic</I> a&lt;b"; got != want {
 		t.Errorf("runsHTML with a limit of 10 = %q, want %q", got, want)
 	}
+	// A space at the end of a run keeps the next run apart, as the runs
+	// of a b c in markdown with b in bold.
+	runs = []any{run("a ", false, false), run("b", true, false), run(" c", false, false)}
+	if got, want := runsHTML(runs, 0, width), "a <B>b</B> c"; got != want {
+		t.Errorf("runsHTML = %q, want %q", got, want)
+	}
 }

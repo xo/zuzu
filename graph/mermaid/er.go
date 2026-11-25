@@ -76,7 +76,9 @@ var (
 // erGraph reads an entity relationship diagram into a graph.
 func erGraph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	e := &erDiagram{
-		d: d, g: &graph.Graph{Directed: true, Direction: graph.TB, Title: d.Title}, issues: &graph.Issues{Strict: strict},
+		// Mermaid 12.3 gives the subgraphs of an ER diagram to its layouts
+		// in the reverse of their order, as those of a flowchart.
+		d: d, g: &graph.Graph{Directed: true, Direction: graph.TB, Title: d.Title, ReverseClusters: true}, issues: &graph.Issues{Strict: strict},
 		entities: map[string]*entity{}, clusters: map[string]*graph.Cluster{},
 		styles: map[string]map[string]string{}, nodeClasses: map[string][]string{}, nodeStyles: map[string]map[string]string{},
 	}
@@ -384,10 +386,11 @@ func (e *erDiagram) relationship(from, rest, t string) error {
 		}
 		text = label(r)
 	}
+	runs := markdownMixed(text)
 	text, font := markdownFont(text)
 	// The cardinality u, the parent of Mermaid, draws no mark in Mermaid
 	// 12, so it draws none here either.
-	ed := &graph.Edge{Source: from, Target: to, Label: text, Head: "none", Tail: "none", ArrowSize: relationArrowSize, Style: fontStyle(font)}
+	ed := &graph.Edge{Source: from, Target: to, Label: text, Runs: runs, Head: "none", Tail: "none", ArrowSize: relationArrowSize, Style: fontStyle(font)}
 	if head != "u" {
 		ed.Head = head
 	}
@@ -435,6 +438,7 @@ func (e *erDiagram) finish() error {
 		n.Label = name
 		if len(ent.attrs) == 0 {
 			fonts[n.ID] = fontStyle(font)
+			n.Runs = markdownMixed(ent.name)
 			continue
 		}
 		font.Bold = true
@@ -494,8 +498,10 @@ func (e *erDiagram) subgraphEnds() error {
 // markdownFont reads the marks of markdown in a name or a label of an
 // entity relationship diagram, as Mermaid does. It returns the text
 // without its marks, and the font that all of its text shares: bold,
-// italic, both or neither. A line of a record or of a label draws in one
-// font, so a part of the text that alone is bold or italic draws plain.
+// italic, both or neither. A line of a record draws in one font, so a
+// part of the text of a record that alone is bold or italic draws plain.
+// The label of a relationship and the name of an entity with no
+// attributes draw the runs of markdownMixed.
 func markdownFont(s string) (string, graph.Font) {
 	var b strings.Builder
 	bold, italic, some := true, true, false
@@ -511,6 +517,30 @@ func markdownFont(s string) (string, graph.Font) {
 		return b.String(), graph.Font{}
 	}
 	return b.String(), graph.Font{Bold: bold, Italic: italic}
+}
+
+// markdownMixed returns the runs of the markdown of a label of an entity
+// relationship diagram whose parts are in more than one font, such as
+// *first*Name, or nil for a label that markdownFont draws in one font.
+func markdownMixed(s string) []graph.Run {
+	runs := markdownRuns(s)
+	var out []graph.Run
+	first, mixed := -1, false
+	for i, r := range runs {
+		out = append(out, graph.Run{Text: r.text, Bold: r.bold, Italic: r.italic})
+		if strings.TrimSpace(r.text) == "" {
+			continue
+		}
+		if first < 0 {
+			first = i
+		} else if r.bold != runs[first].bold || r.italic != runs[first].italic {
+			mixed = true
+		}
+	}
+	if !mixed {
+		return nil
+	}
+	return out
 }
 
 // fontStyle returns the style of a label in a font.

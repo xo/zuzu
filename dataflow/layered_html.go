@@ -8,6 +8,7 @@ import (
 
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/graph"
+	"github.com/xo/zuzu/scene"
 )
 
 // htmlLabel is a label of HTML of a node, laid out by the package html of
@@ -20,6 +21,9 @@ type htmlLabel struct {
 	// *html.Table or the *html.Cell, as gradientangle and style=radial
 	// set it.
 	grads map[any]graph.HTMLGradient
+	// links holds the link and the tooltip of each table and each cell
+	// that has one, by the *html.Table or the *html.Cell (D32).
+	links map[any]graph.HTMLLink
 }
 
 // sizeFunc measures a text in a font, a size and a weight.
@@ -49,11 +53,22 @@ func htmlOf(r Row, size sizeFunc, fontSize float64) (*htmlLabel, bool, error) {
 // layHTML lays out a label of HTML in a size of font.
 func layHTML(src string, size sizeFunc, fontSize float64) (*htmlLabel, error) {
 	src, tables, cells := graph.HTMLGradients(src)
+	src, linkTables, linkCells := graph.HTMLLinks(src, true)
+	// A link with a scheme that zuzu does not write draws no link, and
+	// the parser of DOT reported it.
+	for _, list := range [][]graph.HTMLLink{linkTables, linkCells} {
+		for i := range list {
+			if !scene.LinkAllowed(list[i].Href) {
+				list[i].Href = ""
+			}
+		}
+	}
 	l, _, err := html.Parse(src)
 	if err != nil {
 		return nil, err
 	}
 	grads := map[any]graph.HTMLGradient{}
+	links := map[any]graph.HTMLLink{}
 	// The tables and the cells come in the order of the source, as a walk
 	// of the tree finds them.
 	var walk func(t *html.Table)
@@ -61,10 +76,22 @@ func layHTML(src string, size sizeFunc, fontSize float64) (*htmlLabel, error) {
 		if len(tables) > 0 {
 			grads[t], tables = tables[0], tables[1:]
 		}
+		if len(linkTables) > 0 {
+			if ln := linkTables[0]; ln != (graph.HTMLLink{}) {
+				links[t] = ln
+			}
+			linkTables = linkTables[1:]
+		}
 		for _, r := range t.Rows {
 			for _, c := range r.Cells {
 				if len(cells) > 0 {
 					grads[c], cells = cells[0], cells[1:]
+				}
+				if len(linkCells) > 0 {
+					if ln := linkCells[0]; ln != (graph.HTMLLink{}) {
+						links[c] = ln
+					}
+					linkCells = linkCells[1:]
 				}
 				if c.Table != nil {
 					walk(c.Table)
@@ -87,7 +114,7 @@ func layHTML(src string, size sizeFunc, fontSize float64) (*htmlLabel, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &htmlLabel{label: l, lay: lay, mx: 8, my: 4, grads: grads}, nil
+	return &htmlLabel{label: l, lay: lay, mx: 8, my: 4, grads: grads, links: links}, nil
 }
 
 // size returns the size of a node of a shape around the label, with the
@@ -254,7 +281,66 @@ func (h *htmlLabel) rows(r Row, x, y float64, kind string) []Row {
 	for _, o := range out {
 		copyLink(o, r)
 	}
+	h.cellLinks(out, x0, y0)
 	return out
+}
+
+// cellLinks gives each row of a label of HTML the link and the tooltip of
+// the innermost table or cell with one that holds it, over the link and
+// the tooltip of the node, the edge or the cluster (D32). A row holds the
+// middle of its box, of its line or of its text.
+func (h *htmlLabel) cellLinks(out []Row, x0, y0 float64) {
+	if len(h.links) == 0 {
+		return
+	}
+	type area struct {
+		x1, y1, x2, y2 float64
+		link           graph.HTMLLink
+	}
+	var areas []area
+	for _, b := range h.lay.Boxes {
+		var ln graph.HTMLLink
+		var ok bool
+		if b.Cell != nil {
+			ln, ok = h.links[b.Cell]
+		} else if b.Table != nil {
+			ln, ok = h.links[b.Table]
+		}
+		if ok {
+			areas = append(areas, area{x0 + b.X, y0 + b.Y, x0 + b.X + b.Width, y0 + b.Y + b.Height, ln})
+		}
+	}
+	for _, o := range out {
+		var x, y float64
+		switch o["kind"] {
+		case "htmlRule":
+			x, y = (expr.Number(o["x"])+expr.Number(o["x2"]))/2, (expr.Number(o["y"])+expr.Number(o["y2"]))/2
+		case "htmlRun":
+			// A run starts at x, and its text is of a width that the
+			// layout knows only by its text, so its start counts.
+			x, y = expr.Number(o["x"])+0.5, expr.Number(o["y"])
+		default:
+			x, y = expr.Number(o["x"])+expr.Number(o["width"])/2, expr.Number(o["y"])+expr.Number(o["height"])/2
+		}
+		best := -1
+		for i, a := range areas {
+			if x < a.x1 || x > a.x2 || y < a.y1 || y > a.y2 {
+				continue
+			}
+			if best < 0 || (a.x2-a.x1)*(a.y2-a.y1) < (areas[best].x2-areas[best].x1)*(areas[best].y2-areas[best].y1) {
+				best = i
+			}
+		}
+		if best < 0 {
+			continue
+		}
+		if ln := areas[best].link; ln.Href != "" {
+			o["href"] = ln.Href
+		}
+		if ln := areas[best].link; ln.Tooltip != "" {
+			o["tooltip"] = ln.Tooltip
+		}
+	}
 }
 
 // copyLink copies the link and the tooltip of a node, an edge or a cluster
@@ -330,15 +416,19 @@ func runsHTML(runs []any, limit float64, width func(text, weight string) float64
 	var line []word
 	used := 0.0
 	space := width(" ", "normal")
+	// after says that the run before ends in a space.
+	after := false
 	for _, v := range runs {
 		m, _ := v.(map[string]any)
 		t, _ := m["text"].(string)
 		bold, _ := m["bold"].(bool)
 		italic, _ := m["italic"].(bool)
 		if t == "\n" {
-			lines, line, used = append(lines, line), nil, 0
+			lines, line, used, after = append(lines, line), nil, 0, false
 			continue
 		}
+		joins := !after && !strings.HasPrefix(t, " ")
+		after = strings.HasSuffix(t, " ")
 		weight := "normal"
 		if bold {
 			weight = "bold"
@@ -357,7 +447,7 @@ func runsHTML(runs []any, limit float64, width func(text, weight string) float64
 			}
 			// A word that starts a run with no space before it joins the
 			// word before it, such as a comma right after a bold word.
-			if i == 0 && len(line) > 0 && !strings.HasPrefix(t, " ") {
+			if i == 0 && len(line) > 0 && joins {
 				gap = 0
 				f = "\x00" + f
 			}

@@ -125,8 +125,11 @@ type seqEvent struct {
 	// which its badge shows in place of the number of autonumber.
 	number string
 	// comment holds the lines of a comment of ZenUML, which draw over a
-	// message or a fragment.
-	comment []string
+	// message or a fragment, and commentRuns the runs of its Markdown, bold
+	// or italic, with a run "\n" between two lines, or nil for a comment
+	// in one font.
+	comment     []string
+	commentRuns []textRun
 }
 
 // seqBox is a box of participants: its title and its color.

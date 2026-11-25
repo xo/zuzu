@@ -219,3 +219,18 @@ func TestWrapIssues(t *testing.T) {
 		}
 	}
 }
+
+func TestKeepSpaces(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[string]string{
+		"a b":     "a b",
+		"a  b c":  "a\u00a0\u00a0b c",
+		"a   b":   "a\u00a0\u00a0\u00a0b",
+		"  a":     "\u00a0\u00a0a",
+		"no runs": "no runs",
+	} {
+		if got := keepSpaces(in); got != want {
+			t.Errorf("keepSpaces(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

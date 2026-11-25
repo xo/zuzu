@@ -41,7 +41,7 @@ func TestMathLabelSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w := e.Width(f, "of a whole") + 11*text.MathGap + frac.Width; abs(l.w-w) > 1e-9 || l.h != frac.Height+frac.Depth || len(l.lines) != 1 {
+	if w := e.Width(f, "of a whole") + frac.Width; abs(l.w-w) > 1e-9 || l.h != frac.Height+frac.Depth || len(l.lines) != 1 {
 		t.Errorf("the label is %v by %v in %d lines, want %v by %v in one", l.w, l.h, len(l.lines), w, frac.Height+frac.Depth)
 	}
 	if again, _ := ml.of("of\na whole $$\\frac{a}{b}$$", 11, ""); again != l {

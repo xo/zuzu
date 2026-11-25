@@ -121,6 +121,55 @@ func TestXLabelAvoidsNodes(t *testing.T) {
 	}
 }
 
+// TestPlaceEndLabels checks that the labels at the ends of the routes
+// that the box of a cluster cut, which placeEndLabels places again, cover
+// no node and no other label where they can, and that the other labels
+// keep their places.
+func TestPlaceEndLabels(t *testing.T) {
+	t.Parallel()
+	// Two routes end side by side at the top of a box, so that the first
+	// place of each label covers the other.
+	in := &LayoutInput{
+		Nodes: []LayoutNode{{ID: "a", Width: 30, Height: 20}, {ID: "b", Width: 30, Height: 20}, {ID: "c", Width: 30, Height: 20}},
+		Edges: []LayoutEdge{
+			{Source: "a", Target: "c", HeadLabelWidth: 40, HeadLabelHeight: 12},
+			{Source: "b", Target: "c", HeadLabelWidth: 40, HeadLabelHeight: 12},
+			{Source: "a", Target: "b", HeadLabelWidth: 40, HeadLabelHeight: 12},
+		},
+	}
+	out := &Layout{
+		Nodes: []NodePlace{{X: 0, Y: 0, Width: 30, Height: 20}, {X: 10, Y: 0, Width: 30, Height: 20}, {X: 5, Y: 200, Width: 30, Height: 20}},
+		Edges: []EdgePlace{
+			{Points: [][2]float64{{0, 10}, {0, 100}}},
+			{Points: [][2]float64{{10, 10}, {10, 100}}},
+			{Points: [][2]float64{{0, 10}, {300, 10}}, HeadLabelX: 500, HeadLabelY: 500},
+		},
+	}
+	for i := range out.Edges {
+		pts := out.Edges[i].Points
+		out.Edges[i].EndAngle = math.Atan2(pts[1][1]-pts[0][1], pts[1][0]-pts[0][0]) * 180 / math.Pi
+		out.Edges[i].StartAngle = out.Edges[i].EndAngle + 180
+	}
+	first := func(i int) rect {
+		ep := &out.Edges[i]
+		head, headIn, headRight, _, _, _ := ends(ep)
+		c := endPlaces(head, headIn, headRight, 40, 12, 0, 0)[0]
+		return labelBox(c[0], c[1], 40, 12)
+	}
+	if !first(0).overlaps(first(1)) {
+		t.Fatal("expected the first places of the two labels to overlap")
+	}
+	placeEndLabels(in, out, []bool{true, true, false})
+	a := labelBox(out.Edges[0].HeadLabelX, out.Edges[0].HeadLabelY, 40, 12)
+	b := labelBox(out.Edges[1].HeadLabelX, out.Edges[1].HeadLabelY, 40, 12)
+	if a.overlaps(b) {
+		t.Errorf("expected the labels apart, got %v and %v", a, b)
+	}
+	if ep := out.Edges[2]; ep.HeadLabelX != 500 || ep.HeadLabelY != 500 {
+		t.Errorf("expected the label of a -> b to stay, got %g, %g", ep.HeadLabelX, ep.HeadLabelY)
+	}
+}
+
 func TestRectCuts(t *testing.T) {
 	t.Parallel()
 	r := rect{0, 0, 10, 10}
@@ -216,5 +265,34 @@ func TestRectInside(t *testing.T) {
 	// At the center, no part lies deeper, and the box covers nothing.
 	if got := r.inside([2]float64{20, 10}); got.overlaps(r) {
 		t.Errorf("the center: got %v, which overlaps the box", got)
+	}
+}
+
+// TestFirstLine checks that FirstLine moves the y of a block of lines to
+// the y of its first line, which the writers draw on its baseline: up by
+// half of the lines after the first for the baseline middle, by all of
+// them for the baselines bottom and alphabetic, and not at all for the
+// top or for one line.
+func TestFirstLine(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		n        int
+		baseline string
+		want     float64
+	}{
+		{3, "middle", 100 - 10},
+		{3, "bottom", 100 - 20},
+		{2, "alphabetic", 100 - 10},
+		{2, "", 100 - 10},
+		{3, "top", 100},
+		{1, "middle", 100},
+		{0, "bottom", 100},
+	} {
+		if got := FirstLine(100, c.n, 10, c.baseline); got != c.want {
+			t.Errorf("FirstLine(100, %d, 10, %q) = %v, want %v", c.n, c.baseline, got, c.want)
+		}
+	}
+	if LineCount([]any{"a", "b"}) != 2 || LineCount([]string{"a"}) != 1 || LineCount("a\nb") != 1 || LineCount(nil) != 1 {
+		t.Error("LineCount counts the lines of a list, and 1 for any other value")
 	}
 }

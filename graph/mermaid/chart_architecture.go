@@ -827,7 +827,10 @@ func (a *arch) spec() map[string]any {
 			for _, l := range ls {
 				tl = append(tl, l)
 			}
-			iconTexts = append(iconTexts, map[string]any{"id": n.id, "x": n.x, "y": n.y, "lines": tl})
+			// The lines are in the middle of the tile, and the text draws
+			// from its first line.
+			y := graph.FirstLine(n.y, len(tl), a.font*1.3, "middle")
+			iconTexts = append(iconTexts, map[string]any{"id": n.id, "x": n.x, "y": y, "lines": tl})
 		}
 	}
 	arrow, _ := graph.ArrowPaths("normal")

@@ -105,3 +105,33 @@ func TestLayoutEnvPicksTheEngine(t *testing.T) {
 		t.Errorf("expected no issue from the engine of the env, got %q", e.issues)
 	}
 }
+
+// TestLayoutInputForELK checks that the transform gives the engine the
+// order of the nodes and the clusters, the box of a node and its title,
+// and the algorithm of a cluster, which only the engine of ELK reads.
+func TestLayoutInputForELK(t *testing.T) {
+	t.Parallel()
+	var in graph.LayoutInput
+	e := &layoutEnv{env: graphEnv(), engine: &recordEngine{in: &in}}
+	e.data["clusters"] = []Row{{"key": "k", "algorithm": "elk.box"}}
+	nodes := `[{"key":"a","width":40,"height":20},{"key":"b","label":"one\ntwo","boxed":true,"wrap":20},{"key":"c","width":40,"height":20,"cluster":"k"}]`
+	tr := `[{"type":"zuzu.layered","edges":"edges","clusters":"clusters","order":["c","k","a"]}]`
+	if _, err := Run(e, rowsOf(t, nodes), transformsOf(t, tr), "/transform"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(in.Order, " ") != "c k a" {
+		t.Errorf("expected the order c k a, got %q", in.Order)
+	}
+	if len(in.Clusters) != 1 || in.Clusters[0].Algorithm != "elk.box" {
+		t.Errorf("expected the cluster k with elk.box, got %+v", in.Clusters)
+	}
+	a, b := in.Nodes[0], in.Nodes[1]
+	if a.Boxed || !b.Boxed {
+		t.Errorf("expected only b in a box, got %t and %t", a.Boxed, b.Boxed)
+	}
+	// The title of the box is as high as the label, which the env
+	// measures 10 high.
+	if b.BoxTitle != 10 {
+		t.Errorf("expected the title of the box 10 high, got %g", b.BoxTitle)
+	}
+}

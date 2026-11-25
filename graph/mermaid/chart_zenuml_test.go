@@ -2,6 +2,7 @@ package mermaid_test
 
 import (
 	"cmp"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/xo/zuzu"
+	"github.com/xo/zuzu/graph/mermaid"
 	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
@@ -150,7 +152,6 @@ func TestZenUMLIssues(t *testing.T) {
 		{"zenuml\n  [smile] A\n", "the emoji smile of the participant A"},
 		{"zenuml\n  @EC2 A\n", "the icon EC2 of the participant A, drawn as a participant"},
 		{"zenuml\n  // [red] hot\n  A.m()\n", "the style [red] of a comment"},
-		{"zenuml\n  // **bold**\n  A.m()\n", `the Markdown of the comment "**bold**", drawn as plain text`},
 		{"zenuml\n  A.m() {\n", "no } where the grammar of ZenUML wants one"},
 		{"zenuml\n  A.m()\n  }\n", `the text "}", which does not fit the grammar of ZenUML`},
 	} {
@@ -162,6 +163,42 @@ func TestZenUMLIssues(t *testing.T) {
 		if err != nil || len(report) != 1 || !strings.Contains(report[0].Error(), tc.issue) {
 			t.Errorf("%q: expected the report %q, got %v and %v", tc.src, tc.issue, report, err)
 		}
+	}
+}
+
+func TestZenUMLCommentMarkdown(t *testing.T) {
+	t.Parallel()
+	d, err := mermaid.Read("zenuml\n  // a **bold** and _italic_\n  // `line`\n  A.m()\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, report, err := mermaid.Chart(d, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("expected no issue, got %v and %v", report, err)
+	}
+	var spec struct {
+		Data []struct {
+			Name   string           `json:"name"`
+			Values []map[string]any `json:"values"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(b, &spec); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, ds := range spec.Data {
+		if ds.Name != "commentRuns" {
+			continue
+		}
+		for _, v := range ds.Values {
+			got = append(got, fmt.Sprintf("%v %v %v", v["text"], v["fontWeight"], v["fontStyle"]))
+		}
+	}
+	// Each run draws in its font, and the second line under the first.
+	// Code draws as plain text, with no backticks, as in ZenUML.
+	want := "a 400 normal|bold 600 normal|and 400 normal|italic 400 italic|line 400 normal"
+	if s := strings.Join(got, "|"); s != want {
+		t.Errorf("got  %s\nwant %s", s, want)
 	}
 }
 

@@ -41,6 +41,20 @@ type LayoutInput struct {
 	// clusters still set from the outer to the inner. zuzu.layered does not
 	// read it.
 	ReverseClusters bool
+	// Order holds the ids of the nodes and the clusters in the order in
+	// which the engine of ELK gives them to ELK, or nil. An id names a
+	// node, or else a cluster. The nodes and the clusters that it does not
+	// name follow it, the clusters first, as for no Order. ELK keeps the
+	// order of the model where it can, so the order changes the layout.
+	// Mermaid 12.3 gives the clusters of a flowchart first, and then the
+	// nodes, and the composite states and the notes of a state diagram
+	// among the states, in the order of the source. zuzu.layered and
+	// zuzu.dagre do not read it.
+	Order []string
+	// ELK holds the settings of the section elk of the config of Mermaid,
+	// such as keepEntryNodeOnTop or mergeEdges, by their names, or nil.
+	// Only the engine of ELK reads them.
+	ELK map[string]string
 	// Algorithm is the layout that the spec names in its config with
 	// zuzu.layout, such as elk.stress, or empty. An engine with more than
 	// one algorithm, such as one of ELK, reads it to choose one. zuzu.layered
@@ -61,6 +75,13 @@ type LayoutNode struct {
 	// XLabelWidth and XLabelHeight are the size of the xlabel of the node,
 	// or 0 for none. The xlabel takes no space in the ranks.
 	XLabelWidth, XLabelHeight float64
+	// Boxed puts the node in a box of its own, a cluster that draws
+	// nothing, with a strip at its top of the height BoxTitle. Mermaid
+	// 12.3 puts each note of a state diagram in such a box for its
+	// layouts, with a strip as high as the text of the note on one line.
+	// Only the engine of ELK reads it.
+	Boxed    bool
+	BoxTitle float64
 }
 
 // LayoutEdge is an edge to lay out.
@@ -99,6 +120,10 @@ type LayoutEdge struct {
 	// port on a side, such as 1, 0 for the east side, or nil. An edge at
 	// such a port ends on the port and leaves it in that direction.
 	SourceSide, TargetSide []float64
+	// HeadMarker and TailMarker say that the edge draws an arrowhead at its
+	// head or at its tail. The engine of ELK keeps room for it around a
+	// label at that end, as Mermaid does.
+	HeadMarker, TailMarker bool
 }
 
 // weight returns the weight of the edge, 1 when it has none.
@@ -121,6 +146,12 @@ type LayoutCluster struct {
 	// cluster to a node outside it, as in Mermaid. Otherwise the cluster
 	// follows the layout that holds it.
 	Direction string
+	// Algorithm is the layout of ELK of the cluster alone, such as elk.box,
+	// or empty for the layout of the graph, as the property algorithm of a
+	// subgraph of Mermaid sets it. Only the engine of ELK reads it. As in
+	// Mermaid, the cluster takes the layout of the graph when an edge
+	// crosses its border.
+	Algorithm string
 }
 
 // Layout is the result of Lay, and of the Lay of an Engine, with the places
@@ -163,6 +194,10 @@ type EdgePlace struct {
 	HeadLabelX, HeadLabelY     float64
 	TailLabelX, TailLabelY     float64
 	XLabelX, XLabelY           float64
+	// HeadPlaced and TailPlaced say that the engine placed the label at
+	// the head or at the tail itself, as the engine of ELK does, so that
+	// Finish keeps its place.
+	HeadPlaced, TailPlaced bool
 }
 
 // ClusterPlace is the box of a cluster, its depth from 0 for an outer one,
@@ -200,9 +235,12 @@ type layout struct {
 	// rank, by the edges between two nodes of the same rank and cluster,
 	// and flatOut the vertices that must come after it.
 	flatIn, flatOut [][]int
-	layers          [][]int
-	cparent         []int
-	cdepth          []int
+	// titleLong holds, by cluster, how much longer the box of a cluster of
+	// a layout LR or RL runs across the ranks for its title.
+	titleLong map[int]float64
+	layers    [][]int
+	cparent   []int
+	cdepth    []int
 	// chains holds the vertices of each edge from its upper end to its
 	// lower end, and flip whether that is the reverse of the edge.
 	chains [][]int
@@ -307,6 +345,7 @@ func lay(in LayoutInput) (*Layout, error) {
 	l.flatEdges()
 	l.order()
 	l.place()
+	l.titleRoom()
 	return l.result(ids, sideways), nil
 }
 
@@ -343,7 +382,8 @@ func (l *layout) rank(ids map[string]int, double bool) {
 		es = append(es, redge{u: u, v: v, minlen: m, weight: e.weight()})
 	}
 	es, _ = acyclic(len(in.Nodes), es)
-	ranks := rankNodes(len(in.Nodes), es)
+	// dot balances the ranks of a graph with no cluster only.
+	ranks := rankNodes(len(in.Nodes), es, len(in.Clusters) == 0)
 	for i := range in.Nodes {
 		l.vs[i].rank = ranks[rep[i]]
 	}

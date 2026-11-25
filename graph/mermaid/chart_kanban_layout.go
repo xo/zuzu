@@ -95,7 +95,8 @@ func newKanbanLayout(k *kanban) *kbLayout {
 			"id": id, "key": key, "x": x, "y": 0.0, "x2": x + colW, "y2": bottom,
 		})
 		l.rows["columnLabels"] = append(l.rows["columnLabels"], map[string]any{
-			"id": id, "key": key, "x": x + colW/2, "y": head / 2, "lines": anyStrings(heads[i]),
+			"id": id, "key": key, "x": x + colW/2, "y": graph.FirstLine(head/2, len(heads[i]), lh(kbHeadFont), "middle"),
+			"lines": anyStrings(heads[i]),
 		})
 		l.w, l.h = x+colW, max(l.h, bottom)
 	}

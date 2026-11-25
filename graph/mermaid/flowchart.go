@@ -28,9 +28,14 @@ type flowchart struct {
 	linkDefault map[string]string
 	linkCurves  map[int]string
 	clusters    []*graph.Cluster
-	curve       string
-	line        int
-	anon        int
+	// named holds the ids of the nodes that each open subgraph names, in
+	// its body or in a subgraph in it, and placed the nodes that a
+	// subgraph that ended took.
+	named  map[*graph.Cluster][]string
+	placed map[string]bool
+	curve  string
+	line   int
+	anon   int
 	// wrap is how the labels wrap, and nodeWrap the width at which the
 	// label of a node wraps. markdown holds the nodes whose label is a
 	// string of markdown.
@@ -53,6 +58,9 @@ type flowchart struct {
 	// collapsed holds the line of each @{ view: collapsed } by the id that
 	// it names.
 	collapsed map[string]int
+	// algorithms holds the layout of ELK that @{ algorithm: ... } names,
+	// by the id of its subgraph.
+	algorithms map[string]string
 	// head holds the statements after the direction on the first line,
 	// with a semicolon between them.
 	head []string
@@ -89,7 +97,8 @@ func newFlowchart(d *Diagram, strict bool) *flowchart {
 		nodeStyles: map[string]map[string]string{}, edgeIDs: map[string]*graph.Edge{},
 		linkStyles: map[int]map[string]string{}, linkCurves: map[int]string{},
 		nodeWrap: scaleWrap(d.Kind, "", nodeWrap), markdown: map[string]bool{}, markdownSrc: map[string]string{}, edgeClasses: map[string][]string{},
-		collapsed: map[string]int{}, animated: map[*graph.Edge]bool{}, animClasses: map[string]int{},
+		collapsed: map[string]int{}, algorithms: map[string]string{}, animated: map[*graph.Edge]bool{}, animClasses: map[string]int{},
+		named: map[*graph.Cluster][]string{}, placed: map[string]bool{},
 	}
 }
 
@@ -222,9 +231,8 @@ func (f *flowchart) parse() error {
 	if len(f.head) > 0 {
 		lines = append([]Line{{Text: strings.Join(f.head, ";"), N: f.d.N}}, lines...)
 	}
-	if f.af != nil {
-		lines = joinProps(lines)
-	}
+	// Properties in @{ and } can run over more lines, one property on each.
+	lines = joinProps(lines)
 	for _, l := range joinOpen(lines, `"`) {
 		f.line = l.N
 		var sts []string
@@ -324,7 +332,7 @@ func (f *flowchart) stmt(st string, first, last bool) error {
 			if len(f.clusters) == 0 {
 				return fmt.Errorf("line %d: an end with no subgraph: %w", f.line, ErrSyntax)
 			}
-			f.clusters = f.clusters[:len(f.clusters)-1]
+			f.endCluster()
 			return nil
 		}
 	case "direction":
@@ -522,6 +530,25 @@ func (f *flowchart) subgraph(rest string) error {
 	return nil
 }
 
+// endCluster closes the innermost open subgraph. As in Mermaid, the
+// subgraph takes each node that it names and that no subgraph that ended
+// before it took, so a node that an outer and an inner subgraph both name
+// lies in the inner one, which ends first.
+func (f *flowchart) endCluster() {
+	c := f.clusters[len(f.clusters)-1]
+	f.clusters = f.clusters[:len(f.clusters)-1]
+	if f.af != nil {
+		return
+	}
+	for _, id := range f.named[c] {
+		if n, ok := f.nodes[id]; ok && !f.placed[id] && !f.isCluster(id) {
+			n.Cluster = c.ID
+			f.placed[id] = true
+		}
+	}
+	delete(f.named, c)
+}
+
 // isCluster reports whether an id names a subgraph.
 func (f *flowchart) isCluster(id string) bool {
 	return slices.ContainsFunc(f.g.Clusters, func(c *graph.Cluster) bool { return c.ID == id })
@@ -533,6 +560,11 @@ func (f *flowchart) node(id string) *graph.Node {
 	cluster := f.cluster()
 	if f.af != nil {
 		cluster = ""
+	}
+	if f.af == nil {
+		for _, c := range f.clusters {
+			f.named[c] = append(f.named[c], id)
+		}
 	}
 	if n, ok := f.nodes[id]; ok {
 		if n.Cluster == "" && cluster != "" {
@@ -864,12 +896,10 @@ func (f *flowchart) nodeRef(sc *scanner) (string, error) {
 		}
 		break
 	}
-	// A node of an agentflow diagram can have its properties after its
-	// shape too, as in a["A"]@{ shape: tool }.
-	if f.af != nil {
-		if err := f.nodeProps(sc, n); err != nil {
-			return "", err
-		}
+	// A node can have its properties after its shape too, as in
+	// a["A"]@{ shape: cyl }. The properties win over the shape.
+	if err := f.nodeProps(sc, n); err != nil {
+		return "", err
 	}
 	if strings.HasPrefix(sc.s[sc.i:], ":::") {
 		sc.i += 3
@@ -985,9 +1015,12 @@ func (f *flowchart) props(n *graph.Node, body string) error {
 				delete(f.collapsed, n.ID)
 			}
 		case "algorithm":
-			// algorithm picks an ELK layout for one subgraph. It is a hint,
-			// as layout: elk is, so zuzu lays the subgraph out in its own
-			// layered layout with no issue (D32, D35 part 9).
+			// algorithm picks an ELK layout for one subgraph, which the
+			// engine of ELK lays out. Without it, it is a hint, as layout:
+			// elk is, and the subgraph lays out in the layout of the graph
+			// with no issue (D32, D35 part 9). Mermaid reads it only on a
+			// subgraph.
+			f.algorithms[n.ID] = v
 		default:
 			if err := f.add("the property %s of a node", k); err != nil {
 				return err
@@ -1255,6 +1288,9 @@ func (f *flowchart) finish() error {
 			return err
 		}
 	}
+	for _, c := range f.g.Clusters {
+		c.Algorithm = f.algorithms[c.ID]
+	}
 	if err := f.collapse(); err != nil {
 		return err
 	}
@@ -1269,6 +1305,11 @@ func (f *flowchart) finish() error {
 	}
 	for _, n := range f.g.Nodes {
 		n.Style = classStyle(f.classes, f.nodeClasses[n.ID], f.nodeStyles[n.ID], n.Style)
+		if _, ok := n.Style["strokeWidth"]; n.Shape == "bpmn-end" && !ok {
+			// Mermaid draws the ring of an end event of BPMN 3.4 wide, so
+			// that it differs from a start event.
+			n.Style["strokeWidth"] = "3.4"
+		}
 		n.Wrap = f.wrap.width(f.nodeWrap, f.markdown[n.ID])
 		if f.markdown[n.ID] {
 			n.Runs = styledRuns(f.markdownSrc[n.ID])

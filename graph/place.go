@@ -44,7 +44,14 @@ func (l *layout) separation(u, v int) float64 {
 		if inner {
 			return (a.w+b.w)/2 + l.sep.pad + loop
 		}
-		return (a.w+b.w)/2 + l.sep.edge + loop
+		// In LR and RL the title of a cluster lies outside its left
+		// border, across the ranks (clusterBoxes), so the left border of
+		// a cluster also keeps the title from what is before it.
+		title := 0.0
+		if b.border == -1 && (l.in.Direction == LR || l.in.Direction == RL) {
+			title = l.in.Clusters[b.cluster].TitleHeight
+		}
+		return (a.w+b.w)/2 + l.sep.edge + title + loop
 	}
 	return (a.w+b.w)/2 + gap + loop
 }
@@ -479,6 +486,99 @@ func (l *layout) endRoom() []float64 {
 	return room
 }
 
+// titleRoom widens each cluster whose title, with the padding on each
+// side, is wider than its box, as Mermaid makes the box wider. In TB and
+// BT it moves each vertex right of the middle of the cluster to the right,
+// and each vertex left of it to the left, by half of what is missing, so
+// the order and the gaps of each rank stay, and no gap gets smaller. In LR
+// and RL the title runs along the ranks, so it moves each rank after the
+// last rank of the cluster on by what is missing (sideTitleRoom). The
+// innermost clusters go first, so an outer cluster sees the width of the
+// clusters in it.
+func (l *layout) titleRoom() {
+	in := l.in
+	if len(in.Clusters) == 0 {
+		return
+	}
+	pad := in.ClusterPadding
+	if pad <= 0 {
+		pad = 12
+	}
+	order := make([]int, len(in.Clusters))
+	for c := range order {
+		order[c] = c
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(l.cdepth[b], l.cdepth[a]) })
+	if in.Direction == LR || in.Direction == RL {
+		l.sideTitleRoom(order, pad)
+		return
+	}
+	for _, c := range order {
+		x1, x2 := math.Inf(1), math.Inf(-1)
+		for v, vt := range l.vs {
+			if vt.border != 0 && vt.cluster == c {
+				x1, x2 = math.Min(x1, l.x[v]), math.Max(x2, l.x[v])
+			}
+		}
+		d := in.Clusters[c].TitleWidth + 2*pad - (x2 - x1)
+		if x1 > x2 || d <= 0 {
+			continue
+		}
+		mid := (x1 + x2) / 2
+		for v := range l.x {
+			switch {
+			case l.x[v] > mid:
+				l.x[v] += d / 2
+			case l.x[v] < mid:
+				l.x[v] -= d / 2
+			}
+		}
+	}
+}
+
+// sideTitleRoom makes room for the titles of the clusters of a layout LR
+// or RL, in the order of order. The box of a cluster runs across its
+// ranks, from the top of its first rank to the bottom of its last, with
+// the padding of a cluster at each end, as clusterBoxes draws it. When the
+// title and its padding are longer, each vertex of a later rank moves on by
+// what is missing.
+func (l *layout) sideTitleRoom(order []int, pad float64) {
+	in := l.in
+	for _, c := range order {
+		minR, maxR := math.MaxInt, -1
+		for _, vt := range l.vs {
+			if vt.border != 0 && vt.cluster == c {
+				minR, maxR = min(minR, vt.rank), max(maxR, vt.rank)
+			}
+		}
+		if maxR < 0 {
+			continue
+		}
+		top, bottom := math.Inf(1), math.Inf(-1)
+		for v, vt := range l.vs {
+			if vt.rank == minR {
+				top = math.Min(top, l.y[v]-vt.h/2)
+			}
+			if vt.rank == maxR {
+				bottom = math.Max(bottom, l.y[v]+vt.h/2)
+			}
+		}
+		d := in.Clusters[c].TitleWidth + 2*pad - (bottom - top + 2*l.sep.pad)
+		if d <= 0 {
+			continue
+		}
+		for v, vt := range l.vs {
+			if vt.rank > maxR {
+				l.y[v] += d
+			}
+		}
+		if l.titleLong == nil {
+			l.titleLong = map[int]float64{}
+		}
+		l.titleLong[c] = d
+	}
+}
+
 // result maps the places to the direction of the layout and routes the
 // edges.
 func (l *layout) result(ids map[string]int, _ bool) *Layout {
@@ -509,6 +609,7 @@ func (l *layout) result(ids map[string]int, _ bool) *Layout {
 	}
 	l.clusterBoxes(out, tf)
 	l.routes(out, ids, tf)
+	spreadEnds(in, out, ids)
 	placeLabels(in, out)
 	l.normalize(out)
 	return out
@@ -569,7 +670,7 @@ func (l *layout) clusterBoxes(out *Layout, tf func(x, y float64) (float64, float
 		}
 		bx1, bx2 := x1[c], x2[c]
 		by1 := rankTop[minR[c]] - stack(c, true)
-		by2 := rankBottom[maxR[c]] + stack(c, false)
+		by2 := rankBottom[maxR[c]] + stack(c, false) + l.titleLong[c]
 		if in.Direction == LR || in.Direction == RL {
 			// The title is at the top of the cluster, which is its left
 			// across the ranks.
@@ -606,11 +707,17 @@ func clip(n NodePlace, kind string, px, py float64) (float64, float64) {
 // outline returns where the line from the center of a node toward the
 // center plus dx, dy meets the border of its shape, as a part of dx, dy:
 // below 1 for a point outside the shape, 1 on its border and above 1
-// inside it.
+// inside it. A shape with its label under its figure has the border of its
+// figure, and a person the border of its head and its body.
 func outline(n NodePlace, kind string, dx, dy float64) float64 {
 	hw, hh := n.Width/2, n.Height/2
+	if LabelBelow(kind) {
+		kind, hw, hh = figureOutline(kind)
+	}
 	var t float64
 	switch kind {
+	case person:
+		t = cross(personPolygon(n.Width, n.Height), dx, dy)
 	case "ellipse", "circle", "doublecircle", "oval", "point", "bullseye", mcircle, "fr-circ", "cross-circ", "cloud", "bang", businessEllipse:
 		t = 1 / math.Sqrt(dx*dx/(hw*hw)+dy*dy/(hh*hh))
 	case "diamond", "rhombus", mdiamond:

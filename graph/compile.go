@@ -4,11 +4,11 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"maps"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/xo/zuzu/internal/shape"
 	zlayout "github.com/xo/zuzu/layout"
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text"
@@ -92,6 +92,15 @@ func signature(r map[string]any, keys []string, field string) string {
 	return s
 }
 
+// runRows returns the runs of a label as the values of a row.
+func runRows(runs []Run) []any {
+	out := make([]any, len(runs))
+	for j, run := range runs {
+		out[j] = map[string]any{"text": run.Text, "bold": run.Bold, "italic": run.Italic}
+	}
+	return out
+}
+
 // lines splits a label into its lines.
 func lines(s string) []any {
 	var out []any
@@ -154,50 +163,17 @@ func style(r map[string]any, st map[string]string) {
 	}
 }
 
-// shiftDash returns a dash that starts off along a dash, as the offset of
-// a dash of SVG does, since the scene has no offset of a dash. When the
-// offset falls in a dash, the dash starts with the rest of that dash and
-// ends with its first part and a gap of 0, so that the two parts join.
-// When it falls in a gap, the dash starts at the next dash, since a dash
-// of 0 draws a dot with round ends: the dashes come up to a gap early.
+// shiftDash returns a dash of the values of a spec that starts off along
+// the dash, as shape.ShiftDash shifts it.
 func shiftDash(dash []any, off float64) []any {
-	var d []float64
+	d := make([]float64, 0, len(dash))
 	for _, v := range dash {
 		f, _ := v.(float64)
 		d = append(d, f)
 	}
-	if len(d)%2 == 1 {
-		// SVG repeats a dash of an odd length to make it even.
-		d = append(d, d...)
-	}
-	var period float64
-	for _, v := range d {
-		period += v
-	}
-	if !(period > 0) {
+	out := shape.ShiftDash(d, off)
+	if len(out) == len(d) && slices.Equal(out, d) {
 		return dash
-	}
-	off = math.Mod(off, period)
-	if off < 0 {
-		off += period
-	}
-	if off == 0 {
-		return dash
-	}
-	// Find the dash or the gap where the offset falls.
-	i := 0
-	for ; i < len(d)-1 && off >= d[i]; i++ {
-		off -= d[i]
-	}
-	var out []float64
-	if i%2 == 0 {
-		out = append(out, d[i]-off)
-		out = append(out, d[i+1:]...)
-		out = append(out, d[:i]...)
-		out = append(out, off, 0)
-	} else {
-		out = append(out, d[i+1:]...)
-		out = append(out, d[:i+1]...)
 	}
 	res := make([]any, 0, len(out))
 	for _, v := range out {
@@ -261,11 +237,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			html = true
 		} else if len(n.Runs) > 0 {
 			// The layout wraps the runs and draws them as a label of HTML.
-			runs := make([]any, len(n.Runs))
-			for j, run := range n.Runs {
-				runs[j] = map[string]any{"text": run.Text, "bold": run.Bold, "italic": run.Italic}
-			}
-			r["runs"], r["lines"] = runs, []any{}
+			r["runs"], r["lines"] = runRows(n.Runs), []any{}
 			html = true
 		}
 		if len(n.Margin) == 2 {
@@ -296,12 +268,20 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		link(r, n.Href, n.Tooltip)
 		style(r, n.Style)
+		if _, ok := n.Style["color"]; !ok && LabelBelow(n.Shape) {
+			// The label sits on the background under the figure, not on
+			// its fill, so it keeps the color of text of the theme.
+			delete(r, "textColor")
+		}
 		categories = categoryRow(r, n.Category, categories, false)
 		if n.Note {
 			r["note"] = true
 		}
 		if n.Solid {
 			r["solid"] = true
+		}
+		if n.Boxed {
+			r["boxed"] = true
 		}
 		add("node", signature(r, paintKeys, "_paint"))
 		text := signature(r, textKeys, "_text")
@@ -341,6 +321,10 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 		if e.HTML != "" {
 			r["html"], r["lines"] = e.HTML, []any{}
+			html = true
+		} else if len(e.Runs) > 0 {
+			// The layout wraps the runs and draws them as a label of HTML.
+			r["runs"], r["lines"] = runRows(e.Runs), []any{}
 			html = true
 		}
 		if e.Wrap > 0 && e.Label != "" && e.HTML == "" {
@@ -395,6 +379,31 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		link(r, e.Href, e.Tooltip)
 		style(r, e.Style)
 		add("edge", signature(r, []string{"stroke", "strokeWidth", "strokeDash"}, "_paint"))
+		if len(e.Strokes) > 1 {
+			// Each color but the one of the edge draws a line of its own,
+			// which the layout writes as a row of the kind edgeLine.
+			strokes := make([]any, len(e.Strokes))
+			for k, c := range e.Strokes {
+				strokes[k] = c
+			}
+			r["strokes"] = strokes
+			if e.Weights != nil {
+				weights := make([]any, len(e.Weights))
+				for k, w := range e.Weights {
+					weights[k] = w
+				}
+				r["weights"] = weights
+			}
+			line := map[string]any{"stroke": e.Strokes[0]}
+			for _, k := range []string{"strokeWidth", "strokeDash"} {
+				if v, ok := r[k]; ok {
+					line[k] = v
+				}
+			}
+			sig := signature(line, []string{"stroke", "strokeWidth", "strokeDash"}, "_paint")
+			r["_linePaint"] = sig
+			add("edgeLine", sig)
+		}
 		text := signature(r, textKeys, "_text")
 		add("edgeText", text)
 		if _, ok := r["xLines"]; ok {
@@ -437,6 +446,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		if c.Direction != "" {
 			r["direction"] = c.Direction
 		}
+		if c.Algorithm != "" {
+			r["algorithm"] = c.Algorithm
+		}
 		if c.HTML != "" {
 			r["html"], r["label"], r["lines"] = c.HTML, "", []any{}
 			html = true
@@ -475,6 +487,20 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}
 	if g.ReverseClusters {
 		layout["reverseClusters"] = true
+	}
+	if len(g.ELK) > 0 {
+		settings := make(map[string]any, len(g.ELK))
+		for k, v := range g.ELK {
+			settings[k] = v
+		}
+		layout["elk"] = settings
+	}
+	if len(g.Order) > 0 {
+		order := make([]any, len(g.Order))
+		for i, id := range g.Order {
+			order[i] = id
+		}
+		layout["order"] = order
 	}
 	if g.Math {
 		layout["math"] = true
@@ -587,6 +613,17 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			"x": field("titleX"), "y": field("titleY"), "text": field("lines"), "align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "top"},
 		}, map[string]string{"textColor": "fill"}))
 	}
+	if len(paints["edgeLine"]) > 0 {
+		// The lines of the colors of an edge of more than one color.
+		data = append(data, filter("layoutEdgeLines", "layout", "datum.kind === 'edgeLine'"))
+	}
+	for _, sig := range paints["edgeLine"] {
+		m := mark("path", "layoutEdgeLines", "_paint", sig, []string{StyleEdge}, map[string]any{
+			"x": map[string]any{"value": 0}, "y": map[string]any{"value": 0}, "path": field("path"),
+		}, nil)
+		m["role"] = scene.RoleEdge
+		marks = append(marks, m)
+	}
 	for _, sig := range paints["edge"] {
 		m := mark("path", "layoutEdges", "_paint", sig, []string{StyleEdge}, map[string]any{
 			"x": map[string]any{"value": 0}, "y": map[string]any{"value": 0}, "path": field("path"),
@@ -600,7 +637,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	}}})
 	for _, sig := range paints["edgeText"] {
 		marks = append(marks, mark("text", "edgeLabels", "_text", sig, []string{StyleEdgeLabel}, map[string]any{
-			"x": field("labelX"), "y": field("labelY"), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
+			"x": field("labelX"), "y": field("labelLineY"), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
 		}, map[string]string{"textColor": "fill"}))
 	}
 	// The labels that take no space in the ranks: at the ends of an edge,
@@ -616,7 +653,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		data = append(data, filter(name, source, fmt.Sprintf("datum.%sLabelWidth > 0", kind)))
 		for _, sig := range sigs {
 			marks = append(marks, mark("text", name, sigField, sig, styles, map[string]any{
-				"x": field(kind + "LabelX"), "y": field(kind + "LabelY"), "text": field(kind + "Lines"),
+				"x": field(kind + "LabelX"), "y": field(kind + "LabelLineY"), "text": field(kind + "Lines"),
 				"align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
 			}, rename))
 		}
@@ -709,7 +746,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	marks = append(marks, htmlText...)
 	for _, sig := range paints["nodeText"] {
 		marks = append(marks, mark("text", "layoutNodes", "_text", sig, []string{StyleNodeLabel}, map[string]any{
-			"x": field("textX"), "y": field("textY"), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
+			"x": field("textX"), "y": field("textLineY"), "text": field("lines"), "align": map[string]any{"value": "center"}, "baseline": map[string]any{"value": "middle"},
 		}, map[string]string{"textColor": "fill"}))
 	}
 	// The text of the fields of a record: each row sets its alignment and
@@ -729,6 +766,9 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}, map[string]string{"textColor": "fill"}))
 	}
 	marks = append(marks, mathMarks(&data, mathParts(g))...)
+	if !links {
+		links = htmlLinks(g)
+	}
 	if links {
 		// Each mark draws a part of a node, an edge or a cluster, and each
 		// row of the layout holds the link and the tooltip of its part.
@@ -792,12 +832,20 @@ func Compile(g *Graph) (*vega.Spec, error) {
 }
 
 // fieldRow writes the fields of a record into the row of its node: the
-// text and the port of each field, and the cells, the alignment and the
-// fonts of the fields when any field sets them.
+// text and the port of each field, and the cells, the alignment, the fonts
+// and the groups of the fields when any field sets them.
 func fieldRow(r map[string]any, n *Node) {
-	var texts, ports, cells, aligns, fonts []any
-	table, align, font := false, false, false
-	for _, f := range n.Fields {
+	writeFields(r, n.Fields)
+	r["lines"] = []any{}
+}
+
+// writeFields writes a list of fields into a row, as fieldRow says. The
+// list groups holds, for each field, nil or the row of the fields of its
+// group in braces, which writeFields writes the same way.
+func writeFields(r map[string]any, fs []Field) {
+	var texts, ports, cells, aligns, fonts, groups []any
+	table, align, font, group := false, false, false, false
+	for _, f := range fs {
 		texts, ports = append(texts, f.Text), append(ports, f.Port)
 		var cs []any
 		for _, c := range f.Cells {
@@ -805,16 +853,23 @@ func fieldRow(r map[string]any, n *Node) {
 		}
 		cells = append(cells, cs)
 		aligns = append(aligns, f.Align)
-		var fs []any
+		var fts []any
 		for _, ft := range f.Fonts {
-			fs = append(fs, fontCode(ft))
+			fts = append(fts, fontCode(ft))
 		}
-		fonts = append(fonts, fs)
+		fonts = append(fonts, fts)
+		var sub any
+		if f.Fields != nil {
+			m := map[string]any{}
+			writeFields(m, f.Fields)
+			sub, group = m, true
+		}
+		groups = append(groups, sub)
 		table = table || len(f.Cells) > 0
 		align = align || f.Align != ""
 		font = font || len(f.Fonts) > 0
 	}
-	r["fields"], r["ports"], r["lines"] = texts, ports, []any{}
+	r["fields"], r["ports"] = texts, ports
 	if table {
 		r["cells"] = cells
 	}
@@ -823,6 +878,9 @@ func fieldRow(r map[string]any, n *Node) {
 	}
 	if font {
 		r["fonts"] = fonts
+	}
+	if group {
+		r["groups"] = groups
 	}
 }
 

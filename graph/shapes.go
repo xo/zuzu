@@ -80,6 +80,9 @@ var shapes = map[string]string{
 	"cross-circ": "cross-circ", "summary": "cross-circ", "crossed-circle": "cross-circ",
 	"fr-circ": "fr-circ", "stop": "fr-circ", "framed-circle": "fr-circ",
 	collapsedGroup: collapsedGroup, businessEllipse: businessEllipse,
+	// The shapes of Mermaid that shapes_figure.go draws.
+	person: person, bpmnStart: bpmnStart, bpmnIntermediate: bpmnIntermediate, bpmnBoundary: bpmnBoundary,
+	bpmnEnd: bpmnEnd, bpmnGateway: bpmnGateway, bpmnData: bpmnData, bpmnDataStore: bpmnDataStore,
 }
 
 // ShapeOf returns the shape that draws a name of a shape, and false for a
@@ -99,6 +102,9 @@ func ShapeOf(name string) (string, bool) {
 // NodeSize returns the size of a node of a shape around a label of a size,
 // with a padding.
 func NodeSize(kind string, tw, th, pad float64) (float64, float64) {
+	if fw, fh, ok := figureSize(kind); ok {
+		return figureNodeSize(fw, fh, tw, th)
+	}
 	w, h := tw+2*pad, th+2*pad*1.2
 	if p, ok := readPolygon(kind); ok {
 		w, h = p.size(w, h)
@@ -110,6 +116,8 @@ func NodeSize(kind string, tw, th, pad float64) (float64, float64) {
 		return mw, mh
 	}
 	switch kind {
+	case person:
+		return personSize(w, h)
 	case msquare, mcircle:
 		d := math.Max(w, h)
 		return d, d
@@ -206,6 +214,17 @@ func ColumnPath(xs []float64, top, bottom float64) string {
 	return b.String()
 }
 
+// RowPath returns the lines between the fields of a group of a record
+// that lie one under another: a line from left to right at each y, around
+// the center of the node.
+func RowPath(ys []float64, left, right float64) string {
+	var b strings.Builder
+	for _, y := range ys {
+		b.WriteString("M" + num(left) + "," + num(y) + "L" + num(right) + "," + num(y))
+	}
+	return b.String()
+}
+
 // ellipsePath returns the path of an ellipse of the radii rx and ry around
 // 0, 0.
 func ellipsePath(rx, ry float64) string {
@@ -295,6 +314,8 @@ func shapePath(kind string, w, h float64) string {
 		return poly([2]float64{-x, -y}, [2]float64{-x + w*0.4, -y}, [2]float64{-x + w*0.4 + t, -y + t}, [2]float64{x, -y + t}, [2]float64{x, y}, [2]float64{-x, y})
 	case "none":
 		return ""
+	case person:
+		return personPath(w, h)
 	case mdiamond:
 		// A line across each corner, a little way in from its tip.
 		t := math.Min(0.25, 9/math.Hypot(x, y))
@@ -318,6 +339,9 @@ func shapePath(kind string, w, h float64) string {
 		return p.path(w, h)
 	}
 	if s, ok := morePath(kind, w, h); ok {
+		return s
+	}
+	if s, ok := figurePath(kind); ok {
 		return s
 	}
 	return shape.RoundRect(-x, -y, w, h, 6, 6, 6, 6)

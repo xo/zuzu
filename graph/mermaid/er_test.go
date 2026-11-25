@@ -161,8 +161,18 @@ func TestERMarkdown(t *testing.T) {
 	if b := node(t, g, "b"); b.Label != "Plain" || b.Style["fontStyle"] != "normal" {
 		t.Errorf("expected the name Plain in the style normal, got %q %v", b.Label, b.Style)
 	}
-	if e := g.Edges[0]; e.Label != "owns" || e.Style["fontWeight"] != graph.BoldWeight {
-		t.Errorf("expected the bold label owns, got %q %v", e.Label, e.Style)
+	if e := g.Edges[0]; e.Label != "owns" || e.Style["fontWeight"] != graph.BoldWeight || e.Runs != nil {
+		t.Errorf("expected the bold label owns in one font, got %q %v %v", e.Label, e.Style, e.Runs)
+	}
+	// A label and a name with no attributes draw a part in its own font.
+	g = classOf(t, "erDiagram\n  a[\"*first*Name\"]\n  a ||--o{ b : \"is **very** big\"")
+	want := []graph.Run{{Text: "first", Italic: true}, {Text: "Name"}}
+	if a := node(t, g, "a"); a.Label != "firstName" || !slices.Equal(a.Runs, want) {
+		t.Errorf("expected the runs %v of firstName, got %q %v", want, a.Label, a.Runs)
+	}
+	want = []graph.Run{{Text: "is "}, {Text: "very", Bold: true}, {Text: " big"}}
+	if e := g.Edges[0]; e.Label != "is very big" || !slices.Equal(e.Runs, want) {
+		t.Errorf("expected the runs %v of is very big, got %q %v", want, e.Label, e.Runs)
 	}
 }
 
@@ -196,6 +206,11 @@ func TestERSubgraphsAndStyles(t *testing.T) {
 	}
 	if g.Clusters[0].Direction != graph.TB {
 		t.Errorf("expected the subgraph to run TB, got %q", g.Clusters[0].Direction)
+	}
+	// Mermaid gives the subgraphs to its layouts in reverse, as those of
+	// a flowchart.
+	if !g.ReverseClusters {
+		t.Error("expected the subgraphs in reverse for the layouts")
 	}
 	if n := node(t, g, "CUSTOMER"); n.Style["fill"] != "#f96" {
 		t.Errorf("CUSTOMER: unexpected style %v", n.Style)

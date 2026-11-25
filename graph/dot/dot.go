@@ -680,6 +680,9 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 	if err := p.paint(e.Style, a, false, path); err != nil {
 		return err
 	}
+	if err := p.strokes(e, a, path); err != nil {
+		return err
+	}
 	var err error
 	op := "--"
 	if p.g.Directed {
@@ -691,6 +694,7 @@ func (p *parser) edge(from, to end, a map[string]string, line int) error {
 		return err
 	}
 	if a["style"] == "invis" {
+		e.Strokes, e.Weights = nil, nil
 		e.Style["stroke"] = "transparent"
 		if e.LabelStyle != nil {
 			e.LabelStyle["color"] = "transparent"
@@ -748,6 +752,12 @@ func (p *parser) graphAttrs(a map[string]string) error {
 			switch strings.ToUpper(v) {
 			case "TB", "BT", "LR", "RL":
 				p.g.Direction = strings.ToUpper(v)
+			default:
+				// Graphviz reads TB for any other value, and so does
+				// zuzu, with an issue.
+				if err := p.issues.Add("graph", "the rankdir %s, drawn as TB", v); err != nil {
+					return err
+				}
 			}
 		case "ranksep":
 			if f, err := strconv.ParseFloat(strings.Fields(v + " ")[0], 64); err == nil {
@@ -839,15 +849,19 @@ func (p *parser) finish() error {
 				}
 				n.Fields, isHTMLLabel = fields, false
 			default:
+				// A group in braces lies the other way from the fields
+				// around it, also when it is the whole label.
 				n.Fields = record(v, n.ID)
 			}
-			// The fields of one group in braces lie one under another
-			// when the ranks run down. When the ranks run across, they
-			// lie one under another too, and not side by side as in
-			// Graphviz.
-			n.Stack = wholeGroup(src) && (p.g.Direction == graph.TB || p.g.Direction == graph.BT)
+			if len(n.Fields) > 0 && n.Fields[0].Fields == nil {
+				// The fields of one group in braces of a label of HTML lie
+				// one under another when the ranks run down. When the
+				// ranks run across, they lie one under another too, and
+				// not side by side as in Graphviz.
+				n.Stack = wholeGroup(src) && (p.g.Direction == graph.TB || p.g.Direction == graph.BT)
+			}
 			var parts []string
-			for _, f := range n.Fields {
+			for _, f := range leaves(n.Fields) {
 				parts = append(parts, f.Text)
 			}
 			n.Label = strings.Join(parts, " | ")
@@ -1062,6 +1076,45 @@ func (p *parser) paint(st, a map[string]string, fills bool, path string) error {
 	return err
 }
 
+// strokes reads the color of an edge that is a list of colors, such as
+// `red:blue` or `red;0.3:blue`, into the lines of the edge, as Graphviz
+// draws them: side by side with no weight, and one after another along the
+// edge with a weight. The arrowheads take the first color, or the last of
+// colors one after another. A color that does not read and a weight that
+// is not a number from 0 to 1 are issues, and the edge draws in its first
+// color.
+func (p *parser) strokes(e *graph.Edge, a map[string]string, path string) error {
+	v := a["color"]
+	if !strings.Contains(v, ":") {
+		return nil
+	}
+	colors, weights, ok := graph.ColorList(v)
+	if !ok {
+		return p.issues.Add(path, "the weights of the colors %s", v)
+	}
+	var strokes []string
+	for _, c := range colors {
+		css, ok := graph.ColorIn(c, a["colorscheme"])
+		if !ok {
+			// paint names the first color that does not read.
+			if c == colors[0] {
+				return nil
+			}
+			return p.issues.Add(path, "the color %s", c)
+		}
+		strokes = append(strokes, css)
+	}
+	if len(strokes) < 2 {
+		return nil
+	}
+	e.Strokes = strokes
+	if slices.ContainsFunc(weights, func(w float64) bool { return w >= 0 }) {
+		e.Weights = weights
+		e.Style["stroke"] = strokes[len(strokes)-1]
+	}
+	return nil
+}
+
 // hasStyle reports whether a style of DOT, a list split by commas or
 // spaces, holds a word.
 func hasStyle(style, word string) bool {
@@ -1214,17 +1267,19 @@ func margin(v string) ([]float64, error) {
 	return out, nil
 }
 
-// record reads the fields of the label of a record, {a|<p>b|c}, flat: a
-// field of a nested group is a field of the record. A field with no text,
-// as in `a| |b`, is an empty field, as in Graphviz.
+// record reads the fields of the label of a record, {a|<p>b|c}. A group
+// in braces is a field that holds its fields, which lie the other way from
+// the fields around it, as in Graphviz. A field with no text, as in
+// `a| |b`, is an empty field, as in Graphviz. Text before or after a group
+// in the same field is a field of its own.
 func record(v, id string) []graph.Field {
 	// An escaped bracket or bar is text, so it hides in a private rune
 	// while the fields split.
-	hide := strings.NewReplacer(`\{`, "\ue001", `\}`, "\ue002", `\|`, "\ue003", `\<`, "\ue004", `\>`, "\ue005")
-	show := strings.NewReplacer("\ue001", "{", "\ue002", "}", "\ue003", "|", "\ue004", "<", "\ue005", ">")
-	parts, _ := splitRecord(hide.Replace(v), false)
-	var out []graph.Field
-	for _, part := range parts {
+	hide := strings.NewReplacer(`\{`, "", `\}`, "", `\|`, "", `\<`, "", `\>`, "")
+	show := strings.NewReplacer("", "{", "", "}", "", "|", "", "<", "", ">")
+	src := hide.Replace(v)
+	i := 0
+	leaf := func(part string) graph.Field {
 		part = strings.TrimSpace(part)
 		f := graph.Field{}
 		if strings.HasPrefix(part, "<") {
@@ -1233,7 +1288,93 @@ func record(v, id string) []graph.Field {
 				part = strings.TrimSpace(part[j+1:])
 			}
 		}
-		f.Text = show.Replace(label(part, id))
+		text, align := recordText(part, id)
+		f.Text, f.Align = show.Replace(text), align
+		return f
+	}
+	// group reads the fields up to the brace that ends the group, or to
+	// the end of the label.
+	var group func() []graph.Field
+	group = func() []graph.Field {
+		out := []graph.Field{}
+		var b strings.Builder
+		// closed says that a group ended the field, so that the field has
+		// no text of its own unless text follows the group.
+		closed := false
+		end := func() {
+			if !closed || strings.TrimSpace(b.String()) != "" {
+				out = append(out, leaf(b.String()))
+			}
+			b.Reset()
+			closed = false
+		}
+		for i < len(src) {
+			c := src[i]
+			i++
+			switch c {
+			case '{':
+				if strings.TrimSpace(b.String()) != "" {
+					out = append(out, leaf(b.String()))
+				}
+				b.Reset()
+				out = append(out, graph.Field{Fields: group()})
+				closed = true
+			case '|':
+				end()
+			case '}':
+				end()
+				return out
+			default:
+				b.WriteByte(c)
+			}
+		}
+		end()
+		return out
+	}
+	return group()
+}
+
+// recordText reads the text of a field of a record, as label does, and
+// returns the alignment of its lines, as graph.Field.Align says: \l ends a
+// line at the left, \r a line at the right, and \n or the end of the text
+// a line in the middle. It returns no alignment for a text whose lines are
+// all in the middle.
+func recordText(v, id string) (string, string) {
+	var align []byte
+	for i := 0; i+1 < len(v); i++ {
+		if v[i] != '\\' {
+			continue
+		}
+		switch v[i+1] {
+		case 'n':
+			align = append(align, 'c')
+		case 'l':
+			align = append(align, 'l')
+		case 'r':
+			align = append(align, 'r')
+		}
+		i++
+	}
+	text := label(v, id)
+	if lines := strings.Count(text, "\n") + 1; len(align) < lines {
+		// The last line, which no \n, \l or \r ends, is in the middle.
+		align = append(align, 'c')
+	}
+	if !slices.ContainsFunc(align, func(c byte) bool { return c != 'c' }) {
+		return text, ""
+	}
+	return text, string(align)
+}
+
+// leaves returns the fields of a record that hold no group, in their
+// order, with the fields of each group in its place.
+func leaves(fs []graph.Field) []graph.Field {
+	var out []graph.Field
+	for _, f := range fs {
+		if f.Fields != nil {
+			out = append(out, leaves(f.Fields)...)
+			continue
+		}
 		out = append(out, f)
 	}
 	return out

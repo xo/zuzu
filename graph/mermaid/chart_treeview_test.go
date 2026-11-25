@@ -215,9 +215,10 @@ func TestTreeViewGrammar(t *testing.T) {
 		{"treeView-beta\n  a.txt %% c\n  b\n", []string{"0 /", "1 a.txt %% c", "1 b"}},
 		// A comment on a line of its own drops.
 		{"treeView-beta\n  a\n  %% a note\n  b\n", []string{"0 /", "1 a", "1 b"}},
-		// A name keeps its spaces, and a slash at its end makes a
-		// directory.
-		{"treeView-beta\n  my  file  \n  'dir/'\n", []string{"0 /", "1 my  file", "1 dir"}},
+		// A name keeps its spaces, which draw as spaces that do not
+		// break, so that the run keeps its width, and a slash at its end
+		// makes a directory.
+		{"treeView-beta\n  my  file  \n  'dir/'\n", []string{"0 /", "1 my\u00a0\u00a0file", "1 dir"}},
 		// An item with less indent than the first goes to the root.
 		{"treeView-beta\n    a\n      b\n  c\n", []string{"0 /", "1 a", "2 b", "1 c"}},
 		// Spaces after a name in quotes are the indent of the next item.

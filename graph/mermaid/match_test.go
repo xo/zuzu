@@ -2,6 +2,7 @@ package mermaid
 
 import (
 	"errors"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -235,6 +236,19 @@ func TestLayoutHints(t *testing.T) {
 	} {
 		if err := strictCheck(t, src); err != nil {
 			t.Errorf("%q: %v", src, err)
+		}
+	}
+	// The section elk goes to the graph, for the engine of ELK.
+	elkGraph := classOf(t, "---\nconfig:\n  elk:\n    mergeEdges: true\n    layeringLayerBound: 3\n    preset: legacy\n---\nflowchart LR\n  A --> B\n")
+	if want := map[string]string{"mergeEdges": "true", "layeringLayerBound": "3", "preset": "legacy"}; !maps.Equal(elkGraph.ELK, want) {
+		t.Errorf("expected the settings %v, got %v", want, elkGraph.ELK)
+	}
+	// The algorithm of a subgraph goes to its cluster, for the engine of
+	// ELK. Mermaid reads it only on a subgraph.
+	g := classOf(t, "flowchart TD\n  subgraph grp\n    a\n  end\n  subgraph other\n    b\n  end\n  grp@{ algorithm: elk.box }\n  b@{ algorithm: elk.force }\n")
+	for _, c := range g.Clusters {
+		if want := map[string]string{"grp": "elk.box"}[c.ID]; c.Algorithm != want {
+			t.Errorf("the cluster %s has the algorithm %q, want %q", c.ID, c.Algorithm, want)
 		}
 	}
 	// Mermaid 12.3 has no layout elk.layered.

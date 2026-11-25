@@ -29,11 +29,12 @@ var ucSettings = []string{
 // ucConfig is the config of a use case diagram: the widths in the pixels
 // of Mermaid at which a label wraps and under which a use case does not
 // shrink, the styles of the fonts of the actors and of the use cases, and
-// whether each actor, use case and system boundary takes a color in turn.
+// whether each actor, use case and system boundary takes a color in turn,
+// or only each system boundary.
 type ucConfig struct {
 	wrap, minWidth         float64
 	actorFont, usecaseFont map[string]string
-	rotate                 bool
+	rotate, panels         bool
 }
 
 // usecaseGraph reads a use case diagram, usecase-beta, into a graph. It
@@ -108,7 +109,10 @@ func ucStyleEnd(s string) string {
 // spaces of the layout on the graph, and the rest into a ucConfig. A value
 // that does not read is an issue, and the setting keeps its default.
 func ucReadConfig(d *Diagram, is *graph.Issues, g *graph.Graph) (ucConfig, error) {
-	cfg := ucConfig{wrap: 120, minWidth: 120, actorFont: map[string]string{}, usecaseFont: map[string]string{}}
+	// In a color theme, Mermaid gives each system boundary a color in
+	// turn with each colorScheme, role too.
+	cfg := ucConfig{wrap: 120, minWidth: 120, actorFont: map[string]string{}, usecaseFont: map[string]string{},
+		panels: slices.Contains(colorThemes, themeName(d))}
 	m, _ := d.Config["usecase"].(map[string]any)
 	if m == nil {
 		return cfg, nil
@@ -769,7 +773,8 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 	}
 	// With rotate, the actors and then the use cases take the colors of
 	// the hash of their ids, and the system boundaries take the colors of
-	// the hash of theirs, as panels (D37, D56). colored holds the nodes
+	// the hash of theirs, as panels (D37, D56). In a color theme, the
+	// system boundaries take their colors with role too. colored holds the nodes
 	// that take a color, in that order.
 	var colored []*graph.Node
 	labelOf := func(s *ucState) (string, graph.Font) {
@@ -857,8 +862,10 @@ func (m *ucModel) build(d *Diagram, g *graph.Graph, cfg ucConfig, is *graph.Issu
 		}
 		g.Clusters = append(g.Clusters, c)
 	}
-	if cfg.rotate {
+	if cfg.rotate || cfg.panels {
 		panelColors(g.Clusters)
+	}
+	if cfg.rotate {
 		nodeColors(colored, g.Clusters)
 	}
 	for _, e := range m.edges {

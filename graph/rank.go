@@ -57,8 +57,9 @@ func acyclic(n int, edges []redge) ([]redge, []bool) {
 // Koutsofios, North and Vo, 1993, describe it: each edge spans at least its
 // minlen, and the sum of the spans times the weights is the least. The
 // edges must hold no cycle. Each part of the graph that no edge joins ranks
-// on its own, from 0.
-func rankNodes(n int, edges []redge) []int {
+// on its own, from 0. With balanced, as for a graph with no cluster, each
+// part then moves its nodes to balance its ranks, as balance says.
+func rankNodes(n int, edges []redge, balanced bool) []int {
 	// Join the edges between the same two nodes.
 	type pair struct{ u, v int }
 	merged := map[pair]int{}
@@ -114,8 +115,58 @@ func rankNodes(n int, edges []redge) []int {
 			}
 		}
 		simplex(nodes, pe, rank)
+		if balanced {
+			balance(nodes, pe, rank)
+		}
 	}
 	return rank
+}
+
+// balance moves each node whose edges in weigh as much as its edges out to
+// the rank between the ranks that its edges allow that holds the fewest
+// nodes, as the balance of the ranks of dot does for a graph with no
+// cluster. Such a move keeps the sum of the spans times the weights. The
+// nodes move in their order, and a move counts for the nodes after it. Of
+// two ranks with as few nodes, the node takes the first.
+func balance(nodes []int, es []redge, rank []int) {
+	top := 0
+	for _, x := range nodes {
+		top = max(top, rank[x])
+	}
+	count := make([]int, top+1)
+	for _, x := range nodes {
+		count[rank[x]]++
+	}
+	in := make(map[int][]redge, len(nodes))
+	out := make(map[int][]redge, len(nodes))
+	for _, e := range es {
+		out[e.u] = append(out[e.u], e)
+		in[e.v] = append(in[e.v], e)
+	}
+	for _, x := range nodes {
+		inWeight, outWeight := 0.0, 0.0
+		low, high := 0, top
+		for _, e := range in[x] {
+			inWeight += e.weight
+			low = max(low, rank[e.u]+e.minlen)
+		}
+		for _, e := range out[x] {
+			outWeight += e.weight
+			high = min(high, rank[e.v]-e.minlen)
+		}
+		if inWeight != outWeight {
+			continue
+		}
+		choice := low
+		for r := low + 1; r <= high; r++ {
+			if count[r] < count[choice] {
+				choice = r
+			}
+		}
+		count[rank[x]]--
+		count[choice]++
+		rank[x] = choice
+	}
 }
 
 // simplex ranks one connected part of a graph by network simplex.

@@ -1,7 +1,10 @@
 package mermaid_test
 
 import (
+	"encoding/json/v2"
 	"testing"
+
+	"github.com/xo/zuzu/graph/mermaid"
 
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/theme"
@@ -65,5 +68,36 @@ func TestGanttSections(t *testing.T) {
 		if it.datum["y0"] != nil || it.datum["y"] != nil {
 			t.Errorf("a gantt with no section draws %s %q", it.mark, it.text)
 		}
+	}
+}
+
+// TestGanttTitleAtSections checks that the title of a gantt with names of
+// sections moves left to start at the names, and that a gantt with no
+// sections keeps its title at the time axis.
+func TestGanttTitleAtSections(t *testing.T) {
+	t.Parallel()
+	dx := func(src string) any {
+		d, err := mermaid.Read(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _, _, err := mermaid.Chart(d, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var spec struct {
+			Title map[string]any `json:"title"`
+		}
+		if err := json.Unmarshal(b, &spec); err != nil {
+			t.Fatal(err)
+		}
+		return spec.Title["dx"]
+	}
+	body := "gantt\ntitle T\ndateFormat YYYY-MM-DD\n"
+	if v, ok := dx(body + "section Design\nSketch : 2024-01-01, 2d\n").(float64); !ok || v >= -40 {
+		t.Errorf("the title of a gantt with sections moves by %v, want left of the names of the tasks", v)
+	}
+	if v := dx(body + "Sketch : 2024-01-01, 2d\n"); v != nil {
+		t.Errorf("the title of a gantt with no sections moves by %v", v)
 	}
 }

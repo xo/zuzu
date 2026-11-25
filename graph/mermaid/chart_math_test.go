@@ -1,6 +1,7 @@
 package mermaid_test
 
 import (
+	"cmp"
 	"encoding/json/v2"
 	"errors"
 	"slices"
@@ -284,25 +285,49 @@ func TestChartMathBox(t *testing.T) {
 
 // TestChartMathGrows checks that a fraction makes the label that holds it
 // higher than a label of text, so that the participant, the note, the
-// message, the node and the block that hold it grow.
+// message, the node and the block that hold it grow. A message with math
+// keeps no line of text above its formula, as in Mermaid, so a message
+// with a fraction grows over a message with a formula of one line.
+// TestSequenceMathMessage checks that a message with math sets its
+// formula 2 above its line, and takes less height than a message of text,
+// as in Mermaid.
+func TestSequenceMathMessage(t *testing.T) {
+	t.Parallel()
+	ys := func(label string) (float64, float64) {
+		spec, report := mathSpec(t, "sequenceDiagram\n  A->>B: hi\n  A->>B: "+label+"\n", true)
+		if len(report) > 0 {
+			t.Errorf("the report %q", report)
+		}
+		rows := specData(spec, "messages")
+		return num(rows[0]["y"]), num(rows[1]["y"])
+	}
+	t0, t1 := ys("ab")
+	m0, m1 := ys("$$x$$")
+	if m1-m0 >= t1-t0 {
+		t.Errorf("a message with math is %v below the one before, and a message of text %v", m1-m0, t1-t0)
+	}
+}
+
 func TestChartMathGrows(t *testing.T) {
 	t.Parallel()
 	frac := `$$\frac{a}{b}$$`
 	tests := []struct {
 		name, src, set string
 		size           func(r map[string]any) float64
+		// plain is the label that the fraction grows over, or "" for ab.
+		plain string
 	}{
 		{"participant", "sequenceDiagram\n  participant A as %s\n  A->>A: hi\n", "lifelines", func(r map[string]any) float64 {
 			return num(r["y"])
-		}},
+		}, ""},
 		{"note", "sequenceDiagram\n  participant A\n  Note over A: %s\n", "notes", func(r map[string]any) float64 {
 			return num(r["y2"]) - num(r["y"])
-		}},
+		}, ""},
 		{"message", "sequenceDiagram\n  A->>B: hi\n  A->>B: %s\n", "messages", func(r map[string]any) float64 {
 			return num(r["y"])
-		}},
-		{"mindmap", "mindmap\n  root[\"%s\"]\n", "nodes", func(r map[string]any) float64 { return num(r["height"]) }},
-		{"block", "block-beta\n  a[\"%s\"]\n", "blocks", func(r map[string]any) float64 { return num(r["height"]) }},
+		}, "$$ab$$"},
+		{"mindmap", "mindmap\n  root[\"%s\"]\n", "nodes", func(r map[string]any) float64 { return num(r["height"]) }, ""},
+		{"block", "block-beta\n  a[\"%s\"]\n", "blocks", func(r map[string]any) float64 { return num(r["height"]) }, ""},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -318,7 +343,7 @@ func TestChartMathGrows(t *testing.T) {
 				}
 				return test.size(rows[len(rows)-1])
 			}
-			text, math := last("ab"), last(frac)
+			text, math := last(cmp.Or(test.plain, "ab")), last(frac)
 			t.Logf("with text %v, with a fraction %v", text, math)
 			if math <= text {
 				t.Errorf("with a fraction %v, with text %v, want more", math, text)

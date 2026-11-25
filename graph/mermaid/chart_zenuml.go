@@ -232,7 +232,7 @@ func (z *zenuml) walkFrom(stats []*zStat, origin, caller string, known bool, par
 }
 
 // stat translates one statement into events.
-func (z *zenuml) stat(st *zStat, origin, caller string, known bool, number string, comment []string) error {
+func (z *zenuml) stat(st *zStat, origin, caller string, known bool, number string, comment zComment) error {
 	from, to := st.from, st.to
 	if from != "" {
 		z.add(from)
@@ -263,7 +263,7 @@ func (z *zenuml) stat(st *zStat, origin, caller string, known bool, number strin
 		// activates the new participant below its head.
 		n := z.event(seqEvent{
 			kind: "message", line: st.line, from: from, to: to, arrow: arrow, activate: st.kind == "sync",
-			text: seqText{lines: zLines(st.label)}, number: number, comment: comment,
+			text: seqText{lines: zLines(st.label)}, number: number, comment: comment.lines, commentRuns: comment.runs,
 		})
 		if st.kind == "creation" {
 			if p := z.s.byID[to]; p.created < 0 && !p.used {
@@ -302,7 +302,7 @@ func (z *zenuml) stat(st *zStat, origin, caller string, known bool, number strin
 		}
 		z.event(seqEvent{
 			kind: "message", line: st.line, from: from, to: to, arrow: arrow,
-			text: seqText{lines: zLines(st.label)}, number: number, comment: comment,
+			text: seqText{lines: zLines(st.label)}, number: number, comment: comment.lines, commentRuns: comment.runs,
 		})
 		z.use(from, to)
 	case "divider":
@@ -330,8 +330,8 @@ var zBlocks = map[string]string{
 
 // fragment translates a fragment into a block of the sequence: its start,
 // its sections and its end.
-func (z *zenuml) fragment(st *zStat, origin, caller string, known bool, number string, comment []string) error {
-	e := seqEvent{kind: "start", line: st.line, block: zBlocks[st.frag], number: number, comment: comment, from: origin}
+func (z *zenuml) fragment(st *zStat, origin, caller string, known bool, number string, comment zComment) error {
+	e := seqEvent{kind: "start", line: st.line, block: zBlocks[st.frag], number: number, comment: comment.lines, commentRuns: comment.runs, from: origin}
 	if len(st.sections) > 0 {
 		e.text = seqText{lines: zLines(st.sections[0].label)}
 	}
@@ -372,24 +372,34 @@ var (
 	// comment, such as [red] or <bold>, which ZenUML applies to the
 	// comment and the message.
 	zStyleRE = regexp.MustCompile(`^\s*((?:<[^>]*>|\([^)]*\)|\[[^\]]*\]|\s)+)`)
-	// zMarkRE matches the marks of Markdown that zuzu takes out of a
-	// comment: bold, italic with underscores, and code.
-	zMarkRE = regexp.MustCompile("\\*\\*|__|`")
+	// zCodeRE matches the code of Markdown in a comment, between two
+	// backticks.
+	zCodeRE = regexp.MustCompile("`([^`]*)`")
 )
 
-// comment returns the lines of a comment that ZenUML draws over a
-// statement. A style of the comment and its Markdown are issues, and the
-// text draws plain.
-func (z *zenuml) comment(raw []string) ([]string, error) {
+// zComment is the comment of a statement of ZenUML: its lines, with no
+// marks of Markdown, and the runs of its Markdown, or nil for a comment in
+// one font.
+type zComment struct {
+	lines []string
+	runs  []textRun
+}
+
+// comment returns the comment that ZenUML draws over a statement. ZenUML
+// draws the Markdown of a comment: bold text between two stars or two
+// underscores, and italic text between one star or one underscore. Code
+// between backticks draws as plain text, with no backticks, as ZenUML
+// draws it. A style of the comment is an issue.
+func (z *zenuml) comment(raw []string) (zComment, error) {
 	if len(raw) == 0 {
-		return nil, nil
+		return zComment{}, nil
 	}
 	var lines []string
 	for k, l := range raw {
 		if k == len(raw)-1 {
 			if m := zStyleRE.FindString(l); strings.TrimSpace(m) != "" {
 				if err := z.c.add("the style %s of a comment", strings.TrimSpace(m)); err != nil {
-					return nil, err
+					return zComment{}, err
 				}
 				l = l[len(m):]
 			}
@@ -398,14 +408,20 @@ func (z *zenuml) comment(raw []string) ([]string, error) {
 			lines = append(lines, l)
 		}
 	}
-	text := strings.Join(lines, " ")
-	if zMarkRE.MatchString(text) {
-		if err := z.c.add("the Markdown of the comment %q, drawn as plain text", text); err != nil {
-			return nil, err
+	runs := markdownRuns(zCodeRE.ReplaceAllString(strings.Join(lines, "\n"), "$1"))
+	var c zComment
+	var b strings.Builder
+	for _, r := range runs {
+		if r.text == "\n" {
+			c.lines = append(c.lines, b.String())
+			b.Reset()
+			continue
 		}
-		for k := range lines {
-			lines[k] = zMarkRE.ReplaceAllString(lines[k], "")
+		b.WriteString(r.text)
+		if r.bold || r.italic {
+			c.runs = runs
 		}
 	}
-	return lines, nil
+	c.lines = append(c.lines, b.String())
+	return c, nil
 }

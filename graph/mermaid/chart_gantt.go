@@ -102,10 +102,17 @@ func (g *gantt) spec() (map[string]any, error) {
 	// not grow.
 	least := ganttMillis(lo, hi) * ganttMinBar / g.width
 	measure := g.c.d.estimate()
+	backward := g.backward()
 	var normal, done, active, crit, miles, verts, names []any
 	for i, t := range g.tasks {
 		if t.vert {
 			verts = append(verts, map[string]any{"name": t.name, "at": t.start.Format(ganttLayout)})
+			continue
+		}
+		if !backward && !t.milestone && t.render.Before(t.start) {
+			// Mermaid draws a bar of a negative width for a task that ends
+			// before it starts, which SVG does not draw. The task keeps
+			// its row.
 			continue
 		}
 		start, end := t.start, t.render
@@ -310,7 +317,13 @@ func (g *gantt) spec() (map[string]any, error) {
 		spec["padding"] = map[string]any{"left": 5, "top": 5, "bottom": 5, "right": *g.rightPadding}
 	}
 	if g.title != "" {
-		spec["title"] = map[string]any{"text": g.title, "anchor": "start"}
+		t := map[string]any{"text": g.title, "anchor": "start"}
+		if g.namesLeft > 0 {
+			// The title starts at the names of the sections, at the left
+			// of the chart, and not at the time axis.
+			t["dx"] = -g.namesLeft
+		}
+		spec["title"] = t
 	}
 	if desc := describe(g.c.d, g.desc); desc != "" {
 		spec["description"] = desc
@@ -474,6 +487,7 @@ func (g *gantt) sections(rows []ganttLane, labeled bool) []any {
 	// before the names of the tasks, which end 8 before the plot and draw
 	// at most 180 wide.
 	left := layout.LabelPad + min(keyWidth, 180) + 16 + nameWidth + 8
+	g.namesLeft = left - 8
 	var bands, names []any
 	for i, r := range runs {
 		y0, y1 := float64(r.first*ganttRow), float64((r.last+1)*ganttRow)
@@ -644,15 +658,26 @@ func (g *gantt) backward() bool {
 	return last.Before(first)
 }
 
-// span returns the first and the last time that the tasks draw.
+// span returns the first and the last time of the time axis. As in
+// Mermaid, the axis runs from the first start to the last end, so a task
+// that ends before it starts does not make it longer. When every task ends
+// before the first start, the axis runs backward over the starts and the
+// ends of all the tasks.
 func (g *gantt) span() (time.Time, time.Time) {
+	backward := g.backward()
 	var lo, hi time.Time
 	for _, t := range g.tasks {
-		for _, at := range []time.Time{t.start, t.render} {
-			if lo.IsZero() || at.Before(lo) {
+		for k, at := range []time.Time{t.start, t.render} {
+			if !backward && k == 0 && (lo.IsZero() || at.Before(lo)) {
 				lo = at
 			}
-			if hi.IsZero() || at.After(hi) {
+			if !backward && k == 1 && (hi.IsZero() || at.After(hi)) {
+				hi = at
+			}
+			if backward && (lo.IsZero() || at.Before(lo)) {
+				lo = at
+			}
+			if backward && (hi.IsZero() || at.After(hi)) {
 				hi = at
 			}
 		}

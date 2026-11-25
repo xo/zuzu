@@ -94,9 +94,12 @@ func (l *tvLayout) walk(n *tvNode, depth int) {
 		l.icon(id, ic, labelX+size/2, cy, size)
 		labelX += size + k(tvIconGap)
 	}
-	w := l.m.Width(f, n.name)
+	// Mermaid draws a name and a description in white-space pre, with
+	// their spaces.
+	name := keepSpaces(n.name)
+	w := l.m.Width(f, name)
 	l.labels = append(l.labels, map[string]any{
-		"id": id, "depth": depth, "x": round2(labelX), "y": round2(cy), "text": n.name, "fontWeight": f.Weight,
+		"id": id, "depth": depth, "x": round2(labelX), "y": round2(cy), "text": name, "fontWeight": f.Weight,
 	})
 	l.rows = append(l.rows, tvRow{n: n, id: id, x: x, y: y, labelRight: labelX + w})
 	l.rowY[n] = y
@@ -138,9 +141,9 @@ func (l *tvLayout) annotate() {
 				continue
 			}
 			l.descs = append(l.descs, map[string]any{
-				"id": r.id, "x": round2(x), "y": round2(r.y + l.rowH/2), "text": r.n.desc,
+				"id": r.id, "x": round2(x), "y": round2(r.y + l.rowH/2), "text": keepSpaces(r.n.desc),
 			})
-			l.width = math.Max(l.width, x+l.m.Width(f, r.n.desc)+l.padX)
+			l.width = math.Max(l.width, x+l.m.Width(f, keepSpaces(r.n.desc))+l.padX)
 		}
 	}
 	for _, r := range l.rows {

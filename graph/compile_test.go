@@ -63,6 +63,57 @@ func TestCompileNoLabelAndWeight(t *testing.T) {
 	}
 }
 
+// TestCompileForELK checks that Compile writes what only the engine of ELK
+// reads: the order of the nodes and the clusters, the box of a node, and
+// the algorithm of a cluster.
+func TestCompileForELK(t *testing.T) {
+	t.Parallel()
+	spec, err := Compile(&Graph{
+		Nodes:    []*Node{{ID: "a", Boxed: true}, {ID: "b", Cluster: "k"}},
+		Clusters: []*Cluster{{ID: "k", Algorithm: "elk.box"}},
+		Order:    []string{"b", "k", "a"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	for _, want := range []string{`"order":["b","k","a"]`, `"boxed":true`, `"algorithm":"elk.box"`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("expected %s in the spec", want)
+		}
+	}
+	if n := strings.Count(s, `"boxed":`); n != 1 {
+		t.Errorf("expected one box in the spec, got %d", n)
+	}
+}
+
+// TestCompileColorLines checks that an edge of more than one color writes
+// its colors, and that the spec draws the lines of the other colors.
+func TestCompileColorLines(t *testing.T) {
+	t.Parallel()
+	spec, err := Compile(&Graph{
+		Nodes: []*Node{{ID: "a"}, {ID: "b"}},
+		Edges: []*Edge{{Source: "a", Target: "b", Strokes: []string{"red", "blue"}, Weights: []float64{0.3, -1}, Style: map[string]string{"stroke": "blue"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	for _, want := range []string{`"strokes":["red","blue"]`, `"weights":[0.3,-1]`, `"_linePaint":"stroke"`, `"name":"layoutEdgeLines"`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("expected %s in the spec", want)
+		}
+	}
+}
+
 func TestBusinessEllipse(t *testing.T) {
 	t.Parallel()
 	if got, ok := ShapeOf(businessEllipse); !ok || got != businessEllipse {

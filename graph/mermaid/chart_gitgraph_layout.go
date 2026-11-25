@@ -73,8 +73,9 @@ func newGitLayout(g *gitGraph) *gitLayout {
 	p := 0.0
 	for _, b := range l.branches {
 		var lines []string
+		// Mermaid draws the label of a branch with its spaces.
 		for _, s := range gitBreak.Split(b.name, -1) {
-			lines = append(lines, strings.TrimSpace(s))
+			lines = append(lines, keepSpaces(strings.TrimSpace(s)))
 		}
 		w := 0.0
 		for _, s := range lines {
@@ -297,7 +298,8 @@ func (l *gitLayout) branch(name string) {
 	}
 	l.add("branchBoxes", map[string]any{"key": name, "x": x0, "y": y0, "x2": x0 + w, "y2": y0 + h}, x0, y0, x0+w, y0+h)
 	l.add("branchLabels", map[string]any{
-		"key": name, "x": x0 + w/2, "y": y0 + h/2, "lines": lineRows(lines), "text": strings.Join(lines, " "),
+		"key": name, "x": x0 + w/2, "y": graph.FirstLine(y0+h/2, len(lines), lh(gitBranchFont), "middle"),
+		"lines": lineRows(lines), "text": strings.Join(lines, " "),
 	}, x0, y0, x0+w, y0+h)
 }
 

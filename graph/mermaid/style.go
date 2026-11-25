@@ -84,12 +84,6 @@ var reduxSections = []string{
 // rotate (D37).
 var colorThemes = []string{"redux-color", "redux-dark-color"}
 
-// themeName returns the theme of Mermaid in which a diagram draws, or
-// empty for none. A theme in the section of the kind, such as venn.theme,
-// wins over the theme at the top of the config, as in Mermaid 12.3 (D35
-// part 10). A diagram whose source has no theme that Mermaid 12.3.0 has
-// takes the theme that Mermaid sets in the section of its kind by
-// default, redux-color in a few kinds (D37).
 // sourceTheme returns the theme of Mermaid that the source of a diagram
 // names, in the section of its kind or at the top of its config, or empty
 // for none.
@@ -104,6 +98,13 @@ func sourceTheme(d *Diagram) string {
 	return ""
 }
 
+// themeName returns the theme of Mermaid in which a diagram draws, or
+// empty for none. A theme in the section of the kind, such as venn.theme,
+// wins over the theme at the top of the config, as in Mermaid 12.3 (D35
+// part 10). A diagram whose source has no theme that Mermaid 12.3.0 has
+// takes the theme that Mermaid sets in the section of its kind by
+// default, redux-color in a few kinds (D37). It still draws in the scheme
+// of zuzu (D55).
 func themeName(d *Diagram) string {
 	name, _ := d.Config["theme"].(string)
 	section := themeSection(d.Kind)
@@ -419,11 +420,9 @@ const (
 // mermaidSizes are the sizes in pixels, in the measure of IBM Plex Sans,
 // at which mmdc measures the labels that wrap, by kind of diagram and by
 // label, where the size is not 14. The label "" is each label of the kind
-// that the map does not name. A timeline, a mindmap and a kanban draw their
-// labels at 16. A use case diagram draws a use case at 12, and an actor at 14.
-// that the map does not name. A timeline and a mindmap draw their labels
-// at 16. A use case diagram draws a use case at 12, and an actor at 14. A
-// venn diagram draws its texts at 20, at its default width of 800, and the
+// that the map does not name. A timeline, a mindmap, a kanban, a railroad,
+// a tree view and an event model draw their labels at 16. A use case
+// diagram draws a use case at 12, and an actor at 14. A venn diagram draws its texts at 20, at its default width of 800, and the
 // labels of its sets at 24, which zuzu draws at 11 and 13.2.
 // mmdc measures every label of a sequence diagram at 16 pixels in Times
 // New Roman, which is as wide as 14.5 pixels of the font of zuzu (D32).

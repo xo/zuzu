@@ -186,6 +186,39 @@ func TestGanttBackward(t *testing.T) {
 	}
 }
 
+// TestGanttTaskEndsBeforeStart checks that a task that ends before it
+// starts draws no bar and keeps its row, and that the time axis runs from
+// the first start to the last end, as in Mermaid.
+func TestGanttTaskEndsBeforeStart(t *testing.T) {
+	t.Parallel()
+	d, err := Read("gantt\ndateFormat YYYY-MM-DD\na : 2024-01-01, 2024-01-10\nb : 2024-01-20, 2023-12-01\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, report, err := Chart(d, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	s := string(b)
+	if strings.Contains(s, `"task":"b"`) {
+		t.Error("the task b that ends before it starts draws a bar")
+	}
+	if !strings.Contains(s, `"domain":["a","b"]`) {
+		t.Errorf("the task b has no row: %s", s)
+	}
+	g := &gantt{tasks: []*ganttTask{
+		{start: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), end: time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)},
+		{start: time.Date(2024, 1, 20, 0, 0, 0, 0, time.UTC), end: time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC)},
+	}}
+	for _, t := range g.tasks {
+		t.render = t.end
+	}
+	lo, hi := g.span()
+	if !lo.Equal(g.tasks[0].start) || !hi.Equal(g.tasks[0].end) {
+		t.Errorf("the axis runs from %v to %v, want from the first start to the last end", lo, hi)
+	}
+}
+
 func TestGanttCycle(t *testing.T) {
 	t.Parallel()
 	for _, src := range []string{

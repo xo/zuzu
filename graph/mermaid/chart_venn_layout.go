@@ -400,7 +400,7 @@ func (l *vennLayout) texts(data []*vennArea, s *vennSolution, centers map[string
 			x := (x0 + cw*(float64(i%cols)+0.5)) * l.k
 			y := (y0 + ch*(float64(i/cols)+0.5)) * l.k
 			lines, lw := plainLines(label(t), vennTextFont.Size, vennTextFont.Weight, cw*0.9*l.k, l.m)
-			row := map[string]any{"x": x, "y": y, "lines": anyStrings(lines)}
+			row := map[string]any{"x": x, "y": graph.FirstLine(y, len(lines), lh(vennTextFont), "middle"), "lines": anyStrings(lines)}
 			if col, ok, err := l.color(t.id, "color"); err != nil {
 				return err
 			} else if ok {

@@ -402,7 +402,7 @@ func (b *blockDiagram) spec() map[string]any {
 		}
 		if lines, maths, w, h := b.edgeMath(e.label); maths != nil {
 			x, y := (x0+x1)/2, (y0+y1)/2
-			edgeLabels = append(edgeLabels, map[string]any{"edge": i, "text": []any{}, "x": x, "y": y, "width": w + 8, "height": h + 4})
+			edgeLabels = append(edgeLabels, map[string]any{"edge": i, "text": []any{}, "x": x, "y": y, "textY": y, "width": w + 8, "height": h + 4})
 			texts, paths := b.layLabel(lines, maths, text.Font{Family: text.Family, Size: b.font, Weight: 400}, x, y, true, nil)
 			edgeRuns, edgeMath = append(edgeRuns, keyed(texts, "edge", i)...), append(edgeMath, keyed(paths, "edge", i)...)
 		} else if e.label != "" {
@@ -411,8 +411,11 @@ func (b *blockDiagram) spec() map[string]any {
 			for _, s := range ls {
 				tl = append(tl, s)
 			}
+			// The box of the label takes the middle of its lines, and the
+			// text the y of its first line.
+			y := (y0 + y1) / 2
 			edgeLabels = append(edgeLabels, map[string]any{
-				"edge": i, "text": tl, "x": (x0 + x1) / 2, "y": (y0 + y1) / 2,
+				"edge": i, "text": tl, "x": (x0 + x1) / 2, "y": y, "textY": graph.FirstLine(y, len(ls), b.font*1.3, "middle"),
 				"width": w + 8, "height": float64(len(ls))*b.font*1.3 + 4,
 			})
 		}
@@ -470,7 +473,7 @@ func (b *blockDiagram) spec() map[string]any {
 			"xc": field("x"), "yc": field("y"), "width": field("width"), "height": field("height"),
 		}}},
 		map[string]any{"type": "text", "name": "edgeLabels", "from": map[string]any{"data": "edgeLabels"}, "style": []any{graph.StyleEdgeLabel}, "encode": map[string]any{"update": map[string]any{
-			"x": field("x"), "y": field("y"), "text": field("text"), "fontSize": value(b.font), "lineHeight": value(b.font * 1.3),
+			"x": field("x"), "y": field("textY"), "text": field("text"), "fontSize": value(b.font), "lineHeight": value(b.font * 1.3),
 			"align": value("center"), "baseline": value("middle"),
 		}}},
 	)

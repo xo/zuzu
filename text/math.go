@@ -252,9 +252,9 @@ type MathLine struct {
 // LayMathLine lays out a line of a label with runs of math in a font, with
 // a line of text lineHeight high. Mermaid draws each run as an item of a
 // row, which drops the spaces at its ends, so a run of text loses them, and
-// a run of spaces alone draws nothing. A thin space of 3/18 of the size of
-// the font stands between a run of text and a run of math, so that the two
-// do not touch (docs/STYLE.md). A run of text measures with m, and a run
+// a run of spaces alone draws nothing. A run of text and a run of math
+// meet with no space between them, as in Mermaid (docs/STYLE.md). A run of
+// text measures with m, and a run
 // of math lays out in the font of math of m at the size of the font.
 // A run of math that does not lay out gives its error, and the line is
 // nil.
@@ -267,9 +267,6 @@ func LayMathLine(m Measurer, f Font, runs []Run, lineHeight float64) (*MathLine,
 			if r.Text == "" {
 				continue
 			}
-		}
-		if n := len(l.Pieces); n > 0 && l.Pieces[n-1].Math != r.Math {
-			l.Width += f.Size * MathGap
 		}
 		p := Piece{Run: r, X: l.Width}
 		if r.Math {
@@ -292,10 +289,6 @@ func LayMathLine(m Measurer, f Font, runs []Run, lineHeight float64) (*MathLine,
 	}
 	return l, nil
 }
-
-// MathGap is the space between a run of text and a run of math, in ems of
-// the font of the text: a thin space of TeX.
-const MathGap = 3.0 / 18
 
 // ErrNoMathFont is the error of a run of math with no font of math, which
 // zuzu.WithMath gives.

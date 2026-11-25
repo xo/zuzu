@@ -3,11 +3,13 @@ package dot
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/xo/okage/html"
 
 	"github.com/xo/zuzu/graph"
+	"github.com/xo/zuzu/scene"
 )
 
 // htmlMark starts the value of an attribute that came as a string of HTML,
@@ -26,6 +28,16 @@ func isHTML(v string) (string, bool) {
 // the style radial of a table or a cell itself.
 func (p *parser) html(src, scheme, path string) (*html.Label, error) {
 	src, _, _ = graph.HTMLGradients(src)
+	src, tables, cells := graph.HTMLLinks(src, false)
+	for _, ln := range slices.Concat(tables, cells) {
+		// A link with a scheme that zuzu does not write is an issue, as
+		// for a node, and the part has no link.
+		if ln.Href != "" && !scene.LinkAllowed(ln.Href) {
+			if err := p.issues.Add(path, "the link %s, whose scheme zuzu does not write", ln.Href); err != nil {
+				return nil, err
+			}
+		}
+	}
 	l, issues, err := html.Parse(src)
 	if err != nil {
 		if se, ok := errors.AsType[*html.SyntaxError](err); ok {
