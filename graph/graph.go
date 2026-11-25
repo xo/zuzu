@@ -60,6 +60,11 @@ type Graph struct {
 	// LaneEdges makes an edge between two lanes move its target to the next
 	// rank, as LayoutInput.LaneEdges says.
 	Lanes, LaneEdges bool
+	// LaneOrder orders the lanes, and LaneHops draws the hops of the
+	// routes of a layout in lanes, as the fields of LayoutInput of the same
+	// names say.
+	LaneOrder bool
+	LaneHops  string
 	// ClusterDirection is the direction of a cluster with no direction of
 	// its own that lays out on its own in zuzu.dagre, as
 	// LayoutInput.ClusterDirection says, or empty. A state diagram of

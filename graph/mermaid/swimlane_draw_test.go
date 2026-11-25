@@ -25,6 +25,24 @@ var swimlaneRanks = map[string]map[string]int{
 	"04-nested-rl.mmd":       {"check": 2, "intake": 0, "plan": 1, "review": 2, "sign": 3},
 	"05-lane-edges.mmd":      {"a": 0, "b": 1, "c": 1, "d": 2, "e": 3},
 	"06-styles.mmd":          {"intake": 0, "plan": 1, "review": 1},
+	"07-lane-order.mmd":      {"confirm": 0, "invoice": 0, "order": 0, "paid": 1, "pick": 0, "receive": 1, "ship": 1},
+	"08-line-hops.mmd":       {"draft": 0, "lead": 0, "legal": 1, "plan": 0, "price": 2, "sign": 3, "staff": 1, "start": 2},
+	"09-line-hops-gap.mmd":   {"draft": 0, "lead": 0, "legal": 1, "plan": 0, "price": 2, "sign": 3, "staff": 1, "start": 2},
+	"10-rank-crossings.mmd":  {"approve": 1, "ask": 0, "create": 2, "grant": 3, "use": 4},
+}
+
+// swimlaneLanes holds the order of the lanes of each fixture whose lanes
+// mmdc orders with automaticLaneOrdering. The lanes of the other fixtures
+// keep the order of the source.
+var swimlaneLanes = map[string][]string{
+	"07-lane-order.mmd": {"Finance", "Customer", "Sales", "Warehouse"},
+}
+
+// swimlaneHops holds the kind of the hops that a fixture draws where two
+// routes cross: A for an arc, and M for a gap.
+var swimlaneHops = map[string]string{
+	"08-line-hops.mmd":     "A",
+	"09-line-hops-gap.mmd": "M",
 }
 
 // laneBox is the box of a row of a layout, from its top left to its bottom
@@ -41,9 +59,11 @@ func (b laneBox) overlaps(o laneBox) bool {
 
 // TestSwimlaneFixtures draws each fixture of swimlane and checks it: each
 // node and each label of the source draws once, each node has the rank of
-// mmdc, each node is in the laneBox of its lane, the lanes lie side by side in
-// the order of the source and run along all the ranks, no two nodes
-// overlap, and each edge routes at right angles around the other nodes.
+// mmdc, each node is in the laneBox of its lane, the lanes lie side by side
+// in the order of mmdc and run along all the ranks, no two nodes overlap,
+// each edge routes at right angles around the other nodes and shares no
+// line with another edge, a hop draws where two edges cross, and the title
+// of a lane turns when the ranks run from the left to the right.
 func TestSwimlaneFixtures(t *testing.T) {
 	t.Parallel()
 	for _, path := range fixtures(t, "swimlane") {
@@ -69,6 +89,8 @@ func TestSwimlaneFixtures(t *testing.T) {
 			nodes, clusters := map[string]laneBox{}, map[string]laneBox{}
 			rank := map[string]int{}
 			var routes [][][2]float64
+			var paths []string
+			titles := map[string]drawnItem{}
 			for _, it := range items {
 				switch it.datum["kind"] {
 				case "node":
@@ -84,6 +106,9 @@ func TestSwimlaneFixtures(t *testing.T) {
 					nodes[key] = laneBox{x - w/2, y - h/2, x + w/2, y + h/2}
 					rank[key] = int(expr.Number(it.datum["rank"]))
 				case "cluster":
+					if it.mark == scene.Text {
+						titles[expr.String(it.datum["key"])] = it
+					}
 					if it.mark != scene.Rect {
 						continue
 					}
@@ -101,6 +126,7 @@ func TestSwimlaneFixtures(t *testing.T) {
 						pts = append(pts, [2]float64{expr.Number(xy[0]), expr.Number(xy[1])})
 					}
 					routes = append(routes, pts)
+					paths = append(paths, expr.String(it.datum["path"]))
 				}
 			}
 			for _, n := range g.Nodes {
@@ -138,14 +164,65 @@ func TestSwimlaneFixtures(t *testing.T) {
 			if want := swimlaneRanks[name]; !maps.Equal(rank, want) {
 				t.Errorf("expected the ranks of mmdc %v, got %v", want, rank)
 			}
-			checkLanes(t, g, nodes, clusters, routes)
+			checkLanes(t, g, swimlaneLanes[name], nodes, clusters, routes)
+			checkHops(t, swimlaneHops[name], paths)
+			checkTitles(t, g, nodes, clusters, titles)
 		})
 	}
 }
 
+// checkHops checks that the paths of the edges draw the hops of a kind, A
+// for an arc and M for a gap, and no hop of another kind.
+func checkHops(t *testing.T, kind string, paths []string) {
+	t.Helper()
+	arcs, gaps := 0, 0
+	for _, p := range paths {
+		arcs += strings.Count(p, "A")
+		gaps += strings.Count(p[min(1, len(p)):], "M")
+	}
+	switch {
+	case kind == "A" && (arcs == 0 || gaps > 0), kind == "M" && (gaps == 0 || arcs > 0), kind == "" && arcs+gaps > 0:
+		t.Errorf("expected the hops %q, got %d arcs and %d gaps", kind, arcs, gaps)
+	}
+}
+
+// checkTitles checks the title of each lane: it turns by -90 degrees and
+// lies at the left of the nodes of its lane, inside the lane, when the
+// ranks run from the left to the right, and it does not turn otherwise.
+func checkTitles(t *testing.T, g *graph.Graph, nodes, clusters map[string]laneBox, titles map[string]drawnItem) {
+	t.Helper()
+	for _, c := range g.Clusters {
+		it, ok := titles[c.ID]
+		if c.Parent != "" || !ok {
+			continue
+		}
+		angle := it.item.Angle
+		if g.Direction != graph.LR {
+			if angle != 0 {
+				t.Errorf("lane %s: expected a title that does not turn, got the angle %v", c.ID, angle)
+			}
+			continue
+		}
+		if angle != -90 {
+			t.Errorf("lane %s: expected a title turned by -90 degrees, got %v", c.ID, angle)
+		}
+		x, y := it.item.X, it.item.Y
+		lane := clusters[c.ID]
+		if x < lane.x1 || x > lane.x2 || y < lane.y1 || y > lane.y2 {
+			t.Errorf("lane %s: expected its title at %v %v inside the lane %v", c.ID, x, y, lane)
+		}
+		for _, n := range g.Nodes {
+			if b, ok := nodes[n.ID]; ok && n.Cluster == c.ID && b.x1 < x {
+				t.Errorf("lane %s: expected its title at the left of the node %s, got %v and %v", c.ID, n.ID, x, b)
+			}
+		}
+	}
+}
+
 // checkLanes checks the boxes of the lanes and of the nodes, and the
-// routes, of a layout in lanes.
-func checkLanes(t *testing.T, g *graph.Graph, nodes, clusters map[string]laneBox, routes [][][2]float64) {
+// routes, of a layout in lanes. The lanes lie in the order of order, or of
+// the source for none.
+func checkLanes(t *testing.T, g *graph.Graph, order []string, nodes, clusters map[string]laneBox, routes [][][2]float64) {
 	t.Helper()
 	parent := map[string]string{}
 	var lanes []string
@@ -154,6 +231,9 @@ func checkLanes(t *testing.T, g *graph.Graph, nodes, clusters map[string]laneBox
 		if c.Parent == "" {
 			lanes = append(lanes, c.ID)
 		}
+	}
+	if order != nil {
+		lanes = order
 	}
 	top := func(c string) string {
 		for parent[c] != "" {
@@ -195,6 +275,11 @@ func checkLanes(t *testing.T, g *graph.Graph, nodes, clusters map[string]laneBox
 	}
 	for i, pts := range routes {
 		e := g.Edges[i]
+		for j := range i {
+			if sharesLine(pts, routes[j]) {
+				t.Errorf("edge %s -> %s shares a line with edge %s -> %s", e.Source, e.Target, g.Edges[j].Source, g.Edges[j].Target)
+			}
+		}
 		for k := 1; k < len(pts); k++ {
 			p, q := pts[k-1], pts[k]
 			if math.Abs(p[0]-q[0]) > 0.01 && math.Abs(p[1]-q[1]) > 0.01 {
@@ -211,6 +296,28 @@ func checkLanes(t *testing.T, g *graph.Graph, nodes, clusters map[string]laneBox
 			}
 		}
 	}
+}
+
+// sharesLine reports whether two routes at right angles run along the same
+// line for more than a pixel.
+func sharesLine(a, b [][2]float64) bool {
+	for k := 1; k < len(a); k++ {
+		for m := 1; m < len(b); m++ {
+			p, q, r, s := a[k-1], a[k], b[m-1], b[m]
+			for axis := range 2 {
+				o := 1 - axis
+				if math.Abs(p[o]-q[o]) > 0.01 || math.Abs(r[o]-s[o]) > 0.01 || math.Abs(p[o]-r[o]) > 1 {
+					continue
+				}
+				lo := math.Max(math.Min(p[axis], q[axis]), math.Min(r[axis], s[axis]))
+				hi := math.Min(math.Max(p[axis], q[axis]), math.Max(r[axis], s[axis]))
+				if hi-lo > 1 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // cuts reports whether a part of a route at a right angle passes through a

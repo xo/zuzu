@@ -1,0 +1,24 @@
+---
+config:
+  swimlane:
+    automaticLaneOrdering: true
+---
+swimlane-beta TB
+  subgraph Customer
+    order[Place order]
+    receive[Receive goods]
+  end
+  subgraph Finance
+    invoice[Send invoice]
+    paid[Record payment]
+  end
+  subgraph Warehouse
+    pick[Pick items]
+    ship[Ship order]
+  end
+  subgraph Sales
+    confirm[Confirm order]
+  end
+  order --> confirm --> pick --> ship --> receive
+  confirm --> invoice --> paid
+  receive --> paid

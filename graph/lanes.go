@@ -12,11 +12,12 @@ import (
 
 // The lane layout is the layout of a swimlane diagram of Mermaid 12.3. Each
 // cluster at the top of the graph is a lane, a band that runs along the
-// ranks, beside the other lanes in the order of the input. A node is in the
-// lane of the cluster at the top that holds it. The ranks run as the
-// swimlane layout of Mermaid ranks them: an edge between two lanes does not
-// push its target to the next rank, and a lane holds one node in each rank.
-// The edges route at right angles between the nodes.
+// ranks, beside the other lanes in the order of the input, or in the order
+// of orderLanes with LaneOrder. A node is in the lane of the cluster at the
+// top that holds it. The ranks run as the swimlane layout of Mermaid ranks
+// them: an edge between two lanes does not push its target to the next
+// rank, and a lane holds one node in each rank. The edges route at right
+// angles between the nodes, and hop where they cross with LaneHops.
 
 // noLane is the lane of a dummy node of a long edge, and of a cluster in
 // the graph that ranks.
@@ -96,6 +97,9 @@ func layLanes(in LayoutInput) (*Layout, error) {
 		l.ends = append(l.ends, end)
 	}
 	l.findLanes()
+	if in.LaneOrder {
+		l.orderLanes()
+	}
 	for _, n := range in.Nodes {
 		w, h := n.Width, n.Height
 		if l.sideways {
@@ -451,6 +455,11 @@ func compactRanks(g *rgraph, lr bool) []int {
 // lanes counts: the longest path, where a node with one source in another
 // lane shares its rank, then 8 passes that move each item toward the mean
 // of the ranks around it, and then each edge spans one rank at least.
+// Mermaid 12.3 then moves each node with the setting
+// optimizeRanksByCrossings to the first rank after its sources when that
+// gives fewer crossings. The longest path already gives each node that
+// rank or an earlier one, so the setting moves no node, and zuzu does not
+// read it.
 func gravityRanks(g *rgraph) []int {
 	order := topoKahn(g)
 	in := incoming(g)

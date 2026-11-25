@@ -1692,10 +1692,11 @@ Mermaid 12.3.
 Each subgraph at the top is a lane. A lane is a band that runs along all
 the ranks. The lanes lie side by side in the order of the source: from the
 left to the right when the ranks run down or up, and from the top to the
-bottom when the ranks run across. A node is in the lane of the subgraph at
-the top that holds it. The nodes outside every subgraph go into a lane of
-their own, with no title, before the other lanes, as in Mermaid. A lane
-that holds no node draws nothing. The two characters `\n` in the title of
+bottom when the ranks run across. With `swimlane.automaticLaneOrdering:
+true`, the lanes take the order that "The order of the lanes" says. A node
+is in the lane of the subgraph at the top that holds it. The nodes outside
+every subgraph go into a lane of their own, with no title, before the
+other lanes, as in Mermaid. A lane that holds no node draws nothing. The two characters `\n` in the title of
 a lane are text, as Mermaid draws them, and in every other label they
 start a new line, as in a flowchart.
 
@@ -1725,6 +1726,36 @@ side by side in it, in the order of the medians of their neighbors, as in
 Mermaid. Mermaid ignores the length of a link, such as `--->`, in a
 swimlane diagram, and so does zuzu.
 
+Before the 8 passes, `swimlane.optimizeRanksByCrossings`, true by default,
+makes Mermaid 12.3 try each node at the first rank after its sources, and
+keep the move when the ranks then have fewer crossings. The longest path
+already gives each node that rank, or an earlier one for a node with one
+source in another lane, so Mermaid 12.3 moves no node. zuzu reads the
+setting and moves no node either. On 2026-11-26, 24 random diagrams drew
+the same ranks in mmdc with the setting true and false, and in zuzu.
+
+#### The order of the lanes
+
+With `swimlane.automaticLaneOrdering: true`, zuzu orders the lanes as
+Mermaid 12.3 does:
+
+1. The cost of an order is the sum, over the edges between two lanes, of
+   the number of places from the lane of one end to the lane of the other.
+   An end on a subgraph inside a lane counts in that lane. An end on a lane
+   itself does not count.
+2. Swaps of two neighbor lanes lower the cost, for as many sweeps as there
+   are lanes, from the order of the source.
+3. The same swaps start again from 8 shuffled orders. A hash FNV-1a of the
+   ids of the lanes, of the weights of the edges between them and of the
+   number of the start gives the seed of each shuffle, and mulberry32 gives
+   its numbers, as in Mermaid.
+4. The order of the least cost wins. Of two orders of the same cost, the
+   one closer to the order of the source wins.
+
+A lane that holds no node takes part in the order, as in Mermaid, and then
+draws nothing. On 2026-11-26, zuzu gave the same order as mmdc to the
+lanes of 30 random diagrams, 9 of which changed the order.
+
 zuzu places the nodes in its own look, on a grid of the lanes and the
 ranks:
 
@@ -1737,25 +1768,66 @@ ranks:
    both sides of its nodes, as in Mermaid.
 4. The label of an edge across the ranks goes in the gap in the middle of
    the ranks of the edge, on its route. The gap grows to hold it.
-5. An edge routes at right angles, around the nodes, with round corners.
-   It crosses the lanes in the rank of its source when it can. It leaves
-   its source and comes into its target on the side that faces the way
-   from the source to the target, when it can. A route costs more where
-   another route or a label already is, so that two routes share a line
-   only when no other way is short.
-6. A link from a node to itself draws as a loop out of the side of the
-   node. Mermaid 12.3 fails to draw such a link, and zuzu draws it.
+5. An edge routes at right angles, around the nodes, with round corners,
+   on a grid of lines. The lines run through the centers of the nodes, the
+   ports of the nodes, the middles of the gaps and the sides of the lanes,
+   and between them at 6 pixels apart at least. It crosses the lanes in
+   the rank of its source when it can. It leaves its source and comes into
+   its target on the side that faces the way from the source to the
+   target, when it can.
+6. Two routes share no part of a line. A route does not bend where another
+   route passes, and does not pass where another route bends, so two
+   routes only cross. Each side of a node has ports 12 apart, or closer on
+   a small side, and a route comes into its target at a port, so that the
+   arrowheads on a side keep apart. A route can leave its source at any
+   line of the grid. Routes side by side keep 12 apart where they can, and
+   6 apart at the least. Where no route keeps apart, a route can pass a
+   bend of another route, and where no such route exists, it can share a
+   line, at a cost. No fixture and no test draws such a route.
+7. The routes take their places as Mermaid 12.3 orders them: the edges
+   between two lanes first, then the shorter edges, from the center of one
+   end to the center of the other. A bend costs as much as 16 pixels of
+   route, and a crossing as much as 40 bends. A step of more than 5 pixels
+   against the way from the source to the target, when the target is more
+   than 10 pixels away that way, costs 2 bends for each pixel along the
+   ranks and 1 bend for each pixel across them, as in Mermaid. Mermaid
+   gives a crossing the cost of 20 bends, in a layout about two times as
+   large. A route also costs more where a label already is.
+8. A link from a node to itself draws as a loop out of the side of the
+   node. The loops of a node go out of its right side and its left side in
+   turn, and each next loop of a side reaches farther. Mermaid 12.3 fails
+   to draw such a link, and zuzu draws it.
 
 A curve of a link that is not `basis`, such as `linear`, draws the route
 at right angles with that curve of Vega. `basis`, the default, draws round
-corners, as the curve `rounded` of Mermaid does. Mermaid draws a hop where
-two routes cross, and zuzu draws none.
+corners, as the curve `rounded` of Mermaid does.
+
+Where two routes cross, one of them takes a hop, as `swimlane.lineHops`
+says, as in Mermaid 12.3. `arc`, the default, and `true` draw an arc of a
+radius of 6 pixels. `gap` draws a gap of that size, and `false` draws no
+hop. Of the two parts that cross, the part that runs across the image
+takes the hop. A hop keeps 2 pixels from a round corner, and a crossing in
+a round corner takes no hop. Two hops close together share the room
+between them, and a hop with a radius of less than 3.6 pixels draws
+nothing. A link of a curve other than `basis`, `linear`, `step`,
+`stepBefore` and `stepAfter` takes no hop, and a link of `linear` or of a
+step that takes a hop draws its route with straight lines.
+
+zuzu draws its lanes and its ranks closer together than Mermaid. Its
+routes have less room to go around, so a dense diagram crosses more often
+than in mmdc, and draws more hops. On 2026-11-26, 84 random diagrams drew
+168 hops in zuzu and 58 in mmdc. Each fixture of the swimlane diagrams
+draws no more crossings than mmdc, plus 10 percent and 1.
 
 The look is the look of zuzu. A lane is a panel with its title at the top
-left, and two lanes have a space of 8 between them. Mermaid draws the title
-of a lane in a band at its left, turned, when the ranks run across. zuzu
-draws it at the top left in each direction. A node and an edge draw as in
-a flowchart, and an edge and its arrowheads take the color `edge`.
+left, and two lanes have a space of 8 between them. When the ranks run
+from the left to the right, the title of a lane turns by -90 degrees, so
+that it reads from the bottom to the top, in a band at the left of the
+lane, in the middle of the lane, as Mermaid 12.3 draws it. A lane is then
+at least as tall as its title. Mermaid 12.3 draws the title of a lane at
+the top when the ranks run from the right to the left, and so does zuzu.
+A title of math does not turn. A node and an edge draw as in a flowchart,
+and an edge and its arrowheads take the color `edge`.
 
 zuzu reads the settings of the section `flowchart`, as a flowchart does,
 and these settings:
@@ -1764,17 +1836,21 @@ and these settings:
 | --- | --- | --- |
 | `layout`, `swimlane.layout` | `swimlane` | `swimlane` lays out in lanes. `dagre` and `elk` draw the diagram as a flowchart, with its subgraphs as clusters, as in Mermaid. `swimlane.layout` wins over `layout` |
 | `swimlane.ignoreCrossLaneEdges` | true | false makes each edge move its target to the next rank |
-| `swimlane.optimizeRanksByCrossings` | true | nothing, when `ignoreCrossLaneEdges` is true. When it is false, true is an issue, because zuzu does not move the ranks to fewer crossings |
-| `swimlane.automaticLaneOrdering` | false | true is an issue. zuzu keeps the lanes in the order of the source |
-| `swimlane.lineHops` | `arc` | false draws no hop, as zuzu always does. `arc` and `gap` are issues |
+| `swimlane.optimizeRanksByCrossings` | true | nothing, as in Mermaid 12.3, which moves no node with it |
+| `swimlane.automaticLaneOrdering` | false | true orders the lanes, as "The order of the lanes" says |
+| `swimlane.lineHops` | `arc` | `arc` and true draw an arc where two routes cross, `gap` draws a gap, and false draws no hop |
 | `swimlane.look`, `swimlane.useMaxWidth` | `neo`, true | `swimlane.look` selects the look, as "Hints of the look and the layout" says, and `useMaxWidth` does nothing |
 
 A swimlane diagram with `layout: dagre` or `layout: elk` reads no other
 setting of the section `swimlane`, and such a setting is an issue. Another
 layout, such as `tidy-tree`, is an issue, and the diagram lays out in
 lanes. The spec of a diagram in lanes draws with the transform
-`zuzu.layered` and its parameter `lanes: true`, and with `laneEdges: true`
-when `ignoreCrossLaneEdges` is false.
+`zuzu.layered` and its parameter `lanes: true`, with `laneEdges: true`
+when `ignoreCrossLaneEdges` is false, with `laneOrder: true` when
+`automaticLaneOrdering` is true, and with `laneHops`, `arc` or `gap`, for
+the hops. A row of a lane whose title turns holds `titleAngle`, -90. The
+parameters `laneOrder` and `laneHops` and the field `titleAngle` wait for
+open question 37.
 
 These parts are issues, as in a flowchart: a `theme` that Mermaid does
 not have, the `themeVariables` and the `themeCSS`, which draw in the look

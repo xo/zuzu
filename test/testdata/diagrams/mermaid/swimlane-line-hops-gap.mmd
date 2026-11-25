@@ -1,0 +1,16 @@
+---
+config:
+  swimlane:
+    lineHops: gap
+---
+swimlane-beta LR
+  subgraph Sales
+    lead[New lead]
+  end
+  subgraph Review
+    draft[Draft offer] --> legal[Legal check] --> price[Price check] --> sign[Sign offer]
+  end
+  subgraph Delivery
+    plan[Plan work] --> staff[Staff team] --> start[Start work]
+  end
+  lead --> start

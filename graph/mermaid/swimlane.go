@@ -64,12 +64,10 @@ func lanesOn(d *Diagram) bool {
 // diagram, or of a flowchart that lays out in lanes. laneLayout reads its
 // layout, and its look draws in the look of zuzu. ignoreCrossLaneEdges
 // false makes an edge between two lanes move its target to the next rank.
-// zuzu does not move the ranks to fewer crossings, so
-// optimizeRanksByCrossings true with that setting is an issue. zuzu does
-// not order the lanes, so automaticLaneOrdering true is an issue. Mermaid
-// draws a hop where two edges cross with lineHops, and zuzu draws none, so
-// a hop is an issue too. A diagram that does not lay out in lanes reads
-// only the layout and the look.
+// It checks automaticLaneOrdering and lineHops, which lanes reads.
+// optimizeRanksByCrossings moves no rank in Mermaid 12.3, as gravityRanks
+// says, so zuzu reads it and does nothing. A diagram that does not lay out
+// in lanes reads only the layout and the look.
 func (f *flowchart) swimlaneSettings(v any) error {
 	m, ok := v.(map[string]any)
 	if !ok {
@@ -81,7 +79,7 @@ func (f *flowchart) swimlaneSettings(v any) error {
 		ignore = b
 	}
 	for _, k := range slices.Sorted(maps.Keys(m)) {
-		b, isBool := m[k].(bool)
+		_, isBool := m[k].(bool)
 		var good bool
 		switch k {
 		case "layout":
@@ -91,10 +89,11 @@ func (f *flowchart) swimlaneSettings(v any) error {
 			good = true
 		case "ignoreCrossLaneEdges":
 			good = on && isBool
-		case "optimizeRanksByCrossings":
-			good = on && isBool && (!b || ignore)
-		case "automaticLaneOrdering", "lineHops":
-			good = on && isBool && !b
+		case "optimizeRanksByCrossings", "automaticLaneOrdering":
+			good = on && isBool
+		case "lineHops":
+			s, _ := m[k].(string)
+			good = on && (isBool || s == graph.LaneHopArc || s == graph.LaneHopGap)
 		default:
 			good = accepted(f.d.Kind, "swimlane."+k, m[k])
 		}
@@ -110,9 +109,25 @@ func (f *flowchart) swimlaneSettings(v any) error {
 
 // lanes makes the graph of a diagram that lays out in lanes: each subgraph
 // at the top is a lane, and the nodes outside every subgraph go into a lane
-// of their own, with no title, before the others, as in Mermaid 12.3.
+// of their own, with no title, before the others, as in Mermaid 12.3. It
+// reads the settings automaticLaneOrdering and lineHops of the section
+// swimlane, with the defaults of Mermaid, false and arc. A value that is
+// not right takes the default, and swimlaneSettings reports it.
 func (f *flowchart) lanes() {
 	f.g.Lanes = true
+	m, _ := f.d.Config["swimlane"].(map[string]any)
+	f.g.LaneOrder, _ = m["automaticLaneOrdering"].(bool)
+	f.g.LaneHops = graph.LaneHopArc
+	switch v := m["lineHops"].(type) {
+	case bool:
+		if !v {
+			f.g.LaneHops = ""
+		}
+	case string:
+		if v == graph.LaneHopGap {
+			f.g.LaneHops = graph.LaneHopGap
+		}
+	}
 	loose := false
 	for _, n := range f.g.Nodes {
 		if n.Cluster == "" {

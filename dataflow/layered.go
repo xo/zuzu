@@ -127,6 +127,19 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 	if err != nil {
 		return nil, err
 	}
+	laneOrder, err := p.boolean("laneOrder", false)
+	if err != nil {
+		return nil, err
+	}
+	laneHops, err := p.str("laneHops", "")
+	if err != nil {
+		return nil, err
+	}
+	switch laneHops {
+	case "", graph.LaneHopArc, graph.LaneHopGap:
+	default:
+		return nil, fmt.Errorf("the hops %q of the lanes: %w", laneHops, ErrParam)
+	}
 	// The order of the sibling clusters in zuzu.dagre.
 	reverseClusters, err := p.boolean("reverseClusters", false)
 	if err != nil {
@@ -254,6 +267,7 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 	}
 	in := graph.LayoutInput{
 		Direction: dir, RankSep: rankSep, NodeSep: nodeSep, ClusterPadding: pad, Lanes: lanes, LaneEdges: laneEdges,
+		LaneOrder: laneOrder, LaneHops: laneHops,
 		ClusterDirection: clusterDir, ReverseClusters: reverseClusters, Order: order, ELK: settings,
 	}
 	text := func(r Row, f *Accessor) string {
@@ -756,6 +770,9 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 		o["kind"] = "cluster"
 		o["x"], o["y"], o["width"], o["height"] = cp.X, cp.Y, cp.Width, cp.Height
 		o["depth"], o["titleX"], o["titleY"] = float64(cp.Depth), cp.TitleX, cp.TitleY
+		if cp.TitleAngle != 0 {
+			o["titleAngle"] = cp.TitleAngle
+		}
 		o["titleWidth"], o["titleHeight"] = titles[i][0], titles[i][1]
 		out = append(out, o)
 		if ml, ok := clusterMaths[i]; ok && cp.Width > 0 {

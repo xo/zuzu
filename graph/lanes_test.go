@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"math"
@@ -155,6 +156,11 @@ func checkLaneRules(t *testing.T, name string, in LayoutInput, l *Layout) {
 	}
 	for i, e := range l.Edges {
 		le := in.Edges[i]
+		for j := range i {
+			if sharesLine(e.Points, l.Edges[j].Points) {
+				t.Errorf("%s: the edges %s -> %s and %s -> %s share a line", name, le.Source, le.Target, in.Edges[j].Source, in.Edges[j].Target)
+			}
+		}
 		if _, ok := nidx[le.Target]; ok && len(e.Points) < 2 {
 			t.Errorf("%s: the edge %s -> %s has no route", name, le.Source, le.Target)
 		}
@@ -173,6 +179,28 @@ func checkLaneRules(t *testing.T, name string, in LayoutInput, l *Layout) {
 			}
 		}
 	}
+}
+
+// sharesLine reports whether two routes at right angles run along the same
+// line for more than a pixel.
+func sharesLine(a, b [][2]float64) bool {
+	for k := 1; k < len(a); k++ {
+		for m := 1; m < len(b); m++ {
+			p, q, r, s := a[k-1], a[k], b[m-1], b[m]
+			for axis := range 2 {
+				o := 1 - axis
+				if math.Abs(p[o]-q[o]) > 0.01 || math.Abs(r[o]-s[o]) > 0.01 || math.Abs(p[o]-r[o]) > 1 {
+					continue
+				}
+				lo := math.Max(math.Min(p[axis], q[axis]), math.Min(r[axis], s[axis]))
+				hi := math.Min(math.Max(p[axis], q[axis]), math.Max(r[axis], s[axis]))
+				if hi-lo > 1 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func TestLaneRules(t *testing.T) {
@@ -221,5 +249,106 @@ func TestLaneLayout(t *testing.T) {
 	}
 	if l, err := Lay(LayoutInput{Lanes: true}); err != nil || l.Width != 0 {
 		t.Errorf("expected an empty layout, got %v %v", l, err)
+	}
+}
+
+func TestLaneShuffle(t *testing.T) {
+	t.Parallel()
+	// The hash and the shuffle of Mermaid 12.3, as node computes them.
+	seed := fnv1a("Customer|Finance|Warehouse|Sales#Customer:Sales:1|Customer:Warehouse:1#3")
+	if seed != 920223388 || fnv1a("é|x") != 313676272 {
+		t.Errorf("expected the hashes of JavaScript, got %d and %d", seed, fnv1a("é|x"))
+	}
+	if got := shuffleLanes([]int{0, 1, 2, 3, 4, 5}, seed); !slices.Equal(got, []int{2, 4, 0, 1, 3, 5}) {
+		t.Errorf("expected the shuffle of JavaScript, got %v", got)
+	}
+}
+
+func TestLaneOrder(t *testing.T) {
+	t.Parallel()
+	// The fixture 07-lane-order of graph/mermaid, whose lanes mmdc orders
+	// Finance, Customer, Sales and Warehouse.
+	in := lanesInput(TB, []string{"order:Customer", "receive:Customer", "invoice:Finance", "paid:Finance", "pick:Warehouse", "ship:Warehouse", "confirm:Sales"},
+		[2]string{"order", "confirm"}, [2]string{"confirm", "pick"}, [2]string{"pick", "ship"}, [2]string{"ship", "receive"},
+		[2]string{"confirm", "invoice"}, [2]string{"invoice", "paid"}, [2]string{"receive", "paid"})
+	lanes := func(in LayoutInput) []string {
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		idx := make([]int, len(in.Clusters))
+		for i := range idx {
+			idx[i] = i
+		}
+		slices.SortStableFunc(idx, func(a, b int) int { return cmp.Compare(l.Clusters[a].X, l.Clusters[b].X) })
+		ids := make([]string, len(idx))
+		for k, i := range idx {
+			ids[k] = in.Clusters[i].ID
+		}
+		return ids
+	}
+	if got := lanes(in); !slices.Equal(got, []string{"Customer", "Finance", "Warehouse", "Sales"}) {
+		t.Errorf("expected the order of the input, got %v", got)
+	}
+	in.LaneOrder = true
+	if got := lanes(in); !slices.Equal(got, []string{"Finance", "Customer", "Sales", "Warehouse"}) {
+		t.Errorf("expected the order of mmdc, got %v", got)
+	}
+}
+
+func TestLaneHops(t *testing.T) {
+	t.Parallel()
+	// The route across takes the hop: an arc of 6 over the crossing, or a
+	// gap.
+	edges := []EdgePlace{
+		{Points: [][2]float64{{50, 0}, {50, 100}}},
+		{Points: [][2]float64{{0, 50}, {100, 50}}},
+	}
+	hops := laneHops(edges, []string{"", ""})
+	if len(hops[0]) != 0 || len(hops[1]) != 1 || hops[1][0].point != [2]float64{50, 50} {
+		t.Fatalf("expected one hop on the route across, got %v", hops)
+	}
+	if got := hopPath("", LaneHopArc, edges[1].Points, hops[1]); got != "M0,50L44,50A6,6 0 0 1 56,50L100,50" {
+		t.Errorf("unexpected arc %q", got)
+	}
+	if got := hopPath("", LaneHopGap, edges[1].Points, hops[1]); got != "M0,50L44,50M56,50L100,50" {
+		t.Errorf("unexpected gap %q", got)
+	}
+	// A crossing in a round corner takes no hop, and a curve that does not
+	// draw straight lines takes none.
+	corner := []EdgePlace{
+		{Points: [][2]float64{{0, 48}, {52, 48}, {52, 100}}},
+		{Points: [][2]float64{{50, 0}, {50, 100}}},
+	}
+	if hops := laneHops(corner, []string{"", ""}); len(hops[0])+len(hops[1]) != 0 {
+		t.Errorf("expected no hop in a round corner, got %v", hops)
+	}
+	if got := hopPath("monotoneX", LaneHopArc, edges[1].Points, hops[1]); strings.Contains(got, "A") {
+		t.Errorf("expected no hop on the curve monotoneX, got %q", got)
+	}
+}
+
+func TestLaneTitles(t *testing.T) {
+	t.Parallel()
+	// The title of a lane turns from the left to the right, in the band at
+	// the left of the lane, and does not turn in another direction.
+	for _, dir := range []string{TB, BT, LR, RL} {
+		in := lanesInput(dir, []string{"a:L", "b:L", "c:M"}, [2]string{"a", "b"}, [2]string{"a", "c"})
+		l, err := Lay(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, c := range l.Clusters {
+			want := 0.0
+			if dir == LR {
+				want = -90
+				if c.TitleX >= l.Nodes[0].X-l.Nodes[0].Width/2 || c.TitleY <= c.Y+in.Clusters[i].TitleWidth || c.TitleY >= c.Y+c.Height {
+					t.Errorf("%s: expected the title of %s in the band at the left, got %v", dir, in.Clusters[i].ID, c)
+				}
+			}
+			if c.TitleAngle != want {
+				t.Errorf("%s: expected the angle %v, got %v", dir, want, c.TitleAngle)
+			}
+		}
 	}
 }

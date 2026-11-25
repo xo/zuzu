@@ -41,10 +41,9 @@ and one ends in a link with no node, which mmdc does not draw either. The
 third, a gantt with `dateFormat ss` and a start of `0`, draws since
 2026-11-22.
 
-A swimlane diagram does not do `optimizeRanksByCrossings` with
-`ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
-lines. Some of its routes share a line, and the titles of its lanes do not
-turn in a layout LR, as mmdc turns them.
+In a swimlane diagram from the left to the right, a title of a lane that
+holds math does not turn, as "Swimlane diagram" in `docs/DIAGRAMS.md`
+says. The rows of the math take no angle.
 
 ### Fix what the review page found
 

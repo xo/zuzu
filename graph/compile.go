@@ -487,6 +487,12 @@ func Compile(g *Graph) (*vega.Spec, error) {
 	if g.LaneEdges {
 		layout["laneEdges"] = true
 	}
+	if g.Lanes && g.LaneOrder {
+		layout["laneOrder"] = true
+	}
+	if g.Lanes && g.LaneHops != "" {
+		layout["laneHops"] = g.LaneHops
+	}
 	if g.ClusterDirection != "" {
 		layout["clusterDirection"] = g.ClusterDirection
 	}
@@ -614,9 +620,15 @@ func Compile(g *Graph) (*vega.Spec, error) {
 		}
 	}
 	for _, sig := range paints["clusterText"] {
-		marks = append(marks, mark("text", "layoutClusters", "_text", sig, []string{StyleClusterTitle}, map[string]any{
+		enc := map[string]any{
 			"x": field("titleX"), "y": field("titleY"), "text": field("lines"), "align": map[string]any{"value": "left"}, "baseline": map[string]any{"value": "top"},
-		}, map[string]string{"textColor": "fill"}))
+		}
+		if g.Lanes && g.Direction == LR {
+			// The title of a lane turns, so that it reads from the bottom
+			// to the top, in the band at the left of the lane.
+			enc["angle"] = map[string]any{"signal": "datum.titleAngle || 0"}
+		}
+		marks = append(marks, mark("text", "layoutClusters", "_text", sig, []string{StyleClusterTitle}, enc, map[string]string{"textColor": "fill"}))
 	}
 	if len(paints["edgeLine"]) > 0 {
 		// The lines of the colors of an edge of more than one color.

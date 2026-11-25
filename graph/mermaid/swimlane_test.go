@@ -107,21 +107,29 @@ func TestSwimlaneSettings(t *testing.T) {
 		settings  string
 		issue     string
 		laneEdges bool
+		// order and hops are LaneOrder and LaneHops.
+		order bool
+		hops  string
 	}{
-		{"ignoreCrossLaneEdges: true\n    optimizeRanksByCrossings: true", "", false},
-		{"ignoreCrossLaneEdges: false\n    optimizeRanksByCrossings: false", "", true},
-		{"ignoreCrossLaneEdges: false", "", true},
-		{"ignoreCrossLaneEdges: false\n    optimizeRanksByCrossings: true", "swimlane.optimizeRanksByCrossings", true},
-		{"ignoreCrossLaneEdges: 1", "swimlane.ignoreCrossLaneEdges", false},
-		{"automaticLaneOrdering: false", "", false},
-		{"automaticLaneOrdering: true", "swimlane.automaticLaneOrdering", false},
-		{"lineHops: false", "", false},
-		{"lineHops: arc", "swimlane.lineHops", false},
-		{"look: neo", "", false},
-		{"useMaxWidth: false", "", false},
-		{"theme: redux-color", "", false},
-		{"theme: sepia", "swimlane.theme", false},
-		{"curve: linear", "swimlane.curve", false},
+		{"ignoreCrossLaneEdges: true\n    optimizeRanksByCrossings: true", "", false, false, "arc"},
+		{"ignoreCrossLaneEdges: false\n    optimizeRanksByCrossings: false", "", true, false, "arc"},
+		{"ignoreCrossLaneEdges: false", "", true, false, "arc"},
+		{"ignoreCrossLaneEdges: false\n    optimizeRanksByCrossings: true", "", true, false, "arc"},
+		{"ignoreCrossLaneEdges: false\n    optimizeRanksByCrossings: 1", "swimlane.optimizeRanksByCrossings", true, false, "arc"},
+		{"ignoreCrossLaneEdges: 1", "swimlane.ignoreCrossLaneEdges", false, false, "arc"},
+		{"automaticLaneOrdering: false", "", false, false, "arc"},
+		{"automaticLaneOrdering: true", "", false, true, "arc"},
+		{"automaticLaneOrdering: yes please", "swimlane.automaticLaneOrdering", false, false, "arc"},
+		{"lineHops: false", "", false, false, ""},
+		{"lineHops: true", "", false, false, "arc"},
+		{"lineHops: arc", "", false, false, "arc"},
+		{"lineHops: gap", "", false, false, "gap"},
+		{"lineHops: jump", "swimlane.lineHops", false, false, "arc"},
+		{"look: neo", "", false, false, "arc"},
+		{"useMaxWidth: false", "", false, false, "arc"},
+		{"theme: redux-color", "", false, false, "arc"},
+		{"theme: sepia", "swimlane.theme", false, false, "arc"},
+		{"curve: linear", "swimlane.curve", false, false, "arc"},
 	} {
 		src := "---\nconfig:\n  swimlane:\n    " + tt.settings + "\n---\nswimlane-beta\n  subgraph A\n    a --> b\n  end"
 		d, err := Read(src)
@@ -136,9 +144,18 @@ func TestSwimlaneSettings(t *testing.T) {
 		if tt.issue == "" && len(report) > 0 || tt.issue != "" && !strings.Contains(got, tt.issue) {
 			t.Errorf("%s: expected the issue %q, got %v", tt.settings, tt.issue, report)
 		}
-		if g.LaneEdges != tt.laneEdges {
-			t.Errorf("%s: expected LaneEdges %v, got %v", tt.settings, tt.laneEdges, g.LaneEdges)
+		if g.LaneEdges != tt.laneEdges || g.LaneOrder != tt.order || g.LaneHops != tt.hops {
+			t.Errorf("%s: expected the lane edges %v, the order %v and the hops %q, got %v %v %q",
+				tt.settings, tt.laneEdges, tt.order, tt.hops, g.LaneEdges, g.LaneOrder, g.LaneHops)
 		}
+	}
+	// With no section swimlane, a diagram in lanes draws the hops, and a
+	// diagram that does not lay out in lanes reads no setting of the lanes.
+	if g, err := swimlaneOf(t, "swimlane-beta\n a --> b"); err != nil || g.LaneHops != "arc" || g.LaneOrder {
+		t.Errorf("expected the defaults of Mermaid, got %v %q %v", err, g.LaneHops, g.LaneOrder)
+	}
+	if g, _ := swimlaneOf(t, "---\nconfig:\n  layout: dagre\n---\nswimlane-beta\n a --> b"); g.LaneHops != "" {
+		t.Errorf("expected no hops for the layout dagre, got %q", g.LaneHops)
 	}
 	// A swimlane diagram reads the section flowchart, as Mermaid does.
 	g, err := swimlaneOf(t, "---\nconfig:\n  flowchart:\n    nodeSpacing: 100\n    curve: linear\n---\nswimlane-beta\n a --> b")

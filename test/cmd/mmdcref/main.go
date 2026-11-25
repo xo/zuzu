@@ -1,7 +1,8 @@
-// Command mmdcref reads the SVG of a flowchart, a state diagram, a class
-// diagram, an entity relationship diagram, a requirement diagram or an
-// agentflow diagram that mmdc drew, and writes the nodes, the edges and
-// the clusters that it holds as JSON, the reference of the check of D31.
+// Command mmdcref reads the SVG of a flowchart, a swimlane diagram, a state
+// diagram, a class diagram, an entity relationship diagram, a requirement
+// diagram or an agentflow diagram that mmdc drew, and writes the nodes, the
+// edges and the clusters that it holds as JSON, the reference of the check
+// of D31.
 // Run test/oracle/diagrams.sh to draw the SVGs and to write the
 // references.
 package main
@@ -65,6 +66,9 @@ var (
 	clusterRE   = regexp.MustCompile(`<g class="cluster[^"]*" id="my-svg-([^"]+)"[^>]*><rect[^>]*x="([-\d.e]+)" y="([-\d.e]+)" width="([-\d.e]+)" height="([-\d.e]+)"`)
 	edgeRE      = regexp.MustCompile(`<path [^>]*data-id="(L_[^"]+)"[^>]*data-points="([^"]+)"`)
 	labelRE     = regexp.MustCompile(`<g class="label" data-id="([^"]+)"[^>]*>(.*?)</g>`)
+	// laneLabelRE matches the label of an edge of a swimlane diagram,
+	// which names the id of its edge at the end of its own id.
+	laneLabelRE = regexp.MustCompile(`<g class="label edgeLabel" id="edge-label-[^"]*-(L_[^"]+)"[^>]*>(.*?)</g></g>`)
 	textRE      = regexp.MustCompile(`<(?:p|span)[^>]*>([^<]*)</`)
 	tagRE       = regexp.MustCompile(`<br\s*/?>`)
 	// emRE matches the tags of bold and italic text inside a label.
@@ -167,6 +171,9 @@ func main() {
 	}
 	labels := map[string]string{}
 	for _, m := range labelRE.FindAllStringSubmatch(s, -1) {
+		labels[m[1]] = text(m[2])
+	}
+	for _, m := range laneLabelRE.FindAllStringSubmatch(s, -1) {
 		labels[m[1]] = text(m[2])
 	}
 	for _, m := range edgeRE.FindAllStringSubmatch(s, -1) {

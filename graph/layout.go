@@ -28,6 +28,15 @@ type LayoutInput struct {
 	// next rank in a layout in lanes, as the setting
 	// swimlane.ignoreCrossLaneEdges false of Mermaid does.
 	LaneEdges bool
+	// LaneOrder orders the lanes so that the edges between two lanes are
+	// short, as the setting swimlane.automaticLaneOrdering of Mermaid 12.3
+	// does. Otherwise the lanes keep the order of the input.
+	LaneOrder bool
+	// LaneHops draws a hop where a route of a layout in lanes crosses
+	// another route, as the setting swimlane.lineHops of Mermaid 12.3
+	// does: an arc for LaneHopArc, a gap for LaneHopGap, and none for
+	// empty.
+	LaneHops string
 	// ClusterDirection is the direction of a cluster with no direction of
 	// its own that lays out on its own in zuzu.dagre, or empty. Empty gives
 	// LR inside a graph of TB, and TB inside a graph of any other direction,
@@ -201,12 +210,22 @@ type EdgePlace struct {
 }
 
 // ClusterPlace is the box of a cluster, its depth from 0 for an outer one,
-// and the place of the top left of its title.
+// and the place of the top left of its title. TitleAngle turns the title
+// around that place, in degrees clockwise, as the angle of a text of Vega.
+// A lane of a layout in lanes from the left to the right takes -90, so
+// that its title reads from the bottom to the top.
 type ClusterPlace struct {
 	X, Y, Width, Height float64
 	Depth               int
 	TitleX, TitleY      float64
+	TitleAngle          float64
 }
+
+// The hops of LayoutInput.LaneHops.
+const (
+	LaneHopArc = "arc"
+	LaneHopGap = "gap"
+)
 
 // vertex is a node of the layered graph: a node of the input, a dummy of a
 // long edge, or the dummy that holds the label of an edge.

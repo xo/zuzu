@@ -1,8 +1,9 @@
 // The tests of this file check the fixtures of DOT, and of the flowcharts, the
-// state diagrams, the class diagrams, the entity relationship diagrams, the
-// requirement diagrams and the agentflow diagrams of Mermaid, against the
-// references of dot and of mmdc (D31). zuzu lays out a graph its own way, so the check does not
-// ask for the places of the reference. It asks that every node, edge,
+// swimlane diagrams, the state diagrams, the class diagrams, the entity
+// relationship diagrams, the requirement diagrams and the agentflow diagrams
+// of Mermaid, against the references of dot and of mmdc (D31). zuzu lays
+// out a graph its own way, so the check does not ask for the places of the
+// reference. It asks that every node, edge,
 // cluster and label of the reference exists, that the hard rules of the
 // layout hold, and that the crossings and the span of the edges are no
 // worse than those of the reference, plus 10 percent and 1.
@@ -393,7 +394,10 @@ func check(t *testing.T, g *graph.Graph, r *ref) {
 // input builds the input of the layout of a graph, with the sizes of the
 // nodes from the length of their labels.
 func input(g *graph.Graph) (graph.LayoutInput, map[string]int) {
-	in := graph.LayoutInput{Direction: g.Direction, RankSep: g.RankSep, NodeSep: g.NodeSep, ClusterPadding: 12}
+	in := graph.LayoutInput{
+		Direction: g.Direction, RankSep: g.RankSep, NodeSep: g.NodeSep, ClusterPadding: 12,
+		Lanes: g.Lanes, LaneEdges: g.LaneEdges, LaneOrder: g.LaneOrder, LaneHops: g.LaneHops,
+	}
 	if in.Direction == "" {
 		in.Direction = graph.TB
 	}
@@ -432,13 +436,16 @@ func input(g *graph.Graph) (graph.LayoutInput, map[string]int) {
 // rules checks the hard rules of D31: an edge that keeps its direction
 // goes from a lower rank to a higher one by its minlen at least, the nodes
 // of a group of the same rank share it, no two nodes overlap, and each
-// cluster holds its members and its nested clusters.
+// cluster holds its members and its nested clusters. In a layout in lanes,
+// an edge spans one rank, and an edge between two lanes spans none unless
+// LaneEdges is set, as in Mermaid.
 func rules(t *testing.T, in graph.LayoutInput, l *graph.Layout, ids map[string]int) {
 	t.Helper()
-	// Ranks double when an edge has a label, for the dummy of the label.
+	// Ranks double when an edge has a label, for the dummy of the label,
+	// except in a layout in lanes.
 	factor := 1
 	for _, e := range in.Edges {
-		if e.LabelWidth > 0 && e.Source != e.Target {
+		if e.LabelWidth > 0 && e.Source != e.Target && !in.Lanes {
 			factor = 2
 		}
 	}
@@ -474,6 +481,14 @@ func rules(t *testing.T, in graph.LayoutInput, l *graph.Layout, ids map[string]i
 		}
 		return ""
 	}
+	// lane returns the cluster at the top that holds a node.
+	lane := func(i int) string {
+		c := in.Nodes[i].Cluster
+		for c != "" && parent[c] != "" {
+			c = parent[c]
+		}
+		return c
+	}
 	for _, e := range in.Edges {
 		a, aok := ids[e.Source]
 		b, bok := ids[e.Target]
@@ -489,6 +504,12 @@ func rules(t *testing.T, in graph.LayoutInput, l *graph.Layout, ids map[string]i
 		minlen := max(e.MinLen, 1) * factor
 		if c := own(a); c != "" && c == own(b) {
 			minlen = max(e.MinLen, 1)
+		}
+		if in.Lanes {
+			minlen = 1
+			if !in.LaneEdges && lane(a) != lane(b) {
+				minlen = 0
+			}
 		}
 		if l.Nodes[b].Rank-l.Nodes[a].Rank < minlen && !reach(b, a) {
 			t.Errorf("edge %s -> %s spans %d ranks, less than %d, and is on no cycle", e.Source, e.Target, l.Nodes[b].Rank-l.Nodes[a].Rank, minlen)

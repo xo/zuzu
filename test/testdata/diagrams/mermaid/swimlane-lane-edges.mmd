@@ -1,0 +1,20 @@
+---
+config:
+  swimlane:
+    ignoreCrossLaneEdges: false
+---
+swimlane-beta LR
+  subgraph Requester
+    ask[Ask for access]
+    use[Use the system]
+  end
+  subgraph Manager
+    approve[Approve]
+  end
+  subgraph IT
+    create[Create account]
+    grant[Grant roles]
+  end
+  ask --> approve --> create --> grant --> use
+  approve --> grant
+  ask --> create
