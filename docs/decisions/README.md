@@ -44,7 +44,7 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D28](D028-random-numbers-are-random-and-the-caller-can-give-a-source.md) | Random numbers are random, and the caller can give a source | Decided. Amended by D38 |
 | [D29](D029-zuzu-builds-with-tinygo-for-webassembly-and-has-no-size.md) | zuzu builds with TinyGo for WebAssembly, and has no size target | Decided |
 | [D30](D030-the-transforms-and-the-scale-that-zuzu-adds-for-tiers-1-and-2.md) | The transforms and the scale that zuzu adds for tiers 1 and 2 | Decided |
-| [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Decided. Amended by D32, D35, D38, D45 and D55 |
+| [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Decided. Amended by D32, D35, D38, D45, D55 and D60 |
 | [D32](D032-how-zuzu-reads-the-parts-of-mermaid-and-dot-that-it-does-not-draw.md) | How zuzu reads the parts of Mermaid and DOT that it does not draw | Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36, D37, D38, D39, D40, D57 and D58 |
 | [D33](D033-vegajs-is-the-oracle-of-expressions-and-schemes-are-go-values.md) | vega.js is the oracle of expressions, and schemes are Go values | Decided. Amends D9 and D15 |
 | [D34](D034-ibm-plex-sans-is-embedded-in-woff2.md) | IBM Plex Sans is embedded in WOFF2 | Decided. Amends D16 |
@@ -73,3 +73,4 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D57](D057-zuzu-draws-no-look-like-xkcd-and-phases-0-and-3-are-done.md) | zuzu draws no look like xkcd, and phases 0 and 3 are done | Decided. Amends D22, D32, D39 and D40 |
 | [D58](D058-the-answers-of-2026-11-25-fonts-seeds-labels-schemes-and-known-differences.md) | The answers of 2026-11-25: fonts, seeds, labels, schemes and known differences | Decided. Amends D15, D16, D32, D35, D40 and D52 |
 | [D59](D059-the-answers-of-2026-11-26-item-canvas-legends-and-text-on-a-color.md) | The answers of 2026-11-26: item, canvas, legends and text on a color | Decided. Amends D17, D35 and D55 |
+| [D60](D060-the-parameters-laneorder-and-lanehops-and-the-field-titleangle.md) | The parameters laneOrder and laneHops, and the field titleAngle | Decided. Amends D31 |

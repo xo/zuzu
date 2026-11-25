@@ -1848,9 +1848,9 @@ lanes. The spec of a diagram in lanes draws with the transform
 `zuzu.layered` and its parameter `lanes: true`, with `laneEdges: true`
 when `ignoreCrossLaneEdges` is false, with `laneOrder: true` when
 `automaticLaneOrdering` is true, and with `laneHops`, `arc` or `gap`, for
-the hops. A row of a lane whose title turns holds `titleAngle`, -90. The
-parameters `laneOrder` and `laneHops` and the field `titleAngle` wait for
-open question 37.
+the hops. A row of a lane whose title turns holds `titleAngle`, -90. D60
+accepts the parameters `laneOrder` and `laneHops` and the field
+`titleAngle`.
 
 These parts are issues, as in a flowchart: a `theme` that Mermaid does
 not have, the `themeVariables` and the `themeCSS`, which draw in the look

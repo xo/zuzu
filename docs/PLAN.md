@@ -1301,13 +1301,6 @@ stays true.
     not import them.
 36. Answered on 2026-11-25 by D57: zuzu draws no look like xkcd, so it
     needs no font for one.
-37. Do the maintainers accept the parameters `laneOrder` and `laneHops` of
-    `zuzu.layered`, and the field `titleAngle` of a row of a cluster? This
-    amends D31. With `lanes`, `laneOrder: true` orders the lanes as the
-    setting `swimlane.automaticLaneOrdering` of Mermaid 12.3 does, and
-    `laneHops`, `arc` or `gap`, draws a hop where two routes cross, as the
-    setting `swimlane.lineHops` does. Both are false or empty by default.
-    `titleAngle` turns the title of a cluster around its place, in degrees,
-    and a lane takes -90 when the ranks run from the left to the right.
-    "Swimlane diagram" in `docs/DIAGRAMS.md` says how a swimlane diagram
-    uses them.
+37. Answered on 2026-11-26 by D60: the maintainers accept the parameters
+    `laneOrder` and `laneHops` of `zuzu.layered`, and the field
+    `titleAngle` of a row of a cluster.
