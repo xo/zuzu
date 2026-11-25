@@ -130,6 +130,8 @@ type options struct {
 	lookFonts map[theme.Look]*text.Fallback
 	seed      int64
 	hasSeed   bool
+	// font is the font of WithFont, or nil (D58).
+	font *text.Fallback
 	// engines are the engines of WithLayoutEngine, and layout the layout of
 	// WithLayout, which hasLayout says the option set (D45).
 	engines   []graph.Engine
@@ -367,6 +369,8 @@ type renderOptions struct {
 	lookFonts map[theme.Look]*text.Fallback
 	seed      int64
 	hasSeed   bool
+	// font is the font of WithFont, or nil (D58).
+	font *text.Fallback
 	// engines are the engines of WithLayoutEngine, and layout the layout of
 	// WithLayout, which hasLayout says the option set (D45).
 	engines   []graph.Engine
@@ -587,15 +591,16 @@ func (c *Chart) Render(ctx context.Context, opts ...RenderOption) (*scene.Scene,
 }
 
 // SVG renders the chart and writes it as SVG. In a look drawn by hand, the
-// SVG embeds the font of the look, such as Excalifont, so that a viewer
-// that lacks the font draws the text in it (D43).
+// SVG embeds the font of the look, such as Excalifont, and else the font of
+// WithFont, so that a viewer that lacks the font draws the text in it (D43,
+// D58).
 func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Report, error) {
 	v, report, err := c.NewView(ctx, opts...)
 	if err != nil {
 		return report, err
 	}
 	var b bytes.Buffer
-	if err := svg.Write(&b, v.scene, svg.WithFont(v.rt.lookFont)); err != nil {
+	if err := svg.Write(&b, v.scene, svg.WithFont(v.rt.font)); err != nil {
 		return report, err
 	}
 	_, err = w.Write(b.Bytes())
@@ -604,8 +609,8 @@ func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Rep
 
 // Image renders the chart and draws it with the direct renderer of okage
 // (D11). The text draws in the bundled IBM Plex Sans (D16), the fonts of
-// WithEmoji and the font of a look drawn by hand of WithLookFont, and in
-// no font of the system, so that a chart gives the same pixels on every
+// WithEmoji, the font of a look drawn by hand of WithLookFont and the font
+// of WithFont, and in no font of the system, so that a chart gives the same pixels on every
 // machine. A character that no font has draws nothing (D32). The pixels
 // are premultiplied, as image.RGBA expects.
 func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, Report, error) {
@@ -635,9 +640,10 @@ func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, R
 		fopts = append(fopts, okagesvg.WithLogger(logger))
 	}
 	fallbacks := c.fallbacks(&o)
-	if v.rt.lookFont != nil {
-		// The font of the look draws the text whose family names it.
-		fallbacks = append(slices.Clone(fallbacks), v.rt.lookFont)
+	if v.rt.font != nil {
+		// The font of the look, or of WithFont, draws the text whose
+		// family names it.
+		fallbacks = append(slices.Clone(fallbacks), v.rt.font)
 	}
 	for _, f := range fallbacks {
 		fopts = append(fopts, okagesvg.WithFontFile(f.Data()))

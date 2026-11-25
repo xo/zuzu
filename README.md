@@ -193,6 +193,22 @@ chart, _, err := zuzu.Parse(src, look, font)
 The look works for a chart too. The SVG embeds the font, so a viewer draws
 the text in Excalifont.
 
+## Other fonts
+
+zuzu draws its text in IBM Plex Sans. Four optional packages hold four
+other fonts, each with six faces: `text/mono` holds IBM Plex Mono,
+`text/humanist` holds Inter, `text/serif` holds IBM Plex Serif and
+`text/rounded` holds Nunito. Give one with `zuzu.WithFont`, so that zuzu
+measures and draws the text in it:
+
+```go
+font := zuzu.WithFont(mono.Font())
+chart, _, err := zuzu.Parse(src, font)
+```
+
+The SVG embeds the font. A program that does not import a package of a
+font does not hold the font.
+
 ## Data from a loader
 
 zuzu reads no file and makes no request of its own. A spec that names its

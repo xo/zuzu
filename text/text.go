@@ -70,16 +70,22 @@ const EmojiFamily = "Noto Color Emoji"
 // Fallback is a font for the characters that IBM Plex Sans does not have,
 // such as the font of the package text/emoji (D32). It is safe for
 // concurrent use, and it decodes and parses its font once, on its first use.
+//
+// A Fallback can hold one face or a collection of faces, such as the six
+// weights and styles of the package text/mono. As the main font of
+// Estimate.SetMain, a collection measures each weight and style in its
+// face of that style with the nearest weight, as the bundled IBM Plex Sans
+// does. As a fallback of NewEstimate, it measures in its first face.
 type Fallback struct {
 	family string
 	source []byte
 	sfnt   func() ([]byte, error)
-	parse  func() (*gotext.Font, error)
+	parse  func() ([]parsedFont, error)
 }
 
 // NewFallback returns a fallback of a family from the bytes of a font file:
-// TrueType, OpenType, WOFF, WOFF2 or EOT (D34). The bytes must not change
-// after the call.
+// TrueType, OpenType, WOFF, WOFF2 or EOT, with one face or a collection of
+// faces (D34). The bytes must not change after the call.
 func NewFallback(family string, data []byte) *Fallback {
 	sfnt := sync.OnceValues(func() ([]byte, error) {
 		b, err := okagesvg.ConvertFontData(data)
@@ -88,16 +94,16 @@ func NewFallback(family string, data []byte) *Fallback {
 		}
 		return b, nil
 	})
-	return &Fallback{family: family, source: data, sfnt: sfnt, parse: sync.OnceValues(func() (*gotext.Font, error) {
+	return &Fallback{family: family, source: data, sfnt: sfnt, parse: sync.OnceValues(func() ([]parsedFont, error) {
 		b, err := sfnt()
 		if err != nil {
 			return nil, err
 		}
-		ft, err := gotext.ParseTTF(bytes.NewReader(b))
+		fonts, err := parseFaces(b)
 		if err != nil {
 			return nil, fmt.Errorf("parsing the font %s: %w", family, err)
 		}
-		return ft.Font, nil
+		return fonts, nil
 	})}
 }
 
@@ -182,10 +188,10 @@ type Estimate struct {
 	// has a nil face.
 	fallbacks     []*Fallback
 	fallbackFaces []*gotext.Face
-	// main is the font of SetMain, or nil, and mainFace its face, which
+	// main is the font of SetMain, or nil, and mainFaces its faces, which
 	// the first use makes.
-	main     *Fallback
-	mainFace *gotext.Face
+	main      *Fallback
+	mainFaces []face
 	// math is the font of math of SetMath, or nil.
 	math *MathFont
 }
@@ -216,13 +222,14 @@ func (e *Estimate) SetMath(f *MathFont) {
 // that it has before the bundled font, in each family, weight and style.
 // The look like Excalidraw measures its text in Excalifont this way, with
 // IBM Plex Sans for the characters that Excalifont does not have (D40). A
-// nil font measures in the bundled font. Call it before the first
-// measure.
+// font with several faces, such as the font of text/mono, measures each
+// weight and style in its own face, as the bundled font does (D58). A nil
+// font measures in the bundled font. Call it before the first measure.
 func (e *Estimate) SetMain(f *Fallback) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.main = f
-	e.mainFace = nil
+	e.mainFaces = nil
 	clear(e.cache)
 }
 
@@ -251,7 +258,7 @@ func (e *Estimate) Width(f Font, s string) float64 {
 	if !e.load() {
 		return 0
 	}
-	w := measure(e.faces, e.mainFace, e.fallbackFaces, f, s)
+	w := measure(e.faces, e.mainFaces, e.fallbackFaces, f, s)
 	if len(e.cache) >= maxCache {
 		clear(e.cache)
 	}
@@ -271,8 +278,9 @@ func (e *Estimate) Missing(s string) []rune {
 		return nil
 	}
 	var out []rune
+	main := first(e.mainFaces)
 	for _, r := range s {
-		if invisible(r) || has(e.mainFace, r) || has(e.faces[0].face, r) || fallbackOf(e.fallbackFaces, r) != nil {
+		if invisible(r) || has(main, r) || has(e.faces[0].face, r) || fallbackOf(e.fallbackFaces, r) != nil {
 			continue
 		}
 		if !slices.Contains(out, r) {
@@ -296,7 +304,7 @@ func (e *Estimate) Split(s string) []string {
 	if !e.load() || len(e.fallbackFaces) == 0 {
 		return []string{s}
 	}
-	base := e.faces[0].face
+	base, main := e.faces[0].face, first(e.mainFaces)
 	var out []string
 	start, inFallback, joined := 0, false, false
 	for i, r := range s {
@@ -304,7 +312,7 @@ func (e *Estimate) Split(s string) []string {
 		switch {
 		case r == 0x200d || unicode.Is(unicode.Variation_Selector, r) || (inFallback && invisible(r) && !unicode.IsSpace(r)):
 			fallback = inFallback
-		case (has(base, r) || has(e.mainFace, r)) && (!inFallback || !joined):
+		case (has(base, r) || has(main, r)) && (!inFallback || !joined):
 			fallback = keycap(s[i:], base, e.fallbackFaces)
 		default:
 			fallback = true
@@ -318,13 +326,13 @@ func (e *Estimate) Split(s string) []string {
 	return append(out, s[start:])
 }
 
-// load makes the faces of the Estimate once, and the face of the main
+// load makes the faces of the Estimate once, and the faces of the main
 // font after each SetMain. It reports false when the bundled font does not
 // parse.
 func (e *Estimate) load() bool {
-	if e.main != nil && e.mainFace == nil {
-		if ft, err := e.main.parse(); err == nil {
-			e.mainFace = gotext.NewFace(ft)
+	if e.main != nil && e.mainFaces == nil {
+		if fonts, err := e.main.parse(); err == nil {
+			e.mainFaces = faces(fonts)
 		}
 	}
 	if e.faces != nil {
@@ -334,17 +342,32 @@ func (e *Estimate) load() bool {
 	if err != nil {
 		return false
 	}
-	for _, pf := range fonts {
-		e.faces = append(e.faces, face{gotext.NewFace(pf.font), pf.weight, pf.italic})
-	}
+	e.faces = faces(fonts)
 	for _, fb := range e.fallbacks {
 		var fc *gotext.Face
-		if ft, err := fb.parse(); err == nil {
-			fc = gotext.NewFace(ft)
+		if fonts, err := fb.parse(); err == nil && len(fonts) > 0 {
+			fc = gotext.NewFace(fonts[0].font)
 		}
 		e.fallbackFaces = append(e.fallbackFaces, fc)
 	}
 	return true
+}
+
+// faces makes a face that measures from each parsed font.
+func faces(fonts []parsedFont) []face {
+	out := make([]face, 0, len(fonts))
+	for _, pf := range fonts {
+		out = append(out, face{gotext.NewFace(pf.font), pf.weight, pf.italic})
+	}
+	return out
+}
+
+// first returns the first face of fs, or nil when fs is empty.
+func first(fs []face) *gotext.Face {
+	if len(fs) == 0 {
+		return nil
+	}
+	return fs[0].face
 }
 
 // keycap reports whether s starts with a keycap that a fallback draws: a
@@ -394,20 +417,31 @@ type face struct {
 	italic bool
 }
 
-// parsedFont is one parsed weight of the bundled font. A font of go-text does
-// not change after it is parsed, so the parsed fonts are shared.
+// parsedFont is one parsed face of a font, such as one weight of the bundled
+// font. A font of go-text does not change after it is parsed, so the parsed
+// fonts are shared.
 type parsedFont struct {
 	font   *gotext.Font
 	weight int
 	italic bool
 }
 
-// parsed parses the bundled weights once, and reads the weight and the
-// style of each face from the face.
+// parsed parses the bundled weights once.
 var parsed = sync.OnceValues(func() ([]parsedFont, error) {
-	faces, err := gotext.ParseTTC(bytes.NewReader(fonts()[collection].Data))
+	out, err := parseFaces(fonts()[collection].Data)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", collection, err)
+	}
+	return out, nil
+})
+
+// parseFaces parses each face of a TrueType or OpenType file, or of a
+// collection, and reads the weight and the style of each face from the
+// face.
+func parseFaces(b []byte) ([]parsedFont, error) {
+	faces, err := gotext.ParseTTC(bytes.NewReader(b))
+	if err != nil {
+		return nil, err
 	}
 	out := make([]parsedFont, 0, len(faces))
 	for _, f := range faces {
@@ -415,11 +449,15 @@ var parsed = sync.OnceValues(func() ([]parsedFont, error) {
 		out = append(out, parsedFont{f.Font, int(a.Weight), a.Style == gotext.StyleItalic})
 	}
 	return out, nil
-})
+}
 
-// nearest returns the bundled face of a style, upright or italic, with the
-// weight closest to a weight.
+// nearest returns the face of a style, upright or italic, with the weight
+// closest to a weight, or the first face when no face has the style. It
+// returns nil when fs is empty.
 func nearest(fs []face, weight int, italic bool) *gotext.Face {
+	if len(fs) == 0 {
+		return nil
+	}
 	var best *face
 	for i := range fs {
 		f := &fs[i]
@@ -445,8 +483,8 @@ func abs(n int) int {
 }
 
 // measure sums the advance widths of the glyphs of s, read with the font
-// parser of go-text, which okage uses too. A rune that the main face holds
-// measures in it, at each weight. A rune that neither the main face nor
+// parser of go-text, which okage uses too. A rune that the main font holds
+// measures in its face nearest to the weight and the style of the font. A rune that neither the main face nor
 // the font holds measures in the first fallback that holds it, and as
 // nothing when none does, because it draws nothing.
 //
@@ -457,11 +495,12 @@ func abs(n int) int {
 // a digit, # or * takes the place of that character. A character of format
 // and a selector of a variation that the font does not hold measure as
 // nothing.
-func measure(fs []face, main *gotext.Face, fallbacks []*gotext.Face, f Font, s string) float64 {
+func measure(fs, mains []face, fallbacks []*gotext.Face, f Font, s string) float64 {
 	if len(fs) == 0 || f.Size <= 0 || s == "" {
 		return 0
 	}
 	ft := nearest(fs, f.Weight, f.Italic)
+	main := nearest(mains, f.Weight, f.Italic)
 	advance := func(fc *gotext.Face, r rune) float64 {
 		gid, _ := fc.NominalGlyph(r)
 		return float64(fc.HorizontalAdvance(gid)) / float64(fc.Upem()) * f.Size

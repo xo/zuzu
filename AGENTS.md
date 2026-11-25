@@ -48,7 +48,7 @@ every other agent read the same rules. Edit this file, not `CLAUDE.md`.
 | working on a theme, a color scheme or the look of a mark | [docs/STYLE.md](docs/STYLE.md), then "Themes" in [docs/PLAN.md](docs/PLAN.md), then D12, D14, D35, D37, D39 and D40 |
 | changing or adding a target SVG | [docs/targets/README.md](docs/targets/README.md), then D13 |
 | adding a color scheme from an upstream theme | "Schemes from upstream themes" in [docs/STYLE.md](docs/STYLE.md), then D15 and D33 |
-| choosing or adding a font | D16, then D32, D34, D35 and D36 |
+| choosing or adding a font | D16, then D32, D34, D35, D36 and D58 |
 | naming a package | D21 |
 | deciding whether zuzu supports a feature of Vega | "The Vega subset" in [docs/PLAN.md](docs/PLAN.md), then D6 and D7 |
 | testing against vega.js or the corpus | "Conformance" in [docs/PLAN.md](docs/PLAN.md), then D17 and D32 |
@@ -195,6 +195,7 @@ The repository holds these files:
 | `text/` | the measurement of text and the bundled IBM Plex Sans, one collection in WOFF2 in `text/fonts` with its license (D11, D16, D34) |
 | `text/emoji/` | the bundled Noto Color Emoji with its license, in a package that a caller imports (D32) |
 | `text/excalifont/` | the bundled Excalifont with its license, in a package that a caller imports, for the look like Excalidraw (D40) |
+| `text/mono/`, `text/humanist/`, `text/serif/`, `text/rounded/` | the bundled IBM Plex Mono, Inter, IBM Plex Serif and Nunito, each one collection in WOFF2 with its license, in a package that a caller imports and gives to `WithFont` (D58) |
 | `text/math/` | STIX Two Math, the font of the math of KaTeX, from the package `texmath/stixtwomath` of okage, in a package that a caller imports (D36) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration of the root module and the CI workflow, which also builds and tests the module of ELK |
 | `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |

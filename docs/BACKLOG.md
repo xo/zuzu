@@ -136,20 +136,18 @@ lists. Each theme with a license that MIT does not allow stays out. The two
 prototypes in the targets, `catppuccin` and `solarized`, show the mapping
 from a palette to the tokens of a scheme.
 
-### Bundle the fonts that a scheme can name
+### Let a scheme name a font
 
-D35 part 11. zuzu bundles a monospace, a humanist sans, a serif and a
-rounded sans, each in an optional package as `text/emoji` is, and a scheme
-can name one of them. Open question 30 chooses each font. Each package
-embeds its font in WOFF2 with its license, as `text` does (D34).
-
-### Pass the bundled fonts to okage
-
-D16. The package `text` embeds IBM Plex Sans as one collection in WOFF2,
-and `text.Fonts` returns it, decoded into a TrueType collection (D34).
-Since phase 6, `Chart.Image` loads it into a renderer of okage with no font
-of the system, and sets the family as the sans serif family, so that an
-image draws the same font that the layout measured. A character that IBM
-Plex Sans and the font of `WithEmoji` lack draws nothing, and the report
-names it (D32). The option `WithFonts` of API.md, which gives other fonts,
-and a fallback to the fonts of the system, are not done.
+D35 part 11 and D58 part 1. zuzu bundles a monospace, a humanist sans, a
+serif and a rounded sans, in `text/mono`, `text/humanist`, `text/serif`
+and `text/rounded`. A caller gives one to a chart with `WithFont`, and
+`Chart.Image` loads it into okage with IBM Plex Sans. These are left:
+1. A scheme names one of the four kinds of font, and draws in IBM Plex
+   Sans when the caller has not given that font. No scheme names a font
+   yet, so the name of a font in a scheme, and how it reaches the render,
+   wait for the first scheme that needs one.
+2. The option `WithFonts` of API.md, which gives fonts in a file system,
+   such as a font that zuzu does not bundle.
+3. A fallback to the fonts of the system. A character that IBM Plex Sans,
+   the font of `WithFont` and the font of `WithEmoji` lack draws nothing,
+   and the report names it (D32).

@@ -140,6 +140,7 @@ short word, and an exported name does not repeat its package.
 | `text` | the measurement of text, behind an interface (D11) |
 | `text/emoji` | Noto Color Emoji, which a caller imports and passes with `WithEmoji` (D32) |
 | `text/excalifont` | Excalifont, the font of the look like Excalidraw, which a caller imports and gives to zuzu (D40) |
+| `text/mono`, `text/humanist`, `text/serif`, `text/rounded` | IBM Plex Mono, Inter, IBM Plex Serif and Nunito, the four kinds of font of D35 part 11, which a caller imports and gives to zuzu with `WithFont` (D58) |
 | `text/math` | STIX Two Math from okage, the font of the math of KaTeX, which a caller imports and gives to zuzu with `WithMath` (D36) |
 | `internal/rough` | the copy of rough-go, Rough.js 4.6.6 in Go, which draws a shape as if by hand (D39, docs/UPSTREAM.md) |
 | `internal/dagre` | the copy of dagro, dagre 3.1.1 in Go, which the transform `zuzu.dagre` lays out with. Its package keeps the name `dagro` of upstream (D39, D44, D45, docs/UPSTREAM.md) |
@@ -182,6 +183,7 @@ The module also embeds files that are not Go packages:
 | IBM Plex Sans, weights 400, 500 and 600, upright and italic | SIL Open Font License 1.1 | the bundled font (D16) |
 | Noto Color Emoji 2.057, the CBDT build, in `text/emoji` | SIL Open Font License 1.1 | the color emoji of a package that a caller imports (D32) |
 | Excalifont 1.000, one file in WOFF2 of 52 KB from Excalidraw, in `text/excalifont` | SIL Open Font License 1.1, with no Reserved Font Name | the font of the look like Excalidraw, in a package that a caller imports (D40) |
+| IBM Plex Mono 2.3 in `text/mono`, Inter 4.001 in `text/humanist`, IBM Plex Serif 2.6 in `text/serif` and Nunito 3.602 in `text/rounded`, each one collection in WOFF2 of the weights 400, 500 and 600, upright and italic | SIL Open Font License 1.1. IBM Plex reserves the name Plex | the monospace, the humanist sans, the serif and the rounded sans, each in a package that a caller imports (D35 part 11, D58) |
 | the colors of the named schemes of Vega 6.4.0, as Go values in `scale/schemes_data.go` | BSD-3-Clause for vega-scale 8.1.3, ISC for d3-scale-chromatic 3.1.1, and Apache 2.0 for the colors of ColorBrewer, in `scale/LICENSE-schemes.txt` | a scheme that a spec names draws in its own colors (D46) |
 
 The color schemes are Go values in `theme/theme.go`, and the module embeds
@@ -309,7 +311,9 @@ zuzu bundles IBM Plex Sans (D16), which the targets use. The package
 `text/emoji` bundles Noto Color Emoji, which a caller passes with
 `WithEmoji` (D32). The package `text/excalifont` bundles Excalifont, which
 a caller gives to zuzu with `WithLookFont` for the look like Excalidraw
-(D40).
+(D40). The packages `text/mono`, `text/humanist`, `text/serif` and
+`text/rounded` bundle four other fonts, which a caller gives to zuzu with
+`WithFont` (D58).
 
 ### The browser
 

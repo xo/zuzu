@@ -74,11 +74,13 @@ type runtime struct {
 	itemIssues map[string]bool
 	// measure measures the width of text, for the guides and the bounds.
 	measure *text.Estimate
-	// drawLook is the look of the render, lookSeed the seed of a look
-	// drawn by hand, and lookFont its font, or nil (D40).
+	// drawLook is the look of the render, and lookSeed the seed of a look
+	// drawn by hand (D40). font is the font of the text of the render: the
+	// font of a look drawn by hand, or else the font of WithFont, or nil
+	// for IBM Plex Sans (D58).
 	drawLook theme.Look
 	lookSeed int64
-	lookFont *text.Fallback
+	font     *text.Fallback
 	// engine is the layout engine of the graphs of the render, or nil for
 	// the engine of each transform, and algorithm the name of the layout
 	// that the render forces or that the spec names (D44, D45).

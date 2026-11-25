@@ -130,8 +130,9 @@ func (c *Chart) lookFont(o *renderOptions, l theme.Look) *text.Fallback {
 // of the render wins over the look of the parse, which wins over
 // zuzu.look in the config of the spec (D40 part 1). The seed follows the
 // same order, over zuzu.lookSeed (D58 part 3). A look that zuzu does not
-// have and a seed that is not a whole number are issues. A look drawn by
-// hand with no font is a warning.
+// have and a seed that is not a whole number are issues. The font of a
+// look drawn by hand wins over the font of WithFont (D58). A look drawn by
+// hand with neither font is a warning.
 func (rt *runtime) sketchLook() error {
 	rt.drawLook, rt.lookSeed = theme.LookStandard, theme.SketchSeed
 	cfg := rt.chart.spec.Config
@@ -179,29 +180,40 @@ func (rt *runtime) sketchLook() error {
 			rt.lookSeed = int64(seed)
 		}
 	}
-	if !rt.drawLook.HandDrawn() {
-		return nil
+	rt.font = rt.chart.font(&rt.opts)
+	if rt.drawLook.HandDrawn() {
+		if f := rt.chart.lookFont(&rt.opts, rt.drawLook); f != nil {
+			rt.font = f
+		}
+		if rt.font == nil {
+			// The text still draws, in IBM Plex Sans, so this is a
+			// warning and never an error (D40).
+			rt.warnf(ErrNoLookFont, "", "the look %s draws its text in %s, because the render has no font of the look, which zuzu.WithLookFont gives", rt.drawLook, text.Family)
+		}
 	}
-	rt.lookFont = rt.chart.lookFont(&rt.opts, rt.drawLook)
-	if rt.lookFont == nil {
-		// The text still draws, in IBM Plex Sans, so this is a warning
-		// and never an error (D40).
-		rt.warnf(ErrNoLookFont, "", "the look %s draws its text in %s, because the render has no font of the look, which zuzu.WithLookFont gives", rt.drawLook, text.Family)
-		return nil
+	if rt.font != nil {
+		rt.measure.SetMain(rt.font)
 	}
-	rt.measure.SetMain(rt.lookFont)
 	return nil
 }
 
 // sketch draws the scene of a render in a look drawn by hand, after the
-// layout and before any renderer (D40 part 7).
+// layout and before any renderer (D40 part 7). In the standard look, it
+// gives each text the font of WithFont (D58).
 func (rt *runtime) sketch(s *scene.Scene) {
+	var family string
+	if rt.font != nil {
+		family = "'" + rt.font.Family() + "', " + shape.DefaultFont
+	}
 	if !rt.drawLook.HandDrawn() {
+		if family != "" {
+			useFont(&s.Root, family, rt.measure)
+		}
 		return
 	}
 	o := sketch.Options{Seed: rt.lookSeed}
-	if rt.lookFont != nil {
-		o.Font = "'" + rt.lookFont.Family() + "', " + shape.DefaultFont
+	if family != "" {
+		o.Font = family
 		o.Measure = rt.measure
 	}
 	sketch.Draw(s, o)

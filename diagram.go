@@ -136,7 +136,7 @@ func parseDiagram(src []byte, d Dialect, o options) (*Chart, Report, error) {
 			return nil, nil, err
 		}
 		md.Math, md.Emoji, md.Now = o.math, o.emoji, o.now
-		md.Font = parseLookFont(md, o)
+		md.Font = parseFont(md, o)
 		if mermaid.IsChart(md.Kind) {
 			return mermaidChart(md, o)
 		}
@@ -210,11 +210,12 @@ func addLook(spec *vega.Spec, md *mermaid.Diagram) {
 	}
 }
 
-// parseLookFont returns the font in which a kind of Mermaid that lays out
+// parseFont returns the font in which a kind of Mermaid that lays out
 // when it compiles measures its text: the font of WithLookFont for the
 // look of the parse, the look of WithLook or else the look of the source,
-// such as look: handDrawn, or nil for the standard look (D40 part 1).
-func parseLookFont(md *mermaid.Diagram, o options) *text.Fallback {
+// such as look: handDrawn, and else the font of WithFont, or nil (D40 part
+// 1, D58).
+func parseFont(md *mermaid.Diagram, o options) *text.Fallback {
 	l := o.look
 	if !o.hasLook {
 		var name string
@@ -223,8 +224,8 @@ func parseLookFont(md *mermaid.Diagram, o options) *text.Fallback {
 		}
 		l = theme.Look(name)
 	}
-	if !l.HandDrawn() {
-		return nil
+	if f := o.lookFonts[l]; l.HandDrawn() && f != nil {
+		return f
 	}
-	return o.lookFonts[l]
+	return o.font
 }

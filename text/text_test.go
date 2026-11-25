@@ -214,6 +214,30 @@ func TestFallbackRefusesWhatDoesNotDecode(t *testing.T) {
 	}
 }
 
+// TestMainCollectionMeasuresEachFace checks that a main font with several
+// faces measures each weight and style in its own face, as the bundled
+// font does (D58 part 1): a copy of the bundled collection under another
+// family measures each text as the bundled font does.
+func TestMainCollectionMeasuresEachFace(t *testing.T) {
+	t.Parallel()
+	copied := NewFallback("Copy", fonts()[collection].Data)
+	fonts, err := copied.parse()
+	if err != nil || len(fonts) != 6 {
+		t.Fatalf("the copy parses into %d faces and the error %v, want 6 faces", len(fonts), err)
+	}
+	plain, main := NewEstimate(), NewEstimate()
+	main.SetMain(copied)
+	const s = "Hello, world 123"
+	for _, weight := range []int{300, 400, 500, 600, 700} {
+		for _, italic := range []bool{false, true} {
+			f := Font{Size: 20, Weight: weight, Italic: italic}
+			if got, want := main.Width(f, s), plain.Width(f, s); math.Abs(got-want) > 1e-9 {
+				t.Errorf("the weight %d, italic %t, measures %q as %g, want %g", weight, italic, s, got, want)
+			}
+		}
+	}
+}
+
 // TestEstimateIsSafeForConcurrentUse measures from many goroutines at once,
 // for the race detector.
 func TestEstimateIsSafeForConcurrentUse(t *testing.T) {

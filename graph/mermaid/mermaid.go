@@ -64,8 +64,9 @@ type Diagram struct {
 	Emoji []*text.Fallback
 	// Font is the font of a look drawn by hand, such as Excalifont, which
 	// zuzu.WithLookFont gives when the look of the parse draws by hand, or
-	// nil. A kind that lays out when it compiles measures its text in it,
-	// with IBM Plex Sans for the characters that it does not have (D40).
+	// else the font of zuzu.WithFont, or nil. A kind that lays out when it
+	// compiles measures its text in it, with IBM Plex Sans for the
+	// characters that it does not have (D40, D58).
 	Font *text.Fallback
 	// Now is the time of the render of zuzu.WithNow, or the zero time. A
 	// gantt with the time draws the marker of today, and fills the parts

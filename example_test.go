@@ -11,6 +11,7 @@ import (
 
 	"github.com/xo/zuzu"
 	"github.com/xo/zuzu/text/excalifont"
+	"github.com/xo/zuzu/text/mono"
 	"github.com/xo/zuzu/theme"
 )
 
@@ -208,6 +209,25 @@ func ExampleWithLookSeed() {
 	}
 	fmt.Println(draw() == draw(zuzu.WithLookSeed(7)), draw() == draw(zuzu.WithLookSeed(8)))
 	// Output: true false
+}
+
+func ExampleWithFont() {
+	ctx := context.Background()
+	src := []byte(`sequenceDiagram
+  Client->>Server: GET /chart
+  Server-->>Client: 200 image/svg+xml`)
+	font := zuzu.WithFont(mono.Font())
+	chart, _, err := zuzu.Parse(src, font)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var buf bytes.Buffer
+	report, err := chart.SVG(ctx, &buf, font)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(strings.Contains(buf.String(), mono.Family), len(report))
+	// Output: true 0
 }
 
 func ExampleWithLoader() {

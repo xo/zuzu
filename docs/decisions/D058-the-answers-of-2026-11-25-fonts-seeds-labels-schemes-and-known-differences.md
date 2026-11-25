@@ -12,6 +12,18 @@ that the backlog held after v0.9.0.
    sans, each in an optional package as D35 part 11 says. IBM Plex Mono and
    IBM Plex Serif match IBM Plex Sans, which zuzu bundles (D16). All four
    are under the Open Font License.
+
+   The packages are `text/mono`, `text/humanist`, `text/serif` and
+   `text/rounded`. Each name is one short word that says the kind of the
+   font and not its name, as D21 asks, so a program reads the kind that it
+   draws in. Each package embeds one collection in WOFF2 of the weights
+   400, 500 and 600, each upright and italic, as D34 does for IBM Plex
+   Sans, with its license and a README.md that names its source. Inter
+   and Nunito come from variable fonts, which fontTools cuts into those
+   six static faces. The option `WithFont` of `Parse` and of a render gives
+   a chart one of the fonts, and `text.Estimate` measures each weight and
+   style in its own face of the collection. A scheme does not name a font
+   yet, so that part of D35 part 11 waits in `docs/BACKLOG.md`.
 2. The reader of Mermaid reads a weight and a style out of `fontFamily` in
    one place, and gives them to the text of every kind that draws text.
    This replaces the issue that D32 part 5 gives in the kinds other than

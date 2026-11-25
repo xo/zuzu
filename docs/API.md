@@ -167,7 +167,7 @@ such a link as an issue, and the item has no link.
 An option is a functional option named `With...`, and the caller owns every
 value it gives (okage D20). There are two kinds, so that an option given in
 the wrong place does not compile. `WithEmoji`, `WithLook`,
-`WithLookSeed`, `WithLookFont`, `WithLayoutEngine` and `WithLayout` are of
+`WithLookSeed`, `WithLookFont`, `WithFont`, `WithLayoutEngine` and `WithLayout` are of
 both kinds (D38, D40, D44, D45, D58). Each returns a `SharedOption`, which is an `Option` and a
 `RenderOption`.
 
@@ -183,6 +183,7 @@ both kinds (D38, D40, D44, D45, D58). Each returns a `SharedOption`, which is an
 | `WithLook(theme.Look)` | `zuzu.look` of the spec, then `theme.LookStandard` | the look, such as `theme.LookExcalidraw`, in which a kind of Mermaid that lays out when it compiles measures its text. The chart keeps it, and a render that gives no look of its own draws in it (D40) |
 | `WithLookSeed(int64)` | `zuzu.lookSeed` of the spec, then `theme.SketchSeed` | the seed of a look drawn by hand. The chart keeps it, and a render that gives no seed of its own draws with it (D58) |
 | `WithLookFont(theme.Look, *text.Fallback)` | none | the font of a look drawn by hand, such as Excalifont of the package `text/excalifont`, which a kind of Mermaid that lays out when it compiles measures its text in when the parse draws in that look. The chart keeps it (D40) |
+| `WithFont(*text.Fallback)` | none, so the text measures in IBM Plex Sans | the font of the chart, such as IBM Plex Mono of the package `text/mono`, which a kind of Mermaid that lays out when it compiles measures its text in, unless the parse draws in a look with a font of its own. The chart keeps it (D58) |
 | `WithLayoutEngine(graph.Engine)` | the built in engines, `layered` and `dagre` | a layout engine that a graph can lay out with, under its name, such as the engine `elk` of `elk.Layout()`. It forces nothing. The chart keeps it (D45) |
 | `WithLayout(name string)` | the layout of the source | the layout that each graph of the chart lays out with, such as `dagre` or `elk.stress`, over the layout of the source. The chart keeps it, and a render that forces no layout of its own lays out with it (D45) |
 | `WithNow(time.Time)` | none, so a gantt draws no marker of today and puts a date with no day on 1970-01-01, and `now()` gives 0 | the time of the render. A gantt of Mermaid draws the marker of today at it, and takes the day of a date with no day from it, in the time zone of the time. `now()` gives it. The chart keeps it (D38) |
@@ -212,6 +213,7 @@ both kinds (D38, D40, D44, D45, D58). Each returns a `SharedOption`, which is an
 | `WithLook(theme.Look)` | the look of `WithLook` of `Parse`, then `zuzu.look` of the spec, then `theme.LookStandard` | the look in which the chart draws, as "Looks" says (D40) |
 | `WithLookSeed(int64)` | the seed of `WithLookSeed` of `Parse`, then `zuzu.lookSeed` of the spec, then `theme.SketchSeed` | the seed of a look drawn by hand, as "Looks" says (D58) |
 | `WithLookFont(theme.Look, *text.Fallback)` | the font of `WithLookFont` of `Parse` for the look, then none, so the look draws its text in IBM Plex Sans | the font of a look drawn by hand, as "Looks" says (D40) |
+| `WithFont(*text.Fallback)` | the font of `WithFont` of `Parse`, then none, so the text draws in IBM Plex Sans | the font of the chart, as "Fonts of a chart" says (D58) |
 | `WithLayoutEngine(graph.Engine)` | the engines of `WithLayoutEngine` of `Parse` | a layout engine that a graph can lay out with, as "Layouts" says. An engine of the render wins over an engine of `Parse` with the same name (D45) |
 | `WithLayout(name string)` | the layout of `WithLayout` of `Parse`, then the layout of the source | the layout that each graph lays out with, as "Layouts" says. An empty name forces no layout (D45) |
 
@@ -272,8 +274,9 @@ draws its text in Excalifont. zuzu draws no other look by hand (D57).
    have, so each label fits its box. The SVG names the family of the font
    first and embeds the font in a rule `@font-face` (D43), and the PNG of
    `Image` draws with the font. Without the font, the look draws its text
-   in IBM Plex Sans, and the report warns of it with `ErrNoLookFont`, in
-   the strict mode too. A font for the standard look changes nothing.
+   in the font of `WithFont`, or else in IBM Plex Sans, and the report then
+   warns of it with `ErrNoLookFont`, in the strict mode too. A font of
+   `WithLookFont` for the standard look changes nothing.
 6. `Parse` takes `WithLook` and `WithLookFont`, because a kind of Mermaid
    that lays out when it compiles measures its text then. The look of
    `Parse` is the look of `WithLook`, or else the look of the source. A
@@ -768,9 +771,12 @@ const (
 )
 
 // Scheme is a color scheme. Zuzu, Pastel, Harbor and Ember are built in,
-// and Schemes lists every scheme by name, with those from upstream themes
-// (D15) and from the themes of Mermaid, such as mermaid-forest (D32). A
-// scheme from an upstream theme can bring its own neutrals for a mode.
+// and Schemes lists every scheme by name, with those from the themes of
+// Mermaid, such as mermaid-forest (D32), and those from the styles of
+// transit, such as catppuccin and solarized-dark (D15, D58).
+// docs/SCHEMES.md lists the schemes from the styles of transit. A scheme
+// from a style brings its own background and text for the mode of the
+// style, and a family such as catppuccin brings them for both modes.
 type Scheme struct{ /* unexported */ }
 
 func Lookup(name string) (Scheme, bool)
@@ -843,8 +849,10 @@ program that does not import it does not link goja.
 zuzu draws text in IBM Plex Sans (D16). The package `text/emoji` bundles
 Noto Color Emoji, the font of 10.7 MB that draws an emoji in color (D32). A
 program that does not import the package does not hold the font.
-`NewFallback` accepts a font in TrueType, OpenType, WOFF, WOFF2 or EOT, and
-`Data` gives it as TrueType or OpenType (D34). A render takes the font with
+`NewFallback` accepts a font in TrueType, OpenType, WOFF, WOFF2 or EOT, with
+one face or a collection of faces, and `Data` gives it as TrueType or
+OpenType (D34). A fallback for an emoji measures in the first face of a
+collection. A render takes the font with
 `WithEmoji`, as it takes a pack of icons. `Parse` takes it too, so that a
 kind of Mermaid that lays out when it compiles measures an emoji with it
 (D38):
@@ -915,9 +923,61 @@ An `Estimate` of the package `text` measures in the font with `SetMain`:
 package text
 
 // SetMain gives the Estimate a main font, which measures each character
-// that it has before IBM Plex Sans, in each family, weight and style.
+// that it has before IBM Plex Sans, in each family, weight and style. A
+// font with several faces measures each weight and style in its own face.
 func (e *Estimate) SetMain(f *Fallback)
 ```
+
+### Fonts of a chart
+
+The packages `text/mono`, `text/humanist`, `text/serif` and `text/rounded`
+bundle the four kinds of font of D35 part 11, which D58 part 1 chose. A
+program that does not import a package does not hold its font. Each
+package has the same form as `text/excalifont`:
+
+| Package | Font | Kind | WOFF2 |
+| --- | --- | --- | --- |
+| `text/mono` | IBM Plex Mono 2.3 | the monospace | 156,640 bytes |
+| `text/humanist` | Inter 4.001 | the humanist sans | 432,696 bytes |
+| `text/serif` | IBM Plex Serif 2.6 | the serif | 220,172 bytes |
+| `text/rounded` | Nunito 3.602 | the rounded sans | 175,980 bytes |
+
+```go
+package mono
+
+// Family is the family of the font.
+const Family = "IBM Plex Mono"
+
+// Font returns IBM Plex Mono.
+func Font() *text.Fallback
+```
+
+Each font is one collection in WOFF2 of six faces, the weights 400, 500
+and 600, each upright and italic, as IBM Plex Sans is (D34).
+`WithFont` gives one to a chart:
+
+```go
+font := zuzu.WithFont(mono.Font())
+c, report, err := zuzu.Parse(src, font)
+img, report, err := c.Image(ctx, font)
+```
+
+1. The layout measures each text in the font, with IBM Plex Sans for each
+   character that the font does not have, so each label fits its box. A
+   weight and a style measure in the face of that style with the nearest
+   weight.
+2. Each text names the family of the font first, before IBM Plex Sans,
+   over the font that the spec gives, and is cut to its limit in the font.
+   The SVG embeds the font in a rule `@font-face` (D43), and the PNG of
+   `Image` loads it into okage and draws with it.
+3. The font of a render wins over the font of `Parse`. `Parse` takes the
+   option, because a kind of Mermaid that lays out when it compiles
+   measures its text then.
+4. In a look drawn by hand, the font of `WithLookFont` wins over the font
+   of `WithFont`. A look with no font of its own draws in the font of
+   `WithFont`, with no `ErrNoLookFont`.
+5. A scheme does not name a font yet, and `WithFonts` is not built
+   (BACKLOG).
 
 ## Where the models agreed and differed
 
