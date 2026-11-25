@@ -63,6 +63,8 @@ type interpolator func(from, to *pt, direction int, s stream)
 // and is compareAntimeridian if it is nil. outline, if it is set, sends
 // the points of the outline of the sphere, which a projection such as
 // armadillo draws in a shape of its own, instead of the edge of the clip.
+// move, if it is set, moves each point of a geometry before the clip sees
+// it.
 type clipper struct {
 	visible     func(lambda, phi float64) bool
 	newLine     func(s stream) lineClipper
@@ -70,6 +72,7 @@ type clipper struct {
 	compare     func(a, b *crossing) float64
 	start       [2]float64
 	outline     func(s stream)
+	move        func(lambda, phi float64) (float64, float64)
 }
 
 // clipStream is the stream of a clipper.
@@ -93,6 +96,9 @@ func (c *clipper) stream(sink stream) stream {
 }
 
 func (s *clipStream) point(lambda, phi float64) {
+	if s.c.move != nil {
+		lambda, phi = s.c.move(lambda, phi)
+	}
 	switch s.mode {
 	case 0, 2:
 		if s.c.visible(lambda, phi) {

@@ -66,6 +66,11 @@ type Projection struct {
 	extent             *rectClip
 	delta2             float64
 
+	// outline, if it is set, sends the points of the outline of the
+	// sphere of a type that draws it in a shape of its own, such as
+	// armadillo. It stays the sphere whatever the clip angle.
+	outline func(s stream)
+
 	// The extent that the caller set on a Mercator projection, which also
 	// clips to the square of the world.
 	mercator   int
@@ -463,14 +468,29 @@ func (p *Projection) setParallels(y0, y1 float64) {
 	p.recenter()
 }
 
+// setClipAngle clips the globe to a small circle of a radius in degrees
+// about the center, or to the antimeridian if a is 0 or NaN.
 func (p *Projection) setClipAngle(a float64) {
-	if a != 0 && !math.IsNaN(a) {
-		p.theta, p.hasTheta = a*radians, true
-		p.preclip = circleClip(p.theta)
-		return
+	p.hasTheta = a != 0 && !math.IsNaN(a)
+	if p.hasTheta {
+		p.theta = a * radians
 	}
-	p.hasTheta = false
-	p.preclip = antimeridian
+	p.setPreclip()
+}
+
+// setPreclip sets the clip of the globe from the clip angle, with the
+// outline of the sphere of the type, if it has one.
+func (p *Projection) setPreclip() {
+	c := antimeridian
+	if p.hasTheta {
+		c = circleClip(p.theta)
+	}
+	if p.outline != nil {
+		o := *c
+		o.outline = p.outline
+		c = &o
+	}
+	p.preclip = c
 }
 
 // setClipExtent sets the rectangle that clips the projected geometry, or

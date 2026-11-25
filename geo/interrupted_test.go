@@ -106,10 +106,10 @@ func TestTier3Points(t *testing.T) {
 
 // TestTier3Paths compares the area and the bounds of the paths with those
 // of d3: the outline of the sphere, the graticule and the countries of
-// world-110m. The clip of zuzu leaves out a strip along each cut that
-// differs from that of d3, and it sends a point every 2° along the edge of
-// a lobe, where d3 leaves the edge to the resampling, so an area can differ
-// by 0.4%. Where the path of d3 crosses a gap, the path of zuzu must lie
+// world-110m. The clip of zuzu leaves out a strip of 2e-6 radians along
+// each cut, where d3 does not clip, and it sends a point every 2° along the
+// edge of a lobe, where d3 leaves the edge to the resampling, so an area
+// can differ by 0.4%. Where the path of d3 crosses a gap, the path of zuzu must lie
 // inside its bounds and have no larger area.
 func TestTier3Paths(t *testing.T) {
 	t.Parallel()

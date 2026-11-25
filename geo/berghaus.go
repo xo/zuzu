@@ -50,14 +50,13 @@ func berghausRaw(n float64) rawFunc {
 	}
 }
 
-// berghausClip returns the clip of the star projection: a circle of
-// 179.999° about the center, with the star as the outline of the sphere.
-// For each lobe, from the one that points up and then clockwise, the
-// outline passes near its tip and then to each side of its inner corner.
-func berghausClip(n float64) *clipper {
-	c := *circleClip((180 - 1e-3) * radians)
+// berghausOutline returns the outline of the sphere of the star
+// projection with n lobes, the star. For each lobe, from the one that
+// points up and then clockwise, the outline passes near its tip and then
+// to each side of its inner corner.
+func berghausOutline(n float64) func(s stream) {
 	w := 360 / n
-	c.outline = func(s stream) {
+	return func(s stream) {
 		far := (180 - berghausGap) * radians
 		for k := 0.0; k < n; k++ {
 			th := (90 - k*w) * radians
@@ -74,30 +73,29 @@ func berghausClip(n float64) *clipper {
 			}
 		}
 	}
-	return &c
 }
 
 // berghaus sets up a star projection with the defaults of
-// d3-geo-projection.
+// d3-geo-projection: a clip circle of 179.999° about the center, with the
+// star as the outline of the sphere.
 func (p *Projection) berghaus() {
 	p.init(berghausRaw(berghausLobes))
+	p.outline = berghausOutline(berghausLobes)
 	p.setClipAngle(180 - 1e-3)
-	p.preclip = berghausClip(berghausLobes)
 	p.setScale(87.8076)
 	p.setCenter(0, 17.1875)
 }
 
 // setBerghausLobes sets the number of lobes of a star projection from the
-// parameter lobes of a spec. It keeps a clip angle that the spec set.
+// parameter lobes of a spec. It keeps the clip angle.
 func (p *Projection) setBerghausLobes(v any) error {
 	n := Number(v)
 	if !(n >= 1) || math.IsInf(n, 0) {
 		return fmt.Errorf("the lobes %v: %w", v, ErrProjection)
 	}
 	p.raw = berghausRaw(n)
-	if p.preclip.outline != nil {
-		p.preclip = berghausClip(n)
-	}
+	p.outline = berghausOutline(n)
+	p.setPreclip()
 	p.recenter()
 	return nil
 }

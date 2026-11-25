@@ -51,11 +51,14 @@ func newButterfly() *butterfly {
 
 // project is the raw function of the butterfly. Face k holds the
 // longitudes from -180° + 90°k to -90° + 90°k. A point on a meridian
-// between two faces goes to the east face, except at 180°, as in d3, and so
-// does a point of the strip west of it that lobeRing leaves out.
+// between two faces goes to the east face, except at 180°, as in d3.
 func (b *butterfly) project(lambda, phi float64) (float64, float64) {
-	k := int(math.Floor((lambda + math.Pi + epsilon) / halfPi))
-	k = min(max(k, 0), 3)
+	k := 0
+	for _, c := range [3]float64{-halfPi, 0, halfPi} {
+		if lambda >= c {
+			k++
+		}
+	}
 	l0 := -math.Pi + float64(k)*halfPi
 	p := cartesian(lambda, phi)
 	e0, e1 := cartesian(l0, 0), cartesian(l0+halfPi, 0)
@@ -70,19 +73,21 @@ func (b *butterfly) project(lambda, phi float64) (float64, float64) {
 	return (w0*c0[0] + w1*c1[0] + z*corner[0]) / s, (w0*c0[1] + w1*c1[1] + z*corner[1]) / s
 }
 
-// butterflyRing is the outline of the net on the sphere: the north is one
-// lobe, cut at 180°, and the south is four lobes, cut at each corner of the
-// equator.
-func butterflyRing() [][2]float64 {
-	return lobeRing(
-		[][2]float64{{-math.Pi, math.Pi}},
-		[][2]float64{{-math.Pi, -halfPi}, {-halfPi, 0}, {0, halfPi}, {halfPi, math.Pi}},
-		-1,
-	)
+// butterflyLobes are the lobes of the net on the sphere, as the points of
+// lobeRing: the north is one lobe, cut at 180°, and the south is four
+// lobes, cut at each corner of the equator.
+func butterflyLobes() (north, south [][3][2]float64) {
+	north = [][3][2]float64{{{-math.Pi, 0}, {0, halfPi}, {math.Pi, 0}}}
+	for k := range 4 {
+		w := -math.Pi + float64(k)*halfPi
+		south = append(south, [3][2]float64{{w, 0}, {w + halfPi/2, -halfPi}, {w + halfPi, 0}})
+	}
+	return north, south
 }
 
 // polyhedralButterfly makes p the butterfly of Cahill.
 func (p *Projection) polyhedralButterfly() {
 	p.init(newButterfly().project)
-	p.preclip = newPolygonClip(butterflyRing())
+	north, south := butterflyLobes()
+	p.preclip = newLobeClip(north, south, true)
 }

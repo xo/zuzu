@@ -30,25 +30,18 @@ func degreeRing(points ...[2]float64) [][2]float64 {
 	return out
 }
 
-// ringArea returns the area on the unit sphere that a ring holds on its
-// right, as a fan of triangles from its first point, each with the solid
-// angle of Van Oosterom and Strackee.
+// ringArea returns the area on the unit sphere that a ring in radians
+// holds on its right, as SphereArea measures it.
 func ringArea(ring [][2]float64) float64 {
 	if len(ring) < 3 {
 		return 0
 	}
-	v0 := cartesian(ring[0][0], ring[0][1])
-	sum := 0.0
-	for i := 1; i+1 < len(ring); i++ {
-		a := cartesian(ring[i][0], ring[i][1])
-		b := cartesian(ring[i+1][0], ring[i+1][1])
-		sum += 2 * math.Atan2(v0.dot(a.cross(b)), 1+v0.dot(a)+a.dot(b)+b.dot(v0))
+	coords := make([]any, 0, len(ring)+1)
+	for _, p := range ring {
+		coords = append(coords, []any{p[0] * degrees, p[1] * degrees})
 	}
-	area := -sum
-	if area < 0 {
-		area += 2 * tau
-	}
-	return area
+	coords = append(coords, coords[0])
+	return SphereArea(map[string]any{"type": "Polygon", "coordinates": []any{coords}})
 }
 
 // clipPolygon clips a polygon of one ring, or the sphere if the ring is
@@ -226,8 +219,8 @@ func TestClipPolygonPole(t *testing.T) {
 
 func TestLobeRing(t *testing.T) {
 	t.Parallel()
-	// The lobes cover the sphere but for the strips along the cuts, and
-	// a point on a cut belongs to the lobe that the raw function picks.
+	// The lobes cover the sphere but for the strips along the cuts.
+	const e = 2e-6 * degrees
 	p := mustNew(t, "interruptedMollweide")
 	if a := clipPolygon(p.preclip, nil); math.Abs(a-2*tau) > 1e-4 {
 		t.Errorf("area %v, want about %v", a, 2*tau)
@@ -236,9 +229,9 @@ func TestLobeRing(t *testing.T) {
 		lon, lat float64
 		want     bool
 	}{
-		{-40, 10, true}, {-40 + 1e-6*degrees, 10, false}, {-40, -10, true},
-		{-20, -10, true}, {-20 + 1e-6*degrees, -10, false}, {-20 + 2e-6*degrees, -10, true},
-		{180, 10, false}, {-180, 10, false}, {179.99, 10, true},
+		{-40, 10, false}, {-40 - e, 10, true}, {-40 + e, 10, true}, {-40, -10, true},
+		{-20, -10, false}, {-20 - e, -10, true}, {-20 + e, -10, true},
+		{180, 10, false}, {-180, 10, false}, {-180 + e, 10, true}, {180 - e, 10, true},
 		{0, 90, false}, {0, 89.99, true},
 	} {
 		if got := p.preclip.visible(test.lon*radians, test.lat*radians); got != test.want {
@@ -249,8 +242,27 @@ func TestLobeRing(t *testing.T) {
 	if a := clipPolygon(b.preclip, nil); math.Abs(a-2*tau) > 1e-4 {
 		t.Errorf("butterfly: area %v, want about %v", a, 2*tau)
 	}
-	if !b.preclip.visible(halfPi, -0.5) || b.preclip.visible(halfPi-1e-6, -0.5) || !b.preclip.visible(halfPi-1e-6, 0.5) {
-		t.Error("butterfly: the cut at 90°")
+	// A point on a cut, or in the strip along it, moves into the lobe that
+	// the raw function gives it, as in d3: the west lobe of an interrupted
+	// projection and the east face of the butterfly. A point at ±180°
+	// stays on its side.
+	for _, test := range []struct {
+		p        *Projection
+		lon, lat float64
+		want     float64
+	}{
+		{p, -40, 10, -40 - e}, {p, -40 + e/4, 10, -40 + e}, {p, -20, -10, -20 - e},
+		{p, -180, 10, -180 + e}, {p, 180, 10, 180 - e}, {p, 30, 10, 30},
+		{b, 90, -30, 90 + e}, {b, 90 - e/4, -30, 90 - e}, {b, 90, 30, 90},
+		{b, -180, -30, -180 + e}, {b, 180, 30, 180 - e},
+	} {
+		lambda, phi := test.p.preclip.move(test.lon*radians, test.lat*radians)
+		if math.Abs(lambda*degrees-test.want) > 1e-12 || phi != test.lat*radians {
+			t.Errorf("%s: move(%v, %v) = %v, %v, want %v", test.p.Type(), test.lon, test.lat, lambda*degrees, phi*degrees, test.want)
+		}
+		if !test.p.preclip.visible(lambda, phi) {
+			t.Errorf("%s: move(%v, %v) is not visible", test.p.Type(), test.lon, test.lat)
+		}
 	}
 }
 
@@ -275,14 +287,20 @@ func TestLobes(t *testing.T) {
 	if err := p.Set("lobes", []any{1.0}); err == nil {
 		t.Error("bad lobes give no error")
 	}
-	// A latitude of a lobe other than 0 or ±90 changes nothing, and the
-	// report says so.
+	// The latitudes of the lobes are read. TestLobeLatitudes compares
+	// them with d3.
 	err = p.Set("lobes", []any{
 		[]any{[]any{[]any{-180.0, 0.0}, []any{0.0, 80.0}, []any{180.0, 0.0}}},
 		[]any{[]any{[]any{-180.0, 0.0}, []any{0.0, -90.0}, []any{180.0, 0.0}}},
 	})
-	if !errors.Is(err, ErrParamUnread) {
-		t.Errorf("a latitude of 80 gives %v, want ErrParamUnread", err)
+	if err != nil {
+		t.Errorf("a latitude of 80: %v", err)
+	}
+	if err := p.Set("lobes", []any{
+		[]any{[]any{[]any{-180.0, 0.0}, []any{0.0, math.NaN()}, []any{180.0, 0.0}}},
+		[]any{[]any{[]any{-180.0, 0.0}, []any{0.0, -90.0}, []any{180.0, 0.0}}},
+	}); !errors.Is(err, ErrProjection) {
+		t.Errorf("a latitude of NaN gives %v, want ErrProjection", err)
 	}
 	if err := mustNew(t, "mercator").Set("lobes", []any{1.0}); err != nil {
 		t.Errorf("a projection without lobes: %v", err)

@@ -58,16 +58,14 @@ func armadilloRaw(phi0 float64) rawFunc {
 	}
 }
 
-// armadilloClip returns the clip of the armadillo projection: the clip of
-// the antimeridian, with the outline of the map as the sphere. The outline
-// runs along the pole, then back along the limit of the hidden points, in
-// steps of three times the precision, in degrees, as in
-// d3-geo-projection.
-func armadilloClip(p *Projection, phi0 float64) *clipper {
-	c := *antimeridian
+// armadilloOutline returns the outline of the sphere of the armadillo
+// projection, the outline of the map. It runs along the pole, then back
+// along the limit of the hidden points, in steps of three times the
+// precision, in degrees, as in d3-geo-projection.
+func armadilloOutline(p *Projection, phi0 float64) func(s stream) {
 	t0 := math.Tan(phi0)
 	sg := sign(phi0)
-	c.outline = func(s stream) {
+	return func(s stream) {
 		ps := sg
 		if ps == 0 {
 			ps = 1
@@ -93,21 +91,21 @@ func armadilloClip(p *Projection, phi0 float64) *clipper {
 			s.point(lambda, armadilloLimit(lambda, t0))
 		}
 	}
-	return &c
 }
 
 // armadillo sets up an armadillo projection with the defaults of
-// d3-geo-projection.
+// d3-geo-projection: the clip of the antimeridian, with the outline of the
+// map as the sphere.
 func (p *Projection) armadillo() {
 	p.init(armadilloRaw(armadilloTilt))
-	p.preclip = armadilloClip(p, armadilloTilt)
+	p.outline = armadilloOutline(p, armadilloTilt)
+	p.setPreclip()
 	p.setScale(218.695)
 	p.setCenter(0, 28.0974)
 }
 
 // setArmadilloParallel sets the tilt of an armadillo projection, in
-// degrees, from the parameter parallel of a spec. It keeps a clip angle
-// that the spec set.
+// degrees, from the parameter parallel of a spec. It keeps the clip angle.
 func (p *Projection) setArmadilloParallel(v any) error {
 	f := Number(v)
 	if math.IsNaN(f) || math.IsInf(f, 0) {
@@ -115,9 +113,8 @@ func (p *Projection) setArmadilloParallel(v any) error {
 	}
 	phi0 := f * radians
 	p.raw = armadilloRaw(phi0)
-	if p.preclip.outline != nil {
-		p.preclip = armadilloClip(p, phi0)
-	}
+	p.outline = armadilloOutline(p, phi0)
+	p.setPreclip()
 	p.recenter()
 	return nil
 }

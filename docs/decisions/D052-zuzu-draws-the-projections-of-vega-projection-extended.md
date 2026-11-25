@@ -28,3 +28,21 @@ interruptedMollweideHemispheres, polyhedralButterfly and peirceQuincuncial.
    the back of the globe in its own way, and berghaus, a star of lobes. The
    third holds a clip of a polygon on the sphere, which `geo` does not have,
    and the interrupted and polyhedral projections that need it.
+5. zuzu clips an interrupted or a polyhedral projection to the outline of
+   its lobes or faces, so that no line crosses the gap between two of them.
+   d3-geo-projection does not clip there. Three details follow
+   d3-geo-projection (D58, part 13):
+   - A point on a meridian between two lobes or faces goes to the lobe or
+     the face that d3-geo-projection gives it. A point on the meridian at
+     -180° goes to the west edge of the first lobe or face, and a point on
+     180° goes to the east edge of the last. The clip keeps 1e-6 radians
+     inside each meridian of a lobe. zuzu moves a point that lies within
+     2e-6 radians of a meridian of its lobe to 2e-6 radians inside it. So a
+     line or a polygon on such a meridian draws along the edge of its lobe.
+   - The parameter `lobes` reads the longitude and the latitude of each of
+     the three points of a lobe. The latitude of the west point is where
+     the lobe parts from its neighbors. Nearer to the equator, the lobes
+     join as one map. The latitude of the central point is where the lobe
+     ends. The outline of the sphere follows the three latitudes.
+   - `armadillo` and `berghaus` keep the torus and the star as the sphere
+     with any `clipAngle`. The clip angle cuts the torus or the star.
