@@ -18,8 +18,9 @@ The folder keeps these files of upstream, byte for byte:
 1. `LICENSE` is the Eclipse Public License 2.0, the license of elk-go and of
    most of its files.
 2. `LICENSE.apache-2.0` is the Apache License 2.0 of two adaptations of the
-   runtime of GWT: `internal/javacompat/gwt_priority_queue.go` and
-   `internal/javacompat/gwt_stable_sort.go`.
+   runtime of GWT, `internal/javacompat/gwt_priority_queue.go` and
+   `internal/javacompat/gwt_stable_sort.go`, and of the test of the second,
+   `internal/javacompat/gwt_stable_sort_test.go`.
 3. `LICENSE.v8-bsd` is the BSD 3-Clause License of the routines of V8 and
    fdlibm in `internal/javacompat/jsmath.go`, which also keeps the notice of
    Sun Microsystems.

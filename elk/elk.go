@@ -18,6 +18,7 @@
 package elk
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strconv"
@@ -43,13 +44,15 @@ const mermaidScale = 16.0 / 11
 // elk.mrtree, elk.sporeOverlap, elk.box or elk.rectpacking. It gives the
 // root and each cluster the layout options of Mermaid.
 //
-// The engine names in graph.Layout.Unsupported the ports, the lanes, the
-// groups of the same rank, the edges that take no part in the ranks, the
-// least length and the weight of an edge, and an algorithm that ELK does
-// not have, which lays out with the layered algorithm. It lays out each
-// such part as though the input did not ask for it. It gives no rank and
-// no order. The labels at the ends of the edges and the xlabels take no
-// place in the layout, and graph.Finish places them.
+// The engine names in graph.Layout.Unsupported the port of an edge at a
+// cluster, the lanes, the groups of the same rank, the edges that take no
+// part in the ranks, the least length and the weight of an edge, an
+// algorithm that ELK does not have, which lays out with the layered
+// algorithm, and a setting of graph.LayoutInput.ELK that it does not read.
+// It lays out each such part as though the input did not ask for it. It
+// gives no rank and no order. With the layered algorithm, ELK places the
+// labels at the ends of the edges, as Mermaid has it do. graph.Finish
+// places the other labels at the ends and the xlabels.
 func Layout() graph.Engine {
 	return engine{}
 }
@@ -90,7 +93,9 @@ type conversion struct {
 	// clusterAt of each cluster.
 	nodeAt, clusterAt []int
 	// depth is the depth of each cluster, from 0 for an outer one.
-	depth       []int
+	depth []int
+	// nodes is the index of each node of the input by its id.
+	nodes       map[string]int
 	pad         float64
 	unsupported []string
 }
@@ -101,11 +106,13 @@ func (c *conversion) unsupportedf(format string, args ...any) {
 }
 
 // newConversion builds the graph of the adapter for an input. Its nodes and
-// clusters are in one list, as Mermaid gives them to ELK: the clusters
-// first, then the nodes, each in the order of the input. With
-// LayoutInput.ReverseClusters, the sibling clusters are in the reverse of
-// the order of the input, as Mermaid gives the subgraphs of a flowchart
-// (D45 part 5). Each id of the adapter is new, so that no node, cluster or
+// clusters are in one list, as Mermaid gives them to ELK: the nodes and
+// the clusters that LayoutInput.Order names, in its order, then the other
+// clusters, then the other nodes, each in the order of the input. With
+// LayoutInput.ReverseClusters, the other sibling clusters are in the
+// reverse of the order of the input, as Mermaid gives the subgraphs of a
+// flowchart (D45 part 5). A boxed node lies in a box of its own, a cluster
+// with no title. Each id of the adapter is new, so that no node, cluster or
 // edge of the input can take the id of another, or the id root.
 func newConversion(in *graph.LayoutInput) (*conversion, error) {
 	s := mermaidScale
@@ -130,6 +137,7 @@ func newConversion(in *graph.LayoutInput) (*conversion, error) {
 	if in.Lanes {
 		c.unsupportedf("the lanes of the layout")
 	}
+	c.settings()
 	nodes := make(map[string]int, len(in.Nodes))
 	for i, n := range in.Nodes {
 		if _, ok := nodes[n.ID]; ok {
@@ -137,6 +145,7 @@ func newConversion(in *graph.LayoutInput) (*conversion, error) {
 		}
 		nodes[n.ID] = i
 	}
+	c.nodes = nodes
 	clusters := make(map[string]int, len(in.Clusters))
 	for i, cl := range in.Clusters {
 		clusters[cl.ID] = i
@@ -157,20 +166,11 @@ func newConversion(in *graph.LayoutInput) (*conversion, error) {
 		}
 	}
 	clusterID := func(i int) string { return "c" + strconv.Itoa(i) }
-	order := make([]int, len(in.Clusters))
-	for i := range order {
-		order[i] = i
-	}
-	if in.ReverseClusters {
-		// The adapter keeps the order of the list among siblings, so the
-		// reverse of the whole list reverses each list of siblings.
-		slices.Reverse(order)
-	}
 	c.clusterAt = make([]int, len(in.Clusters))
-	for _, i := range order {
+	addCluster := func(i int) {
 		cl := in.Clusters[i]
 		n := adapter.Node{
-			ID: clusterID(i), Cluster: true, Padding: c.pad * s, Direction: cl.Direction,
+			ID: clusterID(i), Cluster: true, Padding: c.pad * s, Direction: cmp.Or(cl.Direction, in.ClusterDirection), Algorithm: cl.Algorithm,
 		}
 		if parent[i] >= 0 {
 			n.Parent = clusterID(parent[i])
@@ -185,7 +185,8 @@ func newConversion(in *graph.LayoutInput) (*conversion, error) {
 	}
 	c.nodeAt = make([]int, len(in.Nodes))
 	ranks := map[string]bool{}
-	for i, n := range in.Nodes {
+	addNode := func(i int) {
+		n := in.Nodes[i]
 		an := adapter.Node{ID: "n" + strconv.Itoa(i), Width: n.Width * s, Height: n.Height * s}
 		if p, ok := clusters[n.Cluster]; ok && n.Cluster != "" {
 			an.Parent = clusterID(p)
@@ -194,8 +195,54 @@ func newConversion(in *graph.LayoutInput) (*conversion, error) {
 			ranks[n.Rank] = true
 			c.unsupportedf("the group of the same rank %q", n.Rank)
 		}
+		if n.Boxed {
+			// The box is a cluster with no frame and no title, but with
+			// the room of a title at its top, as Mermaid gives the box of
+			// a note to ELK. The node lies alone in it.
+			box := adapter.Node{
+				ID: "b" + strconv.Itoa(i), Parent: an.Parent, Cluster: true, Padding: c.pad * s, NoTitle: true,
+				Label: &adapter.Label{Text: "box", Height: n.BoxTitle * s},
+			}
+			c.g.Nodes = append(c.g.Nodes, box)
+			an.Parent = box.ID
+		}
 		c.nodeAt[i] = len(c.g.Nodes)
 		c.g.Nodes = append(c.g.Nodes, an)
+	}
+	// The nodes and the clusters that Order names go first, in its order.
+	nodeDone := make([]bool, len(in.Nodes))
+	clusterDone := make([]bool, len(in.Clusters))
+	for _, id := range in.Order {
+		if i, ok := nodes[id]; ok {
+			if !nodeDone[i] {
+				nodeDone[i] = true
+				addNode(i)
+			}
+			continue
+		}
+		if i, ok := clusters[id]; ok && !clusterDone[i] {
+			clusterDone[i] = true
+			addCluster(i)
+		}
+	}
+	order := make([]int, 0, len(in.Clusters))
+	for i := range in.Clusters {
+		if !clusterDone[i] {
+			order = append(order, i)
+		}
+	}
+	if in.ReverseClusters {
+		// The adapter keeps the order of the list among siblings, so the
+		// reverse of the whole list reverses each list of siblings.
+		slices.Reverse(order)
+	}
+	for _, i := range order {
+		addCluster(i)
+	}
+	for i := range in.Nodes {
+		if !nodeDone[i] {
+			addNode(i)
+		}
 	}
 	end := func(id string) (string, error) {
 		if i, ok := nodes[id]; ok {
@@ -215,14 +262,28 @@ func newConversion(in *graph.LayoutInput) (*conversion, error) {
 		if err != nil {
 			return nil, err
 		}
-		ae := adapter.Edge{ID: "e" + strconv.Itoa(i), From: from, To: to}
+		ae := adapter.Edge{ID: "e" + strconv.Itoa(i), From: from, To: to, TailMarker: e.TailMarker, HeadMarker: e.HeadMarker}
 		if e.LabelWidth > 0 {
 			ae.Label = &adapter.Label{Text: "label", Width: e.LabelWidth * s, Height: e.LabelHeight * s}
 		}
-		c.g.Edges = append(c.g.Edges, ae)
-		if e.SourcePort != nil || e.TargetPort != nil {
-			c.unsupportedf("the port of the edge %s -> %s", e.Source, e.Target)
+		if c.endLabels(e) {
+			// Only the layered algorithm places the labels at the ends,
+			// and a label at a fixed place of DOT stays for graph.Finish.
+			if e.TailLabelWidth > 0 {
+				ae.Tail = []adapter.Label{{Text: "tail", Width: e.TailLabelWidth * s, Height: e.TailLabelHeight * s}}
+			}
+			if e.HeadLabelWidth > 0 {
+				ae.Head = []adapter.Label{{Text: "head", Width: e.HeadLabelWidth * s, Height: e.HeadLabelHeight * s}}
+			}
 		}
+		var ok bool
+		if ae.FromPort, ok = c.port(i, e.Source, e.SourcePort, e.SourceSide, true); !ok {
+			c.unsupportedf("the port of the edge %s -> %s at %s", e.Source, e.Target, e.Source)
+		}
+		if ae.ToPort, ok = c.port(i, e.Target, e.TargetPort, e.TargetSide, false); !ok {
+			c.unsupportedf("the port of the edge %s -> %s at %s", e.Source, e.Target, e.Target)
+		}
+		c.g.Edges = append(c.g.Edges, ae)
 		if e.NoConstraint {
 			c.unsupportedf("constraint false on the edge %s -> %s", e.Source, e.Target)
 		}
@@ -275,6 +336,14 @@ func (c *conversion) result(r *adapter.Result) *graph.Layout {
 			if aok && bok && a != b {
 				ep.Points = [][2]float64{a, b}
 			}
+		}
+		if len(p.Head) > 0 && p.Head[0] != nil {
+			ep.HeadLabelX, ep.HeadLabelY = (p.Head[0].X+p.Head[0].Width/2)*k, (p.Head[0].Y+p.Head[0].Height/2)*k
+			ep.HeadPlaced = true
+		}
+		if len(p.Tail) > 0 && p.Tail[0] != nil {
+			ep.TailLabelX, ep.TailLabelY = (p.Tail[0].X+p.Tail[0].Width/2)*k, (p.Tail[0].Y+p.Tail[0].Height/2)*k
+			ep.TailPlaced = true
 		}
 		switch {
 		case p.Label != nil:

@@ -109,6 +109,17 @@ type Config struct {
 	// ConsiderModelOrder is the strategy of the order of the model, such as
 	// NONE, NODES_AND_EDGES or PREFER_EDGES. Empty is NODES_AND_EDGES.
 	ConsiderModelOrder string
+	// KeepEntryNodeOnTop pins the entry of each cycle to the first layer,
+	// as keepEntryNodeOnTop of Mermaid does. The entry is the first node
+	// of a group with no source, in the order of the graph, that no edge
+	// enters once the edges that close a cycle are left out.
+	KeepEntryNodeOnTop bool
+	// KeepFeedbackEdges gives ELK each edge in its own direction, as
+	// orientFeedbackEdges false of Mermaid does. By default, an edge that
+	// closes a cycle only through a cluster goes to ELK reversed, so that
+	// ELK routes it downstream and not around the cluster. Its route still
+	// runs from its start to its end.
+	KeepFeedbackEdges bool
 }
 
 // Node is a node or a cluster.
@@ -153,6 +164,11 @@ type Port struct {
 	Side string
 	// Width and Height are the size of the port.
 	Width, Height float64
+	// At is the place of the top left of the port from the top left of
+	// its node, or nil to let ELK place it. A port with a place fixes the
+	// place of each port of its node, and a port of the node with no place
+	// takes the top left of the node.
+	At *Point
 }
 
 // Label is the box of a label. ELK lays out only a label with a text, so
@@ -177,6 +193,11 @@ type Edge struct {
 	// Only Layered places them. Mermaid draws the cardinality of a relation
 	// with them.
 	Tail, Head []Label
+	// TailMarker and HeadMarker say that the edge draws a marker, such as
+	// an arrowhead, at its start and at its end. ELK does not know of the
+	// markers, so a label at such an end keeps room for the marker around
+	// it, as Mermaid does.
+	TailMarker, HeadMarker bool
 }
 
 // Point is a point in the coordinates of the whole graph.
@@ -238,9 +259,11 @@ func Layout(g *Graph) (*Result, error) {
 // builder holds the graph of ELK while it is built, and the place of each
 // part of the input in it.
 type builder struct {
-	root     *elk.Graph
-	nodes    []*elk.Node
-	edges    []*elk.Edge
+	root  *elk.Graph
+	nodes []*elk.Node
+	edges []*elk.Edge
+	// reversed marks each edge that goes to ELK reversed.
+	reversed []bool
 	issues   []string
 	layered  bool
 	clusters map[string]*clusterState
@@ -319,10 +342,42 @@ func build(g *Graph, mermaidTitles bool) (*builder, error) {
 			b.configureCluster(g, &g.Nodes[i], algorithm)
 		}
 	}
+	t := newTree(g, byID)
+	es := make([]ends, len(g.Edges))
+	for i := range g.Edges {
+		from, fok := byID[g.Edges[i].From]
+		to, tok := byID[g.Edges[i].To]
+		if !fok || !tok {
+			return nil, fmt.Errorf("%w: an end of the edge %q is not a node", ErrGraph, edgeID(g, i))
+		}
+		es[i] = ends{from, to}
+	}
+	b.reversed = make([]bool, len(g.Edges))
+	if !g.Config.KeepFeedbackEdges {
+		b.reversed = feedbackEdges(es, t)
+	}
 	if err := b.addEdges(g, byID); err != nil {
 		return nil, err
 	}
 	b.crossHierarchy(g, byID)
+	// ELK takes the edges in the order of the nesting of their ends, as
+	// they are after the reverse, as orderEdgesByNesting of Mermaid gives
+	// them.
+	turned := slices.Clone(es)
+	for i, r := range b.reversed {
+		if r {
+			turned[i] = ends{es[i].to, es[i].from}
+		}
+	}
+	b.root.Edges = b.root.Edges[:0]
+	for _, i := range nestedOrder(turned, t) {
+		b.root.Edges = append(b.root.Edges, b.edges[i])
+	}
+	if g.Config.KeepEntryNodeOnTop {
+		for _, i := range cyclicEntries(len(g.Nodes), es, t) {
+			setOption(&b.nodes[i].LayoutOptions, "elk.layered.layering.layerConstraint", "FIRST")
+		}
+	}
 	b.reserveTitles()
 	return b, nil
 }
@@ -396,19 +451,32 @@ func (b *builder) add(g *Graph, parent string, into *[]*elk.Node, depth int) {
 	}
 }
 
-// addPorts adds the ports of a node. A port with a side fixes the side of
-// each port of its node.
+// addPorts adds the ports of a node. A port with a place fixes the place of
+// each port of its node, and else a port with a side fixes the side of each
+// port of its node.
 func addPorts(en *elk.Node, ports []Port) {
-	sided := false
+	sided, placed := false, false
 	for _, p := range ports {
 		ep := &elk.Port{ID: elk.StringID(p.ID), Width: elk.Float64(p.Width), Height: elk.Float64(p.Height)}
 		if p.Side != "" {
 			sided = true
 			ep.LayoutOptions = elk.LayoutOptions{"elk.port.side": p.Side}
 		}
+		if p.At != nil {
+			placed = true
+			ep.X, ep.Y = elk.Float64(p.At.X), elk.Float64(p.At.Y)
+		}
 		en.Ports = append(en.Ports, ep)
 	}
-	if sided {
+	switch {
+	case placed:
+		for _, ep := range en.Ports {
+			if ep.X == nil {
+				ep.X, ep.Y = elk.Float64(0), elk.Float64(0)
+			}
+		}
+		setOption(&en.LayoutOptions, "elk.portConstraints", "FIXED_POS")
+	case sided:
 		setOption(&en.LayoutOptions, "elk.portConstraints", "FIXED_SIDE")
 	}
 }
@@ -445,6 +513,13 @@ func (b *builder) addEdges(g *Graph, byID map[string]int) error {
 		if err != nil {
 			return err
 		}
+		tail, head := "TAIL", "HEAD"
+		if b.reversed[i] {
+			// ELK lays the edge out from its end to its start, so the
+			// labels at its ends swap their places too.
+			from, to = to, from
+			tail, head = head, tail
+		}
 		ee := &elk.Edge{
 			ID:      elk.StringID(edgeID(g, i)),
 			Sources: []elk.ID{elk.StringID(from)},
@@ -469,10 +544,10 @@ func (b *builder) addEdges(g *Graph, byID map[string]int) error {
 		}
 		if b.layered {
 			for _, l := range e.Tail {
-				ee.Labels = append(ee.Labels, endLabel(l, "TAIL"))
+				ee.Labels = append(ee.Labels, endLabel(l, tail, markerPad(e.TailMarker)))
 			}
 			for _, l := range e.Head {
-				ee.Labels = append(ee.Labels, endLabel(l, "HEAD"))
+				ee.Labels = append(ee.Labels, endLabel(l, head, markerPad(e.HeadMarker)))
 			}
 		}
 		b.edges[i] = ee
@@ -481,12 +556,27 @@ func (b *builder) addEdges(g *Graph, byID map[string]int) error {
 	return nil
 }
 
-// endLabel returns the label of ELK for a label at an end of an edge.
-func endLabel(l Label, placement string) *elk.Label {
+// markerClearance is half the width of the markers of a relation of
+// Mermaid, which a label at an end with a marker keeps around it, the
+// TERMINAL_LABEL_MARKER_CLEARANCE of render.ts.
+const markerClearance = 6
+
+// markerPad returns the room that a label at an end of an edge keeps on
+// each side, for a marker at that end or for none.
+func markerPad(marker bool) float64 {
+	if marker {
+		return markerClearance
+	}
+	return 0
+}
+
+// endLabel returns the label of ELK for a label at an end of an edge, with
+// pad more on each side, as terminalElkLabels of Mermaid gives it.
+func endLabel(l Label, placement string, pad float64) *elk.Label {
 	return &elk.Label{
 		Text:          elk.String(l.Text),
-		Width:         elk.Float64(l.Width),
-		Height:        elk.Float64(l.Height),
+		Width:         elk.Float64(l.Width + 2*pad),
+		Height:        elk.Float64(l.Height + 2*pad),
 		LayoutOptions: elk.LayoutOptions{"edgeLabels.placement": placement},
 	}
 }
@@ -537,18 +627,21 @@ func (b *builder) result(g *Graph) *Result {
 				p.Points = appendPoint(p.Points, *s.EndPoint)
 			}
 		}
+		if b.reversed[i] {
+			slices.Reverse(p.Points)
+		}
 		labels := ee.Labels
 		if g.Edges[i].Label != nil && g.Edges[i].Label.Text != "" {
-			p.Label = labelRect(labels[0])
+			p.Label = labelRect(labels[0], 0)
 		}
 		labels = labels[1:]
 		if b.layered {
 			for range g.Edges[i].Tail {
-				p.Tail = append(p.Tail, labelRect(labels[0]))
+				p.Tail = append(p.Tail, labelRect(labels[0], markerPad(g.Edges[i].TailMarker)))
 				labels = labels[1:]
 			}
 			for range g.Edges[i].Head {
-				p.Head = append(p.Head, labelRect(labels[0]))
+				p.Head = append(p.Head, labelRect(labels[0], markerPad(g.Edges[i].HeadMarker)))
 				labels = labels[1:]
 			}
 		}
@@ -567,12 +660,14 @@ func appendPoint(pts []Point, p elk.Point) []Point {
 	return append(pts, q)
 }
 
-// labelRect returns the place of a label, or nil if ELK did not place it.
-func labelRect(l *elk.Label) *Rect {
+// labelRect returns the place of a label, without the room of pad on each
+// side, or nil if ELK did not place it.
+func labelRect(l *elk.Label, pad float64) *Rect {
 	if l.X == nil || l.Y == nil {
 		return nil
 	}
 	r := rect(l.X, l.Y, l.Width, l.Height)
+	r.X, r.Y, r.Width, r.Height = r.X+pad, r.Y+pad, r.Width-2*pad, r.Height-2*pad
 	return &r
 }
 

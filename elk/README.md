@@ -24,8 +24,9 @@ picks a layout.
 ## The license
 
 This module is under the Eclipse Public License 2.0 (EPL-2.0), in
-[`LICENSE`](LICENSE). Two files of the copy are under the Apache License 2.0,
-in [`LICENSE.apache-2.0`](LICENSE.apache-2.0), and one is under the BSD
+[`LICENSE`](LICENSE). Three files of the copy, two adaptations of the
+runtime of GWT and the test of one of them, are under the Apache License
+2.0, in [`LICENSE.apache-2.0`](LICENSE.apache-2.0). One is under the BSD
 3-Clause License, in [`LICENSE.v8-bsd`](LICENSE.v8-bsd). The line
 `SPDX-License-Identifier` of each file names its license. The module
 `github.com/xo/zuzu` stays under the MIT license and holds no file under the
@@ -61,8 +62,11 @@ holds the name of the layout of Mermaid: `elk`, or empty, for
 `elk.sporeOverlap`, `elk.box` and `elk.rectpacking`. Another name is
 unsupported, and the graph lays out with `elk.layered`. `adapter.Graph`
 takes the names of ELK, and a cluster of the adapter can also take
-`elk.radial`, as in Mermaid. zuzu gives a cluster no algorithm of its own
-yet.
+`elk.radial`, as in Mermaid. A cluster takes its own algorithm from
+`graph.LayoutCluster.Algorithm`, which the property `algorithm` of a
+subgraph of Mermaid sets, such as `grp@{ algorithm: elk.box }`. As in
+Mermaid, a cluster that an edge crosses takes the algorithm of the graph,
+and an algorithm that ELK does not have is an issue.
 
 The adapter follows `render.ts` of Mermaid 12.3.0, which is the same file in
 its bundle and in `@mermaid-js/layout-elk` 1.0.2. It gives the root and each
@@ -74,11 +78,29 @@ The spacing of the nodes is the spacing of Mermaid: `spacing.baseValue` 40 at
 the root, and at each cluster 24, with a spacing of 50 between two nodes.
 `Graph.Options` sets any other option of ELK at the root.
 
-These passes of Mermaid are not in the adapter: the edges that turn back
-into a cluster, the pin of the first node of a cycle to the first layer
-(`keepEntryNodeOnTop`), the order of the edges by their depth, and the
-room for the markers at the ends of an edge. They are in
-`docs/BACKLOG.md`.
+The adapter also runs the passes of Mermaid that change the graph of ELK
+after it is built, in `internal/adapter/passes.go`:
+
+1. An edge that closes a cycle only because ELK lays out a cluster as one
+   node goes to ELK reversed, so that ELK routes it downstream and not
+   around the cluster (`orientFeedbackEdges`, on by default). Its route
+   and the labels at its ends still run from its start to its end.
+   `Config.KeepFeedbackEdges` turns the pass off.
+2. ELK takes an edge from a node inside a cluster before an edge from the
+   border of that cluster to the same node, and the same at the other end,
+   so that the order of the model does not cross them
+   (`orderEdgesByNesting`).
+3. With `Config.KeepEntryNodeOnTop`, the entry of each cycle with no
+   source goes to the first layer (`keepEntryNodeOnTop` and
+   `findCyclicEntryNodes`).
+4. A label at an end of an edge with a marker, such as an arrowhead,
+   keeps 6 pixels of Mermaid around it for the marker, which ELK does not
+   know of (`terminalElkLabels`).
+
+Mermaid also takes out a short last part of a route that runs along the
+border of its node, which its own cut of the route at the shape makes.
+`graph.Finish` cuts a route at the shape without such a part, so the
+adapter has no need of that pass.
 
 The same graph gives the same layout, as AGENTS.md, hard rule 6, asks. No
 algorithm takes a seed from the clock, and the seed 0 is the seed 1.
@@ -89,13 +111,25 @@ algorithm takes a seed from the clock, and the seed 0 is the seed 1.
 D45). Its `Lay` does these steps:
 
 1. It converts `graph.LayoutInput` to `adapter.Graph`. The clusters and the
-   nodes are in one list, as Mermaid gives them to ELK: the clusters first,
-   then the nodes, each in the order of the input. With
-   `LayoutInput.ReverseClusters`, the sibling clusters are in the reverse
-   of the order of the input, as Mermaid gives the subgraphs of a flowchart
-   (D45 part 5). Each node has its measured size, and each cluster its
-   title, its padding and its direction. Each part takes a new id, so that
-   no id of the input can clash with another or with `root`.
+   nodes are in one list, as Mermaid gives them to ELK: the nodes and the
+   clusters that `LayoutInput.Order` names, in its order, as a state
+   diagram gives its states, its composite states and its notes, then the
+   other clusters, then the other nodes, each in the order of the input.
+   With `LayoutInput.ReverseClusters`, those other sibling clusters are in
+   the reverse of the order of the input, as Mermaid gives the subgraphs
+   of a flowchart and of an ER diagram (D45 part 5). Each node has its
+   measured size, and each cluster its title, its padding, its direction,
+   or `LayoutInput.ClusterDirection` when it has none, as Mermaid gives a
+   composite state, and its algorithm. A node with `LayoutNode.Boxed`,
+   such as a note of a state diagram, lies in a cluster of its own with no
+   title and the room of a title at its top, as Mermaid gives ELK the box
+   of a note. A port of an edge is a port of ELK with a fixed place, on the
+   side of the node that faces the route, or on the side that the port
+   names. The labels at the ends of an edge are labels of ELK, with room
+   for the marker at that end, when the algorithm is `elk.layered`. The
+   settings of `LayoutInput.ELK`, the section `elk` of the config of
+   Mermaid, go to `adapter.Config`. Each part takes a new id, so that no id
+   of the input can clash with another or with `root`.
 2. It scales the graph up by 16/11, from the pixels of zuzu, whose text is
    11 pixels, to the pixels of Mermaid, whose text is 16 pixels. The
    adapter gives ELK the spaces of Mermaid in its pixels, so the spaces
@@ -104,14 +138,16 @@ D45). Its `Lay` does these steps:
    `graph.Layout`, scaled down by 11/16. An algorithm that routes no edge,
    such as `elk.box`, leaves each edge a line between the centers of its
    ends.
-4. It puts `adapter.Result.Issues` in `graph.Layout.Unsupported`, after the
-   parts of the input that the engine leaves out: the ports, the lanes, the
-   groups of the same rank, the edges that take no part in the ranks, and
-   the least length and the weight of an edge. The transform reports each
+4. It calls `graph.Finish`, which puts the ends of the edges on the
+   outlines of the shapes, and places the xlabels and the labels at the
+   ends that ELK did not place, as for every engine.
+5. It puts `adapter.Result.Issues` in `graph.Layout.Unsupported`, after the
+   parts of the input that the engine leaves out: the port of an edge at a
+   cluster, the lanes, the groups of the same rank, the edges that take no
+   part in the ranks, the least length and the weight of an edge, an
+   algorithm that it does not have, and a setting of the section `elk`
+   that it does not read, such as `lineHops`. The transform reports each
    one (AGENTS.md, hard rule 4).
-5. It calls `graph.Finish`, which puts the ends of the edges on the
-   outlines of the shapes and places the labels at the ends and the
-   xlabels, as for every engine.
 
 `go.mod` requires `github.com/xo/zuzu` with a `replace` of `../`, as
 `test/go.mod` does, so the module builds against the zuzu of this
