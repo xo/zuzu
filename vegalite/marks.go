@@ -50,10 +50,17 @@ func (u *unit) markOf() (*vega.Mark, error) {
 		case "color", "fill", "stroke", "filled", "orient", "invalid", "type", "style", "tooltip", "point", "line", "clip", "thickness", "binSpacing", "cornerRadiusEnd", "aria", "width", "height", "x", "y", "x2", "y2", "size", "radius", "theta", "theta2", "radius2", "outerRadius", "innerRadius", "xOffset", "yOffset", "x2Offset", "y2Offset", "minBandSize":
 			continue
 		case "radiusOffset", "thetaOffset":
-			// polar adds them to the place of a mark that is not an arc.
-			if u.mark != "arc" {
-				continue
+			// polar adds them to the place of a mark that is not an arc,
+			// and arcOffsets to an arc. Vega has neither.
+			continue
+		case "radius2Offset", "theta2Offset":
+			// vega-lite.js draws neither on an arc, and zuzu says so.
+			if u.mark == "arc" {
+				if err := u.c.issue(u.path+"/mark", "the property %s of an arc", k); err != nil {
+					return nil, err
+				}
 			}
+			continue
 		}
 		if _, set := e[k]; !set {
 			e.set(k, propRef(v))
@@ -85,7 +92,12 @@ func (u *unit) markOf() (*vega.Mark, error) {
 	case "bar":
 		styles = append(styles, theme.StyleBar+u.orient)
 	case "point", "circle", "square":
-		styles = append(styles, theme.StylePoint)
+		// The ring in the color of the background sets a filled point
+		// apart from the points under it. An unfilled point draws its
+		// stroke in its color, so it takes no ring.
+		if f, ok := u.props["filled"].(bool); !ok || f {
+			styles = append(styles, theme.StylePoint)
+		}
 	case "area":
 		// Vega-Lite stacks an area of one series too, so an area is a
 		// layer of a stack when it splits by a channel. An area with an
@@ -111,6 +123,11 @@ func (u *unit) markOf() (*vega.Mark, error) {
 	// order of its values (docs/STYLE.md).
 	if (u.mark == "line" || u.mark == "area") && u.orient != "horizontal" && u.ch["order"] == nil {
 		styles = append(styles, theme.StyleCurve)
+	}
+	// The config of the kind of mark that the spec gives wins over the
+	// look, so its style comes last (D48 part 5).
+	if u.c.cfg != nil && u.c.cfg.specStyles[u.mark] {
+		styles = append(styles, specStyle(u.mark))
 	}
 	m.Style = vega.List(styles...)
 	if c, ok := u.props["clip"].(bool); ok && c {
@@ -248,7 +265,18 @@ func (u *unit) color(e enc) {
 	// A mark with no color of its own takes the color of the theme, through
 	// a style of its config (D14).
 	var ref map[string]any
-	switch c := u.props["color"].(type) {
+	color := u.props["color"]
+	if color == nil && u.c.cfg != nil {
+		// The color of the config of the kind of mark, or else of every
+		// mark, as vega-lite.js writes it in the encoding.
+		for _, m := range []map[string]any{u.c.cfg.marks[u.mark], u.c.cfg.mark} {
+			if c, ok := m["color"]; ok {
+				color = c
+				break
+			}
+		}
+	}
+	switch c := color.(type) {
 	case string:
 		ref = map[string]any{"value": c}
 	case map[string]any:
@@ -501,7 +529,33 @@ func (u *unit) position(e enc) error {
 		return err
 	}
 	u.polar(e)
+	if u.mark == "image" || u.mark == "rect" {
+		u.centerPlace(e)
+	}
 	return nil
+}
+
+// centerPlace centers an image or a rect on its point and sizes it from the
+// width and the height of the mark, as vega-lite.js writes it: an x or a y
+// with no end and no size of its own becomes xc or yc. An image is always
+// centered, and a rect only along an axis whose size the mark gives.
+func (u *unit) centerPlace(e enc) {
+	for _, a := range [][2]string{{"x", "width"}, {"y", "height"}} {
+		ch, size := a[0], a[1]
+		v, sized := u.props[size]
+		if u.mark == "rect" && !sized {
+			continue
+		}
+		r, ok := e[ch]
+		if !ok || e[ch+"2"] != nil || e[ch+"c"] != nil || e[size] != nil {
+			continue
+		}
+		e[ch+"c"] = r
+		delete(e, ch)
+		if sized {
+			e.set(size, propRef(v))
+		}
+	}
 }
 
 // polar sets the theta and the radius of a mark that is not an arc, such as
@@ -632,14 +686,14 @@ func (u *unit) axis(e enc, ch, size string) error {
 	if d.hasValue && u.mark == "tick" && ch == u.measure() {
 		// A tick at a value, such as a tick of an axis drawn by hand, is
 		// as thick as any tick.
-		e.set(pc, propRef(d.value))
+		e.set(pc, posRef(d.value))
 		e.set(size, map[string]any{"value": u.tickThickness()})
 		return nil
 	}
 	if d.hasValue {
-		e.set(p, propRef(d.value))
+		e.set(p, posRef(d.value))
 		if d2 != nil && d2.hasValue {
-			e.set(p2, propRef(d2.value))
+			e.set(p2, posRef(d2.value))
 		}
 		return nil
 	}
@@ -769,7 +823,13 @@ func (u *unit) axis(e enc, ch, size string) error {
 		if sc := u.v.scales[u.v.key(ch)]; hasScale && sc != nil {
 			sc.addDatum(d.datum)
 		}
-		ref = func(string) map[string]any {
+		// The datum is the value of this channel only. A field of the
+		// second channel, such as y2 beside a datum y, keeps its field.
+		plain := ref
+		ref = func(field string) map[string]any {
+			if field != d.out {
+				return plain(field)
+			}
 			r := d.datumRef()
 			r["scale"] = u.v.sn(ch)
 			return r
@@ -919,11 +979,20 @@ func (u *unit) axis(e enc, ch, size string) error {
 				e.set(p2, u.invalidAtZero(ch, d2.out, hasScale, ref(d2.out)))
 			}
 		case d2 != nil && d2.hasValue:
-			e.set(p2, propRef(d2.value))
-		case u.mark == "area" && u.measure() == ch && hasScale && !u.zeroInDomain(ch):
-			// An area whose scale can leave out zero runs down to the
-			// bottom of its domain, as in vega-lite.js, and not past the
-			// edge of the plot.
+			e.set(p2, posRef(d2.value))
+		case d2 != nil && d2.hasDatum:
+			// A datum of the second channel is a value in the domain of
+			// the scale of the first, as vega-lite.js writes it.
+			r := d2.datumRef()
+			if sc := u.v.scales[u.v.key(ch)]; hasScale && sc != nil {
+				sc.addDatum(d2.datum)
+				r["scale"] = u.v.sn(ch)
+			}
+			e.set(p2, r)
+		case (u.mark == "area" || u.mark == "bar") && u.measure() == ch && hasScale && !u.zeroInDomain(ch):
+			// An area or a bar whose scale can leave out zero runs down to
+			// the bottom of its domain, as in vega-lite.js, and not past
+			// the edge of the plot.
 			sn := u.v.sn(ch)
 			e.set(p2, map[string]any{"signal": "scale(" + strconv.Quote(sn) + ", inrange(0, domain(" + strconv.Quote(sn) + ")) ? 0 : domain(" + strconv.Quote(sn) + ")[0])"})
 		case (u.mark == "bar" || u.mark == "area") && u.measure() == ch && hasScale:
@@ -1297,6 +1366,25 @@ func (u *unit) arc(e enc) {
 			e.set("endAngle", map[string]any{"scale": u.v.sn("theta"), "field": t.out, "band": 1})
 		}
 	}
+	u.arcOffsets(e)
+}
+
+// arcOffsets adds the thetaOffset of an arc to both of its angles and its
+// radiusOffset to its outer radius, as vega-lite.js writes them, as the
+// offset of each reference.
+func (u *unit) arcOffsets(e enc) {
+	add := func(prop string, v any) {
+		if r, ok := e[prop].(map[string]any); ok && r["offset"] == nil {
+			r["offset"] = v
+		}
+	}
+	if v, ok := u.props["thetaOffset"]; ok {
+		add("startAngle", v)
+		add("endAngle", v)
+	}
+	if v, ok := u.props["radiusOffset"]; ok {
+		add("outerRadius", v)
+	}
 }
 
 // midRef returns the reference to the middle of an interval through the
@@ -1354,6 +1442,34 @@ func (u *unit) others(e enc) {
 				ref = u.conditional(d, ref)
 			}
 			e.set("text", ref)
+		case d.hasDatum:
+			// A datum of the text, such as the label of a reference line,
+			// writes a date with timeFormat and a number with format, as
+			// vega-lite.js does.
+			var ref map[string]any
+			spec := ""
+			if !d.def.Format.IsZero() {
+				spec = str(d.def.Format)
+			}
+			switch v := d.datum.(type) {
+			case map[string]any:
+				if !isDateTime(v) {
+					ref = map[string]any{"value": v}
+					break
+				}
+				if spec == "" {
+					spec = "%b %d, %Y"
+				}
+				ref = map[string]any{"signal": "timeFormat(" + dateTimeExpr(v) + ", " + strconv.Quote(spec) + ")"}
+			case float64:
+				ref = map[string]any{"signal": "format(" + strconv.FormatFloat(v, 'g', -1, 64) + ", " + strconv.Quote(spec) + ")"}
+			default:
+				ref = map[string]any{"value": v}
+			}
+			if len(d.cond) > 0 {
+				ref = u.conditional(d, ref)
+			}
+			e.set("text", ref)
 		case len(d.cond) > 0 && !d.isField():
 			// A text with conditions alone, such as a label on some rows.
 			var base map[string]any
@@ -1362,28 +1478,7 @@ func (u *unit) others(e enc) {
 			}
 			e.set("text", u.conditional(d, base))
 		case d.isField():
-			var ref map[string]any
-			switch d.typ {
-			case quantitative:
-				spec := ""
-				if !d.def.Format.IsZero() {
-					spec = str(d.def.Format)
-				}
-				ref = map[string]any{"signal": "format(" + fieldRef(d.out) + ", " + strconv.Quote(spec) + ")"}
-				if d.bin != nil {
-					// A bin writes its range, as its tooltip does.
-					start, end := fieldRef(d.out), fieldRef(d.outEnd)
-					ref = map[string]any{"signal": "!isValid(" + start + ") || !isFinite(+" + start + ") ? \"null\" : format(" + start + ", " + strconv.Quote(spec) + ") + \" – \" + format(" + end + ", " + strconv.Quote(spec) + ")"}
-				}
-			case temporal:
-				spec := "%b %d, %Y"
-				if !d.def.Format.IsZero() {
-					spec = str(d.def.Format)
-				}
-				ref = map[string]any{"signal": "timeFormat(" + fieldRef(d.out) + ", " + strconv.Quote(spec) + ")"}
-			default:
-				ref = map[string]any{"signal": "isValid(" + fieldRef(d.out) + ") ? " + fieldRef(d.out) + " : \"\"+" + fieldRef(d.out)}
-			}
+			ref := map[string]any{"signal": fieldText(d, u.numberFormat())}
 			if len(d.cond) > 0 {
 				ref = u.conditional(d, ref)
 			}
@@ -1392,6 +1487,7 @@ func (u *unit) others(e enc) {
 	} else if t, ok := u.props["text"]; ok {
 		e.set("text", map[string]any{"value": t})
 	}
+	u.tooltipLink(e)
 	if d := u.ch["url"]; d != nil && d.isField() {
 		e.set("url", map[string]any{"field": d.out})
 	}
@@ -1496,6 +1592,76 @@ func unitWidth(scale string, c *channelDef) string {
 
 // posRef returns the reference of a position that a mark gives: "width" or
 // "height" for that size of the group, as vega-lite.js writes it, and else
+
+// fieldText returns the expression that writes the field of a channel as
+// text, as vega-lite.js writes a text and a tooltip: a number with format,
+// the range of a bin, a date with timeFormat, and any other value as it is.
+func fieldText(d *channelDef, numberFormat string) string {
+	spec := ""
+	if !d.def.Format.IsZero() {
+		spec = str(d.def.Format)
+	} else if d.typ == quantitative {
+		spec = numberFormat
+	}
+	switch d.typ {
+	case quantitative:
+		if d.bin != nil {
+			start, end := fieldRef(d.out), fieldRef(d.outEnd)
+			return "!isValid(" + start + ") || !isFinite(+" + start + ") ? \"null\" : format(" + start + ", " + strconv.Quote(spec) + ") + \" – \" + format(" + end + ", " + strconv.Quote(spec) + ")"
+		}
+		return "format(" + fieldRef(d.out) + ", " + strconv.Quote(spec) + ")"
+	case temporal:
+		if spec == "" {
+			spec = "%b %d, %Y"
+		}
+		return "timeFormat(" + fieldRef(d.out) + ", " + strconv.Quote(spec) + ")"
+	}
+	return "isValid(" + fieldRef(d.out) + ") ? " + fieldRef(d.out) + " : \"\"+" + fieldRef(d.out)
+}
+
+// numberFormat returns the default format of a quantitative field from the
+// config, or empty for none.
+func (u *unit) numberFormat() string {
+	if u.c.cfg == nil {
+		return ""
+	}
+	return u.c.cfg.numberFormat
+}
+
+// tooltipLink sets the tooltip and the link of a mark from the channels
+// tooltip and href, as vega-lite.js writes them: one field of a tooltip as
+// its text, a list as an object of the texts of the fields by their
+// titles, and a field of href as its text, with the cursor pointer.
+func (u *unit) tooltipLink(e enc) {
+	switch {
+	case len(u.tooltip) == 1 && !u.tooltipList:
+		e.set("tooltip", map[string]any{"signal": fieldText(u.tooltip[0], u.numberFormat())})
+	case len(u.tooltip) > 0:
+		parts := make([]string, len(u.tooltip))
+		for i, d := range u.tooltip {
+			title := titleOf(d)
+			if d.def != nil && !d.def.Title.IsZero() {
+				title = titleString(valueOf(d.def.Title))
+			}
+			parts[i] = strconv.Quote(title) + ": " + fieldText(d, u.numberFormat())
+		}
+		e.set("tooltip", map[string]any{"signal": "{" + strings.Join(parts, ", ") + "}"})
+	}
+	d := u.ch["href"]
+	switch {
+	case d == nil:
+		return
+	case d.isField():
+		f := fieldRef(d.out)
+		e.set("href", map[string]any{"signal": "isValid(" + f + ") ? " + f + " : \"\"+" + f})
+	case d.hasValue:
+		e.set("href", propRef(d.value))
+	default:
+		return
+	}
+	e.set("cursor", map[string]any{"value": "pointer"})
+}
+
 // the value or the expression of the property.
 func posRef(v any) map[string]any {
 	if v == "width" || v == "height" {

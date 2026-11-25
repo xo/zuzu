@@ -301,7 +301,10 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 	}
 	switch u.mark {
 	case "bar", "area", "rect", "rule", "tick", "trail", "line":
-		if (name == "x" || name == "y") && name == u.dimension() {
+		// A rect with an end on the axis spans an interval there, as in
+		// a mosaic, and is no dimension, so its scale keeps zero, as
+		// vega-lite.js writes it.
+		if (name == "x" || name == "y") && name == u.dimension() && (u.mark != "rect" || u.ch[name+"2"] == nil) {
 			s.dimension = true
 		}
 	}
@@ -344,7 +347,9 @@ func (v *view) addScale(u *unit, name string, d *channelDef, fields []string) bo
 // takeGuide adds the title and the axis or the legend that a channel gives
 // to a scale.
 func (s *scaleComp) takeGuide(name string, d *channelDef) {
-	if t := titleOf(d); t != "" && !contains(s.titles, t) {
+	// A title that a channel gives wins over the titles of the fields of
+	// the other layers, as vega-lite.js merges them.
+	if t := titleOf(d); t != "" && !contains(s.titles, t) && !s.titled {
 		s.titles = append(s.titles, t)
 	}
 	if d.def != nil {
@@ -855,7 +860,9 @@ func (v *view) scaleOf(s *scaleComp) vega.Scale {
 		vs.Interpolate = lit("hcl")
 		vs.Zero = vega.BoolValue{Kind: vega.Literal, Bool: false}
 	}
-	if s.typ == "ordinal" && (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") && s.field != nil && s.field.typ == ordinal && s.props["range"] == nil && s.props["scheme"] == nil {
+	if s.typ == "ordinal" && (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") && s.field != nil && s.field.typ == ordinal && s.props["interpolate"] == nil {
+		// An ordinal field of colors interpolates in hcl, with a range
+		// or a scheme of the spec too, as vega-lite.js writes it.
 		vs.Interpolate = lit("hcl")
 	}
 	for k, x := range s.props {
@@ -1147,7 +1154,9 @@ func (v *view) defaultRange(s *scaleComp) vega.ScaleRange {
 	case "opacity", "fillOpacity", "strokeOpacity":
 		return vega.ScaleRange{Values: []vega.Value{lit(0.3), lit(0.8)}}
 	case "strokeWidth":
-		return vega.ScaleRange{Values: []vega.Value{lit(1), lit(8)}}
+		// minStrokeWidth and maxStrokeWidth of the config of the scales
+		// of Vega-Lite are 1 and 4.
+		return vega.ScaleRange{Values: []vega.Value{lit(1), lit(4)}}
 	case "strokeDash":
 		return vega.ScaleRange{Values: []vega.Value{lit([]any{1, 0}), lit([]any{4, 2}), lit([]any{2, 1}), lit([]any{1, 1}), lit([]any{1, 2, 4, 2})}}
 	case "theta":
@@ -1192,7 +1201,13 @@ func (v *view) guides(out *vega.Spec) {
 			continue
 		}
 		title := strings.Join(s.titles, ", ")
-		if t, ok := s.guide["title"]; ok {
+		t, ok := s.guide["title"]
+		if !ok && v.cfg != nil {
+			// The title of the config of the axes, such as null for no
+			// title, as vega-lite.js reads it.
+			t, ok = v.cfg.axisTitle[s.channel]
+		}
+		if ok {
 			if t == nil {
 				title = ""
 			} else {
@@ -1246,6 +1261,13 @@ func (v *view) guides(out *vega.Spec) {
 			if len(s.layerLegends) > 1 {
 				lo.layers = s.layerLegends
 			}
+			if (s.channel == "color" || s.channel == "fill" || s.channel == "stroke") && s.field != nil && s.field.units != nil &&
+				(s.typ == "time" || s.typ == "utc") && l.Type == "" {
+				// A time scale of colors over a unit of time, such as the
+				// quarters of a year, draws a symbol for each unit and not a
+				// gradient, as vega-lite.js writes it.
+				l.Type = "symbol"
+			}
 			sn := v.sn(s.name)
 			switch s.channel {
 			case "color", "fill":
@@ -1267,6 +1289,8 @@ func (v *view) guides(out *vega.Spec) {
 				l.Opacity = sn
 			case "strokeDash":
 				l.StrokeDash = sn
+			case "strokeWidth":
+				l.StrokeWidth = sn
 			}
 			for k, x := range s.guide {
 				switch k {
@@ -1296,6 +1320,10 @@ func (v *view) guides(out *vega.Spec) {
 					l.LegendX = lit(x)
 				case "legendY":
 					l.LegendY = lit(x)
+				case "labelOverlap":
+					l.LabelOverlap = lit(x)
+				case "titleOrient":
+					l.TitleOrient = lit(x)
 				default:
 					if !slices.Contains(passedLegendKeys, k) {
 						continue
@@ -1319,6 +1347,11 @@ func (v *view) guides(out *vega.Spec) {
 				case "trail", "line", "rule":
 					l.SymbolType = lit("stroke")
 				}
+			}
+			if l.Format.IsZero() && v.cfg != nil && v.cfg.numberFormat != "" && s.field != nil && s.field.typ == quantitative && s.field.units == nil {
+				// The numberFormat of the config formats a quantitative
+				// legend.
+				l.Format = lit(v.cfg.numberFormat)
 			}
 			if l.Format.IsZero() && s.field != nil && s.field.units != nil {
 				l.Format = lit(format.TimeUnitSpecifier(s.field.units, vlSpecifiers))
@@ -1444,11 +1477,17 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 	if s.normalized {
 		// A stack normalized to one shows its shares in percent.
 		main.Format = lit(".0%")
+	} else if v.cfg != nil && v.cfg.numberFormat != "" && s.field != nil && s.field.typ == quantitative && s.field.units == nil {
+		// The numberFormat of the config formats a quantitative axis.
+		main.Format = lit(v.cfg.numberFormat)
 	}
 	// The keys go in order, so that a labelBaseline of the spec wins over
 	// the one that a labelAngle of 0 sets.
 	for _, k := range slices.Sorted(maps.Keys(s.guide)) {
 		x := s.guide[k]
+		if conditionalAxis(k, x, grid, &main) {
+			continue
+		}
 		if passedAxisKey(k) {
 			if v, ok := guideValue(x); ok {
 				if strings.HasPrefix(k, "grid") {
@@ -1484,6 +1523,20 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 			}
 		case "labelAlign":
 			main.LabelAlign = lit(x)
+		case "labelFlush":
+			main.LabelFlush = lit(x)
+		case "minExtent":
+			main.MinExtent = lit(x)
+		case "tickBand", "tickExtra", "tickOffset", "tickRound", "tickMinStep", "labelFlushOffset", "labelSeparation", "labelBound":
+			// The runtime draws these as the axis of Vega does, or says
+			// that it does not. The first four place the ticks and the
+			// grid lines alike, so both axes take them, as in vega-lite.js.
+			if v, ok := guideValue(x); ok {
+				setExtra(&main, k, v)
+				if grid != nil && (k == "tickBand" || k == "tickExtra" || k == "tickOffset" || k == "tickRound") {
+					setExtra(grid, k, v)
+				}
+			}
 		case "labelOverlap":
 			main.LabelOverlap = lit(x)
 		case "tickCount":
@@ -1543,6 +1596,106 @@ func axisOf(s *scaleComp, title string, other string, v *view) (grid *vega.Axis,
 	return grid, main
 }
 
+// conditionalParts are the properties of an axis that a condition of
+// Vega-Lite can set for each tick, by the part of the Vega axis that each
+// styles and the property of that part, as vega-lite.js writes them in the
+// encoding of the part. The properties of conditionalSignals take a signal
+// of the conditions instead.
+var (
+	conditionalParts = map[string][2]string{
+		"labelAlign": {"labels", "align"}, "labelBaseline": {"labels", "baseline"}, "labelColor": {"labels", "fill"},
+		"labelFont": {"labels", "font"}, "labelFontSize": {"labels", "fontSize"}, "labelFontStyle": {"labels", "fontStyle"},
+		"labelFontWeight": {"labels", "fontWeight"}, "labelOpacity": {"labels", "opacity"},
+		"gridColor": {"grid", "stroke"}, "gridDash": {"grid", "strokeDash"}, "gridDashOffset": {"grid", "strokeDashOffset"},
+		"gridOpacity": {"grid", "opacity"}, "gridWidth": {"grid", "strokeWidth"},
+		"tickColor": {"ticks", "stroke"}, "tickDash": {"ticks", "strokeDash"}, "tickDashOffset": {"ticks", "strokeDashOffset"},
+		"tickOpacity": {"ticks", "opacity"}, "tickWidth": {"ticks", "strokeWidth"},
+	}
+	conditionalSignals = []string{"labelOffset", "labelPadding", "tickSize"}
+)
+
+// conditionalAxis sets a property of an axis whose value is a condition of
+// Vega-Lite, such as {"condition": {"test": "datum.value === 0", "value":
+// "black"}, "value": "#ddd"}, as vega-lite.js does: a list of rules in the
+// encoding of the part of the axis that the property styles, the grid in
+// grid and the other parts in main, or a signal. It reports false for any
+// other value, and for a condition on a parameter, which needs a selection.
+func conditionalAxis(k string, x any, grid, main *vega.Axis) bool {
+	m, ok := x.(map[string]any)
+	if !ok || m["condition"] == nil {
+		return false
+	}
+	var conds []map[string]any
+	switch c := m["condition"].(type) {
+	case map[string]any:
+		conds = []map[string]any{c}
+	case []any:
+		for _, x := range c {
+			if cm, ok := x.(map[string]any); ok {
+				conds = append(conds, cm)
+			}
+		}
+	}
+	// The test of each condition is an expression, or a predicate of a
+	// field, such as {"field": "value", "timeUnit": "month", "equal": 1},
+	// which the axis reads as an expression of the tick. A condition on a
+	// parameter needs a selection.
+	tests := make([]string, len(conds))
+	for i, c := range conds {
+		switch t := c["test"].(type) {
+		case string:
+			tests[i] = t
+		case map[string]any:
+			tests[i] = predicateOf(t)
+		default:
+			return false
+		}
+	}
+	def, hasDef := m["value"]
+	if slices.Contains(conditionalSignals, k) {
+		s := "null"
+		if hasDef {
+			s = expr.String(def)
+		}
+		for i, c := range slices.Backward(conds) {
+			s = tests[i] + " ? " + expr.String(c["value"]) + " : " + s
+		}
+		setExtra(main, k, vega.Value{Signal: s})
+		return true
+	}
+	part, ok := conditionalParts[k]
+	if !ok {
+		return false
+	}
+	var rules vega.Production
+	for i, c := range conds {
+		rules = append(rules, vega.Rule{Test: tests[i], Value: lit(c["value"]).JSON})
+	}
+	if hasDef {
+		rules = append(rules, vega.Rule{Value: lit(def).JSON})
+	}
+	a := main
+	if part[0] == "grid" {
+		if grid == nil {
+			return true
+		}
+		a = grid
+	}
+	if a.Encode == nil {
+		a.Encode = vega.GuideEncode{}
+	}
+	el := a.Encode[part[0]]
+	if el.Sets == nil {
+		el.Sets = vega.Encode{}
+	}
+	if el.Sets["update"] == nil {
+		el.Sets["update"] = vega.Props{}
+	}
+	el.Sets["update"][part[1]] = rules
+	a.Encode[part[0]] = el
+	return true
+}
+
 // axisStyleKeys are the properties of an axis of Vega-Lite that style a
 // part of the axis, which Vega reads with the same name and meaning: the
 // text of the labels and of the title, and the lines of the grid, of the
@@ -1580,7 +1733,11 @@ func passedAxisKey(k string) bool {
 // valueAxisKey reports whether a property of the axis of a channel passes
 // to the Vega axis only as a value, which guideValue reads.
 func valueAxisKey(k string) bool {
-	return passedAxisKey(k) || k == "labelBaseline" || k == "labelPadding" || k == "bandPosition"
+	switch k {
+	case "labelBaseline", "labelPadding", "bandPosition", "tickBand", "tickExtra", "tickOffset", "tickRound":
+		return true
+	}
+	return passedAxisKey(k)
 }
 
 // guideValue returns the value of a property of a guide as a value of

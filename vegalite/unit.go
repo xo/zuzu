@@ -32,8 +32,11 @@ type unit struct {
 	ch         map[string]*channelDef
 	detail     []*channelDef
 	tooltip    []*channelDef
-	data       *dataNode
-	path       string
+	// tooltipList says that the spec gives the tooltip as a list, which
+	// writes an object of the fields by their titles, as vega-lite.js does.
+	tooltipList bool
+	data        *dataNode
+	path        string
 	// stack is the channel that stacks, such as y, and stackBy the fields
 	// that it stacks by.
 	stack   string
@@ -112,8 +115,9 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 					u.detail = append(u.detail, d)
 				} else {
 					// A field of a tooltip joins the aggregate and the bins,
-					// as Vega-Lite does, and nothing else.
+					// as Vega-Lite does, and writes the tooltip of the mark.
 					u.tooltip = append(u.tooltip, d)
+					u.tooltipList = ch.Array
 				}
 			}
 			continue
@@ -128,6 +132,9 @@ func (c *compiler) unit(s *Spec, v *view, src *dataNode, path string, repeat map
 			// inherit one, such as the scale of y without its field.
 			// An order with only a sort still sorts the stack.
 			continue
+		}
+		if err := rangeEnds(c, path+"/encoding/"+name, name, d); err != nil {
+			return err
 		}
 		if err := guideKeys(c, path+"/encoding/"+name, name, d); err != nil {
 			return err
@@ -1166,7 +1173,8 @@ func producedFields(ts []Transform) map[string]bool {
 var (
 	axisKeys = []string{"title", "grid", "orient", "format", "formatType", "labelAngle", "labelAlign", "labelOverlap",
 		"tickCount", "values", "domain", "labels", "ticks", "offset", "labelBaseline", "labelPadding", "bandPosition",
-		"zindex", "labelExpr"}
+		"zindex", "labelExpr", "labelFlush", "minExtent", "tickBand", "tickExtra", "tickOffset", "tickRound", "tickMinStep",
+		"labelFlushOffset", "labelSeparation", "labelBound"}
 	legendKeys = append([]string{"title", "orient", "direction", "format", "type", "values", "symbolType", "columns",
 		"clipHeight", "gradientLength", "offset", "legendX", "legendY"}, passedLegendKeys...)
 	// passedLegendKeys are the properties of a legend that pass on to the
@@ -1174,8 +1182,47 @@ var (
 	passedLegendKeys = []string{"symbolLimit", "labelLimit", "symbolSize", "symbolFillColor", "symbolStrokeColor",
 		"symbolStrokeWidth", "symbolOpacity", "symbolDash", "rowPadding", "columnPadding", "gradientThickness",
 		"labelColor", "labelFont", "labelFontSize", "labelFontStyle", "labelFontWeight", "labelOpacity",
-		"titleColor", "titleFont", "titleFontSize", "titleFontStyle", "titleFontWeight", "titleOpacity"}
+		"titleColor", "titleFont", "titleFontSize", "titleFontStyle", "titleFontWeight", "titleOpacity",
+		"titleOrient", "titleAnchor", "titleAlign", "titleBaseline", "titleLimit", "titleLineHeight", "titlePadding",
+		"labelAlign", "labelBaseline", "labelOffset", "labelOverlap", "labelSeparation", "labelPadding",
+		"symbolDashOffset", "symbolOffset", "padding", "cornerRadius", "fillColor", "strokeColor", "gridAlign",
+		"tickCount", "tickMinStep", "gradientOpacity", "gradientStrokeColor", "gradientStrokeWidth"}
 )
+
+// rangeEnds reports rangeMin and rangeMax of the scale of a channel when
+// its range is not two values, which the compiler, like vega-lite.js, does
+// not change: a range of the spec of another length, a scheme, or the
+// default range of a channel that is a name or a step, such as the colors
+// or the bands of a discrete x.
+func rangeEnds(c *compiler, path, name string, d *channelDef) error {
+	if d == nil || d.def == nil {
+		return nil
+	}
+	m, ok := valueOf(d.def.Scale).(map[string]any)
+	if !ok || m["rangeMin"] == nil && m["rangeMax"] == nil {
+		return nil
+	}
+	two := true
+	switch r := m["range"].(type) {
+	case nil:
+		switch {
+		case m["scheme"] != nil:
+			two = false
+		case name == "color" || name == "fill" || name == "stroke" || name == "shape" || name == "strokeDash":
+			two = false
+		case isPositional(name) && !d.continuous():
+			two = false
+		}
+	case []any:
+		two = len(r) == 2
+	default:
+		two = false
+	}
+	if two {
+		return nil
+	}
+	return c.issue(path, "rangeMin or rangeMax of a scale whose range is not two values")
+}
 
 // guideKeys reports each property of the axis or the legend of a channel
 // that the compiler does not read, such as labelExpr.
@@ -1195,8 +1242,12 @@ func guideKeys(c *compiler, path, name string, d *channelDef) error {
 		read := slices.Contains(keys, k)
 		if kind == "an axis" && valueAxisKey(k) {
 			// A condition of Vega-Lite on a property, such as the
-			// gridDash of each tick, does not pass on.
+			// gridDash of each tick, passes on when the axis can write it
+			// in the encoding of a part.
 			_, read = guideValue(m[k])
+			if !read {
+				read = conditionalAxis(k, m[k], &vega.Axis{}, &vega.Axis{})
+			}
 		}
 		if !read {
 			if err := c.issue(path, "the property %s of %s", k, kind); err != nil {

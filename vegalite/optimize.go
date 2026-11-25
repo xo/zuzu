@@ -333,6 +333,138 @@ func (c *compiler) mergeSources(out *vega.Spec, read map[string]bool) {
 	}
 }
 
+// isFlatten reports whether a transform is a formula that flattens a field
+// inside an object, before the transforms of a view.
+func (c *compiler) isFlatten(t vega.Transform) bool {
+	if t.Type != "formula" {
+		return false
+	}
+	var e string
+	_ = json.Unmarshal(t.Params["expr"], &e)
+	return slices.Contains(c.flattens, e)
+}
+
+// liftFacetFlattens moves the formulas that flatten fields inside objects,
+// at the start of the datasets that derive from inline values that a facet
+// reads, into one new dataset that derives from the values, once each.
+// vega-lite.js parses the data there, before it facets the rows. The facet
+// and the datasets of the values then read the new dataset, and the
+// datasets of the cells no longer flatten. The new dataset takes the first
+// number of the datasets of the values, and the datasets from that number
+// on take the next one.
+func (c *compiler) liftFacetFlattens(out *vega.Spec, read map[string]bool) {
+	if len(c.flattens) == 0 {
+		return
+	}
+	var facets []*vega.Mark
+	var walk func(ms []vega.Mark)
+	walk = func(ms []vega.Mark) {
+		for i := range ms {
+			if ms[i].From != nil && ms[i].From.Facet != nil {
+				facets = append(facets, &ms[i])
+			}
+			walk(ms[i].Marks)
+		}
+	}
+	walk(out.Marks)
+	for _, fm := range facets {
+		src := fm.From.Facet.Data
+		si := slices.IndexFunc(c.data, func(d vega.Data) bool { return d.Name == src })
+		if si < 0 || c.data[si].Values.IsZero() {
+			continue
+		}
+		key := func(t vega.Transform) string { return string(t.Params["expr"]) + "|" + string(t.Params["as"]) }
+		var kids []int
+		var lifted []vega.Transform
+		have := map[string]bool{}
+		for k, d := range c.data {
+			if len(d.Source.List) != 1 || d.Source.List[0] != src {
+				continue
+			}
+			kids = append(kids, k)
+			for _, t := range d.Transform {
+				if !c.isFlatten(t) {
+					break
+				}
+				if !have[key(t)] {
+					have[key(t)] = true
+					lifted = append(lifted, t)
+				}
+			}
+		}
+		if len(lifted) == 0 {
+			continue
+		}
+		strip := func(ts []vega.Transform) []vega.Transform {
+			for len(ts) > 0 && c.isFlatten(ts[0]) && have[key(ts[0])] {
+				ts = ts[1:]
+			}
+			return ts
+		}
+		for _, k := range kids {
+			c.data[k].Transform = strip(c.data[k].Transform)
+		}
+		for i := range fm.Data {
+			if d := &fm.Data[i]; len(d.Source.List) == 1 && d.Source.List[0] == fm.From.Facet.Name {
+				d.Transform = strip(d.Transform)
+			}
+		}
+		// The new dataset comes first among the datasets of the values,
+		// and the number that a layer reserved counts as one of them.
+		first := -1
+		for _, k := range kids {
+			if n, ok := dataNumber(c.data[k].Name); ok && (first < 0 || n < first) {
+				first = n
+			}
+		}
+		for _, r := range c.reserved {
+			if r.data == src && (first < 0 || r.number < first) {
+				first = r.number
+			}
+		}
+		if first < 0 {
+			first = c.nData
+		}
+		names := map[string]string{}
+		for _, d := range c.data {
+			if n, ok := dataNumber(d.Name); ok && n >= first {
+				names[d.Name] = "data_" + strconv.Itoa(n+1)
+			}
+		}
+		c.renameAll(out, read, names)
+		c.nData++
+		name := "data_" + strconv.Itoa(first)
+		for i := range c.reserved {
+			if c.reserved[i].number >= first {
+				c.reserved[i].number++
+			}
+			if c.reserved[i].data == src {
+				c.reserved[i].data = name
+			}
+		}
+		for j := range c.data {
+			if len(c.data[j].Source.List) == 1 && c.data[j].Source.List[0] == src {
+				c.data[j].Source = vega.List(name)
+			}
+		}
+		rename := func(n string) string {
+			if n == src {
+				return name
+			}
+			return n
+		}
+		for j := range out.Marks {
+			renameMarkData(&out.Marks[j], rename)
+		}
+		for j := range out.Scales {
+			renameDomain(out.Scales[j].Domain.Data, rename)
+		}
+		read[name] = true
+		c.data = slices.Insert(c.data, si+1, vega.Data{Name: name, Source: vega.List(src), Transform: lifted})
+	}
+	c.removeEmpty(read)
+}
+
 // liftFlattens moves the formulas that flatten fields inside objects, at
 // the start of the datasets that derive from a source of a url, into the
 // source, once each, as vega-lite.js parses its data there.
@@ -340,14 +472,7 @@ func (c *compiler) liftFlattens(read map[string]bool) {
 	if len(c.flattens) == 0 {
 		return
 	}
-	isFlatten := func(t vega.Transform) bool {
-		if t.Type != "formula" {
-			return false
-		}
-		var e string
-		_ = json.Unmarshal(t.Params["expr"], &e)
-		return slices.Contains(c.flattens, e)
-	}
+	isFlatten := c.isFlatten
 	for pi := range c.data {
 		if c.data[pi].URL.IsZero() {
 			continue

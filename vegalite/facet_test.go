@@ -63,6 +63,56 @@ func TestFacetIndependentLayers(t *testing.T) {
 	}
 }
 
+// TestFacetFlattensOnce checks that the fields inside objects of the layers
+// of a facet over inline values flatten once, in a dataset of their own
+// that the facet reads, as vega-lite.js compiles it, and not in each
+// dataset of a layer or of a cell.
+func TestFacetFlattensOnce(t *testing.T) {
+	t.Parallel()
+	m := compileMap(t, bullet)
+	flattens := func(d map[string]any) []string {
+		var out []string
+		ts, _ := d["transform"].([]any)
+		for _, tr := range ts {
+			tr, _ := tr.(map[string]any)
+			if e, _ := tr["expr"].(string); tr["type"] == "formula" && strings.Contains(e, "] && datum[") {
+				as, _ := tr["as"].(string)
+				out = append(out, as)
+			}
+		}
+		return out
+	}
+	parse := find(m, "data", "data_0")
+	if parse == nil {
+		t.Fatalf("no data_0: %s", asJSON(m["data"]))
+	}
+	if got := strings.Join(flattens(parse), ","); got != "ranges.1,ranges.0,measures.0,markers.0" {
+		t.Errorf("data_0 flattens %s, want ranges.1,ranges.0,measures.0,markers.0", got)
+	}
+	data, _ := m["data"].([]any)
+	for _, d := range data {
+		d, _ := d.(map[string]any)
+		if d["name"] != "data_0" && len(flattens(d)) > 0 {
+			t.Errorf("the dataset %s flattens again: %s", d["name"], asJSON(d))
+		}
+	}
+	cell := find(m, "marks", "cell")
+	if cell == nil {
+		t.Fatal("no cell")
+	}
+	facet, _ := cell["from"].(map[string]any)["facet"].(map[string]any)
+	if facet["data"] != "data_0" {
+		t.Errorf("the facet reads %v, want data_0", facet["data"])
+	}
+	inCell, _ := cell["data"].([]any)
+	for _, d := range inCell {
+		d, _ := d.(map[string]any)
+		if len(flattens(d)) > 0 {
+			t.Errorf("the dataset %s of the cell flattens again: %s", d["name"], asJSON(d))
+		}
+	}
+}
+
 // TestLoneChannelMarks checks the place across the view of a bar and a tick
 // that have only x: centered, with the size of the mark, the view less the
 // inner padding of the bands of a bar, or three quarters of the view for a

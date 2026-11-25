@@ -3,6 +3,8 @@ package vegalite
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -266,9 +268,9 @@ func TestOverlayLine(t *testing.T) {
 // TestCompileAxisProps checks that the axis of a channel passes on the
 // properties that place its labels and its title, and those that style its
 // parts, as vega-lite.js does: the grid ones to the axis of the grid, and
-// zindex and bandPosition to both axes. Before, each was an issue, so the
-// labels of bar_axis_space_saving ran into the plot. A condition on a
-// property stays an issue.
+// zindex, bandPosition and tickBand to both axes. Before, each was an
+// issue, so the labels of bar_axis_space_saving ran into the plot. A
+// condition on a property stays an issue.
 func TestCompileAxisProps(t *testing.T) {
 	t.Parallel()
 	s := compile(t, `{
@@ -281,7 +283,8 @@ func TestCompileAxisProps(t *testing.T) {
 				"labelExpr": "upper(datum.label)", "labelFontSize": 12, "labelFontWeight": "bold",
 				"titleX": 5, "titleY": -5, "titleAngle": 0, "titleAlign": "left", "titleBaseline": "bottom",
 				"titleAnchor": "start", "titleFontSize": 9, "tickSize": 4, "domainWidth": 2,
-				"gridColor": "red", "gridDash": [2, 2], "titlePadding": {"expr": "1 + 2"}
+				"gridColor": "red", "gridDash": [2, 2], "titlePadding": {"expr": "1 + 2"},
+				"tickBand": "extent", "tickRound": false
 			}},
 			"x": {"field": "b", "type": "quantitative"}
 		}
@@ -314,6 +317,7 @@ func TestCompileAxisProps(t *testing.T) {
 		"labelOffset": `-15`, "labelFontSize": `12`, "labelFontWeight": `"bold"`, "titleX": `5`, "titleY": `-5`,
 		"titleAngle": `0`, "titleAlign": `"left"`, "titleBaseline": `"bottom"`, "titleAnchor": `"start"`,
 		"titlePadding": `{"signal":"1 + 2"}`, "titleFontSize": `9`, "tickSize": `4`, "domainWidth": `2`,
+		"tickBand": `"extent"`, "tickRound": `false`,
 	} {
 		if got := string(m[k]); got != want {
 			t.Errorf("the %s of the axis = %s, want %s", k, got, want)
@@ -323,8 +327,9 @@ func TestCompileAxisProps(t *testing.T) {
 		t.Error("the axis of the labels has the gridColor, want it on the axis of the grid only")
 	}
 	if got := str(grid); !strings.Contains(got, `"gridColor":"red"`) || !strings.Contains(got, `"gridDash":[2,2]`) ||
-		!strings.Contains(got, `"zindex":1`) || !strings.Contains(got, `"bandPosition":0`) {
-		t.Errorf("the axis of the grid = %s, want its gridColor, gridDash, zindex and bandPosition", got)
+		!strings.Contains(got, `"zindex":1`) || !strings.Contains(got, `"bandPosition":0`) ||
+		!strings.Contains(got, `"tickBand":"extent"`) {
+		t.Errorf("the axis of the grid = %s, want its gridColor, gridDash, zindex, bandPosition and tickBand", got)
 	}
 	if got := str(main.Encode); got != `{"labels":{"update":{"text":{"signal":"upper(datum.label)"}}}}` {
 		t.Errorf("the encode of the axis = %s, want the labelExpr as the text of the labels", got)
@@ -339,8 +344,32 @@ func TestCompileAxisProps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := Compile(cond, WithStrict(true)); err == nil {
-		t.Error("strict Compile of a condition on the gridDash of an axis succeeded, want an issue")
+	// A condition on the gridDash of each tick is a list of rules in the
+	// encoding of the grid, as vega-lite.js writes it.
+	out, _, err := Compile(cond, WithStrict(true))
+	if err != nil {
+		t.Fatalf("strict Compile of a condition on the gridDash of an axis: %v", err)
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"strokeDash":[{"value":[2,2],"test":"datum.value > 0"},{"value":[]}]`; !strings.Contains(string(b), want) {
+		t.Errorf("expected %s in the grid of the axis, got %s", want, b)
+	}
+	// A condition on a parameter needs a selection, and is an issue.
+	param, err := Parse([]byte(`{
+		"data": {"values": [{"b": 28}]},
+		"mark": "point",
+		"encoding": {"x": {"field": "b", "type": "quantitative", "axis": {
+			"gridDash": {"condition": {"param": "p", "value": [2, 2]}, "value": []}
+		}}}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Compile(param, WithStrict(true)); err == nil {
+		t.Error("strict Compile of a condition on a parameter succeeded, want an issue")
 	}
 }
 
@@ -682,6 +711,292 @@ func TestCompileBinnedBarSpacing(t *testing.T) {
 		}
 		if ref["offset"] != want {
 			t.Errorf("%s is %s, want the offset %v", ch, b, want)
+		}
+	}
+}
+
+// TestConfigAxisTitle checks that the title of the config of the axes, such
+// as null for no title, gives the title of each axis that sets none, as
+// vega-lite.js reads it, and that the title of an axis wins over it.
+func TestConfigAxisTitle(t *testing.T) {
+	t.Parallel()
+	s, err := Parse([]byte(`{
+		"data": {"values": [{"a": 1, "b": 2}]},
+		"mark": "point",
+		"encoding": {
+			"x": {"field": "a", "type": "quantitative"},
+			"y": {"field": "b", "type": "quantitative", "axis": {"title": "B"}}
+		},
+		"config": {"axis": {"title": null}}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := Compile(s, WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := map[string]string{}
+	for _, a := range out.Axes {
+		if a.Title.JSON != nil {
+			titles[a.Scale] = string(a.Title.JSON)
+		}
+	}
+	if want := map[string]string{"y": `"B"`}; !maps.Equal(titles, want) {
+		t.Errorf("the titles %v, want %v", titles, want)
+	}
+}
+
+// TestLayerTitleExplicitWins checks that a title that a layer gives wins
+// over the title of the field of another layer, as vega-lite.js merges the
+// titles of an axis, so the axis reads x and not "x, Median of m".
+func TestLayerTitleExplicitWins(t *testing.T) {
+	t.Parallel()
+	s, err := Parse([]byte(`{
+		"data": {"values": [{"x": 1, "m": 2}]},
+		"layer": [
+			{"mark": "point", "encoding": {"x": {"field": "x", "type": "quantitative", "title": "x"}}},
+			{"mark": "rule", "encoding": {"x": {"aggregate": "median", "field": "m"}}}
+		]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := Compile(s, WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range out.Axes {
+		if a.Title.JSON != nil && string(a.Title.JSON) != `"x"` {
+			t.Errorf("the title %s, want x", a.Title.JSON)
+		}
+	}
+}
+
+// TestStrokeWidthLegend checks that a legend of strokeWidth alone names its
+// scale, so that it draws, and that the scale runs from 1 to 4, the
+// minStrokeWidth and maxStrokeWidth of Vega-Lite.
+func TestStrokeWidthLegend(t *testing.T) {
+	t.Parallel()
+	s, err := Parse([]byte(`{
+		"data": {"values": [{"a": 1, "b": 2, "c": 1}]},
+		"mark": "line",
+		"encoding": {
+			"x": {"field": "a", "type": "quantitative"},
+			"y": {"field": "b", "type": "quantitative"},
+			"strokeWidth": {"field": "c", "type": "quantitative"}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := Compile(s, WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Legends) != 1 || out.Legends[0].StrokeWidth != "strokeWidth" {
+		t.Errorf("the legends %+v, want one of the scale strokeWidth", out.Legends)
+	}
+	b, err := json.Marshal(out.Scales)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"name":"strokeWidth","type":"linear"`) || !strings.Contains(string(b), `"range":[1,4]`) {
+		t.Errorf("expected a scale strokeWidth from 1 to 4, got %s", b)
+	}
+}
+
+// TestRangeEndsReported checks that rangeMin and rangeMax are an issue on a
+// range that is not two values, such as the named range of a color, and
+// replace the end of a range of two values, such as the range of a size.
+func TestRangeEndsReported(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		enc   string
+		issue bool
+	}{
+		{`"color": {"field": "c", "type": "quantitative", "scale": {"rangeMin": "red"}}`, true},
+		{`"x": {"field": "c", "type": "nominal", "scale": {"rangeMax": 200}}`, true},
+		{`"size": {"field": "c", "type": "quantitative", "scale": {"rangeMax": 500}}`, false},
+	} {
+		s, err := Parse([]byte(`{"data": {"values": [{"c": 3}]}, "mark": "point", "encoding": {` + test.enc + `}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, report, err := Compile(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := len(report) > 0; got != test.issue {
+			t.Errorf("%s: the report %v, want an issue %v", test.enc, report, test.issue)
+		}
+	}
+}
+
+// TestTimeUnitLegendIsSymbol checks that a legend of colors over a unit of
+// time draws a symbol for each unit, as vega-lite.js writes it, and not a
+// gradient.
+func TestTimeUnitLegendIsSymbol(t *testing.T) {
+	t.Parallel()
+	s, err := Parse([]byte(`{
+		"data": {"values": [{"d": "2020-01-01", "v": 1}]},
+		"mark": "line",
+		"encoding": {
+			"x": {"field": "d", "type": "temporal", "timeUnit": "month"},
+			"y": {"field": "v", "type": "quantitative"},
+			"color": {"field": "d", "type": "temporal", "timeUnit": "quarter"}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := Compile(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Legends) != 1 || out.Legends[0].Type != "symbol" {
+		t.Errorf("the legends %+v, want one of the type symbol", out.Legends)
+	}
+}
+
+// TestMarkConfigStyles checks that config.mark and the config of a kind of
+// mark, such as config.text, pass on as a style that the mark takes after
+// the styles of the look, without the properties that only Vega-Lite has,
+// and that their color is the color of the mark, as vega-lite.js writes it.
+func TestMarkConfigStyles(t *testing.T) {
+	t.Parallel()
+	s, err := Parse([]byte(`{
+		"data": {"values": [{"a": 1}]},
+		"mark": "text",
+		"encoding": {"x": {"field": "a", "type": "quantitative"}, "text": {"field": "a", "type": "quantitative"}},
+		"config": {"mark": {"color": "red", "opacity": 0.5}, "text": {"dx": 3, "dy": 1, "filled": true}}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := Compile(s, WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(out, json.Deterministic(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`"zuzu.spec.text":{"dx":3,"dy":1,"opacity":0.5}`,
+		`"fill":{"value":"red"}`,
+		`"style":["text","zuzu.spec.text"]`,
+	} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("expected %s in %s", want, b)
+		}
+	}
+}
+
+// TestConfigNumberFormat checks that config.numberFormat formats each
+// quantitative field, in its axis, its legend, its text and its tooltip, as
+// vega-lite.js writes it, and that customFormatTypes is an issue.
+func TestConfigNumberFormat(t *testing.T) {
+	t.Parallel()
+	src := `{
+		"data": {"values": [{"a": 1, "b": 2}]},
+		"mark": "text",
+		"encoding": {
+			"x": {"field": "a", "type": "quantitative"},
+			"color": {"field": "b", "type": "quantitative"},
+			"text": {"field": "a", "type": "quantitative"},
+			"tooltip": {"field": "b", "type": "quantitative"}
+		},
+		"config": {"numberFormat": ".2f"%s}
+	}`
+	s, err := Parse([]byte(fmt.Sprintf(src, "")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := Compile(s, WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(out, json.Deterministic(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`"format":".2f"`, `"text":{"signal":"format(datum[\"a\"], \".2f\")"}`,
+		`"tooltip":{"signal":"format(datum[\"b\"], \".2f\")"}`,
+	} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("expected %s in %s", want, b)
+		}
+	}
+	if n := strings.Count(string(b), `"format":".2f"`); n != 2 {
+		t.Errorf("%d formats .2f, want the axis and the legend", n)
+	}
+	s, err = Parse([]byte(fmt.Sprintf(src, `, "customFormatTypes": true`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Compile(s, WithStrict(true)); err == nil {
+		t.Error("strict Compile with customFormatTypes succeeded, want an issue")
+	}
+}
+
+// TestRectIntervalKeepsZero checks that the scale of a rect with an end on
+// its axis, as in a mosaic, keeps zero, as vega-lite.js writes it.
+func TestRectIntervalKeepsZero(t *testing.T) {
+	t.Parallel()
+	s, err := Parse([]byte(`{
+		"data": {"values": [{"a": 1, "b": 3, "c": 2, "d": 5}]},
+		"mark": "rect",
+		"encoding": {
+			"x": {"field": "a", "type": "quantitative"}, "x2": {"field": "b"},
+			"y": {"field": "c", "type": "quantitative"}, "y2": {"field": "d"}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := Compile(s, WithStrict(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sc := range out.Scales {
+		if (sc.Name == "x" || sc.Name == "y") && (sc.Zero.Kind != vega.Literal || !sc.Zero.Bool) {
+			t.Errorf("the scale %s has zero %+v, want true", sc.Name, sc.Zero)
+		}
+	}
+}
+
+// TestGuidePropsPassOn checks that the properties of an axis and of a legend
+// that Vega has pass on to the Vega guide, in its fields, so that the
+// runtime draws them or says that it does not.
+func TestGuidePropsPassOn(t *testing.T) {
+	t.Parallel()
+	s, err := Parse([]byte(`{
+		"data": {"values": [{"a": 1, "b": "x"}]},
+		"mark": "point",
+		"encoding": {
+			"x": {"field": "a", "type": "quantitative", "axis": {"minExtent": 30, "labelFlush": false, "tickBand": "extent"}},
+			"color": {"field": "b", "type": "nominal", "legend": {"titleOrient": "left", "labelOverlap": true, "padding": 4}}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, report, err := Compile(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Errorf("the report %v, want none", report)
+	}
+	b, err := json.Marshal(out, json.Deterministic(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"minExtent":30`, `"labelFlush":false`, `"tickBand":"extent"`, `"titleOrient":"left"`, `"labelOverlap":true`, `"padding":4`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("expected %s in %s", want, b)
 		}
 	}
 }

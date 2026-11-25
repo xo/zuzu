@@ -296,6 +296,172 @@ func TestCompilePositions(t *testing.T) {
 			},
 		},
 		{
+			// A datum of y2 is a value of the scale of y, as vega-lite.js
+			// writes it.
+			"datum of y2", `{
+				"data": {"values": [{"a": 1}]},
+				"mark": "bar",
+				"encoding": {
+					"x": {"field": "a", "type": "quantitative"},
+					"y": {"datum": 1},
+					"y2": {"datum": 3}
+				}
+			}`, "marks",
+			map[string]string{
+				"y":  `{"scale":"y","value":1}`,
+				"y2": `{"scale":"y","value":3}`,
+			},
+		},
+		{
+			// A field of y2 beside a datum of y keeps its field.
+			"field of y2 beside a datum of y", `{
+				"data": {"values": [{"a": 1, "c": 5}]},
+				"mark": "bar",
+				"encoding": {
+					"x": {"field": "a", "type": "quantitative"},
+					"y": {"datum": 1, "type": "quantitative"},
+					"y2": {"field": "c"}
+				}
+			}`, "marks",
+			map[string]string{
+				"y":  `{"scale":"y","value":1}`,
+				"y2": `{"scale":"y","field":"c"}`,
+			},
+		},
+		{
+			// A datum of the text writes a date with timeFormat, as the
+			// label of a reference line does in vega-lite.js.
+			"date datum of the text", `{
+				"data": {"values": [{}]},
+				"mark": "text",
+				"encoding": {"text": {"datum": {"year": 2020, "month": 3, "date": 1}}}
+			}`, "marks",
+			map[string]string{
+				"text": `{"signal":"timeFormat(time(datetime(2020, 3-1, 1, 0, 0, 0, 0)), \"%b %d, %Y\")"}`,
+			},
+		},
+		{
+			"number datum of the text", `{
+				"data": {"values": [{}]},
+				"mark": "text",
+				"encoding": {"text": {"datum": 5, "format": ".2f"}}
+			}`, "marks",
+			map[string]string{
+				"text": `{"signal":"format(5, \".2f\")"}`,
+			},
+		},
+		{
+			// The value width of x2 is the width of the view, as
+			// vega-lite.js writes it.
+			"value width of x2", `{
+				"data": {"values": [{"a": 1}]},
+				"mark": "rect",
+				"encoding": {
+					"x": {"value": 0}, "x2": {"value": "width"},
+					"y": {"field": "a", "type": "quantitative"}
+				}
+			}`, "marks",
+			map[string]string{
+				"x2": `{"field":{"group":"width"}}`,
+			},
+		},
+		{
+			// A list of fields of a tooltip writes an object of their texts
+			// by their titles, and a field of href is the link of the mark,
+			// with the cursor pointer, as vega-lite.js writes them.
+			"tooltip and href", `{
+				"data": {"values": [{"a": 1, "b": 2, "u": "https://example.org"}]},
+				"mark": "point",
+				"encoding": {
+					"x": {"field": "a", "type": "quantitative"},
+					"href": {"field": "u"},
+					"tooltip": [{"field": "a", "type": "quantitative"}, {"field": "b", "type": "quantitative", "title": "B", "format": ".1f"}]
+				}
+			}`, "marks",
+			map[string]string{
+				"tooltip": `{"signal":"{\"a\": format(datum[\"a\"], \"\"), \"B\": format(datum[\"b\"], \".1f\")}"}`,
+				"href":    `{"signal":"isValid(datum[\"u\"]) ? datum[\"u\"] : \"\"+datum[\"u\"]"}`,
+				"cursor":  `{"value":"pointer"}`,
+			},
+		},
+		{
+			// One field of a tooltip is its text.
+			"one field of a tooltip", `{
+				"data": {"values": [{"a": "x", "b": 2}]},
+				"mark": "bar",
+				"encoding": {
+					"x": {"field": "a", "type": "nominal"},
+					"y": {"field": "b", "type": "quantitative", "aggregate": "sum"},
+					"tooltip": {"field": "b", "type": "quantitative", "aggregate": "sum"}
+				}
+			}`, "marks",
+			map[string]string{
+				"tooltip": `{"signal":"format(datum[\"sum_b\"], \"\")"}`,
+			},
+		},
+		{
+			// An image centers on its point, with the width and the height
+			// of the mark, as vega-lite.js writes it.
+			"image of a size", `{
+				"data": {"values": [{"a": 1, "b": 2, "u": "x.png"}]},
+				"mark": {"type": "image", "width": 50, "height": 40},
+				"encoding": {
+					"x": {"field": "a", "type": "quantitative"},
+					"y": {"field": "b", "type": "quantitative"},
+					"url": {"field": "u"}
+				}
+			}`, "marks",
+			map[string]string{
+				"xc": `{"scale":"x","field":"a"}`, "yc": `{"scale":"y","field":"b"}`,
+				"x": "", "y": "", "width": `{"value":50}`, "height": `{"value":40}`,
+			},
+		},
+		{
+			// A rect with a width of its own centers on its x.
+			"rect of a width", `{
+				"data": {"values": [{"a": 1, "b": 2}]},
+				"mark": {"type": "rect", "width": 30},
+				"encoding": {
+					"x": {"field": "a", "type": "quantitative"},
+					"y": {"field": "b", "type": "quantitative"}
+				}
+			}`, "marks",
+			map[string]string{
+				"xc": `{"scale":"x","field":"a"}`, "x": "", "width": `{"value":30}`,
+			},
+		},
+		{
+			// thetaOffset moves both angles of an arc and radiusOffset its
+			// outer radius, as vega-lite.js writes them, and neither goes
+			// to Vega.
+			"offsets of an arc", `{
+				"data": {"values": [{"a": "x", "b": 2}]},
+				"mark": {"type": "arc", "radiusOffset": 10, "thetaOffset": 0.2},
+				"encoding": {"theta": {"field": "b", "type": "quantitative"}, "color": {"field": "a", "type": "nominal"}}
+			}`, "marks",
+			map[string]string{
+				"startAngle":   `{"scale":"theta","field":"b_end","offset":0.2}`,
+				"endAngle":     `{"scale":"theta","field":"b_start","offset":0.2}`,
+				"outerRadius":  `{"signal":"min(width,height)/2","offset":10}`,
+				"radiusOffset": "", "thetaOffset": "",
+			},
+		},
+		{
+			// A bar whose scale can leave out zero runs from the bottom of
+			// its domain, as in vega-lite.js.
+			"bar with no zero", `{
+				"data": {"values": [{"a": "x", "b": 20}]},
+				"mark": "bar",
+				"encoding": {
+					"x": {"field": "a", "type": "nominal"},
+					"y": {"field": "b", "type": "quantitative", "stack": null, "scale": {"zero": false}}
+				}
+			}`, "marks",
+			map[string]string{
+				"y2": `{"signal":"scale(\"y\", inrange(0, domain(\"y\")) ? 0 : domain(\"y\")[0])"}`,
+			},
+		},
+		{
 			// A rule from one band to another runs between their middles,
 			// and the offsets of the mark move its ends.
 			"rule between bands with offsets", `{

@@ -166,6 +166,19 @@ type config struct {
 	// position, x or y, when the config gives one: the grid of axisX or
 	// axisY, else the grid of axis.
 	grid map[string]bool
+	// axisTitle holds the title of the config of the axes of each channel
+	// of position, in the same way, when the config gives one, such as
+	// null for no title.
+	axisTitle map[string]any
+	// specStyles holds the kinds of mark that the config of the spec
+	// styles, through specStyle.
+	specStyles map[string]bool
+	// numberFormat is the default format of a quantitative field, in its
+	// axis, its legend, its text and its tooltip, and customFormats says
+	// that the config turns on customFormatTypes, which name functions of
+	// JavaScript that zuzu does not have.
+	numberFormat  string
+	customFormats bool
 }
 
 // barBandPaddingInner returns the inner padding of the bands of a bar: the
@@ -228,6 +241,12 @@ func readConfig(raw []byte) *config {
 		}
 	}
 	cfg.mark = m.Mark
+	if nf, ok := all["numberFormat"].(string); ok {
+		cfg.numberFormat = nf
+	}
+	if cf, ok := all["customFormatTypes"].(bool); ok && cf {
+		cfg.customFormats = true
+	}
 	if v, ok := m.Mark["invalid"]; ok && v == nil {
 		cfg.keepInvalid = true
 	}
@@ -258,6 +277,12 @@ func readConfig(raw []byte) *config {
 				}
 				cfg.grid[ch] = g
 			}
+			if t, ok := x["title"]; ok {
+				if cfg.axisTitle == nil {
+					cfg.axisTitle = map[string]any{}
+				}
+				cfg.axisTitle[ch] = t
+			}
 		}
 	}
 	return cfg
@@ -266,15 +291,36 @@ func readConfig(raw []byte) *config {
 // spacing returns the padding of the layout of a facet or a
 // concatenation: the spacing of the spec, else the spacing of the config,
 // else 20. A spacing can be one number or an object with a row and a
-// column, as the padding of a layout of Vega can.
+// column, as the padding of a layout of Vega can. An object that leaves out
+// the row or the column takes the spacing of the config, or 20, for it.
 func spacing(s *Spec, config any) any {
-	if v := valueOf(s.Spacing); v != nil {
-		return v
+	def := config
+	if def == nil {
+		def = 20.0
 	}
-	if config != nil {
-		return config
+	v := valueOf(s.Spacing)
+	m, ok := v.(map[string]any)
+	if !ok {
+		if v != nil {
+			return v
+		}
+		return def
 	}
-	return 20.0
+	out := map[string]any{}
+	for _, key := range []string{"row", "column"} {
+		x := m[key]
+		if x == nil {
+			x = def
+			if dm, ok := def.(map[string]any); ok {
+				x = dm[key]
+			}
+		}
+		if x == nil {
+			x = 20.0
+		}
+		out[key] = x
+	}
+	return out
 }
 
 // passedConfig are the parts of the config of a spec that the Vega config
@@ -333,6 +379,25 @@ func styleConfig(raw []byte) vega.Config {
 			out[k] = v
 		}
 	}
+	if ms := markStyles(m); len(ms) > 0 {
+		var styles map[string]any
+		_ = json.Unmarshal(out["style"], &styles)
+		if styles == nil {
+			styles = map[string]any{}
+		}
+		for k, v := range ms {
+			if _, ok := styles[k]; !ok {
+				styles[k] = v
+			}
+		}
+		b, err := json.Marshal(styles, json.Deterministic(true))
+		if err == nil {
+			if out == nil {
+				out = vega.Config{}
+			}
+			out["style"] = b
+		}
+	}
 	if cell := viewStyle(m["view"]); cell != nil {
 		var styles map[string]any
 		_ = json.Unmarshal(out["style"], &styles)
@@ -354,15 +419,76 @@ func styleConfig(raw []byte) vega.Config {
 	return out
 }
 
+// specStyle names the style that holds the config of a kind of mark of a
+// spec, such as zuzu.spec.point, which the mark takes after the styles of
+// the look, so that the config of the spec wins over the look (D48 part 5).
+func specStyle(mark string) string { return "zuzu.spec." + mark }
+
+// vegaLiteOnly are the properties of the config of a mark of Vega-Lite that
+// Vega does not have, which the compiler reads itself or leaves out, as
+// vega-lite.js does.
+var vegaLiteOnly = map[string]bool{
+	"color": true, "filled": true, "invalid": true, "tooltip": true, "point": true, "line": true,
+	"timeUnitBandPosition": true, "timeUnitBandSize": true, "continuousBandSize": true, "discreteBandSize": true,
+	"minBandSize": true, "binSpacing": true, "thickness": true, "cornerRadiusEnd": true, "style": true, "clip": true,
+	"x": true, "y": true, "x2": true, "y2": true, "width": true, "height": true, "orient": true,
+	"radiusOffset": true, "thetaOffset": true, "radius2Offset": true, "theta2Offset": true,
+	"xOffset": true, "yOffset": true, "x2Offset": true, "y2Offset": true,
+}
+
+// markStyles returns the style of each kind of mark from the config of a
+// spec: the properties of config.mark and of the config of the kind, such
+// as config.point, with those of the kind winning, without the properties
+// that only Vega-Lite has. The size of a bar or a tick is its width in
+// Vega-Lite, and not a property of Vega, so it stays out too.
+func markStyles(m map[string]jsontext.Value) map[string]any {
+	var common map[string]any
+	_ = json.Unmarshal(m["mark"], &common)
+	out := map[string]any{}
+	for kind := range vegaMark {
+		var own map[string]any
+		_ = json.Unmarshal(m[kind], &own)
+		st := map[string]any{}
+		for _, src := range []map[string]any{common, own} {
+			for k, v := range src {
+				if vegaLiteOnly[k] || k == "size" && (kind == "bar" || kind == "tick") {
+					continue
+				}
+				st[k] = v
+			}
+		}
+		if len(st) > 0 {
+			out[specStyle(kind)] = st
+		}
+	}
+	return out
+}
+
 // compile compiles the spec of the top level.
 func (c *compiler) compile(s *Spec) (*vega.Spec, error) {
 	c.top = s
 	c.cfg = readConfig(s.Config)
+	if c.cfg.customFormats {
+		// A custom format type names a function of JavaScript, which zuzu
+		// does not have, so the formats stay those of d3.
+		if err := c.issue("/config/customFormatTypes", "the custom format types of the config"); err != nil {
+			return nil, err
+		}
+	}
 	out := &vega.Spec{Schema: schemaVega}
 	if s.Description != nil {
 		out.Description = *s.Description
 	}
 	out.Config = styleConfig(s.Config)
+	var raw map[string]jsontext.Value
+	if len(s.Config) > 0 && json.Unmarshal(s.Config, &raw) == nil {
+		for k := range markStyles(raw) {
+			if c.cfg.specStyles == nil {
+				c.cfg.specStyles = map[string]bool{}
+			}
+			c.cfg.specStyles[strings.TrimPrefix(k, specStyle(""))] = true
+		}
+	}
 	out.Padding = s.Padding
 	if out.Padding.IsZero() {
 		out.Padding = lit(5)
@@ -1018,6 +1144,7 @@ func (c *compiler) mergeAggregates(out *vega.Spec) {
 	// A merge of datasets can bring aggregates side by side, and a merge
 	// of aggregates can leave datasets that match.
 	c.mergeSources(out, read)
+	c.liftFacetFlattens(out, read)
 	c.liftFlattens(read)
 	for range 10 {
 		c.liftBins(out, read)

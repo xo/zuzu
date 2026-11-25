@@ -894,11 +894,46 @@ func (c *compiler) facet(s *Spec, out *vega.Spec, src *dataNode, path string, re
 	case column != nil:
 		cols = map[string]any{"signal": "length(data('" + colDomain + "'))"}
 	}
-	out.Layout = lit(map[string]any{"padding": facetPadding(spacing(s, c.cfg.facetSpacing), row, column), "columns": cols, "bounds": "full", "align": "all"})
+	align := "all"
+	if row == nil && column != nil && indep["x"] || column == nil && row != nil && indep["y"] {
+		// The cells of a facet along one channel with an independent scale
+		// along it can differ in size, so vega-lite.js lets them follow
+		// each other with the align none.
+		align = "none"
+	}
+	layout := map[string]any{"padding": facetPadding(spacing(s, c.cfg.facetSpacing), row, column), "columns": cols, "bounds": "full", "align": align}
+	out.Layout = lit(facetTitleLayout(layout, marks))
 	if !c.nested {
 		c.mergeAggregates(out)
 	}
 	return nil
+}
+
+// facetTitleLayout adds to the layout of a facet what its titles need, as
+// vega-lite.js compiles them: an offset of 10 between the title of a row
+// or of a column and its headers, and the anchor end for a title at the
+// bottom or at the right. It returns the layout.
+func facetTitleLayout(layout map[string]any, marks []vega.Mark) map[string]any {
+	offset, anchor := map[string]any{}, map[string]any{}
+	for _, m := range marks {
+		ch, ok := strings.CutSuffix(m.Name, "-title")
+		if !ok || m.Role != m.Name || m.Title == nil || ch != "row" && ch != "column" {
+			continue
+		}
+		offset[ch+"Title"] = 10.0
+		var orient string
+		_ = m.Title.Orient.Decode(&orient)
+		if ch == "row" && orient == "right" || ch == "column" && orient == "bottom" {
+			anchor[ch] = "end"
+		}
+	}
+	if len(offset) > 0 {
+		layout["offset"] = offset
+	}
+	if len(anchor) > 0 {
+		layout["titleAnchor"] = anchor
+	}
+	return layout
 }
 
 // splitFacet finds the first aggregate of the data of a child of a facet
@@ -1407,6 +1442,10 @@ func (c *compiler) facetOfFacet(s *Spec, row, column *facetDef, cell *Spec, out 
 	facet := &vega.Facet{Name: "facet", Data: c.name(src), GroupBy: vega.List(field)}
 	layout := map[string]any{}
 	_ = json.Unmarshal(inner.Layout.JSON, &layout)
+	// The inner facet can have lost its title to the outer one.
+	delete(layout, "offset")
+	delete(layout, "titleAnchor")
+	layout = facetTitleLayout(layout, inner.Marks)
 	var encode vega.Encode
 	if column != nil && innerCol != nil {
 		// The columns of each cell are the values of the inner field in it.
@@ -1426,7 +1465,13 @@ func (c *compiler) facetOfFacet(s *Spec, row, column *facetDef, cell *Spec, out 
 	if column != nil {
 		cols = map[string]any{"signal": "length(data('" + domain + "'))"}
 	}
-	out.Layout = lit(map[string]any{"padding": facetPadding(spacing(s, c.cfg.facetSpacing), row, column), "columns": cols, "bounds": "full", "align": "all"})
+	// A header of the outer facet stands at the middle of its cell, which
+	// is a grid of its own, as vega-lite.js places it.
+	outerLayout := map[string]any{
+		"padding": facetPadding(spacing(s, c.cfg.facetSpacing), row, column), "columns": cols, "bounds": "full", "align": "all",
+		"headerBand": map[string]any{channel: 0.5},
+	}
+	out.Layout = lit(facetTitleLayout(outerLayout, marks))
 	if !c.nested {
 		c.mergeAggregates(out)
 	}
