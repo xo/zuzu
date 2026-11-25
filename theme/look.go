@@ -8,7 +8,7 @@ import "slices"
 // Excalidraw" in docs/STYLE.md holds its rules.
 type Look string
 
-// The looks. A look like xkcd waits for a font (D40).
+// The looks. The look like Excalidraw is the only look drawn by hand (D57).
 const (
 	// LookStandard draws each mark as docs/STYLE.md says. It is the
 	// default.

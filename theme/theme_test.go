@@ -205,7 +205,8 @@ func TestAGrayNearBlackOrWhiteFlips(t *testing.T) {
 }
 
 // TestTheDivergingRampRuns checks that the diverging ramp runs from the
-// color of a fall through the grid color to the color of a rise.
+// color of a fall through the color muted to the color of a rise, so that a
+// mark near the middle shows (docs/STYLE.md).
 func TestTheDivergingRampRuns(t *testing.T) {
 	t.Parallel()
 	for _, m := range []Mode{Light, Dark} {
@@ -213,7 +214,7 @@ func TestTheDivergingRampRuns(t *testing.T) {
 		for _, c := range []struct {
 			v    float64
 			want string
-		}{{0, th.Down}, {0.5, th.Grid}, {1, th.Up}, {0.25, mix(th.Down, th.Grid, 0.5)}} {
+		}{{0, th.Down}, {0.5, th.Muted}, {1, th.Up}, {0.25, mix(th.Down, th.Muted, 0.5)}} {
 			if got := th.Diverging(c.v); got != c.want {
 				t.Errorf("%s: Diverging(%v) = %s, want %s", m, c.v, got, c.want)
 			}

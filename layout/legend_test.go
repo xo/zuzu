@@ -251,3 +251,167 @@ func TestLegendSymbols(t *testing.T) {
 		t.Errorf("symbols = %+v, want circles from the opacity 0.3", syms)
 	}
 }
+
+// TestLegendTitlePlace checks that titleOrient, titleAnchor and
+// titlePadding place the title of a legend beside its entries, as the
+// legend of Vega documents them, and that the legend then starts at the top
+// left of its title and its entries. Before, zuzu reported each and kept
+// the title of the look, so the title of calendar-view stood 16 from its
+// gradient rather than 20.
+func TestLegendTitlePlace(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "ordinal", []any{"x", "y"}, []any{"#ff0000", "#00ff00"})
+	pad := func(f float64) *float64 { return &f }
+	legend := func(l Legend) (scene.Item, Bounds) {
+		t.Helper()
+		l.Fill, l.Title, l.Format = sc, "Group", expr.String
+		m := st.Legend(&l)
+		title := find(m, "legend-title")
+		if title == nil {
+			t.Fatal("no title")
+		}
+		return title.Items[0], st.MarkBounds(find(m, "legend-entry"))
+	}
+	for _, c := range []struct {
+		name  string
+		l     Legend
+		check func(t scene.Item, tb, body Bounds) bool
+	}{
+		{"left with a padding", Legend{TitleOrient: "left", TitlePadding: pad(20)}, func(it scene.Item, tb, body Bounds) bool {
+			return math.Abs(body.X1-tb.X2-20) < 1e-9 && math.Abs(tb.X1) < 1e-9 && it.Baseline == "middle"
+		}},
+		{"top at the end", Legend{TitleOrient: "top", TitleAnchor: "end", TitlePadding: pad(4)}, func(it scene.Item, tb, body Bounds) bool {
+			return math.Abs(body.Y1-tb.Y2-4) < 1e-9 && math.Abs(tb.X2-body.X2) < 1e-9 && tb.Y1 == 0
+		}},
+		{"bottom in the middle", Legend{TitleOrient: "bottom", TitleAnchor: "middle"}, func(it scene.Item, tb, body Bounds) bool {
+			return math.Abs(tb.Y1-body.Y2-legendTitleGap) < 1e-9 && math.Abs((tb.X1+tb.X2)-(body.X1+body.X2)) < 1e-9
+		}},
+		{"right at the end", Legend{TitleOrient: "right", TitleAnchor: "end"}, func(it scene.Item, tb, body Bounds) bool {
+			return math.Abs(tb.X1-body.X2-entryGap) < 1e-9 && math.Abs(tb.Y2-body.Y2) < 1e-9
+		}},
+		{"a padding alone keeps the side of the look", Legend{TitlePadding: pad(4)}, func(it scene.Item, tb, body Bounds) bool {
+			return math.Abs(body.X1-tb.X2-4) < 1e-9
+		}},
+	} {
+		it, body := legend(c.l)
+		if tb := st.textBounds(&it); !c.check(it, tb, body) {
+			t.Errorf("%s: the title is at %+v, the entries at %+v", c.name, tb, body)
+		}
+	}
+	it, _ := legend(Legend{TitleAlign: "center", TitleBaseline: "top", TitleLimit: 20, TitleLineHeight: 15})
+	if it.Align != "center" || it.Baseline != "top" || it.Limit != 20 || it.LineHeight != 15 {
+		t.Errorf("the title is %+v, want the align, the baseline, the limit and the line height of the spec", it)
+	}
+}
+
+// TestLegendFrame checks that the padding, the fillColor, the strokeColor
+// and the cornerRadius of a legend draw a frame around it, with the
+// entries the padding inside it, as the legend of Vega documents them.
+func TestLegendFrame(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "ordinal", []any{"x", "y"}, []any{"#ff0000", "#00ff00"})
+	m := st.Legend(&Legend{Fill: sc, Format: expr.String, Padding: 8, FillColor: "white", StrokeColor: "gray", CornerRadius: 3})
+	frame := find(m, "legend-frame")
+	if frame == nil {
+		t.Fatal("no frame")
+	}
+	f := frame.Items[0]
+	if f.X != 0 || f.Y != 0 || f.Fill.Color != "white" || f.Stroke.Color != "gray" || f.CornerRadius != 3 {
+		t.Errorf("the frame is %+v, want white, gray and rounded by 3 at the origin", f)
+	}
+	inner := st.MarkBounds(find(m, "legend-entry"))
+	if math.Abs(inner.X1-8) > 1e-9 || math.Abs(inner.Y1-8) > 1e-9 || math.Abs(f.Width-(inner.X2-inner.X1)-16) > 1e-9 {
+		t.Errorf("the entries are at %+v in a frame %v wide, want 8 inside it", inner, f.Width)
+	}
+	if find(st.Legend(&Legend{Fill: sc, Format: expr.String}), "legend-frame") != nil {
+		t.Error("a legend of the look has a frame")
+	}
+}
+
+// TestLegendEntryProps checks the properties of the entries of a legend
+// that the legend of Vega documents: labelOffset, labelAlign,
+// labelBaseline, symbolOffset, gridAlign, symbolBaseFillColor and
+// symbolBaseStrokeColor.
+func TestLegendEntryProps(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "ordinal", []any{"a", "bbbbbbbbbbbb", "c", "d"}, []any{"#ff0000", "#00ff00", "#0000ff", "#000000"})
+	off := 2.0
+	m := st.Legend(&Legend{Fill: sc, Format: expr.String, LabelOffset: &off, LabelAlign: "right", LabelBaseline: "top", SymbolOffset: 3})
+	syms, labels := collect(m, "legend-symbol"), collect(m, "legend-label")
+	if labels[0].X != swatch+off || labels[0].Align != "right" || labels[0].Baseline != "top" {
+		t.Errorf("the first label is at %v, %s on %s, want at %v, right on top", labels[0].X, labels[0].Align, labels[0].Baseline, swatch+off)
+	}
+	if syms[0].X != swatch/2+3 {
+		t.Errorf("the first symbol is at %v, want %v", syms[0].X, swatch/2+3)
+	}
+	left := func(align string) []float64 {
+		var out []float64
+		for _, it := range collect(st.Legend(&Legend{Fill: sc, Format: expr.String, Columns: 2, GridAlign: align}), "legend-symbol") {
+			out = append(out, it.X)
+		}
+		return out
+	}
+	each, all, none := left("each"), left("all"), left("")
+	if !slices.Equal(each, none) || each[1] != each[3] {
+		t.Errorf("the symbols of gridAlign each are at %v, want each column in line, as the look", each)
+	}
+	if all[1]-all[0] <= each[1]-each[0] && all[3]-all[2] != all[1]-all[0] {
+		t.Errorf("the symbols of gridAlign all are at %v, want columns as wide as the widest", all)
+	}
+	if flow := left("none"); flow[3] >= flow[1] {
+		t.Errorf("the symbols of gridAlign none are at %v, want the second row closer, after its short first label", flow)
+	}
+	sizes := newScale(t, "linear", []any{0.0, 10.0}, []any{0.0, 100.0})
+	base := collect(st.Legend(&Legend{Size: sizes, Entries: true, Format: expr.String, SymbolBaseFill: "pink", SymbolBaseStroke: "navy"}), "legend-symbol")
+	if len(base) == 0 || base[0].Fill.Color != "pink" || base[0].Stroke.Color != "navy" {
+		t.Errorf("the symbols of the base colors are %+v, want pink in navy", base)
+	}
+}
+
+// TestLegendGradientLabels checks that a tickCount labels the gradient of a
+// legend at its ticks, that tickMinStep takes fewer, and that labelOverlap
+// drops the labels that overlap, as the legend of Vega documents them. The
+// look labels only the ends.
+func TestLegendGradientLabels(t *testing.T) {
+	t.Parallel()
+	st := style()
+	lin := newScale(t, "linear", []any{0.0, 100.0}, []any{"#ffffff", "#000000"})
+	labels := func(l Legend) []string {
+		l.Fill, l.Gradient, l.Format = lin, true, expr.String
+		return labelTexts(st.Legend(&l))
+	}
+	if got := labels(Legend{}); !slices.Equal(got, []string{"0", "100"}) {
+		t.Errorf("the labels of the look are %q, want the ends", got)
+	}
+	if got := labels(Legend{TickCount: 5}); !slices.Equal(got, []string{"0", "20", "40", "60", "80", "100"}) {
+		t.Errorf("the labels of tickCount 5 are %q", got)
+	}
+	if got := labels(Legend{TickCount: 5, TickMinStep: 50}); !slices.Equal(got, []string{"0", "50", "100"}) {
+		t.Errorf("the labels of tickMinStep 50 are %q", got)
+	}
+	if got := labels(Legend{TickCount: 50, GradientLength: 100, LabelOverlap: true}); len(got) >= 51 || got[0] != "0" {
+		t.Errorf("the labels with labelOverlap are %q, want fewer than 51 from 0", got)
+	}
+}
+
+// TestLegendPathSymbolRows checks that a row of a legend whose symbols are
+// the path of an SVG reaches down to the bottom of the path, as Vega
+// bounds an entry, so that the rows of deneb/coronation-arc stand the
+// rowPadding apart. Before, a row took the height of the square of the
+// size of the symbol.
+func TestLegendPathSymbolRows(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "ordinal", []any{"a", "b"}, []any{"#ff0000", "#00ff00"})
+	pad := 10.0
+	// A flat bar from y -0.2 to 0.2 of the square from -1 to 1.
+	m := st.Legend(&Legend{Fill: sc, Format: expr.String, Columns: 1, RowPadding: &pad, SymbolSize: 400, SymbolType: "M-1,-0.2H1V0.2H-1Z"})
+	syms := collect(m, "legend-symbol")
+	// The side of the square is 20, so the bar reaches 10+2 down.
+	if len(syms) != 2 || math.Abs(syms[1].Y-syms[0].Y-(12+pad)) > 1e-9 {
+		t.Errorf("the symbols are at %v and %v, want %v apart", syms[0].Y, syms[1].Y, 12+pad)
+	}
+}

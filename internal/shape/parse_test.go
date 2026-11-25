@@ -92,7 +92,10 @@ func TestScalePath(t *testing.T) {
 
 // TestLineBaselines checks that the baselines line-top and line-bottom of
 // Vega are the top and the bottom of a box one line height high around
-// the text, and that the lines of a text at line-bottom go up from it.
+// the text, and that a text of more lines draws its first line on its
+// baseline, for each baseline, as vega.js draws it. Before, the first line
+// of a text at the baselines middle, bottom, alphabetic and line-bottom
+// moved up, so the source note of sankey-chart sat 16 pixels too high.
 func TestLineBaselines(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -104,8 +107,12 @@ func TestLineBaselines(t *testing.T) {
 		{"line-top", 1, 0.79*10 + 5},
 		{"bottom", 1, -0.21 * 10},
 		{"line-bottom", 1, -0.21*10 - 5},
-		{"line-bottom", 2, -0.21*10 - 5 - 20},
+		{"line-bottom", 2, -0.21*10 - 5},
 		{"line-top", 2, 0.79*10 + 5},
+		{"middle", 3, 0.3 * 10},
+		{"bottom", 3, -0.21 * 10},
+		{"alphabetic", 2, 0},
+		{"", 2, 0},
 	} {
 		it := &scene.Item{FontSize: 10, LineHeight: 20, Baseline: c.baseline, Text: make(scene.Lines, c.lines)}
 		if got := TextOf(it, nil).Y; math.Abs(got-c.want) > 1e-9 {

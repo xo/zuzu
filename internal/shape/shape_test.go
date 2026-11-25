@@ -3,6 +3,7 @@ package shape
 import (
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -244,4 +245,28 @@ func TestMonotoneOfAHorizontalArea(t *testing.T) {
 func pathNum(s string) float64 {
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
+}
+
+// TestShiftDash checks that ShiftDash starts a dash that far along it, as
+// the offset of a dash of SVG does: in a dash, the rest of the dash first
+// and its first part last, and in a gap, the next dash first. A dash of an
+// odd length repeats, and an offset of a whole period changes nothing.
+func TestShiftDash(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		dash []float64
+		off  float64
+		want []float64
+	}{
+		{[]float64{4, 2}, 1, []float64{3, 2, 1, 0}},
+		{[]float64{4, 2}, 5, []float64{4, 2}},
+		{[]float64{4, 2}, 6, []float64{4, 2}},
+		{[]float64{4, 2}, -1, []float64{4, 2}},
+		{[]float64{3}, 1, []float64{2, 3, 1, 0}},
+		{[]float64{0, 0}, 1, []float64{0, 0}},
+	} {
+		if got := ShiftDash(c.dash, c.off); !slices.Equal(got, c.want) {
+			t.Errorf("ShiftDash(%v, %v) = %v, want %v", c.dash, c.off, got, c.want)
+		}
+	}
 }

@@ -349,15 +349,15 @@ func TestPathAndTextBounds(t *testing.T) {
 		baseline string
 		y1, y2   float64
 	}{
-		// Three lines of 10 pixels, 20 apart, are 50 high.
+		// Three lines of 10 pixels, 20 apart, are 50 high, and the first
+		// line sits on the baseline, as the writers draw it.
 		{"top", 0, 50},
-		{"middle", -25, 25},
-		{"bottom", -50, 0},
+		{"middle", -5, 45},
+		{"bottom", -10, 40},
 		// The line baselines add half of the line height less the size.
 		{"line-top", 5, 55},
-		{"line-bottom", -55, -5},
-		// The last line sits on the alphabetic baseline.
-		{"alphabetic", -48, 2},
+		{"line-bottom", -15, 35},
+		{"alphabetic", -8, 42},
 	} {
 		it := scene.Item{Text: scene.Lines{"a", "b", "c"}, FontSize: 10, LineHeight: 20, Baseline: c.baseline}
 		if b := st.ItemBounds(scene.Text, &it); math.Abs(b.Y1-c.y1) > 1e-9 || math.Abs(b.Y2-c.y2) > 1e-9 {

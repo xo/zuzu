@@ -183,3 +183,49 @@ func SymbolOf(it *scene.Item) (string, bool) {
 func ArcOf(it *scene.Item) string {
 	return Arc(it.InnerRadius, it.OuterRadius, it.StartAngle, it.EndAngle, it.PadAngle, it.CornerRadius)
 }
+
+// ShiftDash returns a dash that starts off along a dash, as the offset of
+// a dash of SVG does, since the scene has no offset of a dash. When the
+// offset falls in a dash, the dash starts with the rest of that dash and
+// ends with its first part and a gap of 0, so that the two parts join.
+// When it falls in a gap, the dash starts at the next dash, since a dash
+// of 0 draws a dot with round ends: the dashes come up to a gap early. A
+// dash with no length, or an offset of a whole number of periods, returns
+// the dash as it is.
+func ShiftDash(dash []float64, off float64) []float64 {
+	d := dash
+	if len(d)%2 == 1 {
+		// SVG repeats a dash of an odd length to make it even.
+		d = append(append([]float64{}, d...), d...)
+	}
+	var period float64
+	for _, v := range d {
+		period += v
+	}
+	if !(period > 0) {
+		return dash
+	}
+	off = math.Mod(off, period)
+	if off < 0 {
+		off += period
+	}
+	if off == 0 {
+		return dash
+	}
+	// Find the dash or the gap where the offset falls.
+	i := 0
+	for ; i < len(d)-1 && off >= d[i]; i++ {
+		off -= d[i]
+	}
+	out := make([]float64, 0, len(d)+2)
+	if i%2 == 0 {
+		out = append(out, d[i]-off)
+		out = append(out, d[i+1:]...)
+		out = append(out, d[:i]...)
+		out = append(out, off, 0)
+	} else {
+		out = append(out, d[i+1:]...)
+		out = append(out, d[:i+1]...)
+	}
+	return out
+}

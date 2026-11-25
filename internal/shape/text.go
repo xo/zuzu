@@ -63,7 +63,9 @@ func TextOf(it *scene.Item, m text.Measurer) Text {
 	// own frame, after the turn of its angle, as in Vega. So a turned
 	// label with the baseline middle centers on its point.
 	ox := it.Dx
-	oy := it.Dy + baselineOffset(it.Baseline, size, lh) - lh*float64(len(it.Text)-1)*multiline(it.Baseline)
+	// The first line sits on the baseline, and each other line one line
+	// height below the one before it, for each baseline, as in Vega.
+	oy := it.Dy + baselineOffset(it.Baseline, size, lh)
 	if it.Angle != 0 {
 		sin, cos := math.Sincos(it.Angle * math.Pi / 180)
 		ox, oy = ox*cos-oy*sin, ox*sin+oy*cos
@@ -123,19 +125,6 @@ func baselineOffset(baseline string, size, lh float64) float64 {
 		return baselines[baselineBottom]*size - (lh-size)/2
 	}
 	return baselines[baseline] * size
-}
-
-// multiline returns how far the first line of a text of several lines moves
-// up, in lines, for a baseline: none for the top, half for the middle and all
-// of them for the bottom.
-func multiline(baseline string) float64 {
-	switch baseline {
-	case baselineMiddle:
-		return 0.5
-	case baselineBottom, "line-bottom", "alphabetic", "":
-		return 1
-	}
-	return 0
 }
 
 // Collapse collapses the white space of a line as SVG collapses the text of

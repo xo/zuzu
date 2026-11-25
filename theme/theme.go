@@ -408,8 +408,9 @@ func IsDark(background string) bool {
 }
 
 // Diverging returns the color at v, from 0 to 1, on the diverging ramp of
-// the theme. The ramp runs from the color of a fall through the grid color
-// to the color of a rise.
+// the theme. The ramp runs from the color of a fall through the color
+// muted to the color of a rise, so that a mark near the middle still shows
+// (docs/STYLE.md).
 func (t Theme) Diverging(v float64) string {
-	return ramp([]string{t.Down, t.Grid, t.Up}, v)
+	return ramp([]string{t.Down, t.Muted, t.Up}, v)
 }

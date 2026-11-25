@@ -50,6 +50,17 @@ type Axis struct {
 	// BandPosition is where in a band a grid line sits, from 0 to 1. A
 	// label stays in the middle of its band.
 	BandPosition float64
+	// TickExtra adds a tick and a grid line at the start of the band of
+	// the first value, the place of the axis before its first band. With a
+	// BandPosition of 1, the ticks then mark both edges of each band. Only
+	// a scale with bands draws it.
+	TickExtra bool
+	// TickOffset moves the ticks, the labels and the grid lines along the
+	// axis, in pixels.
+	TickOffset float64
+	// TickRound rounds the place of each tick, label and grid line along
+	// the axis to a whole pixel.
+	TickRound bool
 	// LabelFlush is the distance from an end of the axis within which a
 	// label aligns flush with that end, so that it stays inside the axis,
 	// or a negative number for none.
@@ -323,9 +334,38 @@ func (a *Axis) place(vals []any) ([]any, []float64) {
 			continue
 		}
 		out = append(out, v)
-		pos = append(pos, p)
+		pos = append(pos, a.adjust(p))
 	}
 	return out, pos
+}
+
+// adjust moves a place along the axis by the tick offset, and rounds it
+// when the axis asks.
+func (a *Axis) adjust(p float64) float64 {
+	p += a.TickOffset
+	if a.TickRound {
+		p = math.Round(p)
+	}
+	return p
+}
+
+// extraTick returns the place of the extra tick and grid line of an axis
+// that asks for one: the start of the band of the first value of vals.
+func (a *Axis) extraTick(vals []any) (float64, bool) {
+	if !a.TickExtra || len(vals) == 0 || a.Scale.Bandwidth() <= 0 {
+		return 0, false
+	}
+	p, ok := a.Scale.Map(vals[0]).(float64)
+	if !ok || math.IsNaN(p) {
+		return 0, false
+	}
+	return a.adjust(p), true
+}
+
+// extraDatum returns the datum of the extra tick and grid line, which holds
+// the first value and an extra flag.
+func extraDatum(vals []any) map[string]any {
+	return map[string]any{"value": vals[0], "index": 0.0, "extra": true}
 }
 
 // zero returns the position of zero along the axis, for a linear scale
@@ -364,6 +404,15 @@ func (s Style) Axis(a *Axis) scene.Mark {
 		grid := scene.Mark{Type: scene.Rule, Role: "axis-grid"}
 		for i, p := range gpos {
 			it := scene.Item{Stroke: scene.Paint{Color: t.Grid}, StrokeWidth: ptr(1), Datum: tickDatum(gvals, i)}
+			if a.vertical() {
+				it.X, it.X2, it.Y, it.Y2 = 0, a.Cross, p, p
+			} else {
+				it.X, it.X2, it.Y, it.Y2 = p, p, 0, a.Cross
+			}
+			grid.Items = append(grid.Items, it)
+		}
+		if p, ok := a.extraTick(gvals); ok {
+			it := scene.Item{Stroke: scene.Paint{Color: t.Grid}, StrokeWidth: ptr(1), Datum: extraDatum(gvals)}
 			if a.vertical() {
 				it.X, it.X2, it.Y, it.Y2 = 0, a.Cross, p, p
 			} else {
@@ -416,8 +465,16 @@ func tickDatum(vals []any, i int) map[string]any {
 func (a *Axis) tickMarks(color string, vals []any, pos []float64) scene.Mark {
 	m := scene.Mark{Type: scene.Rule, Role: "axis-tick"}
 	x0, y0 := a.origin()
+	data := make([]map[string]any, 0, len(pos)+1)
+	for i := range pos {
+		data = append(data, tickDatum(vals, i))
+	}
+	if p, ok := a.extraTick(vals); ok {
+		pos = append(slices.Clip(pos), p)
+		data = append(data, extraDatum(vals))
+	}
 	for i, p := range pos {
-		it := scene.Item{Stroke: scene.Paint{Color: color}, StrokeWidth: ptr(theme.TickWidth), Datum: tickDatum(vals, i)}
+		it := scene.Item{Stroke: scene.Paint{Color: color}, StrokeWidth: ptr(theme.TickWidth), Datum: data[i]}
 		switch a.Orient {
 		case "bottom":
 			ruleEnds(&it, p, y0, p, y0+a.TickSize)
@@ -465,7 +522,7 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 	pad := a.labelPad()
 	// A label stays in the middle of its band, where the bandPosition of
 	// the axis puts its tick and its grid line, as in Vega.
-	shift := a.Scale.Bandwidth()*(0.5-a.BandPosition) + a.LabelOffset
+	shift := a.Scale.Bandwidth() * (0.5 - a.BandPosition)
 	for i, v := range vals {
 		str := a.Format(v)
 		if str == "" {
@@ -475,6 +532,10 @@ func (s Style) axisLabels(a *Axis, vals []any, pos []float64) scene.Mark {
 		}
 		var it scene.Item
 		at := pos[i] + shift
+		if a.TickRound {
+			at = math.Round(at)
+		}
+		at += a.LabelOffset
 		switch a.Orient {
 		case "bottom":
 			it = s.label(at, a.Cross+a.Offset+pad, str, LabelSize, 400, color, "center", "top")
@@ -556,10 +617,16 @@ func turnLabel(it *scene.Item, orient string, angle float64) {
 // dropOverlaps keeps every other label until no two labels overlap, and
 // always keeps the first.
 func (s Style) dropOverlaps(items []scene.Item) []scene.Item {
+	return s.dropOverlapsBy(items, 2, 0)
+}
+
+// dropOverlapsBy keeps every other label until no two labels stand closer
+// than sepX across and sepY up and down, and always keeps the first.
+func (s Style) dropOverlapsBy(items []scene.Item, sepX, sepY float64) []scene.Item {
 	overlaps := func(list []scene.Item) bool {
 		for i := 1; i < len(list); i++ {
 			a, b := s.textBounds(&list[i-1]), s.textBounds(&list[i])
-			if a.X1 < b.X2+2 && b.X1 < a.X2+2 && a.Y1 < b.Y2 && b.Y1 < a.Y2 {
+			if a.X1 < b.X2+sepX && b.X1 < a.X2+sepX && a.Y1 < b.Y2+sepY && b.Y1 < a.Y2+sepY {
 				return true
 			}
 		}

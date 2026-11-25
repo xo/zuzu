@@ -1,10 +1,11 @@
 // Package text measures text for the layout of zuzu (D11).
 //
-// The okage peer writes the API that measures and shapes text as okage does,
-// when zuzu needs it. Until then, Estimate measures a string from the advance
-// widths of the bundled IBM Plex Sans (D16), with no shaping and no kerning.
-// The layout depends on the interface Measurer, so that the measurement of
-// okage can take its place.
+// okage shapes text with ShapeText of its package svg (okage D37), and the
+// package raster draws text with it. The layout does not use it yet. It
+// measures a string with Estimate, from the advance widths of the bundled
+// IBM Plex Sans (D16), with no shaping and no kerning. The layout depends on
+// the interface Measurer, so that the measurement of okage can take its
+// place.
 //
 // A Fallback is a font for the characters that IBM Plex Sans does not
 // have. The package text/emoji gives one with the emoji of Noto Color

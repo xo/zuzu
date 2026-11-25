@@ -191,6 +191,16 @@ func (s Style) itemBounds(typ string, it *scene.Item) Bounds {
 		if it.Size != nil {
 			r = math.Sqrt(math.Max(0, *it.Size)) / 2
 		}
+		if !shape.Named(it.Shape) {
+			// A shape of a path is bounded by its path, as Vega bounds it.
+			if d, ok := shape.Symbol(it.Shape, 4*r*r); ok {
+				sin, cos := math.Sincos(it.Angle * math.Pi / 180)
+				if shape.Parse(d, &pathSink{b: &b, x: it.X, y: it.Y, sin: sin, cos: cos}) == nil && !b.IsEmpty() {
+					return b
+				}
+				b = Empty()
+			}
+		}
 		b.add(it.X-r, it.Y-r)
 		b.add(it.X+r, it.Y+r)
 	case scene.Arc:
@@ -317,21 +327,20 @@ func (s Style) textBounds(it *scene.Item) Bounds {
 	case "right":
 		x0 = -w
 	}
+	// The first line sits on the baseline, and the other lines below it,
+	// as the writers draw them.
 	y0 := -size * 0.8
 	switch it.Baseline {
-	case "", "alphabetic":
-		// On the alphabetic baseline, the last line sits on the baseline.
-		y0 -= extra
 	case "top":
 		y0 = 0
 	case "line-top":
 		y0 = (lh - size) / 2
 	case "middle":
-		y0 = -h / 2
+		y0 = -size / 2
 	case "bottom":
-		y0 = -h
+		y0 = -size
 	case "line-bottom":
-		y0 = -h - (lh-size)/2
+		y0 = -size - (lh-size)/2
 	}
 	x0 += it.Dx
 	y0 += it.Dy

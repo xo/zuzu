@@ -1,11 +1,13 @@
 // Package svg writes a scene graph as SVG (D10).
 //
 // The output is deterministic: the same scene gives the same bytes. It uses
-// only the parts of SVG that okage renders: shapes, paths, text, linear and
-// radial gradients and clip paths, with no CSS (D13). It also writes the link
-// of an item as an a element around it, and the tooltip of an item as a
-// title element inside it (D32), which okage does not draw. A link with a
-// scheme that scene.LinkAllowed refuses, such as javascript, is not written.
+// only the parts of SVG that okage renders: shapes, paths, text, images,
+// linear and radial gradients and clip paths, with no CSS (D13). The one
+// exception is a font of WithFont, which it embeds in a style element as a
+// rule @font-face (D43). It also writes the link of an item as an a element
+// around it, and the tooltip of an item as a title element inside it (D32),
+// which okage does not draw. A link with a scheme that scene.LinkAllowed
+// refuses, such as javascript, is not written.
 package svg
 
 import (
