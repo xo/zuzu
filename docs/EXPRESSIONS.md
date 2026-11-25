@@ -66,8 +66,9 @@ calls them. The function library is written in Go.
    strings, `==` converts types and `===` does not, and `NaN` and `null`
    behave as they do in JavaScript. A test against a JavaScript engine finds
    each difference.
-5. The regular expressions of Go have no lookbehind and no backreference,
-   which JavaScript has. A spec that uses either gets an error. A regular
+5. The regular expressions of Go have no lookahead, no lookbehind and no
+   backreference, which JavaScript has. A spec that uses one of them gets
+   an error. A regular
    expression can be a literal, such as `/^h/i`, or a call to `regexp`.
 6. The tree can be written back as JavaScript, so the browser component runs
    the same expression.
@@ -106,6 +107,30 @@ is vega.js in Node.js, not goja: `test/oracle/exprs.mjs` evaluates the
 expressions of `expr/testdata/exprs.txt`, and a test compares A with the
 result. The second use stays, and is not built yet: no package runs
 scripts in goja.
+
+## The functions of the view
+
+The package `zuzu` gives the functions that read the view: its data, its
+scales, its projections and its trees. They follow the documentation of
+Vega, and the result of vega.js where the documentation says less. The
+test `TestFuncsOracle` compares them with vega.js on the cases of
+`testdata/funcs/cases.json`, which `test/oracle/funcs.mjs` evaluates.
+
+zuzu draws a chart once, with no events. Each function reads the state
+that the spec gives, and nothing changes it after that. These are the
+choices for the functions that need one:
+
+| Function | What zuzu does |
+| --- | --- |
+| `gradient(scale, p0, p1, count)` | It returns a linear gradient that samples a continuous scale at the ticks of its domain for about `count` values, 15 by default, with the ends of the domain. `p0` and `p1` are `[0, 0]` and `[1, 0]` when they are not given. A scale that is not continuous, such as an ordinal scale, is an issue |
+| `copy(name)` | It returns a copy of a scale or a projection, or undefined for a name that is neither. The functions of projections take the copy of a projection in place of its name. The functions of scales find no scale in the copy of a scale, as in vega.js, so `scale` gives undefined and `domain` gives `[]` |
+| `scale(name, value)` | The name can be a projection, or a copy of one. It maps `[longitude, latitude]` to `[x, y]` |
+| `geoArea`, `geoBounds` and `geoCentroid` | With a projection, they measure in its plane. With null as the projection, they measure on the sphere, as d3-geo does: the area in steradians, the box of longitudes and latitudes, and the centroid in degrees |
+| `geoShape(projection, geojson)` | It returns the path of the GeoJSON object in the projection, which a `shape` mark draws as its `shape`. With no projection, the path is empty |
+| `treePath(name, source, target)` and `treeAncestors(name, node)` | They read the tree that a `stratify` transform of the dataset built, or of the dataset that it derives from. A node is the row with that key, after every transform of the dataset. A dataset with no tree, or a key that the tree does not have, gives undefined. zuzu has no `nest` transform |
+| `vlSelectionTest(store, datum, op)` and `vlSelectionIdTest(store, datum, op)` | They report whether the datum matches an entry of the store, or, with `intersect`, an entry of each unit. A store holds only the entries that the spec gives it, such as the `value` of a param of Vega-Lite. An empty store gives 0, which is false. The `empty` of Vega-Lite is in the expression that calls the function, such as `!length(data('brush_store')) \|\| vlSelectionTest('brush_store', datum)` |
+| `vlSelectionResolve(store, op, multi, vl5)` | It returns the values of each field of the store, joined by `op`. A store of ids gives its ids as a list, where vega.js gives a `Set` |
+| `screen()` and `windowSize()` | A static chart has no window, so a call is an issue |
 
 ## Extension from Go
 

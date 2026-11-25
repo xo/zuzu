@@ -2,7 +2,7 @@
   <img src="docs/zuzu.svg" alt="zuzu" width="600"/>
   <br/>
   <a href="#about" title="About">About</a> |
-  <a href="#status" title="Status">Status</a> |
+  <a href="#examples" title="Examples">Examples</a> |
   <a href="#design" title="Design">Design</a> |
   <a href="#documents" title="Documents">Documents</a> |
   <a href="#contributing" title="Contributing">Contributing</a> |
@@ -27,71 +27,225 @@
 
 # About
 
-`zuzu` draws charts and diagrams in pure Go. A caller gives it a declarative
-spec, which says what to draw from which data, and zuzu writes the chart as
-SVG or as an image.
+`zuzu` draws charts and diagrams in pure Go, with no cgo. You give it a
+declarative spec, which says what to draw from which data. zuzu writes the
+chart as SVG or draws it as an image.
 
 The spec follows [Vega][vega] and [Vega-Lite][vega-lite]. A spec written for
-the Vega tools works with zuzu, as far as zuzu supports it. zuzu draws its
-own design, at the quality of nivo and visx, with a light and a dark mode and
-color schemes that swap. zuzu renders the SVG to an image with
-[`okage`][okage], a pure Go port of resvg.
+the Vega tools works with zuzu, as far as zuzu supports it. zuzu also reads
+the DOT language of Graphviz and every kind of diagram of Mermaid 12.3.
+[`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what it reads.
 
-zuzu also reads the DOT language of Graphviz and the syntax of Mermaid, and
-draws a diagram in the same look. Later, zuzu sends live charts to a web
-browser, and draws the results of a query for [`usql`][usql].
+zuzu draws its own look, with a light and a dark mode and color schemes that
+you swap apart from the mode. It can also draw any chart or diagram as if by
+hand. It draws an image with [`okage`][okage], a pure Go port of resvg, and
+it measures and draws text in the fonts that it bundles. The same spec gives
+the same image on every machine of one architecture.
 
-# Status
+Add zuzu to a module:
 
-Phases 0 to 7 of the plan are done. Phase 0, the repository, the tests of
-the documents, CI, the corpus and the oracle, is done. The scene graph, the
-themes, the SVG writer and the measurement of text with the bundled IBM Plex
-Sans exist (phases 1 and 2). zuzu reads a Vega spec and draws it (phase 3).
-On the 540 specs of the first target, its datasets, scales and marks match
-those of vega.js for 99 percent of the specs. zuzu compiles a Vega-Lite spec
-itself (phase 4), and its result matches for 98 percent of the 470
-Vega-Lite specs. Phase 5 added the transforms of statistics, hierarchies,
-maps, contours and labels, and the transforms and the scale of zuzu for
-sankeys, chord diagrams, hex bins and trading days. Phase 6 added
-`raster`, which draws a chart with okage directly, without SVG, and
-`Chart.Image`. Phase 7 added the diagrams of DOT and Mermaid: a layered
-layout of graphs, the flowchart and nine charts of Mermaid, and icons, with
-four packs bundled. Since then zuzu also draws every other kind of
-Mermaid 12.3: the sequence, state, class, ER, requirement, block,
-swimlane, use case, agentflow, timeline, C4, venn, ishikawa, Cynefin,
-event model, ZenUML, kanban, packet and railroad diagrams, the mindmap,
-the architecture diagram, the gitGraph, the tree view and info. The
-package `text/emoji` draws an emoji in color. `WithLook` draws any chart
-or diagram in the look like Excalidraw, as if by hand, and the package
-`text/excalifont` holds its font, Excalifont (D40).
-[`docs/DIAGRAMS.md`](docs/DIAGRAMS.md) lists what zuzu reads.
-[`docs/PLAN.md`](docs/PLAN.md) holds the plan, its phases and the questions
-that the maintainers have not answered.
-
-```go
-chart, _, err := zuzu.Parse(src)
-if err != nil {
-	return err
-}
-report, err := chart.SVG(ctx, w, zuzu.WithLoader(zuzu.FSLoader(os.DirFS("data"))))
+```bash
+go get github.com/xo/zuzu
 ```
 
-The first step was a survey of what other libraries do. Open
-[`docs/survey/compare.html`](docs/survey/compare.html) to see the same real
-data drawn by zuzu and 14 other chart and diagram libraries, side by side, in
-a light and a dark theme. [`docs/survey/README.md`](docs/survey/README.md)
-says how to open it.
+# Examples
 
-The second step was the look. Open
-[`docs/targets/index.html`](docs/targets/index.html) to see 33 target charts,
-from a line to a flowchart, in the light and the dark mode and in thirteen
-color schemes. They came before any code. The script in `docs/targets/` draws them,
-and [`docs/targets/README.md`](docs/targets/README.md) says how to draw and
-open them.
+The code below comes from the examples of the package, which `go test`
+runs. Each image is a PNG that `Chart.Image` drew from that code. The test
+`TestTheReadmeImagesAreDrawn` draws the images again with `-update`.
+
+## A chart from Vega-Lite
+
+`zuzu.Parse` reads a Vega-Lite or a Vega spec, and `Chart.Image` draws it.
+The report lists each feature of the spec that zuzu did not draw.
+
+```go
+ctx := context.Background()
+src := []byte(`{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 320,
+  "height": 180,
+  "data": {"values": [
+    {"fruit": "Apples", "sold": 28},
+    {"fruit": "Bananas", "sold": 55},
+    {"fruit": "Cherries", "sold": 43},
+    {"fruit": "Dates", "sold": 91},
+    {"fruit": "Figs", "sold": 81}
+  ]},
+  "mark": "bar",
+  "encoding": {
+    "x": {"field": "fruit", "type": "nominal", "title": null, "axis": {"labelAngle": 0}},
+    "y": {"field": "sold", "type": "quantitative"},
+    "color": {"field": "fruit", "legend": null}
+  }
+}`)
+chart, _, err := zuzu.Parse(src)
+if err != nil {
+	log.Fatal(err)
+}
+img, report, err := chart.Image(ctx)
+if err != nil {
+	log.Fatal(err)
+}
+for _, issue := range report {
+	log.Println(issue)
+}
+var buf bytes.Buffer
+if err := png.Encode(&buf, img); err != nil {
+	log.Fatal(err)
+}
+```
+
+<img src="docs/readme/bar.png" alt="A bar chart of five fruits, each bar in its own color" width="358"/>
+
+`png.Encode` writes the image to any `io.Writer`, such as a file. A `Chart`
+does not change after `Parse`, so many goroutines can draw one `Chart` at
+the same time.
+
+## SVG
+
+`Chart.SVG` writes the same chart as SVG:
+
+```go
+var buf bytes.Buffer
+report, err := chart.SVG(ctx, &buf)
+```
+
+The SVG names the font IBM Plex Sans, and a viewer that does not have the
+font draws the text in another one. `Chart.Image` draws the text in the
+bundled font, so the image looks the same everywhere.
+
+## A Mermaid diagram
+
+`zuzu.Parse` finds a diagram of Mermaid or of DOT by its first word. Draw it
+as you draw a chart:
+
+```go
+src := []byte(`flowchart TD
+  A[Spec] --> B{Vega-Lite?}
+  B -- yes --> C[Compile]
+  B -- no --> D[Run]
+  C --> D
+  D --> E[(Scene)]`)
+chart, _, err := zuzu.Parse(src)
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/flowchart-dark.png"/>
+  <img src="docs/readme/flowchart-light.png" alt="A flowchart from a spec to a scene, through a choice between compile and run" width="174"/>
+</picture>
+
+## A DOT graph
+
+```go
+src := []byte(`digraph {
+  rankdir=LR
+  parse -> compile -> run -> scene
+  scene -> svg
+  scene -> image
+}`)
+chart, _, err := zuzu.Parse(src)
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/graph-dark.png"/>
+  <img src="docs/readme/graph-light.png" alt="A graph from parse to scene, which leads to svg and to image" width="465"/>
+</picture>
+
+## Dark mode and color schemes
+
+A theme is a mode, light or dark, and a color scheme. The mode sets the
+background, the text and the axes. The scheme sets the colors of the data.
+Give either one to a render:
+
+```go
+img, report, err := chart.Image(ctx,
+	zuzu.WithMode(theme.Dark),
+	zuzu.WithScheme(theme.Ember),
+)
+```
+
+| The light mode and the scheme `zuzu` | The dark mode and the scheme `ember` |
+| --- | --- |
+| <img src="docs/readme/bar.png" alt="The bar chart in the light mode" width="358"/> | <img src="docs/readme/bar-dark-ember.png" alt="The bar chart in the dark mode with warm colors" width="358"/> |
+
+`theme.Schemes` returns the names of the schemes, and `theme.Lookup` finds
+one by its name. [`docs/STYLE.md`](docs/STYLE.md) describes each one.
+
+## The hand-drawn look
+
+`zuzu.WithLook(theme.LookExcalidraw)` draws each mark as if by hand, as
+Excalidraw does. The package `text/excalifont` holds the font of the look,
+Excalifont. Give it with `zuzu.WithLookFont`, so that zuzu measures and
+draws the text in it:
+
+```go
+look := zuzu.WithLook(theme.LookExcalidraw)
+font := zuzu.WithLookFont(theme.LookExcalidraw, excalifont.Font())
+chart, _, err := zuzu.Parse(src, look, font)
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/sketch-dark.png"/>
+  <img src="docs/readme/sketch-light.png" alt="The flowchart drawn as if by hand" width="174"/>
+</picture>
+
+The look works for a chart too. The SVG embeds the font, so a viewer draws
+the text in Excalifont.
+
+## Data from a loader
+
+zuzu reads no file and makes no request of its own. A spec that names its
+data by `url` reads it through the loader that you give with
+`zuzu.WithLoader`. `zuzu.FSLoader` reads each url as a path in a file system
+that you choose:
+
+```go
+src := []byte(`{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "width": 320,
+  "height": 180,
+  "data": {"url": "temps.csv"},
+  "mark": {"type": "line", "point": true},
+  "encoding": {
+    "x": {"field": "month", "type": "ordinal", "sort": null, "title": null},
+    "y": {"field": "temp", "type": "quantitative", "title": "°C"},
+    "color": {"field": "city", "title": null}
+  }
+}`)
+// Any fs.FS works, such as os.DirFS("data").
+fsys := fstest.MapFS{"temps.csv": {Data: []byte(`month,city,temp
+Jan,Oslo,-4
+Feb,Oslo,-4
+Mar,Oslo,0
+Apr,Oslo,5
+May,Oslo,11
+Jun,Oslo,15
+Jan,Rome,8
+Feb,Rome,9
+Mar,Rome,11
+Apr,Rome,14
+May,Rome,18
+Jun,Rome,22
+`)}}
+chart, _, err := zuzu.Parse(src)
+if err != nil {
+	log.Fatal(err)
+}
+img, report, err := chart.Image(ctx, zuzu.WithLoader(zuzu.FSLoader(fsys)))
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/line-dark.png"/>
+  <img src="docs/readme/line-light.png" alt="A line chart of the temperature of Oslo and Rome from January to June" width="361"/>
+</picture>
+
+`zuzu.WithValues` gives the rows of a dataset directly, without a loader.
+[`docs/API.md`](docs/API.md) lists every option.
 
 # Design
 
-zuzu has four stages, and each stage hands the next one a value that can be
+zuzu has four stages. Each stage hands the next one a value that can be
 written as JSON:
 
 1. A front end reads Vega, Vega-Lite, DOT or Mermaid, and produces a spec
@@ -100,13 +254,14 @@ written as JSON:
    builds the scales and lays out the axes and the legends.
 3. The result is a scene graph: a tree of shapes with their final positions,
    sizes and colors.
-4. A renderer writes the scene graph as SVG, draws it with okage, or later
-   sends it to a browser.
+4. A renderer writes the scene graph as SVG, or draws it with okage.
 
-The first target is static Vega, which is Vega without the events of a mouse
-or a keyboard, and the Vega-Lite that compiles to it. The corpus of 579
-Vega-Lite specs and 87 Vega specs from [`vegagoja`][vegagoja], with the output
-of vega.js for each, measures how far zuzu agrees with Vega.
+zuzu runs static Vega, which is Vega without the events of a mouse or a
+keyboard, and the Vega-Lite that compiles to it. A corpus of 579 Vega-Lite
+specs and 87 Vega specs from [`vegagoja`][vegagoja], with the output of
+vega.js for each, measures how far zuzu agrees with Vega. Later, zuzu will
+send live charts to a web browser and draw the results of a query for
+[`usql`][usql].
 
 # Documents
 

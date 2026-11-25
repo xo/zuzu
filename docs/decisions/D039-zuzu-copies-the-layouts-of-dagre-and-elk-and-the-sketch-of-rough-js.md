@@ -1,6 +1,6 @@
 # D39. zuzu copies the layouts of dagre and ELK and the sketch of rough.js
 
-Status: Decided. Amends D6 and D32. Amended by D41, D44 and D45.
+Status: Decided. Amends D6 and D32. Amended by D41, D44, D45 and D57.
 
 On 2026-11-22 the maintainers asked whether the Go packages of the d2lang
 organization can give zuzu better graph layouts and the looks drawn by

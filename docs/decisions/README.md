@@ -35,7 +35,7 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D19](D019-live-data-in-a-browser-comes-later-so-the-scene-graph-is.md) | Live data in a browser comes later, so the scene graph is JSON | Decided |
 | [D20](D020-usql-makes-charts-with-zuzu-much-later-with-the-usql-peer.md) | usql makes charts with zuzu much later, with the usql peer | Decided |
 | [D21](D021-the-names-of-the-packages.md) | The names of the packages | Decided |
-| [D22](D022-the-documents-name-no-person.md) | The documents name no person | Decided |
+| [D22](D022-the-documents-name-no-person.md) | The documents name no person | Decided. Amended by D57 |
 | [D23](D023-the-survey-of-other-libraries-lives-in-docs-survey.md) | The survey of other libraries lives in docs/survey | Decided |
 | [D24](D024-the-public-api.md) | The public API | Decided. Amended by D38, D42, D44 and D45 |
 | [D25](D025-zuzu-reads-data-only-through-a-loader-that-the-caller-gives.md) | zuzu reads data only through a loader that the caller gives | Decided |
@@ -45,15 +45,15 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D29](D029-zuzu-builds-with-tinygo-for-webassembly-and-has-no-size.md) | zuzu builds with TinyGo for WebAssembly, and has no size target | Decided |
 | [D30](D030-the-transforms-and-the-scale-that-zuzu-adds-for-tiers-1-and-2.md) | The transforms and the scale that zuzu adds for tiers 1 and 2 | Decided |
 | [D31](D031-diagrams-of-dot-and-mermaid-and-the-transform-zuzu-layered.md) | Diagrams of DOT and Mermaid, and the transform zuzu.layered | Decided. Amended by D32, D35, D38, D45 and D55 |
-| [D32](D032-how-zuzu-reads-the-parts-of-mermaid-and-dot-that-it-does-not-draw.md) | How zuzu reads the parts of Mermaid and DOT that it does not draw | Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36, D37, D38, D39 and D40 |
+| [D32](D032-how-zuzu-reads-the-parts-of-mermaid-and-dot-that-it-does-not-draw.md) | How zuzu reads the parts of Mermaid and DOT that it does not draw | Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36, D37, D38, D39, D40 and D57 |
 | [D33](D033-vegajs-is-the-oracle-of-expressions-and-schemes-are-go-values.md) | vega.js is the oracle of expressions, and schemes are Go values | Decided. Amends D9 and D15 |
 | [D34](D034-ibm-plex-sans-is-embedded-in-woff2.md) | IBM Plex Sans is embedded in WOFF2 | Decided. Amends D16 |
 | [D35](D035-the-answers-of-the-maintainers-of-2026-11-20.md) | The answers of the maintainers of 2026-11-20 | Decided. Amends D14, D16, D31 and D32. Amended by D36, D37, D40, D46 and D48 |
 | [D36](D036-zuzu-draws-the-math-of-katex-with-the-math-layout-of-okage.md) | zuzu draws the math of KaTeX with the math layout of okage | Decided. Amends D16, D32 and D35 |
 | [D37](D037-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-20.md) | The answers of the maintainers on the backlog of 2026-11-20 | Decided. Amends D14, D32 and D35. Amended by D48, D53, D55 and D56 |
 | [D38](D038-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-22.md) | The answers of the maintainers on the backlog of 2026-11-22 | Decided. Amends D24, D28, D31 and D32 |
-| [D39](D039-zuzu-copies-the-layouts-of-dagre-and-elk-and-the-sketch-of-rough-js.md) | zuzu copies the layouts of dagre and ELK and the sketch of rough.js | Decided. Amends D6 and D32. Amended by D41, D44 and D45 |
-| [D40](D040-the-details-of-the-look-drawn-by-hand.md) | The details of the look drawn by hand | Decided. Amends D32 and D35. Amended by D41, D42, D43, D47 and D49 |
+| [D39](D039-zuzu-copies-the-layouts-of-dagre-and-elk-and-the-sketch-of-rough-js.md) | zuzu copies the layouts of dagre and ELK and the sketch of rough.js | Decided. Amends D6 and D32. Amended by D41, D44, D45 and D57 |
+| [D40](D040-the-details-of-the-look-drawn-by-hand.md) | The details of the look drawn by hand | Decided. Amends D32 and D35. Amended by D41, D42, D43, D47, D49 and D57 |
 | [D41](D041-the-output-is-the-same-on-one-architecture.md) | The output is the same on one architecture | Decided. Amends D39 and D40 |
 | [D42](D042-the-options-and-the-rules-of-the-look-like-excalidraw.md) | The options and the rules of the look like Excalidraw | Decided. Amends D24 and D40. Amended by D47 |
 | [D43](D043-the-svg-of-a-look-embeds-its-font.md) | The SVG of a look embeds its font | Decided. Amends D10 and D40 |
@@ -70,3 +70,4 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D54](D054-composite-states-draw-a-title-band-and-notes-take-the-yellow-of-the-scheme.md) | Composite states draw a title band, and notes take the yellow of the scheme | Decided. Amends D53. Amended by D55 and D56 |
 | [D55](D055-mermaid-takes-the-scheme-of-zuzu-and-tints-are-solid.md) | Mermaid takes the scheme of zuzu, and tints are solid | Decided. Amends D31, D37, D53 and D54. Amended by D56 |
 | [D56](D056-a-named-node-takes-the-color-of-the-hash-of-its-name.md) | A named node takes the color of the hash of its name | Decided. Amends D37, D54 and D55 |
+| [D57](D057-zuzu-draws-no-look-like-xkcd-and-phases-0-and-3-are-done.md) | zuzu draws no look like xkcd, and phases 0 and 3 are done | Decided. Amends D22, D32, D39 and D40 |

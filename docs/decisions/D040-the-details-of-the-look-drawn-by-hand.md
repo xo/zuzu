@@ -1,6 +1,6 @@
 # D40. The details of the look drawn by hand
 
-Status: Decided. Amends D32 and D35. Amended by D41, D42, D43, D47 and D49.
+Status: Decided. Amends D32 and D35. Amended by D41, D42, D43, D47, D49 and D57.
 
 On 2026-11-22, before the work of D39 started, the maintainers answered
 four questions on the look drawn by hand, and accepted the defaults below.

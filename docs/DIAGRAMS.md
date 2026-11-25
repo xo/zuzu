@@ -52,7 +52,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | the graph | `ranksep`, `nodesep` | the space between the ranks and between the nodes, in inches |
 | the graph | `rank` | the rank of the subgraphs that start after it, as above |
 | the graph | `newrank` | nothing. zuzu always ranks the nodes of a cluster with the nodes of the whole graph, as dot does with `newrank=true` |
-| the graph | `splines` | curved or straight edges. Another value is an issue |
+| the graph | `splines` | `true` or `spline`, the curved edges that zuzu always draws. Another value, such as `line`, `polyline` or `ortho`, is an issue |
 | the graph | `layout` | `dot`. Another layout is an issue |
 | the graph | `fontname` | the weight and the style of the title, as below |
 | the graph | `bgcolor` | the background of the page and of the theme, as below |
@@ -77,7 +77,7 @@ in angle brackets. Strings joined with `+` are one string. Comments are
 | an edge | `arrowsize` | the scale of the arrowheads |
 | an edge | `minlen`, `weight`, `constraint` | the ranks that the edge spans, its weight, and whether it takes part in the ranks |
 | an edge | `headport`, `tailport` | the ports, as below |
-| an edge | `color`, `penwidth`, `style`, `fontcolor`, `fontsize` | the paint |
+| an edge | `color`, `penwidth`, `style`, `fontcolor`, `fontsize` | the paint. A list of colors draws a line in each color, as "Edges of more than one color" says |
 | a cluster | `label` | the title, or a title of HTML |
 | a cluster | `style`, `color`, `fillcolor`, `bgcolor`, `fontcolor`, `penwidth`, `pencolor`, `gradientangle` | the paint |
 
@@ -300,7 +300,9 @@ edge can end inside the margin of its node, so a label can cover the part
 of its own node that lies outside the end. The labels at the ends of the
 relations of a class diagram of Mermaid move in the same way. The space
 between two ranks grows to hold the labels at the ends of the edges
-between them.
+between them. When the box of a cluster cuts the route of an edge to the
+cluster, the labels at its ends go to new places by the same rules, so
+that they cover no node and no other label where they can.
 If an edge sets `labeldistance` or `labelangle`, the center of each label
 is 10 times `labeldistance` points from the end, at `labelangle` degrees
 counterclockwise from the edge, as in dot. The defaults are 1 and -25.
@@ -315,14 +317,19 @@ first place where it covers no node, no other label and no edge.
 A node of the shape `record` or `Mrecord` is a box of fields:
 `label="<f0> left|<f1> mid|<f2> right"`. The fields lie across the ranks,
 side by side when the ranks run down and one under another when they run
-across. A field of a nested group, `{b|{c|d}}`, is a field of the record,
-in order. `<name>` names a port, and an edge that names the port ends at
-its field. `\{`, `\}`, `\|`, `\<`, `\>` and `\ ` are text.
+across. A group in braces, `{b|c}`, lies the other way from the fields
+around it, as in Graphviz. So in `a|{b|c}|d`, b lies over c between a and
+d when the ranks run down, and a group in a group, `{b|{c|d}}`, turns
+again. A record whose label is one group in braces, `{a|b|c}`, lays its
+fields one under another when the ranks run down, and side by side when
+they run across. The fields of a group share the room of the group in
+equal parts, as in Graphviz. `<name>` names a port, and an edge that names
+the port ends at its field. `\{`, `\}`, `\|`, `\<`, `\>` and `\ ` are
+text.
 
-A record whose label is one group in braces, `{a|b|c}`, lays its fields
-one under another when the ranks run down, as in Graphviz. When the ranks
-run across, its fields also lie one under another, and not side by side
-as in Graphviz.
+In the text of a field, `\l` ends a line at the left of the field, `\r` a
+line at the right, and `\n` a line in the middle, as in Graphviz. A last
+line with no end is in the middle.
 
 A record can have a label of HTML, as a class of UML of the gallery of
 Graphviz does:
@@ -340,7 +347,9 @@ does. A field of HTML has no port, as in Graphviz. The `face` of a font
 gives the line its weight and its style, as "Font names" says. A table
 in a field, a line in more than one font, a font with a color or a size,
 a face with a weight other than bold, a line at the right, and a field
-with lines at the left and at the center are issues.
+with lines at the left and at the center are issues. The groups in braces
+of a label of HTML lie in one list, and one group that is the whole label
+lies one under another in every direction.
 
 ### Labels of HTML
 
@@ -362,6 +371,7 @@ The package `html` of okage reads it and lays it out as dot 16.1.0 does
 | `style` | `rounded`, `radial`, `dashed` and `dotted` |
 | `rows="*"`, `columns="*"` | a rule between each two rows or columns |
 | `port` | a port, as below |
+| `href`, `URL`, `tooltip`, `title` | the link and the tooltip of a table or a cell, as "Links and tooltips" says |
 
 A table in a node with no shape, such as `shape=none` or `shape=plaintext`,
 takes the fill of a node of the theme. Text with no `color` on a cell with a
@@ -385,6 +395,29 @@ from the center of the port. An edge to a side ends on that side of the
 port, or of the node when the end names no port, and leaves it in the
 direction of the side.
 
+### Edges of more than one color
+
+A `color` of an edge that is a list of colors, such as `red:blue`, draws
+a line in each color, as in Graphviz. With no weight, the lines lie side
+by side, 2 pixels apart, or as far apart as the lines are wide. The first
+color is at the right of the edge as it runs from its tail, and the
+arrowheads take the first color. The lines stop at the arrowheads. With a
+weight, such as `red;0.3:blue`, the colors lie one after another along the
+edge, from the tail, each over its weight of the length of the edge. The
+colors with no weight share the rest of the length, and the arrowheads
+take the last color. A color that zuzu cannot read and a weight that is not
+a number from 0 to 1 are issues, and the edge draws in its first color.
+
+### Ranks
+
+zuzu ranks the nodes by network simplex, as dot does. In a graph with no
+cluster, a node whose edges in weigh as much as its edges out then moves
+to the rank with the fewest nodes that its edges allow, as the balance of
+the ranks of dot does. So in `a -> b -> c; x -> c [weight=0]`, x goes to
+the rank of a. Each part of the graph that no edge joins balances on its
+own. The transform `zuzu.layered` balances the ranks of a graph of Mermaid
+too.
+
 ### Links and tooltips
 
 `URL` or `href` gives a link to the graph, a cluster, a node or an edge,
@@ -395,6 +428,13 @@ shape and its labels. An edge puts them on its line, its arrowheads and
 its labels. A cluster puts them on its box and its title. The graph puts
 them on the group that holds the whole diagram. The image of `Image`
 draws neither.
+
+A table or a cell of a label of HTML takes a link from `href` or `URL`
+and a tooltip from `tooltip` or `title`, as in Graphviz. They go on its
+box, its rules and its text, and on the parts of the tables and the cells
+inside it that have none of their own, over the link and the tooltip of
+the node, the edge or the cluster. A table or a cell with a link and no
+`bgcolor` gets a box with no fill, which takes the link.
 
 In a link and a tooltip, `\G` is the name of the graph, or of the cluster,
 `\N` is the name of the node, `\E` is the edge, as `a->b`, `\T` and `\H`
@@ -409,7 +449,7 @@ that zuzu writes.
 
 An attribute that the table does not list, a shape that zuzu does not
 draw, a name that is not an arrowhead, a number that does not read, and a
-part of a label of HTML that okage does not read, such as `href` or
+part of a label of HTML that okage does not read, such as `target` or
 `<img>`, are issues. A label of HTML that is not valid is an
 error with its line and column.
 
@@ -418,8 +458,8 @@ error with its line and column.
 
 ## Mermaid
 
-zuzu reads Mermaid 12.3.0. The test fixtures compare zuzu with `mmdc`, the
-version that bundles Mermaid 12.3.0.
+zuzu reads Mermaid 12.3.0. The test fixtures compare zuzu with `mmdc` of
+mermaid-cli 12.2.0, which bundles Mermaid 12.3.0.
 
 ### Every kind
 
@@ -452,6 +492,21 @@ starts a comment that runs to the end of the line, as in YAML. A `title`
 or a `description` that is a map, a `config` that is not a map, a list, a
 list in brackets, and a line that is not a key are issues, at their line.
 The other parts of YAML, such as anchors, do not read.
+
+A line that starts with `%%` is a comment in every kind. A `%%` in the
+middle of a line follows the lexer of the kind in Mermaid 12.3. In most
+kinds, it starts a comment out of double quotes. The lexer of a kind of
+jison cuts a comment only where a token can start, so a `%%` in a text
+token is text. So in a sequence diagram, a gantt, a journey and a
+mindmap, a `%%` in the middle of a line is text, as in
+`participant A %% B` and `A->>B: 50%% off`. In a state diagram, a class
+diagram and a ZenUML diagram, a `%%` after a colon, in the text of a
+label or a message, is text. A comment can follow the keyword of the kind
+with no space, as in `sequenceDiagram%% a comment`. zuzu reads
+`flowchart LR %% a comment` and `a --> b %% a comment` with a comment, and
+mmdc reads each as an error. The kinds that read their source by a
+grammar of their own, such as the railroad diagrams, the tree view and
+the use case diagram, read their comments as their sections say.
 
 `%%{wrap}%%` sets `wrap: true` at the top of the config, over the `wrap`
 of an `init` directive, as in Mermaid. Of the kinds that zuzu draws, only
@@ -513,7 +568,7 @@ it.
 `handDrawnSeed` seeds the lines of the look, as `zuzu.lookSeed`. Its
 default, 0, gives a random seed in Mermaid, and the seed 1 of zuzu, so that
 the same source draws the same bytes (D39 part 6). A seed that is not a
-whole number is an issue. A look like xkcd waits for a font (D40).
+whole number is an issue.
 
 `layout` picks the layout of a graph, as in Mermaid 12.3 (D45). zuzu
 accepts it with no issue in every kind, in the config or at the top of the
@@ -532,21 +587,38 @@ the config of the spec, and the runtime picks the engine from it, as
    caller makes available with `zuzu.WithLayoutEngine(elk.Layout())`.
    Without it, zuzu draws the graph with its own layered layout,
    `zuzu.layered`, with no issue, so an ELK layout is a hint (D32).
+   `zuzu.layered` moves the ends of the edges that join a node on the
+   same side at least 8 pixels apart, in their order, as ELK spreads the
+   ends of the edges on a side of a node. So two edges that come to a node
+   from about the same direction do not meet at their ends and cross
+   there.
 2. `layout: dagre` draws with the transform `zuzu.dagre`: the layout of
    dagre with the crossing sweep of dagre 0.8 and the wrap of Mermaid
    around it, which places the nodes closest to mmdc with `layout: dagre`
    (D45 parts 1 and 2). As in Mermaid, the sibling subgraphs of a
-   flowchart go to dagre in the reverse of the order of the source (D45
-   part 5).
+   flowchart and of an ER diagram go to dagre and to ELK in the reverse of
+   the order of the source (D45 part 5). A state diagram gives ELK its
+   states, its composite states and its notes in the order in which a line
+   first names each, and each note in a box of its own, as Mermaid does.
 3. `zuzu.WithLayout` of the caller forces a layout by its name, such as
    `layered`, `dagre` or `elk.stress`, on every graph, over the layout of
    the source (D45 part 4).
 
-The section `elk` of the config, which holds the settings of ELK, is a
-hint, and the engine of ELK takes the settings of Mermaid. So is the
-property `algorithm` of a node, such as `grp@{ algorithm: elk.box }`, which
-picks an ELK layout for one subgraph. zuzu lays the subgraph out in the
-layout of the graph, with no issue, whatever the value (D35 part 9).
+The section `elk` of the config holds the settings of ELK. The engine of
+ELK reads `preset`, `nodePlacementStrategy`, `nodePlacementAlignment`,
+`cycleBreakingStrategy`, `layeringStrategy`, `layeringLayerBound`,
+`mergeEdges`, `forceNodeModelOrder`, `considerModelOrder`,
+`keepEntryNodeOnTop` and `orientFeedbackEdges`, as Mermaid 12.3 does, and
+names each other setting, such as `lineHops`, in the report. The
+property `algorithm` of a subgraph, such as `grp@{ algorithm: elk.box }`,
+picks an ELK layout for that subgraph, and the engine of ELK lays it out
+so. As in Mermaid, a subgraph that an edge crosses takes the layout of the
+graph, and the report says so. Without the engine of ELK, the section and
+the property are hints, and zuzu lays the subgraph out in the layout of
+the graph, with no issue, whatever the value (D35 part 9). Mermaid reads
+`algorithm` only on a subgraph, so on a node it draws nothing, with no
+issue.
+
 Another layout, such as `elk.layered` or `tidy-tree`, is an issue. A
 swimlane diagram and a flowchart accept `layout: swimlane`, as "Swimlane
 diagram" says. A mindmap accepts `cose-bilkent` and `tidy-tree` too.
@@ -597,9 +669,10 @@ Mermaid 12.3 sets the theme `redux-color` by default in the sections
 in its source draws in the scheme of the caller, or `zuzu`, with the blue
 of a chart and a graph of DOT (D55). A diagram of such a kind still counts
 as one in `redux-color`, so its nodes and its panels take the colors of
-D53 and D54 from that scheme. Each subgraph of a flowchart and each lane
-of a swimlane takes the color of the hash of its id among the second to
-the tenth colors, as a composite state does (D55, D56). Each class of a
+D53 and D54 from that scheme. Each subgraph of a flowchart, each lane of
+a swimlane, each namespace of a class diagram and each subgraph of an ER
+diagram takes the color of the hash of its id among the second to the
+tenth colors, as a composite state does (D55, D56). Each class of a
 class diagram, entity of an ER diagram, and requirement and element of a
 requirement diagram takes the color of the hash of its id among all ten
 (D56). Mermaid gives them the colors of its palette in the order in which
@@ -754,14 +827,24 @@ named shapes of Mermaid 12:
 | `directory` | a folder |
 | `bpmn-activity` | a rounded rectangle |
 | `bpmn-annotation` | a square bracket on the left of the label |
+| `person` | a round head over a body with round corners, with the label in the middle of the body. The body is at least 100 wide, and the head is 0.23 of its width, from 16 to 56 |
+| `bpmn-start`, `bpmn-end` | a ring of 36, with the label under it. The ring of an end is 3.4 wide |
+| `bpmn-intermediate`, `bpmn-boundary` | two rings of 36 and 30, with the label under them |
+| `bpmn-gateway` | a diamond of 50 by 50, with the label under it |
+| `bpmn-data` | a page of 36 by 50 with a folded corner, with the label under it |
+| `bpmn-data-store` | a cylinder of 50 by 50 with three lines under its top, with the label under it |
 
 A shape with no text drops its label, as Mermaid does. An edge ends on the
 box of the node, except for `cross-circ`, `fr-circ`, `f-circ`, `sm-circ`,
-`start`, `cloud` and `bang`, where it ends on the circle or the ellipse. A shape that zuzu does not draw yet draws as a
-rounded rectangle, and the report says so. These are `person`, and the
-shapes of BPMN that put their label under the shape: `bpmn-start`,
-`bpmn-intermediate`, `bpmn-boundary`, `bpmn-end`, `bpmn-gateway`,
-`bpmn-data` and `bpmn-data-store`.
+`start`, `cloud` and `bang`, where it ends on the circle or the ellipse.
+An edge of a `person` ends on its head or its body. A shape of BPMN with
+its label under it draws its figure at the size of Mermaid, in the middle
+of the node. The node is as wide as the wider of the figure and the label,
+and keeps a band as high as the label and a gap of 6 above the figure and
+under it, as in Mermaid. An edge ends on the figure, and the label takes
+the color of text of the theme, because it is on the background. A shape
+that zuzu does not know draws as a rounded rectangle, and the report says
+so.
 
 The links:
 
@@ -797,16 +880,29 @@ because Mermaid draws such a label as math. A text in double quotes, such as a s
 markdown, can run over more lines, and each new line in it starts a new
 line of the label. This holds for a node, a link and the title of a
 subgraph. Each line of the title of a subgraph draws on its own line, and
-the title takes the space of its lines. The value of a property in `A@{ ... }` can be in double quotes or
-in single quotes, and zuzu takes the quotes off. In single quotes, `''` is
-one quote, as in YAML. A long label wraps, as "Labels that wrap" says.
+the title takes the space of its lines. The box of a subgraph is at least
+as wide as its title and its padding, as in Mermaid, and the layout makes
+room for it. The properties `A@{ ... }` can follow the brackets of a node,
+as in `a["A"]@{ shape: cyl }`, and can run over more lines, one property
+on each. The value of a property can be in double quotes or in single
+quotes, and zuzu takes the quotes off. In single quotes, `''` is one
+quote, as in YAML. A long label wraps, as "Labels that wrap" says.
+
+A node lies in the first subgraph to end that names it, as in Mermaid.
+An inner subgraph ends before the subgraph that holds it, so a node that
+both name lies in the inner one. Of two subgraphs side by side that name
+a node, the first holds it.
 
 A subgraph with a direction lays out in that direction, as Mermaid does,
 when no edge links a node inside it to a node outside it. zuzu lays out
 such a subgraph on its own, and then places it as one node in the layout
-that holds it. A subgraph inside it without a direction lays out in the
-same direction. If an edge links a node inside the subgraph to a node outside
-it, the subgraph follows the direction of the layout that holds it.
+that holds it. A subgraph without a direction inside it also lays out on
+its own, in the direction LR, as ELK lays out a subgraph that Mermaid gives
+no direction. So in a `flowchart LR`, a subgraph inside a subgraph with
+`direction TB` draws LR. If an edge links a node inside the subgraph to a
+node outside it, the subgraph follows the direction of the layout that
+holds it. So does a subgraph that holds an edge between a node in it and
+a node in a subgraph inside it, together with the subgraphs inside it.
 Mermaid does the same, so this is not an issue.
 
 An edge to the id of a subgraph ends at the box of the subgraph, as in
@@ -910,7 +1006,8 @@ too. A value that is not a number of 0 or more is an issue, and the space
 keeps its default.
 
 Without `inheritDir`, a subgraph with no direction takes the direction of
-the subgraph that holds it, as the subgraphs above say. With
+the layout that holds it, or LR inside a subgraph that lays out on its
+own, as the subgraphs above say. With
 `inheritDir: true`, it takes the direction of the flowchart, as in Mermaid.
 
 These parts are issues: the target of a link, as "Links and tooltips"
@@ -1186,11 +1283,14 @@ The name of an entity, the type, the name and the comment of an
 attribute, and the label of a relationship are markdown, as in Mermaid.
 Two stars or two underscores around a text make it bold, and one star or
 one underscore make it italic. An underscore inside a word, as in
-`first_name`, is text. zuzu draws the text without its marks. A line of
-an entity and a label draw in one font, so zuzu draws a text bold or
-italic only when all of its text is. `**string**` draws bold, and
-`*Customer Account*` italic. In `*first*Name`, only a part is italic, so
-it draws plain, and Mermaid draws `first` in italic. The name of an
+`first_name`, is text. zuzu draws the text without its marks. The label
+of a relationship and the name of an entity with no attributes draw each
+part in its font, as in Mermaid, so `*first*Name` draws `first` in
+italic. A line of an entity with attributes draws in one font, so zuzu
+draws a text there bold or italic only when all of its text is.
+`**string**` draws bold, and `*Customer Account*` italic. In an attribute
+`*first*Name`, only a part is italic, so it draws plain, and Mermaid draws
+`first` in italic. The name of an
 entity with attributes is bold, and markdown can make it italic too. A
 class or a style of an entity with no attributes wins over the font of
 its markdown.
@@ -1515,7 +1615,9 @@ zuzu reads these settings of `usecase`:
    those of the look of zuzu, which are smaller than those of Mermaid.
 5. `actorFontFamily` and `usecaseFontFamily`, which give the weight and
    the style that the name of a family holds.
-6. `colorScheme: role`, the default, which draws in the colors of zuzu.
+6. `colorScheme: role`, the default, which draws the actors and the use
+   cases in the colors of zuzu. In a color theme, each system boundary
+   takes a color, as the next paragraphs say.
 7. `colorScheme: rotate`, which gives each actor, use case and system
    boundary a color, as the next paragraphs say.
 
@@ -1536,8 +1638,10 @@ Mermaid 12.3.0 gives the colors in turn only in a color theme,
 draws in `redux-color`, so `rotate` takes effect there. In any other
 theme, such as `default` or `forest`, Mermaid draws no colors in turn, and
 zuzu does the same, with no issue. In a color theme, Mermaid gives each
-system boundary a color in turn with `role` too. With `role`, zuzu draws
-a system boundary as a panel.
+system boundary a color in turn with `role` too. zuzu does the same: with
+`role`, each system boundary takes the color of the hash of its id among
+the second to the tenth colors, as with `rotate`, and the actors and the
+use cases take no color.
 
 These parts are issues: a value of `colorScheme` other than `role` and
 `rotate`, another setting of `usecase`, a `theme` that Mermaid does not
@@ -1568,10 +1672,8 @@ These are errors, as in Mermaid:
 9. Classes after `:::` on a name that a relation only names.
 
 Mermaid 12.3.0 draws no title of the front matter in a use case diagram,
-and zuzu draws it. Mermaid removes the last semicolon of a line of `style`
-or of `classDef` that holds a color, such as `style A fill:#f00;`, before
-it reads the line. zuzu reads such a semicolon as an error. zuzu reads
-`%%` after a statement as a comment, and Mermaid reads it as an error.
+and zuzu draws it. zuzu reads `%%` after a statement as a comment, and
+Mermaid reads it as an error.
 `accTitle` and `accDescr` join into the description of the Vega spec.
 
 ### Swimlane diagram
@@ -1773,7 +1875,7 @@ and the size that mmdc measures with. mmdc measures each label of a
 sequence diagram at 16 pixels in Times New Roman, because the family of
 fonts of Mermaid ends in a semicolon that makes it invalid. That text is
 as wide as 14.5 pixels of IBM Plex Sans, so each label of a sequence
-diagram wraps at 11/14.5 of its width in Mermaid, as "Sequence diagram"
+diagram wraps at 11/14.5 of its width in Mermaid, as "sequenceDiagram"
 says. A use case diagram draws a use case
 at 12 pixels, and an actor and a note at 14. So the label of a use case
 wraps at 11/12 of `usecase.wrappingWidth`, and an actor at 11/14. A
@@ -1819,7 +1921,7 @@ is not a number of 0 or more is an issue, and the width keeps its default.
 
 The charts compile to Vega-Lite or Vega, as D31 says. A setting of the
 config that a chart does not read is an issue, and so are a `theme` that
-Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap`, `block`, `ishikawa`, `kanban` and `venn-beta` joins
+Mermaid does not have and the `themeCSS`, as "The theme" says. Each chart but `sankey`, `mindmap`, `block`, `ishikawa`, `kanban`, `zenuml` and `venn-beta` joins
 `accTitle` and `accDescr` into the description of the spec, as "The
 description" says. Mermaid does not read them in a sankey, a mindmap, a
 block diagram or a venn diagram either, so there they are errors, as in
@@ -1827,8 +1929,9 @@ Mermaid. In a kanban, Mermaid reads them as the text of a node, and so
 does zuzu. A C4 diagram reads `accTitle` as its title, as "C4" says.
 An ishikawa diagram reads them as causes, as "ishikawa" says. A ZenUML
 diagram reads them as messages, as "zenuml" says. Each chart
-has 5 to 7 fixtures in `graph/mermaid/testdata`, the sequence diagram has
-10, the gantt has 18, and the git graph has 12. A test draws each fixture and checks that each value of
+has 5 to 7 fixtures in `graph/mermaid/testdata`, except the info diagram,
+which has 2, the sequence diagram, which has 10, the git graph, which has
+12, and the gantt, which has 19. A test draws each fixture and checks that each value of
 the source draws once, with its label.
 
 | Keyword | Compiles to |
@@ -1929,12 +2032,12 @@ categories, which is at the left of a horizontal chart.
 | `xAxis.axisLineWidth`, `yAxis.axisLineWidth` | the `domainWidth` of the axis |
 | `xAxis.tickLength`, `yAxis.tickLength` | the `tickSize` of the axis |
 | `xAxis.tickWidth`, `yAxis.tickWidth` | the `tickWidth` of the axis |
+| `xAxis.labelPadding`, `yAxis.labelPadding` | the `labelPadding` of the axis |
+| `xAxis.titlePadding`, `yAxis.titlePadding` | the `titlePadding` of the axis |
 
-These settings are issues, because the look of zuzu has no place for them.
-The compile of an xychart does not pass `labelPadding` and `titlePadding`
-of an axis to Vega yet, though the runtime reads them, so they are issues.
 `width` and `height` give the size of the plot, so
-`plotReservedSpacePercent` is an issue.
+`plotReservedSpacePercent` is an issue, because the look of zuzu has no
+place for it.
 
 With `showDataLabel`, the value of a bar is 10 pixels from the end of the
 bar, inside it or outside it, as in Mermaid. In a horizontal chart, the
@@ -1999,8 +2102,12 @@ the scheme, as Mermaid draws it red.
 `todayMarker off` draws no marker, and another value of `todayMarker` is
 the style of the line, as `stroke:#0f0,stroke-width:4px`, as in Mermaid. A
 style that a line cannot draw, such as `fill`, changes nothing, and a style
-that zuzu does not read is an issue. zuzu draws no marker when the time is
-outside the time axis. A date of `dateFormat` that has no day, such as
+that zuzu does not read is an issue. When the time is outside the time
+axis, Mermaid draws the marker in its margin of 75 pixels at each side of
+the axis, or past the edge of the image, where it does not show. zuzu
+draws the marker in a margin of 75 pixels of Mermaid too, at its place,
+and the axis does not grow for it. Past the margin, zuzu draws no
+marker. A date of `dateFormat` that has no day, such as
 `HH:mm`, takes the day of the time. The day and the hour are those that
 the time has in its own time zone. Without the time, zuzu draws no marker,
 a `todayMarker` other than `off` is an issue, and a date with no day takes
@@ -2053,8 +2160,11 @@ The Date of JavaScript also reads a number alone. So in `dateFormat ss`,
 where a date has two digits, a start of `0` is 2000-01-01, and a start of
 `5` is 2001-05-01, because a number from 1 to 12 is a month. A start
 before the year -10000 or after the year 10000 is an error, as in
-Mermaid. If every task ends before the first start, the time axis runs
-backward, from right to left, as in Mermaid. A task `0, 20` in
+Mermaid. The time axis runs from the first start to the last end, as in
+Mermaid. A task that ends before it starts draws no bar, as in Mermaid,
+and keeps its row, and it does not make the axis longer. If every task
+ends before the first start, the time axis runs backward, from right to
+left, as in Mermaid. A task `0, 20` in
 `dateFormat ss` does this without `zuzu.WithNow`, because it ends on
 1970-01-01. With the time, it ends on the day of the time.
 
@@ -2066,7 +2176,10 @@ draws it in the text color at a low opacity, so that the grid and the
 names of the tasks show through it. The name of each section is at the
 left of the names of its tasks, in the middle of its rows, 11 pixels and
 bold. The names take the place of the legend. A gantt with no named
-section draws no band and no name.
+section draws no band and no name. The title starts at the left of the
+names of the sections, at the left edge of the chart, and not at the time
+axis. Mermaid centers the title over the chart, and zuzu keeps a title at
+the left, as its look does.
 
 #### journey
 
@@ -2111,7 +2224,9 @@ the right, as in Mermaid.
 `labelStyle: outlined` gives each label a halo, and changes the side of a
 label as Mermaid does. The label of a node in a layer before the layer of
 the largest node goes at the left of the node, and the others at the right.
-The default style is `legacy`.
+An outlined label can reach past the edges of the chart, as in Mermaid, so
+the label of a node in the first layer draws past the left edge, and the
+image grows to hold it. The default style is `legacy`.
 
 A label goes on the inner side of its node, as Mermaid puts it: at the
 right of a node in the left half, and at the left of the others. Mermaid
@@ -2448,7 +2563,9 @@ hold a new line. A statement can have more than one `tag:`, and the last
 digits, `_`, `-`, `.` and `/`. The word does not start with a digit, it
 ends in a letter, a digit, `_` or `-`, and it is not a keyword. A new line,
 the two characters `\n` and `<br>` in a name start a new line of its
-label. `order:` is a whole number. Each statement is on a line of its own,
+label. The label keeps a run of spaces, as Mermaid draws it, and the id of
+a commit draws a run of spaces as one, as in Mermaid. `order:` is a whole
+number. Each statement is on a line of its own,
 and the keywords are in the case of the table. Any other text is an error,
 as in Mermaid 12.3. The message of a commit draws nothing, as in Mermaid.
 
@@ -3393,7 +3510,8 @@ zuzu reads the source as the lexer of Mermaid 12.3 reads it:
    with no quotes is part of the name.
 2. A name with no quotes runs to the end of the line, or to the space
    before an annotation. Its spaces at the end drop, and the spaces in it
-   stay.
+   stay. A run of spaces in a name or a description draws as wide as its
+   spaces, as Mermaid draws it in `white-space: pre`.
 3. A name in quotes ends at its end quote. Two names in quotes on one line
    are two items.
 4. A word that starts with `title`, such as `titles.txt`, starts a title,
@@ -3647,10 +3765,13 @@ draws the rest.
 These are issues, because ZenUML draws them and zuzu does not: the color
 of a participant, such as `A #FF0000`, an emoji of a participant, such as
 `[smile] A`, the icons of the clouds, `@EC2`, `@Lambda`, `@AzureFunction`,
-`@SQS`, `@SNS` and `@IAM`, which draw as participants, a style at the start
-of the last line of a comment, such as `[red]`, `<bold>` or `(blue)`, and
-the Markdown of a comment, `**`, `__` and `` ` ``, which zuzu takes out
-and draws as plain text.
+`@SQS`, `@SNS` and `@IAM`, which draw as participants, and a style at the
+start of the last line of a comment, such as `[red]`, `<bold>` or
+`(blue)`.
+
+A comment draws its Markdown as ZenUML draws it: bold text between `**`
+or `__`, and italic text between `*` or `_`. Code between backticks draws
+as plain text, with no backticks, as in ZenUML.
 
 ZenUML reads these parts and draws nothing for them, so zuzu reads them
 with no issue (D32): the width of a participant, such as `A 200`, a group
@@ -3771,7 +3892,7 @@ draws the grid of the texts, which zuzu does not draw, so it is an issue.
 `venn.look` is a hint, as `look` is. Mermaid 12.3 draws a venn diagram in
 the theme of `venn.theme`, `redux-color` by default. zuzu reads
 `venn.theme` too, as "The theme" says. A venn diagram with no theme
-draws in the scheme `mermaid-redux-color`, as in Mermaid (D37). The colors `venn1` to `venn8` of `themeVariables` are
+draws in the scheme of the caller, or `zuzu`, as "The theme" says (D55). The colors `venn1` to `venn8` of `themeVariables` are
 issues, as the other theme variables are.
 
 zuzu draws a venn diagram in other ways than Mermaid in two places.
@@ -3790,8 +3911,9 @@ the five kinds of C4 diagram, the ishikawa diagram, the Cynefin diagram,
 the info diagram, the kanban, the packet, the four kinds of railroad
 diagram, the tree view, the event model, the ZenUML diagram and the venn
 diagram. The agentflow diagram reads into a graph, as
-the flowchart does. Every other kind of Mermaid is an error that wraps
-`mermaid.ErrKind`. D32 sets the order of the next kinds.
+the flowchart does. zuzu added the kinds in the order that D32 sets, and
+no kind of that order is left. Every other kind is an error that wraps
+`mermaid.ErrKind`.
 
 ## Math of KaTeX
 
@@ -3819,9 +3941,12 @@ Mermaid draws math in these kinds and labels, and so does zuzu:
 A formula draws in the display style, at the size of the text of its
 label, as Mermaid asks KaTeX to. A line of a label with math is a row of
 its text and its formulas, each centered on the middle of the line, with
-no wrap. The spaces at the ends of each run of text drop, as in Mermaid,
-and a thin space of 3/18 of the size of the text stands between a run of
-text and a formula, as `docs/STYLE.md` says.
+no wrap. The spaces at the ends of each run of text drop, and a run of
+text and a formula meet with no space between them, as in Mermaid and as
+`docs/STYLE.md` says. A message of a sequence diagram with math sets its
+formula on its line, 2 above it, and keeps no line of text above the
+formula, as Mermaid does, so it takes less height than a message of
+text.
 The line is as high as a line of text, or as its tallest formula when that
 is higher, so a fraction makes its node, its note or its row higher. A
 line of math alone is as high as its formula. In a graph, a label with

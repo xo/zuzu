@@ -72,10 +72,9 @@ git -C upstream/dagro checkout 30476a97eb110dfc64e32a5691e37a2e6f2dc175
 ```
 
 A checkout of Go code holds a `go.mod` of its own, so `go build ./...` in
-zuzu does not build it. The checkouts of rough-go and dagro have one in
-their root. The
-tests of the documents skip the folder `upstream`, because no file in it is
-a file of zuzu.
+zuzu does not build it. The checkouts of rough-go, dagro and elk-go each
+have one in their root. The tests of the documents skip the folder
+`upstream`, because no file in it is a file of zuzu.
 
 ## A copy
 
@@ -147,7 +146,8 @@ upstream. This is why the golden file of a copy is pinned to amd64 below the
 level v3.
 
 The tests of a copy other than its golden test run on every architecture,
-and CI runs the tests of the root module on arm64 too.
+and CI runs the tests of the root module and of the module of ELK on arm64
+too.
 
 ## A new commit of an upstream
 

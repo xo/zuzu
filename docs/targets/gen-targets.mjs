@@ -168,10 +168,11 @@ function theme(mode, scheme = "zuzu") {
   const seq = d3.hsl(m.bg).l < 0.5
     ? [...tints, d3.interpolateRgb(base, "#ffffff")(0.45), d3.interpolateRgb(base, "#ffffff")(0.85)]
     : [...tints, d3.interpolateRgb(base, "#000000")(0.35), d3.interpolateRgb(base, "#000000")(0.6)];
-  // The diverging ramp runs from the color of a fall through the grid
-  // color to the color of a rise. A scheme that a spec names draws in its
-  // own colors, so the theme holds no ramp for it (D46).
-  const div = [cat[s.down], m.grid, cat[s.up]];
+  // The diverging ramp runs from the color of a fall through the color
+  // muted to the color of a rise, so that a mark near the middle still
+  // shows. A scheme that a spec names draws in its own colors, so the theme
+  // holds no ramp for it (D46).
+  const div = [cat[s.down], m.muted, cat[s.up]];
   return { ...m, scheme, cat, seq, div, up: cat[s.up], down: cat[s.down] };
 }
 const THEMES = { light: theme("light"), dark: theme("dark") };

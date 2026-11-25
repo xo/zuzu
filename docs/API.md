@@ -104,7 +104,7 @@ func (v *View) Signal(name string) (any, error)
 func (v *View) Scale(name string) (scale.Scale, error)
 ```
 
-On 2026-11-12 the code has all of this document but these:
+The code has all of this document but these:
 
 1. `WithFonts`. Since phase 6, `Image` draws with the bundled IBM Plex
    Sans and no font of the system (BACKLOG).
@@ -138,8 +138,11 @@ look drawn by hand (D43).
 
 `raster.Draw` exists since phase 6. `raster.WithRenderer` names the
 renderer of okage whose fonts draw the text, with the layout of text of
-okage D37. A program makes one and shares it, because it loads the fonts of
-the system on its first use (okage D36).
+okage D37. A program makes one renderer and shares it. It gives the
+renderer `WithLoadSystemFonts(false)`, because a renderer of okage loads
+the fonts of the system by default (okage D36), and the image then depends
+on the machine. Without `raster.WithRenderer`, `raster.Draw` makes a
+renderer with the bundled fonts alone.
 
 ### Links
 
@@ -197,7 +200,7 @@ D40, D44, D45). Each returns a `SharedOption`, which is an `Option` and a
 | `WithLocation(*time.Location)` | `time.Local` | the time zone of time scales and formats (D27) |
 | `WithLocale(format.Locale)` | `format.EnUS` | the locale of numbers and dates (D27) |
 | `WithRandom(func() rand.Source)` | a source seeded from the system | the random numbers of a render (D28) |
-| `WithFonts(text.Fonts)` | IBM Plex Sans (D16) | the fonts that text is measured and drawn with. Not built yet |
+| `WithFonts(fs.FS)` | IBM Plex Sans, as `text.Fonts()` gives it (D16) | the fonts that text is measured and drawn with, in a file system such as the one that `text.Fonts()` returns. Not built yet |
 | `WithSize(width, height float64)` | from the spec | the size of the chart |
 | `WithBackground(color.Color)` | `zuzu.background` of the spec, then the spec, then the theme | the background over the theme and the spec. An alpha of 0 draws none, and nil keeps the default |
 | `WithScale(float64)` | 1 | the ratio of device pixels to the pixels of the chart in the image of `Image`, such as 2 for a screen of high density. The layout does not change, and the SVG does not change |
@@ -241,7 +244,7 @@ A look changes the shapes and the font of a chart, and keeps the colors
 of its mode and its scheme (D39, D40). `theme.LookStandard` is the look
 of `docs/STYLE.md`, the default. `theme.LookExcalidraw` draws each mark
 as if by hand, as "The look like Excalidraw" in `docs/STYLE.md` says, and
-draws its text in Excalifont. A look like xkcd waits for a font (D40).
+draws its text in Excalifont. zuzu draws no other look by hand (D57).
 
 1. `WithLook` of a render wins over `WithLook` of `Parse`, which wins over
    the key `zuzu.look` of the config of the spec, whose values are the
@@ -398,7 +401,7 @@ type Loader interface {
 // LoadRequest says what a spec asks for.
 type LoadRequest struct {
 	URL    string // the url of the spec, as written
-	Format string // csv, tsv, json or topojson, from the spec
+	Format string // csv, tsv, json or topojson, from the spec, or image for the image of a node
 	Name   string // the name of the dataset
 }
 
@@ -895,8 +898,8 @@ character draws in IBM Plex Sans.
 `WithLookFont` is an option of its own, and not a second argument of
 `WithLook`, because a source can ask for the look by itself, such as
 `look: handDrawn` of Mermaid, and the font then still reaches the render.
-It takes the look, so that each look drawn by hand gets its own font, such
-as a font for the look like xkcd later. This amends D24.
+It takes the look, so that each look drawn by hand gets its own font. This
+amends D24.
 
 An `Estimate` of the package `text` measures in the font with `SetMain`:
 

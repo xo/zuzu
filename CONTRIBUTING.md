@@ -22,6 +22,7 @@ Run the checks that CI runs:
 ```bash
 gofmt -l . && go vet ./... && go build ./... && CGO_ENABLED=0 go build ./... && go test -race -count=2 ./...
 golangci-lint run ./... && (cd test && golangci-lint run ./... && go vet ./... && go build ./... && go test -race -count=1 ./...)
+(cd elk && gofmt -l . && go vet ./... && go build ./... && go test -race -count=1 ./... && golangci-lint run ./...)
 ```
 
 CI pins golangci-lint at v2.15.0 and installs it with `go install`, as

@@ -74,7 +74,8 @@ background is the one that the chart draws: the background of the spec when
 it sets one, and the background of the mode otherwise (D35). On a dark
 background the ramp runs on to a lighter color, and on a light background
 to a darker color. The diverging ramp runs from the color of a fall through
-`grid` to the color of a rise.
+`muted` to the color of a rise, so that a line or a point near the middle
+of the ramp still shows on the background in both modes.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -186,6 +187,13 @@ These rules say which colors flip:
 5. A chart whose background is light, such as one whose spec sets a white
    background, draws each color as named in both modes. A diagram of DOT
    or Mermaid keeps its colors, because its theme sets its mode (D32, D37).
+6. A chart whose spec paints a light background of its own, in its
+   `background`, in a signal that gives the `background`, or in
+   `config.background`, draws in the light mode when the caller asks for
+   the dark mode and gives no background. So its axes, its legends and
+   its titles take the neutrals of the light mode and read on its
+   background. A dark background of the spec, also from a signal, keeps
+   the dark mode, and its grays flip.
 
 ### Schemes from upstream themes
 
@@ -275,9 +283,10 @@ A label that sits on a busy mark gets a halo: a stroke of 3 in the
 background color, drawn under the fill with `paint-order="stroke"`.
 
 A formula of math in a label of Mermaid draws in STIX Two Math, at the size
-and in the color of the text of the label (D36). A thin space, 3/18 of the
-size of the text, as `\,` of TeX, stands between a formula and the text
-next to it, so that the two do not touch.
+and in the color of the text of the label (D36). A formula and the text
+next to it meet with no space between them, as in Mermaid. A message of a
+sequence diagram with math sets its formula 2 above its line, where a
+message of text keeps 5, as Mermaid sets a formula on the line.
 
 ## The frame
 
@@ -324,8 +333,22 @@ next to it, so that the two do not touch.
    In a grid with the bounds `flush`, which lays out each cell by its plot
    alone, a cell still keeps room above its plot for such a title, so that
    it does not cover the cell above, as in `concat_marginal_histograms`.
+   A row of a grid also keeps room above and below its cells for its row
+   header, such as the labels and the title of the axis that the header
+   holds, as in `trellis_bar` and `line_concat_facet`. Vega places the
+   headers outside the cells, and does not count them in the size of a row.
 7. Numbers use a thousands separator, and a unit is in the label, such as
    `$400` or `20°`.
+8. On a scale of bands, the ticks and the grid lines stand at the
+   `bandPosition` of the axis or of its config, such as `axisBand`, and
+   the middle of each band by default. A label stays in the middle of its
+   band. `tickExtra` adds a tick and a grid line at the start of the first
+   band, `tickOffset` moves the ticks, the labels and the grid lines along
+   the axis, and `tickRound` rounds their places to whole pixels. A
+   `tickBand` of `extent` puts the ticks and the grid lines at the edges
+   of the bands, and one of `center` in their middle, as in Vega. The look
+   does not round the places, so an axis rounds them only when the spec
+   or its config sets `tickRound`.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -393,6 +416,21 @@ over the look (D46). zuzu reads these properties:
 | `offset`, `legendX`, `legendY` | the place of the legend, as in Vega |
 | `gradientLength`, `gradientThickness` | the length and the width of the bar of a gradient, in place of 120 and 10 |
 | `columns`, `direction` | the grid of the entries |
+| `gridAlign` | how the columns of the grid line up: `each`, as the look, `all`, as wide as the widest, or `none`, each entry right after the one before it |
+| `titleOrient`, `titleAnchor`, `titlePadding` | the side of the entries where the title stands, its place along that side, and its space from the entries, in place of 16 at the side and 6 above or below. A title at the side with no anchor stays in the middle of the first row. The legend then starts at the top left of its title and its entries |
+| `titleAlign`, `titleBaseline`, `titleLimit`, `titleLineHeight` | the align, the baseline, the widest and the line height of the title |
+| `padding`, `fillColor`, `strokeColor`, `cornerRadius` | a frame around the legend, with the entries `padding` inside it. The look has no frame |
+| `labelOffset`, `labelAlign`, `labelBaseline` | the space between a symbol or a gradient and its label, in place of 6 and 4, and the align and the baseline of each label |
+| `labelOverlap`, `labelSeparation` | the labels of a gradient that overlap, or stand closer than the separation, drop in turns, as the labels of an axis do |
+| `symbolOffset`, `symbolDashOffset` | a move of each symbol to the right, and the start of its dash |
+| `symbolBaseFillColor`, `symbolBaseStrokeColor` | the fill and the stroke of the symbols when no scale of the legend gives them |
+| `tickCount`, `tickMinStep` | the count of the values of a continuous scale and the least step between them, for the entries and for the labels of a gradient. A gradient of the look labels only its ends. With a `tickCount` or `values`, it labels each value along the bar |
+| `gradientOpacity`, `gradientStrokeColor`, `gradientStrokeWidth` | the paint of the bar of a gradient |
+
+An entry is as high as its symbol, and the symbol of the path of an SVG
+reaches as far down as its path, as Vega bounds an entry. A `size` or a
+`shape` that the encode of the symbols gives as a value counts, as Vega
+lays out the entries after the encode.
 
 ## Marks
 
@@ -407,7 +445,7 @@ over the look (D46). zuzu reads these properties:
 | point | radius 3 to 4, at 0.7 to 0.9 opacity, with a ring of 1 or 2 in the background color. A point smaller than 20 square pixels, or with a shape that is a path of SVG, such as a star, has no ring, because the ring covers a small or thin shape |
 | bubble | the area is the value. The largest is drawn first, so that the small ones stay on top |
 | arc | a gap between the slices, and round corners of 4. A donut has an inner radius of 0.64 of the outer one, and its total in the center |
-| box | round corners of 5, a fill of the series color at 0.2 opacity, an outline of 1.5, and a median of 2.5 across the box in the series color. The whiskers and their ticks are 1.5 wide in the series color. The raw points are under the box. A part whose properties the spec gives, such as `"median": {"color": "red"}`, keeps them, and the look sets only the others |
+| box | round corners of 5, a fill of the series color at 0.2 opacity, or 0.24 in the dark mode, an outline of 1.5, and a median of 2.5 across the box in the series color. The whiskers and their ticks are 1.5 wide in the series color. The raw points are under the box. A part whose properties the spec gives, such as `"median": {"color": "red"}`, keeps them, and the look sets only the others |
 | error bar | the rule and its ticks in the series color, as the whiskers of a box, rather than the black of Vega-Lite, which the dark mode hides. A color that the spec gives wins |
 | hierarchy | a group is a tint of its color with its name at the top left. A leaf is the full color. Corners round by 3 to 6 |
 | link of a sankey | the color of its source at 0.32 opacity |

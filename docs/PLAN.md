@@ -129,7 +129,7 @@ short word, and an exported name does not repeat its package.
 | `vega` | the Go types of a Vega spec, read from and written to JSON |
 | `vegalite` | the Go types of a Vega-Lite spec and the compiler to `vega` |
 | `expr` | the expression language: the parser, the tree, the evaluator and the functions (D9) |
-| `script` | the evaluator that runs scripts in goja, which a program imports only if it wants it (D9) |
+| `script` | the evaluator that runs scripts in goja, which a program imports only if it wants it (D9). It is not built yet (D33) |
 | `format` | the formats of numbers and times, with the syntax of d3-format and d3-time-format, the tables of each locale (D27), the units of time and the dates that JavaScript reads |
 | `dataflow` | the data sources and the transforms |
 | `scale` | the scales, and the interpolation of a color ramp |
@@ -140,7 +140,9 @@ short word, and an exported name does not repeat its package.
 | `text` | the measurement of text, behind an interface (D11) |
 | `text/emoji` | Noto Color Emoji, which a caller imports and passes with `WithEmoji` (D32) |
 | `text/excalifont` | Excalifont, the font of the look like Excalidraw, which a caller imports and gives to zuzu (D40) |
+| `text/math` | STIX Two Math from okage, the font of the math of KaTeX, which a caller imports and gives to zuzu with `WithMath` (D36) |
 | `internal/rough` | the copy of rough-go, Rough.js 4.6.6 in Go, which draws a shape as if by hand (D39, docs/UPSTREAM.md) |
+| `internal/dagre` | the copy of dagro, dagre 3.1.1 in Go, which the transform `zuzu.dagre` lays out with. Its package keeps the name `dagro` of upstream (D39, D44, D45, docs/UPSTREAM.md) |
 | `elk` | a separate module under EPL-2.0: the layout engine of ELK, which a caller makes available to zuzu with `WithLayoutEngine`, the adapter that maps the graph and the options of Mermaid onto ELK in `elk/internal/adapter`, and the copy of elk-go in `elk/internal/elkgo` (D39 part 13, D44, D45) |
 | `internal/sketch` | the pass from scene to scene that draws a look drawn by hand with `internal/rough`, which `Render` runs after the layout (D39, D40) |
 | `theme` | the modes and the color schemes, and the Vega config they make (D14, D15) |
@@ -150,7 +152,7 @@ short word, and an exported name does not repeat its package.
 | `graph` | the graph model and the layered layout, with `dot` and `mermaid` below it (D18, D31) |
 | `icon` | the reader of icons of Iconify and of SVG, and the cleaning of an SVG (D31) |
 | `icons` | the bundled packs of icons, one package each below it, each with its license (D31) |
-| `web` | the browser component, which embeds its JavaScript (D19) |
+| `web` | the browser component, which embeds its JavaScript (D19). It is not built yet, and phase 8 builds it |
 | `test/` | a separate module with the corpus, the vega.js oracle and the comparisons (D17) |
 
 `svg` is also the name of the package of okage that zuzu imports. Inside
@@ -171,8 +173,7 @@ the reason (D5). A package that only the test module uses is not listed.
 
 | Package | Pure Go | Why |
 | --- | --- | --- |
-| `github.com/xo/okage` | yes | rasterizes SVG (D10), and draws the direct renderer and measures text (D11). Its package `html` reads the labels of HTML of DOT (D31). zuzu requires v0.5.0, which draws the glyphs in color of an emoji (D32). It brings `github.com/go-text/typesetting` and `golang.org/x/image` |
-| `github.com/go-text/typesetting` | yes | reads the advance widths of the bundled font for the estimate of `text` (D11). okage uses it too, so it adds no module |
+| `github.com/xo/okage` | yes | rasterizes SVG (D10), and draws the direct renderer and measures text (D11). Its package `html` reads the labels of HTML of DOT (D31). Its package `typesetting/font`, a copy of the font parser of go-text, reads the advance widths of the bundled font for the estimate of `text` (D11, D36). zuzu requires v0.20.1. It brings `golang.org/x/image` |
 
 The module also embeds files that are not Go packages:
 
@@ -182,21 +183,23 @@ The module also embeds files that are not Go packages:
 | Noto Color Emoji 2.057, the CBDT build, in `text/emoji` | SIL Open Font License 1.1 | the color emoji of a package that a caller imports (D32) |
 | Excalifont 1.000, one file in WOFF2 of 52 KB from Excalidraw, in `text/excalifont` | SIL Open Font License 1.1, with no Reserved Font Name | the font of the look like Excalidraw, in a package that a caller imports (D40) |
 | the colors of the named schemes of Vega 6.4.0, as Go values in `scale/schemes_data.go` | BSD-3-Clause for vega-scale 8.1.3, ISC for d3-scale-chromatic 3.1.1, and Apache 2.0 for the colors of ColorBrewer, in `scale/LICENSE-schemes.txt` | a scheme that a spec names draws in its own colors (D46) |
-| the color schemes, one JSON file each | the license of each upstream theme, MIT or compatible | the schemes of D15, with the license file of each source |
 
-The module also holds a copy of Go code from another project, which
-`docs/UPSTREAM.md` lists with its license: rough-go under MIT in
-`internal/rough`.
+The color schemes are Go values in `theme/theme.go`, and the module embeds
+no file of a scheme (D33).
+
+The module also holds copies of Go code from other projects, which
+`docs/UPSTREAM.md` lists with their licenses: rough-go under MIT in
+`internal/rough`, and dagro under MIT in `internal/dagre`.
 
 The module `github.com/xo/zuzu/elk`, apart from the module that a user
 imports, holds a copy of elk-go under EPL-2.0 in `elk/internal/elkgo`, with
-two files under Apache-2.0 and one under BSD-3-Clause. It imports only the
+three files under Apache-2.0 and one under BSD-3-Clause. It imports only the
 standard library and `github.com/xo/zuzu`, and it adds about 5 MB to a
 build of TinyGo for WebAssembly. The module `github.com/xo/zuzu` does not
 import it.
 
 The test module adds Node.js with vega.js and vega-lite.js as the oracle
-(D17), and goja as the oracle of the expression language (D9).
+(D17). vega.js is also the oracle of the expression language (D33).
 
 ## The Vega subset
 
@@ -230,11 +233,12 @@ the same language, and [`EXPRESSIONS.md`](EXPRESSIONS.md) holds the design.
 The maintainers accepted choice C on 2026-11-10 (D9). A native evaluator in
 Go runs every expression, with its own library of the functions of Vega. An
 interface stands between the runtime and the evaluator. goja, which is pure
-Go, stands behind the same interface twice: in the test module, as an oracle
-that finds each difference from JavaScript, and in an optional package that
-runs scripts beyond the expression language. A program that does not import
-that package does not link goja. The browser component runs the same
-expressions as JavaScript.
+Go, stands behind the same interface in an optional package that runs
+scripts beyond the expression language, which is not built yet. A program
+that does not import that package does not link goja. vega.js in Node.js,
+in the test module, is the oracle that finds each difference from
+JavaScript (D33). The browser component runs the same expressions as
+JavaScript.
 
 ## Rendering
 
@@ -250,7 +254,9 @@ output.
 okage renders SVG data with `svg.Renderer`. One renderer, or one
 `svg.FontDatabase`, is made once and shared, because it loads the fonts of
 the system on its first call, in about 55 ms (okage D36). The renderer is
-safe for concurrent use. zuzu passes its logger through `svg.WithLogger`.
+safe for concurrent use. `Chart.Image` passes the logger of
+`WithRenderLogger`, or else of `WithLogger`, to its renderer through
+`svg.WithLogger`.
 
 ### okage directly
 
@@ -293,7 +299,9 @@ fallback and shaping as the package `svg` of okage. The SVG output comes
 first. Until the API exists, the measurement sits behind an interface in the
 package `text`, and its first implementation estimates a width from the
 characters of the string. A cache keyed by the text, the font and the size
-holds each result.
+holds each result. okage v0.3.0 gave `ShapeText` (okage D37), and the
+direct renderer draws text with it, as phase 6 says. The layout still
+measures with the estimate.
 
 The fonts decide the output. A test that must give the same bytes on every
 machine uses fonts that the test brings, and never the fonts of the system.
@@ -638,9 +646,10 @@ Every spec runs. In the loose mode, the report names each feature that zuzu
 skipped. The most common are the mark `shape` with its geographic
 transforms, and the transforms `density`, `geojson`, `geopoint`, `kde`,
 `stratify` and `regression`, all of phase 5. Most of the other differences
-come from vega.js itself. A transform of Vega changes the rows that the
-datasets which derive from the same source share, and zuzu copies a row
-before it changes it. D32 says that zuzu follows vega.js here.
+come from vega.js itself. A dataset of vega.js that derives from another
+and changes its rows, such as with a `formula` or a `stack`, changes copies
+of them. So no transform of one dataset adds a field to the rows of
+another, and zuzu copies a row before it changes it, as vega.js does (D32).
 `docs/BACKLOG.md` lists what is left.
 
 The phase holds these packages:
@@ -766,6 +775,13 @@ does not find yet: `bar_heatlane`, `concat_population_pyramid`,
 `facet_bullet`, `repeat_child_layer`, `repeat_histogram_flights`,
 `wheat_wages` and the Deneb `variance-chart`.
 
+On 2026-11-25 zuzu sorts a domain of mixed values as V8 sorts it, and the
+compiler puts the formulas that flatten the fields of a facet in one
+dataset that every layer reads, as vega-lite.js does. Then 538 specs match
+the Vega check, and only `density-heatmaps` and `flight-passengers`
+differ. The Vega-Lite check matches 464 of 470 specs, 98.7 percent, and
+every one of its 1193 scales.
+
 zuzu chose these rules where the documents of Vega say nothing (D6):
 
 - `kde`, `density` and `regression` read a missing value as 0, as the
@@ -869,7 +885,11 @@ of okage. The layout of a text item, its place, its baseline, its anchor,
 its lines and its limit, moves to `internal/shape`, so that both renderers
 place it the same way. A line loses its extra white space first, as a
 `text` element of SVG does. A halo, the stroke of a text, draws under its
-fill.
+fill. A text of more lines draws its first line on its baseline, for each
+baseline, and each other line one line height below the one before it,
+as vega.js draws it. The bounds of a text follow. A diagram that places
+the lines of a label as a block, by their middle, gives the text the y of
+its first line, with `graph.FirstLine`.
 
 With the text and the bundled fonts, the 540 specs draw in 4.3 s directly
 and in 6.0 s through SVG with okage v0.3.0: 29 percent less time. No spec
@@ -913,8 +933,8 @@ says how to write the references again.
 
 The nine charts of Mermaid that D31 names compile to Vega-Lite or Vega in
 `graph/mermaid`, each with its fixtures. The plan of a gantt is worked out
-in Go, and its 18 fixtures give the same start and end of each task as
-mermaid.js. An axis of time reads a `tickCount` of an interval and a step.
+in Go, and its fixtures, 19 on 2026-11-25, give the same start and end of
+each task as mermaid.js. An axis of time reads a `tickCount` of an interval and a step.
 The known gaps are in `docs/BACKLOG.md`, under "Phase 7".
 
 On 2026-11-11 phase 7 is done.
@@ -927,8 +947,9 @@ programs that detect and draw a file, such as iv.
 On 2026-11-12 zuzu draws every kind of Mermaid 12.3, in the order that
 D32 set. Of the 2811 files of the corpus of mermaid-go-renderer, it draws
 2808, and 2732 with no issue. The swimlane diagram lays out with the
-parameters `lanes` and `laneEdges` of `zuzu.layered`, which wait for a
-review (open question 29).
+parameters `lanes` and `laneEdges` of `zuzu.layered`, which then waited for
+a review (open question 29). The maintainers accepted them on 2026-11-20
+(D35).
 
 ### Phase 8. The browser
 
@@ -1210,7 +1231,5 @@ stays true.
     dagre 3.1.1.
 35. Answered on 2026-11-22 by D39: zuzu copies dagro and rough-go, and does
     not import them.
-36. Which font under the OFL does the look like xkcd draw its text in (D40)?
-    xkcd-script is under CC BY-NC 3.0 and Humor Sans has no clear license,
-    so neither meets D16. The candidates are Comic Neue, Patrick Hand and
-    Architects Daughter.
+36. Answered on 2026-11-25 by D57: zuzu draws no look like xkcd, so it
+    needs no font for one.

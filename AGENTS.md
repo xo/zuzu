@@ -15,7 +15,7 @@ done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
 draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
 of DOT and Mermaid of D31, and since then every other kind of Mermaid
 12.3, in the order of D32. Code follows the plan (D3).
-Every decision from D1 to D56 is decided. The open questions are at the
+Every decision from D1 to D57 is decided. The open questions are at the
 end of `docs/PLAN.md`.
 
 ## Standing rules
@@ -145,7 +145,7 @@ and `dbmeta`. List them with `ListAgents`, and send a message with
 
 ## Layout
 
-On 2026-11-12 the repository holds these files:
+The repository holds these files:
 
 | Path | What it holds |
 | --- | --- |
@@ -164,6 +164,7 @@ On 2026-11-12 the repository holds these files:
 | `docs/STYLE.md` | the rules and the tokens of the look (D12, D14) |
 | `docs/DIAGRAMS.md` | the parts of DOT and of Mermaid that zuzu reads (D31) |
 | `docs/zuzu.svg` | the logo of zuzu, which `README.md` shows |
+| `docs/readme/` | the images of `README.md`, which `TestTheReadmeImagesAreDrawn` draws with `-update` from the examples in `example_test.go` |
 | `docs/survey/` | the survey of other libraries and the page that compares them (D23) |
 | `docs/targets/` | the script that draws the target SVGs and their gallery, which git ignores (D13) |
 | `*.go`, `testdata/` | the package `zuzu`: the API of D24 and the runtime that runs a spec, with its golden files, and the tests of the documents |
@@ -192,6 +193,7 @@ On 2026-11-12 the repository holds these files:
 | `text/` | the measurement of text and the bundled IBM Plex Sans, one collection in WOFF2 in `text/fonts` with its license (D11, D16, D34) |
 | `text/emoji/` | the bundled Noto Color Emoji with its license, in a package that a caller imports (D32) |
 | `text/excalifont/` | the bundled Excalifont with its license, in a package that a caller imports, for the look like Excalidraw (D40) |
+| `text/math/` | STIX Two Math, the font of the math of KaTeX, from the package `texmath/stixtwomath` of okage, in a package that a caller imports (D36) |
 | `.golangci.yml`, `.github/workflows/test.yml` | the lint configuration of the root module and the CI workflow, which also builds and tests the module of ELK |
 | `test/` | the test module: the corpus, the inventory, the oracles, the conformance check, the gallery and the TinyGo check. `test/README.md` says how to run each |
 

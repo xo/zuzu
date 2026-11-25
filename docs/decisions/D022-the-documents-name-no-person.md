@@ -1,6 +1,6 @@
 # D22. The documents name no person
 
-Status: Decided.
+Status: Decided. Amended by D57.
 
 zuzu has several maintainers. The maintainers asked on 2026-11-10 that the
 documents name no one of them, unlike the other `xo` repositories. A document
