@@ -243,6 +243,12 @@ type Field struct {
 	// a row of cells, or nil for the font of the node. A cell draws no
 	// line under it.
 	Fonts []Font
+	// Runs holds the runs of each line of the text, or of each cell of a
+	// row of cells, as Fonts holds their fonts, or nil. A line or a cell
+	// with runs draws each run in its own font, in the place of its font
+	// in Fonts, as a label of HTML. A line or a cell with no runs draws
+	// in its font.
+	Runs [][]Run
 }
 
 // Font is the font of a line of a field: bold, italic, or with a line

@@ -227,7 +227,11 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			r["rank"] = n.Rank
 		}
 		if len(n.Fields) > 0 {
-			fieldRow(r, n)
+			if fieldRow(r, n) {
+				// The layout draws the runs of a line or a cell as a label
+				// of HTML.
+				html = true
+			}
 			if n.Stack {
 				r["stack"] = true
 			}
@@ -832,20 +836,33 @@ func Compile(g *Graph) (*vega.Spec, error) {
 }
 
 // fieldRow writes the fields of a record into the row of its node: the
-// text and the port of each field, and the cells, the alignment, the fonts
-// and the groups of the fields when any field sets them.
-func fieldRow(r map[string]any, n *Node) {
-	writeFields(r, n.Fields)
+// text and the port of each field, and the cells, the alignment, the fonts,
+// the runs and the groups of the fields when any field sets them. It
+// reports whether a field has runs.
+func fieldRow(r map[string]any, n *Node) bool {
+	runs := writeFields(r, n.Fields)
 	r["lines"] = []any{}
+	return runs
 }
 
 // writeFields writes a list of fields into a row, as fieldRow says. The
 // list groups holds, for each field, nil or the row of the fields of its
-// group in braces, which writeFields writes the same way.
-func writeFields(r map[string]any, fs []Field) {
-	var texts, ports, cells, aligns, fonts, groups []any
-	table, align, font, group := false, false, false, false
+// group in braces, which writeFields writes the same way. The list
+// fieldRuns holds, for each field, the runs of each line or cell, or nil
+// for one with no runs. writeFields reports whether a field has runs.
+func writeFields(r map[string]any, fs []Field) bool {
+	var texts, ports, cells, aligns, fonts, runs, groups []any
+	table, align, font, run, group := false, false, false, false, false
 	for _, f := range fs {
+		var rs []any
+		for _, l := range f.Runs {
+			var row any
+			if len(l) > 0 {
+				row, run = runRows(l), true
+			}
+			rs = append(rs, row)
+		}
+		runs = append(runs, rs)
 		texts, ports = append(texts, f.Text), append(ports, f.Port)
 		var cs []any
 		for _, c := range f.Cells {
@@ -861,7 +878,7 @@ func writeFields(r map[string]any, fs []Field) {
 		var sub any
 		if f.Fields != nil {
 			m := map[string]any{}
-			writeFields(m, f.Fields)
+			run = writeFields(m, f.Fields) || run
 			sub, group = m, true
 		}
 		groups = append(groups, sub)
@@ -879,9 +896,13 @@ func writeFields(r map[string]any, fs []Field) {
 	if font {
 		r["fonts"] = fonts
 	}
+	if run {
+		r["fieldRuns"] = runs
+	}
 	if group {
 		r["groups"] = groups
 	}
+	return run
 }
 
 // htmlMarks returns the marks that draw the labels of HTML that the

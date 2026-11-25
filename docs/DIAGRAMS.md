@@ -1287,15 +1287,14 @@ The name of an entity, the type, the name and the comment of an
 attribute, and the label of a relationship are markdown, as in Mermaid.
 Two stars or two underscores around a text make it bold, and one star or
 one underscore make it italic. An underscore inside a word, as in
-`first_name`, is text. zuzu draws the text without its marks. The label
-of a relationship and the name of an entity with no attributes draw each
-part in its font, as in Mermaid, so `*first*Name` draws `first` in
-italic. A line of an entity with attributes draws in one font, so zuzu
-draws a text there bold or italic only when all of its text is.
-`**string**` draws bold, and `*Customer Account*` italic. In an attribute
-`*first*Name`, only a part is italic, so it draws plain, and Mermaid draws
-`first` in italic. The name of an
-entity with attributes is bold, and markdown can make it italic too. A
+`first_name`, is text. zuzu draws the text without its marks. Each text
+draws each part in its font, as in Mermaid, so `*first*Name` draws
+`first` in italic and `Name` plain. This holds for the label of a
+relationship, the name of an entity, and each cell of the attributes of
+an entity: the type, the name and the comment. A cell takes the width of
+its parts in their fonts. `**string**` draws bold, and
+`*Customer Account*` italic. The name of an entity with attributes is
+bold, and markdown can make all of it or a part of it italic too. A
 class or a style of an entity with no attributes wins over the font of
 its markdown.
 
@@ -2147,7 +2146,10 @@ the axis writes no names. The name of each task goes in the middle of its
 bar, if it is no wider than the bar. Else it goes 4 pixels past the end of
 the bar, or 4 pixels before the start of the bar if it does not fit at the
 right of the axis. The name of a milestone goes beside its diamond. A name
-has a halo, so that it reads on a bar and on the grid.
+has a halo, so that it reads on a bar and on the grid. If the time axis
+runs backward, as a paragraph below says, the start of a bar is at its
+left and its end at its right. The names then go by the bars in the same
+way, as in Mermaid 12.3.
 
 A long gantt follows two limits of Mermaid. If the tasks span more than 5
 whole years, zuzu draws no bands of the excluded days. If `tickInterval`

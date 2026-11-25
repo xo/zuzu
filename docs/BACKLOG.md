@@ -55,19 +55,10 @@ and one ends in a link with no node, which mmdc does not draw either. The
 third, a gantt with `dateFormat ss` and a start of `0`, draws since
 2026-11-22.
 
-1. In an ER diagram, a cell of the attributes of an entity draws in one
-   font, so a part of it in bold or italic, such as `*first*Name`, draws
-   plain. A record has one font for each cell. The name of an entity with
-   no attributes and the label of a relation draw their runs.
-2. A swimlane diagram does not do `optimizeRanksByCrossings` with
-   `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
-   lines. Some of its routes share a line, and the titles of its lanes do
-   not turn in a layout LR, as mmdc turns them.
-
-### Draw more of Mermaid
-
-In the mode `compact` of a gantt whose tasks all end before the first
-start, the names of the tasks do not take the backward axis into account.
+A swimlane diagram does not do `optimizeRanksByCrossings` with
+`ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
+lines. Some of its routes share a line, and the titles of its lanes do not
+turn in a layout LR, as mmdc turns them.
 
 ### Fix what the review page found
 

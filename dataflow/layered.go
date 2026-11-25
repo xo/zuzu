@@ -323,6 +323,19 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 				}
 				return ml
 			}
+			// The runs of a line or a cell draw as the runs of the label
+			// of a node, with no wrap.
+			rec.html = func(runs []any) *htmlLabel {
+				src := runsHTML(runs, 0, func(t, weight string) float64 {
+					w, _ := sizeAt(t, "", size, weight)
+					return w
+				})
+				h, err := layHTML(src, sizeAt, size)
+				if err != nil && merr == nil {
+					merr = err
+				}
+				return h
+			}
 			n.Width, n.Height = rec.size(func(v any, weight string) (float64, float64) {
 				if ml := rec.math(v, weight); ml != nil {
 					return ml.w, ml.h

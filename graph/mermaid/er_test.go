@@ -139,19 +139,24 @@ func TestERMarkdown(t *testing.T) {
 	if f := p.Fields[0]; f.Text != "Person" || f.Fonts[0] != (graph.Font{Bold: true, Italic: true}) {
 		t.Errorf("expected the bold italic name Person, got %q %v", f.Text, f.Fonts)
 	}
+	if f := p.Fields[0]; f.Runs != nil {
+		t.Errorf("expected the name Person in one font, got the runs %v", f.Runs)
+	}
 	rows := []struct {
 		cells []string
 		fonts []graph.Font
+		runs  [][]graph.Run
 	}{
-		// A part of a cell that is italic alone draws plain.
-		{[]string{"string", "firstName", "", ""}, nil},
-		{[]string{"string", "last_name", "", ""}, []graph.Font{{Bold: true}, {}, {}, {}}},
-		{[]string{"int", "age", "", "in years"}, []graph.Font{{}, {Bold: true, Italic: true}, {}, {}}},
+		// A part of a cell that is italic alone draws its runs.
+		{[]string{"string", "firstName", "", ""}, nil, [][]graph.Run{nil, {{Text: "first", Italic: true}, {Text: "Name"}}, nil, nil}},
+		{[]string{"string", "last_name", "", ""}, []graph.Font{{Bold: true}, {}, {}, {}}, nil},
+		{[]string{"int", "age", "", "in years"}, []graph.Font{{}, {Bold: true, Italic: true}, {}, {}}, [][]graph.Run{nil, nil, nil, {{Text: "in "}, {Text: "years", Italic: true}}}},
 	}
 	for i, want := range rows {
 		f := p.Fields[i+1]
-		if !slices.Equal(f.Cells, want.cells) || !slices.Equal(f.Fonts, want.fonts) {
-			t.Errorf("row %d: expected %q %v, got %q %v", i, want.cells, want.fonts, f.Cells, f.Fonts)
+		if !slices.Equal(f.Cells, want.cells) || !slices.Equal(f.Fonts, want.fonts) ||
+			!slices.EqualFunc(f.Runs, want.runs, slices.Equal) {
+			t.Errorf("row %d: expected %q %v %v, got %q %v %v", i, want.cells, want.fonts, want.runs, f.Cells, f.Fonts, f.Runs)
 		}
 	}
 	if a := node(t, g, "a"); a.Label != "Account" || a.Style["fontWeight"] != graph.BoldWeight {
@@ -173,6 +178,16 @@ func TestERMarkdown(t *testing.T) {
 	want = []graph.Run{{Text: "is "}, {Text: "very", Bold: true}, {Text: " big"}}
 	if e := g.Edges[0]; e.Label != "is very big" || !slices.Equal(e.Runs, want) {
 		t.Errorf("expected the runs %v of is very big, got %q %v", want, e.Label, e.Runs)
+	}
+	// The name of an entity with attributes is bold, and a part of it in
+	// italic draws its runs. A part in bold alone draws as the rest.
+	g = classOf(t, "erDiagram\n  a[\"*first*Name\"] {\n    int x\n  }\n  b[\"**first**Name\"] {\n    int x\n  }")
+	want = []graph.Run{{Text: "first", Bold: true, Italic: true}, {Text: "Name", Bold: true}}
+	if f := node(t, g, "a").Fields[0]; len(f.Runs) != 1 || !slices.Equal(f.Runs[0], want) {
+		t.Errorf("expected the runs %v of the name firstName, got %v", want, f.Runs)
+	}
+	if f := node(t, g, "b").Fields[0]; f.Runs != nil || f.Fonts[0] != (graph.Font{Bold: true}) {
+		t.Errorf("expected the bold name firstName in one font, got %v %v", f.Fonts, f.Runs)
 	}
 }
 

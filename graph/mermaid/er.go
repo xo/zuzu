@@ -441,8 +441,18 @@ func (e *erDiagram) finish() error {
 			n.Runs = markdownMixed(ent.name)
 			continue
 		}
+		// The name of a record is bold, and a part of it can be italic.
 		font.Bold = true
-		n.Fields = []graph.Field{{Text: name, Fonts: []graph.Font{font}}}
+		head := graph.Field{Text: name, Fonts: []graph.Font{font}}
+		if runs := markdownMixed(ent.name); runs != nil {
+			for i := range runs {
+				runs[i].Bold = true
+			}
+			if mixedRuns(runs) != nil {
+				head.Runs = [][]graph.Run{runs}
+			}
+		}
+		n.Fields = []graph.Field{head}
 		for _, a := range ent.attrs {
 			typ, typFont := markdownFont(a.typ)
 			attr, attrFont := markdownFont(a.name)
@@ -450,6 +460,11 @@ func (e *erDiagram) finish() error {
 			f := graph.Field{Cells: []string{typ, attr, strings.Join(a.keys, ", "), comment}, Port: a.name}
 			if typFont != (graph.Font{}) || attrFont != (graph.Font{}) || commentFont != (graph.Font{}) {
 				f.Fonts = []graph.Font{typFont, attrFont, {}, commentFont}
+			}
+			// A cell whose parts are in more than one font draws its runs.
+			runs := [][]graph.Run{markdownMixed(a.typ), markdownMixed(a.name), nil, markdownMixed(a.comment)}
+			if slices.ContainsFunc(runs, func(r []graph.Run) bool { return r != nil }) {
+				f.Runs = runs
 			}
 			n.Fields = append(n.Fields, f)
 		}
@@ -498,10 +513,10 @@ func (e *erDiagram) subgraphEnds() error {
 // markdownFont reads the marks of markdown in a name or a label of an
 // entity relationship diagram, as Mermaid does. It returns the text
 // without its marks, and the font that all of its text shares: bold,
-// italic, both or neither. A line of a record draws in one font, so a
-// part of the text of a record that alone is bold or italic draws plain.
-// The label of a relationship and the name of an entity with no
-// attributes draw the runs of markdownMixed.
+// italic, both or neither. A text whose parts are in more than one font
+// draws the runs of markdownMixed: the name and each cell of a record,
+// the name of an entity with no attributes, and the label of a
+// relationship.
 func markdownFont(s string) (string, graph.Font) {
 	var b strings.Builder
 	bold, italic, some := true, true, false
@@ -523,24 +538,27 @@ func markdownFont(s string) (string, graph.Font) {
 // relationship diagram whose parts are in more than one font, such as
 // *first*Name, or nil for a label that markdownFont draws in one font.
 func markdownMixed(s string) []graph.Run {
-	runs := markdownRuns(s)
-	var out []graph.Run
-	first, mixed := -1, false
+	var runs []graph.Run
+	for _, r := range markdownRuns(s) {
+		runs = append(runs, graph.Run{Text: r.text, Bold: r.bold, Italic: r.italic})
+	}
+	return mixedRuns(runs)
+}
+
+// mixedRuns returns the runs when the runs with text in them are in more
+// than one font, or nil.
+func mixedRuns(runs []graph.Run) []graph.Run {
+	first := -1
 	for i, r := range runs {
-		out = append(out, graph.Run{Text: r.text, Bold: r.bold, Italic: r.italic})
-		if strings.TrimSpace(r.text) == "" {
-			continue
-		}
-		if first < 0 {
+		switch {
+		case strings.TrimSpace(r.Text) == "":
+		case first < 0:
 			first = i
-		} else if r.bold != runs[first].bold || r.italic != runs[first].italic {
-			mixed = true
+		case r.Bold != runs[first].Bold || r.Italic != runs[first].Italic:
+			return runs
 		}
 	}
-	if !mixed {
-		return nil
-	}
-	return out
+	return nil
 }
 
 // fontStyle returns the style of a label in a font.

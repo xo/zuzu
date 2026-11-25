@@ -284,6 +284,16 @@ func TestClassAndERDiagrams(t *testing.T) {
 			t.Errorf("the ER diagram has no %s", want)
 		}
 	}
+	// A cell with a part in italic draws each part in its own font.
+	s, report, err = svgOf(t, "erDiagram\n  p {\n    string *first*Name\n  }", true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{`font-style="italic"[^>]*>first<`, `font-style="normal"[^>]*>Name<`} {
+		if !regexp.MustCompile(want).MatchString(s) {
+			t.Errorf("the ER diagram has no %s", want)
+		}
+	}
 }
 
 func TestRequirementDiagram(t *testing.T) {

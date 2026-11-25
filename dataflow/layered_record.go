@@ -34,6 +34,30 @@ type record struct {
 	// for a text that draws as text (D36). It is nil for a graph with no
 	// math.
 	math func(v any, weight string) *mathLabel
+	// runs holds the runs of each line or cell of each field, or nil for
+	// a line or a cell in one font. labels holds their layouts, which
+	// html makes, as the runs of the label of a node draw.
+	runs   [][][]any
+	labels [][]*htmlLabel
+	html   func(runs []any) *htmlLabel
+}
+
+// label returns the layout of the runs of the line or the cell k of the
+// field j, or nil for a line or a cell in one font.
+func (rec *record) label(j, k int) *htmlLabel {
+	if rec.html == nil || k >= len(rec.runs[j]) || len(rec.runs[j][k]) == 0 {
+		return nil
+	}
+	if rec.labels == nil {
+		rec.labels = make([][]*htmlLabel, len(rec.runs))
+	}
+	if rec.labels[j] == nil {
+		rec.labels[j] = make([]*htmlLabel, len(rec.runs[j]))
+	}
+	if rec.labels[j][k] == nil {
+		rec.labels[j][k] = rec.html(rec.runs[j][k])
+	}
+	return rec.labels[j][k]
 }
 
 // mathOf returns the layout of a text with math in a weight, or nil.
@@ -60,6 +84,7 @@ func readRecord(r Row, across bool) *record {
 	cells, _ := r["cells"].([]any)
 	aligns, _ := r["aligns"].([]any)
 	fonts, _ := r["fonts"].([]any)
+	runs, _ := r["fieldRuns"].([]any)
 	groups, _ := r["groups"].([]any)
 	at := func(list []any, j int) any {
 		if j < len(list) {
@@ -82,8 +107,16 @@ func readRecord(r Row, across bool) *record {
 				ft = append(ft, strOf(c))
 			}
 		}
+		var rs [][]any
+		if l, ok := at(runs, j).([]any); ok {
+			for _, c := range l {
+				row, _ := c.([]any)
+				rs = append(rs, row)
+			}
+		}
 		rec.cells = append(rec.cells, cs)
 		rec.fonts = append(rec.fonts, ft)
+		rec.runs = append(rec.runs, rs)
 		var sub *record
 		if g, ok := at(groups, j).(map[string]any); ok {
 			// A group lies the other way from the fields around it.
@@ -95,9 +128,9 @@ func readRecord(r Row, across bool) *record {
 }
 
 // oneByOne reports whether the field j draws one line at a time: it has
-// fonts, or it puts a line at the left or at the right.
+// fonts or runs, or it puts a line at the left or at the right.
 func (rec *record) oneByOne(j int) bool {
-	return len(rec.fonts[j]) > 0 || strings.ContainsAny(rec.aligns[j], "lr")
+	return len(rec.fonts[j]) > 0 || len(rec.runs[j]) > 0 || strings.ContainsAny(rec.aligns[j], "lr")
 }
 
 // align returns the alignment of the line k of the field j: l, c or r.
@@ -143,7 +176,7 @@ func (rec *record) size(measure measureFunc, padding float64) (float64, float64)
 			// into one text.
 			if len(cs) > 0 && rec.texts[j] == "" {
 				rec.texts[j] = strings.Join(cs, " ")
-				rec.fonts[j] = nil
+				rec.fonts[j], rec.runs[j] = nil, nil
 			}
 			rec.cells[j] = nil
 			continue
@@ -152,7 +185,11 @@ func (rec *record) size(measure measureFunc, padding float64) (float64, float64)
 			for len(rec.cols) <= k {
 				rec.cols = append(rec.cols, 0)
 			}
-			if tw, _ := measure(c, weight(rec.font(j, k))); tw > 0 {
+			tw, _ := measure(c, weight(rec.font(j, k)))
+			if h := rec.label(j, k); h != nil {
+				tw = h.lay.Width
+			}
+			if tw > 0 {
 				rec.cols[k] = math.Max(rec.cols[k], tw+2*padding)
 			}
 		}
@@ -165,7 +202,7 @@ func (rec *record) size(measure measureFunc, padding float64) (float64, float64)
 	for j, t := range rec.texts {
 		var fw, fh float64
 		if sub := rec.groups[j]; sub != nil {
-			sub.math = rec.math
+			sub.math, sub.html = rec.math, rec.html
 			fw, fh = sub.size(measure, padding)
 		} else {
 			var tw, th float64
@@ -174,11 +211,17 @@ func (rec *record) size(measure measureFunc, padding float64) (float64, float64)
 				tw = table - 2*padding
 				for k, c := range rec.cells[j] {
 					_, ch := measure(c, weight(rec.font(j, k)))
+					if h := rec.label(j, k); h != nil {
+						ch = h.lay.Height
+					}
 					th = math.Max(th, ch)
 				}
 			case rec.oneByOne(j):
 				for k, l := range strings.Split(t, "\n") {
 					lw, lh := measure(l, weight(rec.font(j, k)))
+					if h := rec.label(j, k); h != nil {
+						lw, lh = h.lay.Width, h.lay.Height
+					}
 					if lh == 0 {
 						_, lh = measure("X", "")
 					}
@@ -336,7 +379,10 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 				if x > fx {
 					xs = append(xs, x-np.X)
 				}
-				if c != "" && !maths(rec, c, x+padding, cy, true, rec.font(j, k)) {
+				switch h := rec.label(j, k); {
+				case h != nil:
+					out = append(out, h.rows(r, x+padding+h.lay.Width/2, cy, "none")...)
+				case c != "" && !maths(rec, c, x+padding, cy, true, rec.font(j, k)):
 					out = append(out, text(x+padding, cy, split(c), "left", rec.font(j, k)))
 				}
 				x += rec.cols[k]
@@ -358,7 +404,10 @@ func (rec *record) rows(r Row, np graph.NodePlace, kind string, padding, fontSiz
 					x, x0, align = fx+fw-padding, fx+fw-padding-lw, "right"
 				}
 				code := rec.font(j, k)
-				if !maths(rec, l, x, y+lh/2, align == "left", code) {
+				switch h := rec.label(j, k); {
+				case h != nil:
+					out = append(out, h.rows(r, x0+lw/2, y+lh/2, "none")...)
+				case !maths(rec, l, x, y+lh/2, align == "left", code):
 					out = append(out, text(x, y+lh/2, []any{l}, align, code))
 				}
 				if strings.Contains(code, "u") && lw > 0 {

@@ -133,7 +133,7 @@ func (g *gantt) spec() (map[string]any, error) {
 			row["tone"] = tone(t.section)
 		}
 		if g.compact {
-			names = append(names, ganttName(t, row["key"], lo, hi, g.width, measure))
+			names = append(names, ganttName(t, row["key"], lo, hi, backward, g.width, measure))
 		}
 		if t.milestone {
 			row["at"] = t.start.Add(t.render.Sub(t.start) / 2).Format(ganttLayout)
@@ -404,17 +404,25 @@ func (g *gantt) rows(keys []string) ([]int, []ganttLane) {
 // Mermaid places it: in the middle of its bar when it is no wider than the
 // bar, else past the end of the bar, and else before the start of the bar
 // when it does not fit at the right of the time axis. The time axis runs
-// from lo to hi, and m measures the name. The name of a milestone is
-// beside its diamond.
-func ganttName(t *ganttTask, key any, lo, hi time.Time, width float64, m text.Measurer) map[string]any {
+// from lo to hi, from right to left when backward is true, and m measures
+// the name. On a backward axis every task ends before it starts, so the
+// start of a bar is at its left and its end at its right, as Mermaid
+// draws it. The name of a milestone is beside its diamond.
+func ganttName(t *ganttTask, key any, lo, hi time.Time, backward bool, width float64, m text.Measurer) map[string]any {
 	scale := max(ganttMillis(lo, hi), 1) / width
 	px := func(at time.Time) float64 { return ganttMillis(lo, at) / scale }
+	// dir is the way of the time along the axis, from left to right.
+	dir := 1.0
+	if backward {
+		px = func(at time.Time) float64 { return ganttMillis(at, hi) / scale }
+		dir = -1
+	}
 	start, end := t.start, t.render
 	if t.milestone {
 		// The diamond draws in the middle of the task, and the name keeps
 		// clear of it.
 		mid := t.start.Add(t.render.Sub(t.start) / 2)
-		start, end = ganttAdd(mid, -ganttDiamond*scale), ganttAdd(mid, ganttDiamond*scale)
+		start, end = ganttAdd(mid, -dir*ganttDiamond*scale), ganttAdd(mid, dir*ganttDiamond*scale)
 	}
 	w := m.Width(text.Font{Family: text.Family, Size: layout.LabelSize, Weight: 600}, t.name)
 	x0, x1 := px(start), px(end)

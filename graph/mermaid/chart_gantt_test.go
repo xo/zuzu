@@ -3,6 +3,7 @@ package mermaid
 import (
 	"encoding/json/v2"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -183,6 +184,68 @@ func TestGanttBackward(t *testing.T) {
 		if got := strings.Contains(s, `"reverse":true`); got != test.backward {
 			t.Errorf("%v: the axis runs backward: %t, want %t", test.now, got, test.backward)
 		}
+	}
+}
+
+// TestGanttCompactBackward checks that the compact mode places the name
+// of each task by its bar on a time axis that runs backward, as Mermaid
+// does. The axis runs from 2024-01-31 at the left to 2024-01-01 at the
+// right, so a bar starts at its left and ends at its right.
+func TestGanttCompactBackward(t *testing.T) {
+	t.Parallel()
+	d, err := Read(`---
+displayMode: compact
+---
+gantt
+dateFormat YYYY-MM-DD
+section A
+Long : 2024-01-31, 2024-01-01
+section B
+Beside the end of its bar : 2024-01-27, 2024-01-26
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, report, err := Chart(d, true)
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	if !strings.Contains(string(b), `"reverse":true`) {
+		t.Fatal("the time axis does not run backward")
+	}
+	var spec any
+	if err := json.Unmarshal(b, &spec); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	var walk func(v any)
+	walk = func(v any) {
+		switch v := v.(type) {
+		case map[string]any:
+			if place, ok := v["place"].(string); ok {
+				name, _ := v["name"].(string)
+				at, _ := v["at"].(string)
+				got[name] = place + " " + at
+			}
+			for _, w := range v {
+				walk(w)
+			}
+		case []any:
+			for _, w := range v {
+				walk(w)
+			}
+		}
+	}
+	walk(spec)
+	// A name that fits on its bar draws in its middle. A name that does
+	// not draws past the end of its bar, at its right, since it fits
+	// there.
+	want := map[string]string{
+		"Long":                      "inside 2024-01-16T00:00:00.000",
+		"Beside the end of its bar": "right 2024-01-26T00:00:00.000",
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("expected the names at %v, got %v", want, got)
 	}
 }
 
