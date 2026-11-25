@@ -30,7 +30,7 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D14](D014-a-theme-is-a-mode-and-a-color-scheme-as-one-vega-config.md) | A theme is a mode and a color scheme, as one Vega config | Decided. Amended by D35 and D37 |
 | [D15](D015-color-schemes-come-from-the-upstream-themes-that-transit.md) | Color schemes come from the upstream themes that transit draws from | Decided. Amended by D33 and D58 |
 | [D16](D016-zuzu-bundles-ibm-plex-sans.md) | zuzu bundles IBM Plex Sans | Decided. Amended by D32, D34, D35, D36 and D58 |
-| [D17](D017-conformance-with-vega-js-measures-meaning-not-look.md) | Conformance with vega.js measures meaning, not look | Decided. Amended by D32 |
+| [D17](D017-conformance-with-vega-js-measures-meaning-not-look.md) | Conformance with vega.js measures meaning, not look | Decided. Amended by D32 and D59 |
 | [D18](D018-dot-and-mermaid-compile-into-the-same-spec.md) | DOT and Mermaid compile into the same spec | Decided |
 | [D19](D019-live-data-in-a-browser-comes-later-so-the-scene-graph-is.md) | Live data in a browser comes later, so the scene graph is JSON | Decided |
 | [D20](D020-usql-makes-charts-with-zuzu-much-later-with-the-usql-peer.md) | usql makes charts with zuzu much later, with the usql peer | Decided |
@@ -48,7 +48,7 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D32](D032-how-zuzu-reads-the-parts-of-mermaid-and-dot-that-it-does-not-draw.md) | How zuzu reads the parts of Mermaid and DOT that it does not draw | Decided. Amends D6, D12, D16, D17 and D31. Amended by D35, D36, D37, D38, D39, D40, D57 and D58 |
 | [D33](D033-vegajs-is-the-oracle-of-expressions-and-schemes-are-go-values.md) | vega.js is the oracle of expressions, and schemes are Go values | Decided. Amends D9 and D15 |
 | [D34](D034-ibm-plex-sans-is-embedded-in-woff2.md) | IBM Plex Sans is embedded in WOFF2 | Decided. Amends D16 |
-| [D35](D035-the-answers-of-the-maintainers-of-2026-11-20.md) | The answers of the maintainers of 2026-11-20 | Decided. Amends D14, D16, D31 and D32. Amended by D36, D37, D40, D46, D48 and D58 |
+| [D35](D035-the-answers-of-the-maintainers-of-2026-11-20.md) | The answers of the maintainers of 2026-11-20 | Decided. Amends D14, D16, D31 and D32. Amended by D36, D37, D40, D46, D48, D58 and D59 |
 | [D36](D036-zuzu-draws-the-math-of-katex-with-the-math-layout-of-okage.md) | zuzu draws the math of KaTeX with the math layout of okage | Decided. Amends D16, D32 and D35 |
 | [D37](D037-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-20.md) | The answers of the maintainers on the backlog of 2026-11-20 | Decided. Amends D14, D32 and D35. Amended by D48, D53, D55 and D56 |
 | [D38](D038-the-answers-of-the-maintainers-on-the-backlog-of-2026-11-22.md) | The answers of the maintainers on the backlog of 2026-11-22 | Decided. Amends D24, D28, D31 and D32 |
@@ -72,3 +72,4 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D56](D056-a-named-node-takes-the-color-of-the-hash-of-its-name.md) | A named node takes the color of the hash of its name | Decided. Amends D37, D54 and D55 |
 | [D57](D057-zuzu-draws-no-look-like-xkcd-and-phases-0-and-3-are-done.md) | zuzu draws no look like xkcd, and phases 0 and 3 are done | Decided. Amends D22, D32, D39 and D40 |
 | [D58](D058-the-answers-of-2026-11-25-fonts-seeds-labels-schemes-and-known-differences.md) | The answers of 2026-11-25: fonts, seeds, labels, schemes and known differences | Decided. Amends D15, D16, D32, D35, D40 and D52 |
+| [D59](D059-the-answers-of-2026-11-26-item-canvas-legends-and-text-on-a-color.md) | The answers of 2026-11-26: item, canvas, legends and text on a color | Decided. Amends D17 and D35 |
