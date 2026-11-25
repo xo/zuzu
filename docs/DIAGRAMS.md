@@ -721,16 +721,20 @@ weight 600, and `Times-Italic` draws in italic. These parts name a family:
 
 | Part | What zuzu does |
 | --- | --- |
-| `fontFamily` at the top of the config | gives each node, link and subgraph of a flowchart, a swimlane diagram, an agentflow diagram, a state diagram, a class diagram, an entity relationship diagram, a requirement diagram and a use case diagram the weight and the style of the name, and the participants, the messages and the notes of a sequence diagram. A style of a node, a link or a class wins over it |
+| `fontFamily` at the top of the config, in a graph | gives each node, link and subgraph of a flowchart, a swimlane diagram, an agentflow diagram, a state diagram, a class diagram, an entity relationship diagram, a requirement diagram and a use case diagram the weight and the style of the name. A style of a node, a link or a class wins over it |
+| `fontFamily` at the top of the config, in a sequence diagram | gives the weight and the style of the name to the participants, the messages and the notes |
+| `fontFamily` at the top of the config, in each other kind | gives the weight and the style of the name to all the text of the kind, such as the labels of a pie, a timeline, a mindmap, a C4 diagram or a kanban board, and the labels and the titles of its axes and its legend (D58). Text at the normal weight takes the weight of the name, and text that the kind draws at a weight of its own, such as a bold heading, keeps that weight. An italic name makes all the text italic. The kind measures its text in the same weight and style. A style of a block in a block diagram wins over it. The labels that the look of zuzu adds, such as the total in the hole of a donut, keep their own weight and style |
 | `sequence.actorFontFamily`, `sequence.messageFontFamily`, `sequence.noteFontFamily` | gives the weight and the style to the participants, the messages or the notes. Each wins over `fontFamily`, and `actorFontWeight` and the other weights win over each |
 | `font-family` in a style, such as `style A font-family:Times-Bold` | gives the weight and the style to the label. `font-weight` and `font-style` in the same style win over it |
 | `usecase.actorFontFamily`, `usecase.usecaseFontFamily` | gives the weight and the style to the actors or the use cases of a use case diagram. Each wins over `fontFamily`, and `actorFontWeight` and `usecaseFontWeight` win over each |
 | another setting whose name ends in `FontFamily`, such as `journey.taskFontFamily` | nothing |
 
 A name with no weight and no style, such as `courier` or `Trebuchet MS`,
-is no issue anywhere. A name with a weight or a style in a part that does
-not read it, such as `fontFamily` in a pie, is an issue. `fontFamily` in
-`themeVariables` is an issue with the rest of `themeVariables`.
+is no issue anywhere. `fontFamily` at the top of the config is no issue in
+any kind. A name with a weight or a style in another setting whose name
+ends in `FontFamily`, such as `journey.taskFontFamily: Times-Bold`, is an
+issue. `fontFamily` in `themeVariables` is an issue with the rest of
+`themeVariables`.
 
 ### Flowchart
 

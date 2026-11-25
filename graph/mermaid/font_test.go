@@ -62,12 +62,4 @@ func TestSequenceFontFamily(t *testing.T) {
 	if !strings.Contains(string(b), `"fontStyle":{"value":"italic"}`) {
 		t.Errorf("the spec has no italic text:\n%s", b)
 	}
-	// A family with a weight on a chart that does not read it is an issue.
-	d, err = mermaid.Read("---\nconfig:\n  fontFamily: Helvetica-Bold\n---\npie\n\"a\": 1\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, report, err = mermaid.Chart(d, false); err != nil || len(report) != 1 || !strings.Contains(report[0].Message, "fontFamily") {
-		t.Errorf("a pie with a bold family: the report %v and the error %v, want one issue of fontFamily", report, err)
-	}
 }

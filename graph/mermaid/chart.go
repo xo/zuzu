@@ -106,6 +106,7 @@ func Chart(d *Diagram, strict bool) ([]byte, bool, vega.Report, error) {
 	if err != nil {
 		return nil, false, c.issues.Report, err
 	}
+	d.face().apply(spec)
 	if lite {
 		spec["$schema"] = "https://vega.github.io/schema/vega-lite/v6.json"
 	} else {

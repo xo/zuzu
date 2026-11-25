@@ -57,7 +57,7 @@ var (
 // kbLayout lays out a kanban and writes its rows.
 type kbLayout struct {
 	k    *kanban
-	m    *text.Estimate
+	m    text.Measurer
 	rows map[string][]any
 	w, h float64
 	err  error
@@ -122,17 +122,20 @@ func (l *kbLayout) card(n *kbNode, id, key string, x, y, w float64) float64 {
 	ly := y + kbCardPadY + lh(kbCardFont)/2
 	for i, line := range lines {
 		for _, r := range line.runs {
-			weight, style := kbCardFont.Weight, "normal"
+			weight := kbCardFont.Weight
 			if r.bold {
 				weight = boldWeight
 			}
-			if r.italic {
-				style = "italic"
-			}
-			l.rows["cardLabels"] = append(l.rows["cardLabels"], map[string]any{
+			// An upright run has no style, so that it takes the style of
+			// fontFamily (D58).
+			row := map[string]any{
 				"id": id, "line": i, "x": x + kbCardPadX + r.x, "y": ly, "text": r.text,
-				"fontWeight": weight, "fontStyle": style,
-			})
+				"fontWeight": weight,
+			}
+			if r.italic {
+				row["fontStyle"] = "italic"
+			}
+			l.rows["cardLabels"] = append(l.rows["cardLabels"], row)
 		}
 		ly += lh(kbCardFont)
 	}

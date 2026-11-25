@@ -41,7 +41,7 @@ var rrKeys = []any{"nonterminal", "terminal", "special"}
 // rrLayout lays out a railroad diagram and writes its rows.
 type rrLayout struct {
 	r *railroad
-	m *text.Estimate
+	m text.Measurer
 	// scale turns a size of Mermaid into a size of zuzu.
 	scale float64
 	// pad, vsep, hsep, arc and marker are the sizes of the config, in the

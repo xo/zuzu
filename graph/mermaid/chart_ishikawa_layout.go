@@ -62,7 +62,7 @@ var ishBreak = regexp.MustCompile(`(?i)<br\s*/?>|\n`)
 // ishLayout lays out an ishikawa diagram and writes its rows.
 type ishLayout struct {
 	k *ishikawa
-	m *text.Estimate
+	m text.Measurer
 
 	rows                   map[string][]any
 	minX, minY, maxX, maxY float64

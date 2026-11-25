@@ -348,7 +348,7 @@ func TestSankeyIssues(t *testing.T) {
 		{"---\nconfig:\n  sankey:\n    useWidth: 500\n---\nsankey\nA,B,1\n", "sankey.useWidth"},
 		{"---\nconfig:\n  sankey:\n    nodeAlignment: top\n---\nsankey\nA,B,1\n", "nodeAlignment top"},
 		{"---\nconfig:\n  theme: sepia\n---\nsankey\nA,B,1\n", "theme of Mermaid"},
-		{"---\nconfig:\n  fontFamily: Helvetica-Bold\n---\nsankey\nA,B,1\n", "setting fontFamily"},
+		{"---\nconfig:\n  sankey:\n    fontFamily: Helvetica-Bold\n---\nsankey\nA,B,1\n", "setting sankey.fontFamily"},
 	}
 	for _, test := range tests {
 		report, err := chartOf(test.src, false)

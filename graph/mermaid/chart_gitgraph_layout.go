@@ -36,7 +36,7 @@ type gitPoint struct{ x, y float64 }
 // gitLayout lays out a git graph and writes its rows.
 type gitLayout struct {
 	g        *gitGraph
-	m        *text.Estimate
+	m        text.Measurer
 	vertical bool
 	branches []gitBranch
 	// lane is the place of the lane of each branch across the graph.

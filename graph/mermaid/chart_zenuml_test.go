@@ -191,12 +191,17 @@ func TestZenUMLCommentMarkdown(t *testing.T) {
 			continue
 		}
 		for _, v := range ds.Values {
-			got = append(got, fmt.Sprintf("%v %v %v", v["text"], v["fontWeight"], v["fontStyle"]))
+			style, ok := v["fontStyle"]
+			if !ok {
+				style = "upright"
+			}
+			got = append(got, fmt.Sprintf("%v %v %v", v["text"], v["fontWeight"], style))
 		}
 	}
 	// Each run draws in its font, and the second line under the first.
-	// Code draws as plain text, with no backticks, as in ZenUML.
-	want := "a 400 normal|bold 600 normal|and 400 normal|italic 400 italic|line 400 normal"
+	// Code draws as plain text, with no backticks, as in ZenUML. An upright
+	// run has no style.
+	want := "a 400 upright|bold 600 upright|and 400 upright|italic 400 italic|line 400 upright"
 	if s := strings.Join(got, "|"); s != want {
 		t.Errorf("got  %s\nwant %s", s, want)
 	}

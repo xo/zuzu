@@ -160,7 +160,7 @@ func newSeqConfig(cfg map[string]any, kind string) seqConfig {
 type seqLayout struct {
 	s   *sequence
 	cfg seqConfig
-	m   *text.Estimate
+	m   text.Measurer
 	// math lays out the lines of the labels with math of KaTeX.
 	math *mathLines
 
@@ -210,14 +210,15 @@ type seqPart struct {
 
 // newSeqLayout lays out a sequence diagram.
 func newSeqLayout(s *sequence, cfg seqConfig) *seqLayout {
+	m := s.c.d.estimate()
 	l := &seqLayout{
-		s: s, cfg: cfg, m: s.c.d.estimate(), idx: map[string]int{}, rows: map[string][]any{},
+		s: s, cfg: cfg, m: m, idx: map[string]int{}, rows: map[string][]any{},
 		minX: math.Inf(1), maxX: math.Inf(-1), acts: map[string][]float64{},
 	}
 	// A sequence diagram draws the math of KaTeX in its labels, and the
 	// diagram of ZenUML, which shares this layout, draws the source.
 	if s.c.d.Kind == "sequenceDiagram" {
-		l.m.SetMath(s.c.d.Math)
+		m.SetMath(s.c.d.Math)
 	}
 	l.math = newMathLines(l.m)
 	for _, p := range s.participants {
@@ -1089,15 +1090,17 @@ func (l *seqLayout) comment(e seqEvent, y float64) float64 {
 		for i, line := range lines {
 			ly := top + float64(i)*lh(f)
 			for _, r := range line.runs {
-				style := "normal"
-				if r.italic || f.Italic {
-					style = "italic"
-				}
-				l.add("commentRuns", map[string]any{
+				// An upright run has no style, so that a diagram of ZenUML
+				// gives it the style of fontFamily (D58).
+				row := map[string]any{
 					"kind": "comment", "x": x + 4 + r.x, "y": ly, "lines": lineRows([]string{r.text}),
 					"align": "left", "baseline": "top", "text": r.text,
-					"fontWeight": textFont(f.Size, f.Weight, r).Weight, "fontStyle": style,
-				}, x+4+r.x, x+4+r.x+r.w, ly+lh(f))
+					"fontWeight": textFont(f.Size, f.Weight, r).Weight,
+				}
+				if r.italic || f.Italic {
+					row["fontStyle"] = "italic"
+				}
+				l.add("commentRuns", row, x+4+r.x, x+4+r.x+r.w, ly+lh(f))
 			}
 		}
 		return top + float64(len(lines))*lh(f) + 4 - l.gap()

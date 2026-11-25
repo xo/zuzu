@@ -15,11 +15,8 @@ decided on the way.
 
 D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
 zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
-11 lists. These are left:
-1. The SVG writer measures the `limit` of a text without the font of
-   emoji (6).
-2. A weight or a style in `fontFamily` draws only in the graphs and in the
-   sequence. It is an issue in the other kinds (5).
+11 lists. One part is left: the SVG writer measures the `limit` of a text
+without the font of emoji (6).
 
 ### Bring the look like Excalidraw closer to Mermaid
 

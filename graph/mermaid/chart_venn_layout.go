@@ -37,7 +37,7 @@ const (
 // vennLayout lays out a venn diagram and writes its rows.
 type vennLayout struct {
 	v *venn
-	m *text.Estimate
+	m text.Measurer
 	// k turns the pixels of Mermaid into the pixels of zuzu.
 	k    float64
 	keys []string

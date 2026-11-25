@@ -29,7 +29,7 @@ const (
 // tvLayout lays out a tree view and writes its rows.
 type tvLayout struct {
 	t *treeView
-	m *text.Estimate
+	m text.Measurer
 	// font is the font of a label, and size its size in the pixels of
 	// zuzu.
 	font text.Font

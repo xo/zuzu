@@ -53,7 +53,7 @@ var (
 // tlLayout lays out a timeline and writes its rows.
 type tlLayout struct {
 	t *timeline
-	m *text.Estimate
+	m text.Measurer
 	// keys are the keys of the colors, in the order of the source.
 	keys []string
 

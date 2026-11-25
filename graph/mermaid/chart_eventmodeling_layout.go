@@ -102,7 +102,7 @@ type emRel struct {
 // emLayout lays out an event model.
 type emLayout struct {
 	m     *eventModel
-	meas  *text.Estimate
+	meas  text.Measurer
 	lanes map[int]*emLane
 	boxes []*emBox
 	rels  []emRel

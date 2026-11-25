@@ -316,11 +316,11 @@ func isGraph(kind string) bool {
 // issue: a setting that inert names, a theme that Look reads, at the top
 // of the config or in the section of the kind, such as venn.theme, a hint at
 // the top level of the config, such as layout: elk, a layout that hint
-// accepts in the section of the kind, such as flowchart.layout: dagre, or
-// a font family with
-// no weight and no style, such as fontFamily: Arial or
-// sequence.actorFontFamily: courier. zuzu draws in IBM Plex Sans only, so the name of a family
-// changes nothing (D32).
+// accepts in the section of the kind, such as flowchart.layout: dagre,
+// fontFamily at the top of the config, whose weight and style every kind
+// gives to its text (D58), or another font family with no weight and no
+// style, such as sequence.actorFontFamily: courier. zuzu draws in IBM Plex
+// Sans only, so the rest of the name of a family changes nothing (D32).
 func accepted(kind, path string, v any) bool {
 	if inert(kind, path) || !strings.Contains(path, ".") && hint(path, v) {
 		return true
@@ -341,8 +341,7 @@ func accepted(kind, path string, v any) bool {
 	if !ok {
 		return false
 	}
-	weight, style := graph.FontFace(s)
-	return weight == "" && style == ""
+	return path == "fontFamily" || faceOf(s).empty()
 }
 
 // inert reports whether a setting changes nothing in a still image of a

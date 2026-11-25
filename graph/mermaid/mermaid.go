@@ -238,11 +238,12 @@ func Read(src string) (*Diagram, error) {
 }
 
 // estimate returns a measurer of text with the font of the look and the
-// fonts of Emoji, for a kind that lays out when it compiles.
-func (d *Diagram) estimate() *text.Estimate {
+// fonts of Emoji, for a kind that lays out when it compiles. It measures
+// in the weight and the style of fontFamily, as face says.
+func (d *Diagram) estimate() faceMeasurer {
 	e := text.NewEstimate(d.Emoji...)
 	e.SetMain(d.Font)
-	return e
+	return faceMeasurer{Estimate: e, face: d.face()}
 }
 
 // raw returns the line n of the source as the source gives it, with its
@@ -786,7 +787,7 @@ func Graph(d *Diagram, strict bool) (*graph.Graph, vega.Report, error) {
 	if err != nil {
 		return g, report, err
 	}
-	familyStyle(g, str(d.Config, "fontFamily"))
+	familyStyle(g, d.face())
 	g.ELK = elkSettings(d)
 	return g, report, nil
 }
@@ -826,14 +827,13 @@ func (d *Diagram) reportUnread(is *graph.Issues) error {
 }
 
 // familyStyle gives each node, edge and cluster of a graph the weight and
-// the style that the setting fontFamily names, such as Helvetica-Bold,
-// unless its own style sets them. zuzu draws in IBM Plex Sans only, so the
-// rest of the name changes nothing (D32).
-func familyStyle(g *graph.Graph, family string) {
-	weight, style := graph.FontFace(family)
-	if weight == "" && style == "" {
+// the style of the face of fontFamily, such as Helvetica-Bold, unless its
+// own style sets them (D32, D58).
+func familyStyle(g *graph.Graph, f fontFace) {
+	if f.empty() {
 		return
 	}
+	weight, style := f.weight, f.style
 	set := func(st map[string]string) map[string]string {
 		if st == nil {
 			st = map[string]string{}

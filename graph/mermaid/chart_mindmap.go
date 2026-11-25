@@ -665,7 +665,7 @@ func mindmapSpec(nodes []*mindmapNode, m text.Measurer) map[string]any {
 				for _, t := range texts {
 					runs = append(runs, map[string]any{
 						"node": n.id, "line": i, "x": t.x, "y": mid, "text": t.s,
-						"fontWeight": n.weight, "fontStyle": "normal", "fontSize": n.size,
+						"fontWeight": n.weight, "fontSize": n.size,
 					})
 				}
 				for _, p := range paths {
@@ -676,17 +676,20 @@ func mindmapSpec(nodes []*mindmapNode, m text.Measurer) map[string]any {
 				continue
 			}
 			for _, r := range l.runs {
-				weight, style := n.weight, "normal"
+				weight := n.weight
 				if r.bold {
 					weight = max(weight, boldWeight)
 				}
-				if r.italic {
-					style = "italic"
-				}
-				runs = append(runs, map[string]any{
+				// An upright run has no style, so that it takes the style
+				// of fontFamily (D58).
+				row := map[string]any{
 					"node": n.id, "line": i, "x": x + r.x, "y": y, "text": r.text,
-					"fontWeight": weight, "fontStyle": style, "fontSize": n.size,
-				})
+					"fontWeight": weight, "fontSize": n.size,
+				}
+				if r.italic {
+					row["fontStyle"] = "italic"
+				}
+				runs = append(runs, row)
 			}
 			y += lh
 		}

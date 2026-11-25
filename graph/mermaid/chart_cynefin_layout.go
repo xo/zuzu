@@ -63,7 +63,7 @@ const cyDefaultID = "my-svg"
 // cyLayout lays out a Cynefin diagram and writes its rows.
 type cyLayout struct {
 	y    *cynefin
-	m    *text.Estimate
+	m    text.Measurer
 	rows map[string][]any
 	// w and h are the size of the diagram, and cx and cy the center of
 	// each domain.
