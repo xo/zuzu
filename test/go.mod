@@ -3,7 +3,7 @@ module github.com/xo/zuzu/test
 go 1.27.3
 
 require (
-	github.com/xo/okage v0.20.1
+	github.com/xo/okage v0.22.0
 	github.com/xo/transit/styles v0.7.8
 	github.com/xo/zuzu v0.8.0
 	github.com/xo/zuzu/elk v0.0.0
