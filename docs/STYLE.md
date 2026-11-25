@@ -359,6 +359,14 @@ Helvetica Neue, Arial and the generic sans-serif.
 A label that sits on a busy mark gets a halo: a stroke of 3 in the
 background color, drawn under the fill with `paint-order="stroke"`.
 
+A text that sits on a colored fill, such as the name of a leaf of a
+treemap, takes `text` of the light mode or `text` of the dark mode,
+whichever has the higher contrast ratio of WCAG 2.1 with the fill (D59).
+It has no box and no halo behind it. A fill with some opacity counts as
+drawn over the background. On a tie, the text takes `text` of its own
+mode. The style `zuzu.textOnColor` gives a text this rule, and a color of
+text that the spec gives wins over it.
+
 A formula of math in a label of Mermaid draws in STIX Two Math, at the size
 and in the color of the text of the label (D36). A formula and the text
 next to it meet with no space between them, as in Mermaid. A message of a
@@ -540,7 +548,7 @@ lays out the entries after the encode.
 | arc | a gap between the slices, and round corners of 4. A donut has an inner radius of 0.64 of the outer one, and its total in the center |
 | box | round corners of 5, a fill of the series color at 0.2 opacity, or 0.24 in the dark mode, an outline of 1.5, and a median of 2.5 across the box in the series color. The whiskers and their ticks are 1.5 wide in the series color. The raw points are under the box. A part whose properties the spec gives, such as `"median": {"color": "red"}`, keeps them, and the look sets only the others |
 | error bar | the rule and its ticks in the series color, as the whiskers of a box, rather than the black of Vega-Lite, which the dark mode hides. A color that the spec gives wins |
-| hierarchy | a group is a tint of its color with its name at the top left. A leaf is the full color. Corners round by 3 to 6 |
+| hierarchy | a group is a tint of its color with its name at the top left. A leaf is the full color, with its name in the text on a color of "Type". Corners round by 3 to 6 |
 | link of a sankey | the color of its source at 0.32 opacity |
 | node of a graph | a rounded rectangle with a solid tint of its color, its color mixed into the background at `NodeTint`, and an outline of 1.25 in its color. A panel with a color, such as a flow or a composite state, and a note take a solid tint too, so a node over a panel keeps its tint (D55) |
 | solid node of a graph | a node that marks a point of the flow, such as the start and the end of a state diagram, a fork or a join bar, and a junction point of a flowchart, fills with the color of its outline, not with a tint. A start of a state diagram takes the color of the state that it points to, and an end the color of the state that ends in it, when there is one such state. With more than one, it keeps the color of a node. The look like Excalidraw fills it solid, not with a hachure (D55) |
@@ -655,6 +663,8 @@ a gradient. These are the rules of the look:
    length. A hachure fills a shape as the rule nonzero of SVG fills it: a
    ring inside a ring that runs the same way, such as the inner circle of
    a double circle, fills, and a ring that runs the other way is a hole.
+   Two rings that overlap and run the same way fill their overlap. A line
+   of the hachure runs where the winding number of the path is not 0.
 4. A hachure draws over an underlay: a solid fill in the color of the
    background, in the shape of the item, with the same wobble. So a mark
    hides what is under it, as in the standard look, and a mark under it

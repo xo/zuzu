@@ -505,29 +505,88 @@ func TestCanvasGrowsForWobbleOnly(t *testing.T) {
 	}
 }
 
-// TestNonzeroRings checks that the hachure fills a ring inside a ring that
-// runs the same way, as the rule nonzero of SVG fills the inner circle of a
-// double circle, keeps a ring that runs the other way as a hole, and keeps
-// the dot of a bullseye, which runs the way of the outer ring inside the
-// hole (D55).
+// TestNonzeroRings checks that the hachure of a path follows the rule
+// nonzero of SVG. It fills a ring inside a ring that runs the same way, as
+// SVG fills the inner circle of a double circle, keeps a ring that runs the
+// other way as a hole, and keeps the dot of a bullseye, which runs the way
+// of the outer ring inside the hole (D55). It also fills the overlap of two
+// squares that run the same way, and the part of the second square outside
+// the first.
 func TestNonzeroRings(t *testing.T) {
 	t.Parallel()
 	const outer = "M0,0L100,0L100,100L0,100Z"
 	same := outer + "M20,20L80,20L80,80L20,80Z"
 	hole := outer + "M20,20L20,80L80,80L80,20Z"
-	count := func(d string) int {
-		var f flattener
-		_ = shape.Parse(d, &f)
-		f.end()
-		return len(nonzero(f.rings))
+	overlap := "M0,0L50,0L50,50L0,50Z M30,30L80,30L80,80L30,80Z"
+	for _, c := range []struct {
+		name string
+		d    string
+		x, y float64
+		want bool
+	}{
+		{"a ring inside a ring of the same way", same, 50, 50, true},
+		{"a ring inside a ring of the other way", hole, 50, 50, false},
+		{"the dot of a bullseye", hole + "M40,40L60,40L60,60L40,60Z", 50, 50, true},
+		{"the overlap of two squares", overlap, 40, 40, true},
+		{"the second of two squares", overlap, 70, 70, true},
+	} {
+		if got := hachured(t, c.d, c.x, c.y); got != c.want {
+			t.Errorf("%s: the hachure reaches %v,%v is %t, want %t", c.name, c.x, c.y, got, c.want)
+		}
 	}
-	if got := count(same); got != 1 {
-		t.Errorf("a ring inside a ring of the same way leaves %d rings, want 1", got)
+}
+
+// hachured reports whether a line of the hachure of a path passes within 4
+// pixels of a point.
+func hachured(t *testing.T, d string, x, y float64) bool {
+	t.Helper()
+	s := root(120, 120, scene.Mark{Type: scene.Path, Items: []scene.Item{{Path: d, Fill: scene.Paint{Color: "#5b6ee1"}}}})
+	Draw(s, Options{})
+	parts := withoutUnderlay(marksOf(s)[0].Items)
+	if len(parts) != 1 {
+		t.Fatalf("%d parts, want 1", len(parts))
 	}
-	if got := count(hole); got != 2 {
-		t.Errorf("a ring inside a ring of the other way leaves %d rings, want 2, a hole", got)
+	var segs segmentList
+	if err := shape.Parse(parts[0].Path, &segs); err != nil {
+		t.Fatal(err)
 	}
-	if got := count(hole + "M40,40L60,40L60,60L40,60Z"); got != 3 {
-		t.Errorf("a bullseye leaves %d rings, want 3, the dot in the hole", got)
+	for _, sg := range segs.segs {
+		if distance(x, y, sg) <= 4 {
+			return true
+		}
 	}
+	return false
+}
+
+// segmentList is a sink of shape.Parse that holds each segment from its
+// start to its end.
+type segmentList struct {
+	segs [][4]float64
+	x, y float64
+}
+
+func (l *segmentList) MoveTo(x, y float64) { l.x, l.y = x, y }
+func (l *segmentList) LineTo(x, y float64) { l.add(x, y) }
+func (l *segmentList) QuadTo(_, _, x, y float64) {
+	l.add(x, y)
+}
+
+func (l *segmentList) CubicTo(_, _, _, _, x, y float64) {
+	l.add(x, y)
+}
+func (l *segmentList) Close() {}
+
+func (l *segmentList) add(x, y float64) {
+	l.segs = append(l.segs, [4]float64{l.x, l.y, x, y})
+	l.x, l.y = x, y
+}
+
+// distance returns the distance from a point to a segment.
+func distance(x, y float64, sg [4]float64) float64 {
+	dx, dy := sg[2]-sg[0], sg[3]-sg[1]
+	t := 0.0
+	if n := dx*dx + dy*dy; n > 0 {
+		t = math.Max(0, math.Min(1, ((x-sg[0])*dx+(y-sg[1])*dy)/n))
+	}
+	return math.Hypot(x-sg[0]-t*dx, y-sg[1]-t*dy)
 }

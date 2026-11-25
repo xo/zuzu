@@ -62,6 +62,9 @@ type Options struct {
 	PreserveVertices        *bool     `json:"preserveVertices,omitempty"`
 	FixedDecimalPlaceDigits *float64  `json:"fixedDecimalPlaceDigits,omitempty"`
 	FillShapeRoughnessGain  *float64  `json:"fillShapeRoughnessGain,omitempty"`
+	// zuzu: the fill rule of the hachure of a polygon, "nonzero" or
+	// "evenodd", which is the default (README.md, change 3).
+	FillRule *string `json:"fillRule,omitempty"`
 }
 
 // Float64 returns a pointer suitable for a numeric Options field.
@@ -102,6 +105,8 @@ type ResolvedOptions struct {
 	PreserveVertices        bool
 	FixedDecimalPlaceDigits *float64
 	FillShapeRoughnessGain  float64
+	// zuzu: FillRule is the fill rule of the hachure (README.md, change 3).
+	FillRule string
 	// RoughnessGain is retained for source compatibility with v0.1.0. Rough.js
 	// 4.6.6 computes the gain per line and no longer mutates this field.
 	RoughnessGain float64
@@ -281,6 +286,10 @@ func mergeOptions(base ResolvedOptions, o *Options) ResolvedOptions {
 	}
 	if o.FillShapeRoughnessGain != nil {
 		base.FillShapeRoughnessGain = *o.FillShapeRoughnessGain
+	}
+	// zuzu: README.md, change 3.
+	if o.FillRule != nil {
+		base.FillRule = *o.FillRule
 	}
 	return base
 }

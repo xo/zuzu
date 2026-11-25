@@ -134,7 +134,10 @@ pix, err := raster.Draw(s, raster.WithRenderer(fonts)) // phase 6 (D11)
 
 `svg.Write` takes options. `svg.WithFont` embeds a font in a rule
 `@font-face` when a text names its family, as `SVG` does for the font of a
-look drawn by hand (D43).
+look drawn by hand (D43). `svg.WithFallbacks` gives the fonts of the
+emoji, and a text with a limit measures with them, as `raster.WithFallbacks`
+does. `SVG` gives it the fonts of `WithEmoji`, so that the SVG cuts a text
+with an emoji at the same place as the layout (D32).
 
 `raster.Draw` exists since phase 6. `raster.WithRenderer` names the
 renderer of okage whose fonts draw the text, with the layout of text of
@@ -881,11 +884,14 @@ img, report, err := c.Image(ctx, zuzu.WithEmoji(emoji.Font()))
 ```
 
 With the font, an emoji measures at the width that the font gives it, so
-that its label fits, and the PNG of `Image` draws it in color. The SVG
+that its label fits, and the PNG of `Image` draws it in color. An emoji
+in a turned text turns with the text in the PNG, as in the SVG. The SVG
 names the family `'Noto Color Emoji'` after the family of a text that
 holds a character that IBM Plex Sans does not have, and a viewer draws
-the emoji in the color font that it has. Without the font, an emoji is a
-character that no font has: it draws nothing, and it is `ErrNoGlyph`.
+the emoji in the color font that it has. A text with a limit measures its
+emoji with the font in the SVG too, so it is cut where the layout cuts it.
+Without the font, an emoji is a character that no font has: it draws
+nothing, and it is `ErrNoGlyph`.
 
 ### Excalifont
 

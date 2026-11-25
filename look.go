@@ -19,13 +19,17 @@ import (
 
 // look gives a mark the rules of docs/STYLE.md that the config of the theme
 // names and that no property of Vega draws, after its items are built, and
-// returns the marks that it adds after the mark. A spec turns a rule off
+// returns the marks that it adds after the mark. under holds the marks
+// before it in its group, which draw under it. A spec turns a rule off
 // with its config (D14).
-func (s *scope) look(m *vega.Mark, sm *scene.Mark) []scene.Mark {
+func (s *scope) look(m *vega.Mark, sm *scene.Mark, under []scene.Mark) []scene.Mark {
 	if len(sm.Items) == 0 {
 		return nil
 	}
 	d := s.rt.markDefaults(m)
+	if sm.Type == scene.Text && expr.Truthy(d[theme.TextOnColor]) && !encodes(m, "fill") {
+		s.textOnColor(sm, under)
+	}
 	var out []scene.Mark
 	if sm.Type == scene.Area {
 		// An opacity that the spec sets wins over the look: the area is a
@@ -869,7 +873,12 @@ func (s *scope) hierarchyLook(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 					continue
 				}
 			} else {
-				lab.X, lab.FontSize, lab.Fill = x+5, 10, halo
+				// A leaf names itself in the text on a color (D59), or
+				// in the text of the theme on a gradient.
+				lab.X, lab.FontSize = x+5, 10
+				if c := s.textOn(it); c != "" {
+					lab.Fill = scene.Paint{Color: c}
+				}
 				if tw, _ := st.TextSize(&lab); w <= tw+10 || h <= 18 {
 					continue
 				}
@@ -915,6 +924,60 @@ func (s *scope) hierarchyLook(m *vega.Mark, sm *scene.Mark) []scene.Mark {
 		return nil
 	}
 	return []scene.Mark{names}
+}
+
+// textOnColor gives each text of a mark the color of text that reads on
+// the fill under it, the fill of the last item of the marks under it whose
+// box holds the anchor of the text (D59). A text with no such fill keeps
+// its color.
+func (s *scope) textOnColor(sm *scene.Mark, under []scene.Mark) {
+	for i := range sm.Items {
+		t := &sm.Items[i]
+		if it := itemUnder(t.X, t.Y, under); it != nil {
+			if c := s.textOn(it); c != "" {
+				t.Fill = scene.Paint{Color: c}
+			}
+		}
+	}
+}
+
+// itemUnder returns the last rect of the marks whose box holds a point, or
+// nil.
+func itemUnder(x, y float64, marks []scene.Mark) *scene.Item {
+	for _, m := range slices.Backward(marks) {
+		if m.Type != scene.Rect {
+			continue
+		}
+		for j := len(m.Items) - 1; j >= 0; j-- {
+			bx, by, w, h := shape.Box(&m.Items[j])
+			if x >= bx && x <= bx+w && y >= by && y <= by+h {
+				return &m.Items[j]
+			}
+		}
+	}
+	return nil
+}
+
+// textOn returns the color of a text on the fill of an item, by
+// theme.TextOn, with the fill drawn at its opacity over the background that
+// the chart draws, or empty when the fill is not one color.
+func (s *scope) textOn(it *scene.Item) string {
+	c, ok := color.Parse(it.Fill.Color)
+	if it.Fill.Gradient != nil || !ok {
+		return ""
+	}
+	a := c.A
+	if it.FillOpacity != nil {
+		a *= *it.FillOpacity
+	}
+	if it.Opacity != nil {
+		a *= *it.Opacity
+	}
+	t := s.rampTheme()
+	if bg, ok := color.Parse(t.Background); ok && a < 1 {
+		c = color.Mix(color.RGBA{R: bg.R, G: bg.G, B: bg.B, A: 1}, color.RGBA{R: c.R, G: c.G, B: c.B, A: 1}, math.Max(0, a), "rgb")
+	}
+	return s.rt.theme.TextOn(c.Hex())
 }
 
 // hasText reports whether the spec of a scope has a text mark.

@@ -100,16 +100,22 @@ func (w *writer) point(cmd byte, pts ...float64) {
 }
 
 // polygon returns the points of path data as one polygon, for a hachure.
-// Each curve becomes lines. The subpaths join through bridges that go out
-// and come back along the same line, which add no area to a fill of the
-// rule evenodd, as the hachure of rough.js reads a polygon. So a hole,
-// such as the inside of a ring, stays empty.
+// Each curve becomes lines, and a ring of fewer than three points goes. The
+// rings join through bridges that go out and come back along the same
+// line. A bridge adds no area to a fill by the rule evenodd, and does not
+// change the winding number of the rule nonzero, which the hachure of a
+// path follows. So a hole, such as the inside of a ring that runs the
+// other way, stays empty, and the overlap of two rings that run the same
+// way is filled.
 func polygon(d string) []rough.Point {
 	var f flattener
 	_ = shape.Parse(d, &f)
 	f.end()
 	var out []rough.Point
-	for _, ring := range nonzero(f.rings) {
+	for _, ring := range f.rings {
+		if len(ring) < 3 {
+			continue
+		}
 		if len(out) > 0 {
 			// Close the ring before, and go to the start of this one.
 			out = append(out, out[0])
@@ -137,66 +143,6 @@ func rings(d string) int {
 		}
 	}
 	return n
-}
-
-// nonzero returns the rings of at least three points that the fill of
-// the rule nonzero, the rule of SVG, needs, for the hachure of rough.js,
-// which reads its rings with the rule evenodd. A ring stays when the fill
-// changes across it: when the winding number just outside it, the sum of
-// the directions of the rings that hold it, is zero on one side of it and
-// not on the other. So the inner circle of a double circle, inside a ring
-// that runs the same way, adds no area and goes, and the hachure does not
-// leave it empty. A ring inside a ring that runs the other way stays a
-// hole, and the dot of a bullseye, inside that hole, stays filled.
-func nonzero(rings [][]rough.Point) [][]rough.Point {
-	var keep [][]rough.Point
-	for _, r := range rings {
-		if len(r) >= 3 {
-			keep = append(keep, r)
-		}
-	}
-	dir := func(r []rough.Point) int {
-		if signedArea(r) > 0 {
-			return 1
-		}
-		return -1
-	}
-	var out [][]rough.Point
-	for i, r := range keep {
-		outside := 0
-		for j, o := range keep {
-			if i != j && math.Abs(signedArea(o)) > math.Abs(signedArea(r)) && inside(r[0], o) {
-				outside += dir(o)
-			}
-		}
-		if (outside == 0) != (outside+dir(r) == 0) {
-			out = append(out, r)
-		}
-	}
-	return out
-}
-
-// signedArea returns the area of a ring, positive when it runs one way
-// and negative when it runs the other.
-func signedArea(r []rough.Point) float64 {
-	a := 0.0
-	for i := range r {
-		p, q := r[i], r[(i+1)%len(r)]
-		a += p[0]*q[1] - q[0]*p[1]
-	}
-	return a / 2
-}
-
-// inside reports whether a point is inside a ring, by the rule evenodd.
-func inside(p rough.Point, r []rough.Point) bool {
-	in := false
-	for i, j := 0, len(r)-1; i < len(r); j, i = i, i+1 {
-		a, b := r[i], r[j]
-		if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < (b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0] {
-			in = !in
-		}
-	}
-	return in
 }
 
 // flattener is a sink of shape.Parse that turns path data into rings of

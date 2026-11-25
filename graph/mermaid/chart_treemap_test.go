@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/xo/zuzu/graph/mermaid"
+	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -122,6 +124,59 @@ func TestTreemapDashes(t *testing.T) {
 	src := "treemap-beta\n\"A\": 1:::c\nclassDef c stroke-dasharray:a b;"
 	if _, err := chartOf(src, false); !errors.Is(err, mermaid.ErrSyntax) {
 		t.Errorf("%q: the error %v", src, err)
+	}
+}
+
+// TestTreemapTextOnColor checks that the name and the value of a leaf take
+// the text of the light or the dark mode, whichever has the higher contrast
+// with the leaf drawn over the background, with no box and no opacity of
+// their own (D59).
+func TestTreemapTextOnColor(t *testing.T) {
+	t.Parallel()
+	dark, light := theme.New(theme.Light, theme.Zuzu).Text, theme.New(theme.Dark, theme.Zuzu).Text
+	items, _ := drawFixture(t, "testdata/treemap/04-budget.mmd")
+	ratio := func(a, b color.RGBA) float64 {
+		la, lb := a.Luminance(), b.Luminance()
+		return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+	}
+	white, _ := color.Parse("#ffffff")
+	leaves := 0
+	for _, box := range items {
+		if children, _ := box.datum["children"].(float64); box.mark != scene.Rect || children > 0 || box.datum["depth"] == 0.0 {
+			continue
+		}
+		leaves++
+		fill, ok := color.Parse(box.item.Fill.Color)
+		if !ok || box.item.FillOpacity == nil {
+			t.Fatalf("the leaf %v has the fill %v at %v", box.datum["name"], box.item.Fill, box.item.FillOpacity)
+		}
+		under := color.Mix(white, fill, *box.item.FillOpacity, "rgb")
+		n := 0
+		for _, it := range items {
+			if it.mark != scene.Text || it.datum["name"] != box.datum["name"] {
+				continue
+			}
+			n++
+			got, _ := color.Parse(it.item.Fill.Color)
+			other, _ := color.Parse(dark)
+			if it.item.Fill.Color == dark {
+				other, _ = color.Parse(light)
+			} else if it.item.Fill.Color != light {
+				t.Errorf("the text %q is in %s, want %s or %s", it.text, it.item.Fill.Color, dark, light)
+			}
+			if ratio(got, under) < ratio(other, under) {
+				t.Errorf("the text %q is in %s, which reads less on %s than %s", it.text, it.item.Fill.Color, under.Hex(), other.Hex())
+			}
+			if it.item.FillOpacity != nil || !it.item.Stroke.IsZero() {
+				t.Errorf("the text %q has the opacity %v and the stroke %v, want none", it.text, it.item.FillOpacity, it.item.Stroke)
+			}
+		}
+		if n != 2 {
+			t.Errorf("the leaf %v has %d texts, want its name and its value", box.datum["name"], n)
+		}
+	}
+	if leaves != 5 {
+		t.Errorf("%d leaves, want 5", leaves)
 	}
 }
 

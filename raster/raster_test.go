@@ -14,6 +14,7 @@ import (
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/svg"
 	"github.com/xo/zuzu/text"
+	"github.com/xo/zuzu/text/emoji"
 )
 
 // scenes reads the test scenes of the SVG writer: the marks, and the tier 0
@@ -282,4 +283,61 @@ func TestDrawReadsNoSystemFont(t *testing.T) {
 	if !bytes.Equal(plain.Pix, bundled.Pix) {
 		t.Error("Draw with no renderer draws the text unlike a renderer of the bundled fonts")
 	}
+}
+
+// TestDrawTurnsAColorEmoji checks that a color emoji in a turned text turns
+// with the text, as okage draws the SVG of the scene (D32). The red of the
+// rocket of Noto Color Emoji at 90 degrees covers the box of the red at 0
+// degrees, turned by 90 degrees around the anchor of the text.
+func TestDrawTurnsAColorEmoji(t *testing.T) {
+	t.Parallel()
+	const ax, ay = 60, 60
+	f := emoji.Font()
+	r := okagesvg.New(okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
+		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family), okagesvg.WithFontFile(f.Data()))
+	draw := func(angle float64) *image.RGBA {
+		t.Helper()
+		s := &scene.Scene{Width: 120, Height: 120, Root: scene.Mark{Type: scene.Group, Items: []scene.Item{{
+			Items: []scene.Mark{{Type: scene.Text, Items: []scene.Item{{X: ax, Y: ay, Angle: angle, Text: scene.Lines{"🚀"}, FontSize: 48}}}},
+		}}}}
+		got, err := Draw(s, WithRenderer(r), WithFallbacks(f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var b bytes.Buffer
+		if err := svg.Write(&b, s, svg.WithFallbacks(f)); err != nil {
+			t.Fatal(err)
+		}
+		want, err := r.Render(b.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := differ(got, want); d > 0.01 {
+			t.Errorf("at %g degrees, %.2f%% of the pixels differ from okage, more than 1%%", angle, 100*d)
+		}
+		return got
+	}
+	upright, turned := red(draw(0)), red(draw(90))
+	if upright.Empty() {
+		t.Fatal("the emoji draws no red at 0 degrees")
+	}
+	want := image.Rect(ax-(upright.Max.Y-ay), ay+(upright.Min.X-ax), ax-(upright.Min.Y-ay), ay+(upright.Max.X-ax))
+	near := func(a, b int) bool { return a-b <= 2 && b-a <= 2 }
+	if !near(turned.Min.X, want.Min.X) || !near(turned.Min.Y, want.Min.Y) || !near(turned.Max.X, want.Max.X) || !near(turned.Max.Y, want.Max.Y) {
+		t.Errorf("the red of the turned emoji is in %v, want %v, the red of the upright emoji in %v turned", turned, want, upright)
+	}
+}
+
+// red returns the box of the pixels of an image that are clearly red.
+func red(img *image.RGBA) image.Rectangle {
+	var out image.Rectangle
+	b := img.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if p := demultiply(img, x, y); p[3] > 128 && p[0] > 180 && p[1] < 100 && p[2] < 100 {
+				out = out.Union(image.Rect(x, y, x+1, y+1))
+			}
+		}
+	}
+	return out
 }

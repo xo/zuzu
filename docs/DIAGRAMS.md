@@ -2293,6 +2293,11 @@ out the sizes with Vega expressions after the layout of the treemap:
    than the leaf, or when it ends less than 4 pixels from the bottom of the
    leaf. Its smallest size is 4, or 6 in a treemap of 20 leaves or fewer.
 
+The name and the value of a leaf take the style `zuzu.textOnColor`: the
+text of the light mode or the text of the dark mode, whichever has the
+higher contrast with the color of the leaf (D59). A `color` of a class
+wins over it.
+
 #### sequenceDiagram
 
 zuzu lays out a sequence diagram in Go. Each participant has a lifeline,

@@ -11,20 +11,6 @@ decided on the way.
 
 ## Phase 7
 
-### Do the work of D32
-
-D32 records the answers of the maintainers of 2026-11-12. On 2026-11-12
-zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
-11 lists. One part is left: the SVG writer measures the `limit` of a text
-without the font of emoji (6).
-
-### Bring the look like Excalidraw closer to Mermaid
-
-1. The hachure of rough-go fills one polygon. zuzu joins the subpaths of a
-   path with bridges, so a hole stays empty, but subpaths that overlap in
-   the same direction, which the rule nonzero of SVG fills, draw as the
-   rule evenodd.
-
 ### Follow what zuzu offered to elk-go
 
 On 2026-11-25 zuzu offered these to d2lang/elk-go (D58 part 16), checked
@@ -81,16 +67,6 @@ their bounds after the encode. The legend of zuzu is one flat group, laid
 out before any encode, in `layout/legend.go`. To apply such an encode, the
 layout of the legend reads the encode, or gives each entry a group of its
 own. No spec of the corpus encodes the place of a part of a legend.
-
-### Draw a color emoji on a turned text
-
-With `WithEmoji`, a color emoji in a turned text draws upright in the
-direct renderer, through `RenderColorGlyphs` of okage.
-
-### Give the look a style of a text on a color
-
-A text on a leaf of a treemap takes the style `zuzu.edgeLabelBox` for the
-color of the background. A style of text on a color is cleaner.
 
 ## Themes
 

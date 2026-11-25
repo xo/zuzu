@@ -8,6 +8,7 @@ import (
 
 	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text"
+	"github.com/xo/zuzu/text/emoji"
 )
 
 // TestWithFontEmbedsTheFontOfAText checks that WithFont embeds a font as a
@@ -43,5 +44,40 @@ func TestWithFontEmbedsTheFontOfAText(t *testing.T) {
 	}
 	if out := write("'Other'", WithFont(other)); !strings.Contains(out, "data:font/ttf;base64,") || !strings.Contains(out, "format('truetype')") {
 		t.Errorf("a TrueType font is not embedded as truetype in\n%s", out)
+	}
+}
+
+// TestWithFallbacksMeasuresTheLimitWithTheEmoji checks that a text with a
+// limit measures its emoji in the font of WithFallbacks, as the layout
+// measures it, and so is cut at the same place (D32). Without the font, an
+// emoji measures as nothing, and the text fits.
+func TestWithFallbacksMeasuresTheLimitWithTheEmoji(t *testing.T) {
+	t.Parallel()
+	const line, limit = "🚀🚀🚀🚀 go far", 40
+	write := func(opts ...Option) string {
+		t.Helper()
+		root := scene.Mark{Type: scene.Group, Items: []scene.Item{{Items: []scene.Mark{
+			{Type: scene.Text, Items: []scene.Item{{X: 1, Y: 10, Text: scene.Lines{line}, FontSize: 11, Limit: limit}}},
+		}}}}
+		var b bytes.Buffer
+		if err := Write(&b, &scene.Scene{Width: 50, Height: 50, Root: root}, opts...); err != nil {
+			t.Fatal(err)
+		}
+		return b.String()
+	}
+	if out := write(); !strings.Contains(out, ">"+line+"</text>") {
+		t.Errorf("without the font of emoji, the text is cut in\n%s", out)
+	}
+	f := text.Font{Size: 11}
+	want := text.Truncate(text.NewEstimate(emoji.Font()), f, line, limit)
+	if want == line || !strings.HasSuffix(want, text.Ellipsis) {
+		t.Fatalf("the layout cuts %q to %q, want a cut text", line, want)
+	}
+	out := write(WithFallbacks(emoji.Font()))
+	if !strings.Contains(out, ">"+want+"</text>") {
+		t.Errorf("with the font of emoji, the text is not %q in\n%s", want, out)
+	}
+	if !strings.Contains(out, "'"+text.EmojiFamily+"'") {
+		t.Errorf("the text does not name the font of emoji in\n%s", out)
 	}
 }

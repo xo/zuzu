@@ -802,7 +802,12 @@ func (p *pass) path(m *scene.Mark, it *scene.Item, d, fill string, x, y, angle f
 			} else if b.x1 <= b.x2 {
 				p.addCover(only, x+b.x1, y+b.y1, x+b.x2, y+b.y2, f)
 			}
-			out = append(out, p.parts(it, only, p.gen.Polygon(hachure, only.options(next(seed))), x, y, angle, f)...)
+			// SVG fills a path by the rule nonzero, so the hachure does too.
+			// Two subpaths that overlap and run the same way fill their
+			// overlap, and a subpath that runs the other way is a hole.
+			o := only.options(next(seed))
+			o.FillRule = new("nonzero")
+			out = append(out, p.parts(it, only, p.gen.Polygon(hachure, o), x, y, angle, f)...)
 		}
 	}
 	if !ps.stroke.IsZero() {

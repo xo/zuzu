@@ -74,7 +74,8 @@ type Option func(*options)
 
 // options holds the options of Write.
 type options struct {
-	fonts []*text.Fallback
+	fonts     []*text.Fallback
+	fallbacks []*text.Fallback
 }
 
 // WithFont embeds a font in the SVG, as a rule @font-face with the bytes of
@@ -90,13 +91,28 @@ func WithFont(f *text.Fallback) Option {
 	}
 }
 
+// WithFallbacks sets the fonts for the characters that IBM Plex Sans does
+// not have, such as the font of the package text/emoji, in order (D32). A
+// line measures with them for its limit, as the layout measured it, so that
+// a text with an emoji is cut at the same place as in the layout. The
+// writer does not embed them.
+func WithFallbacks(fallbacks ...*text.Fallback) Option {
+	return func(o *options) {
+		o.fallbacks = fallbacks
+	}
+}
+
 // Write writes a scene as SVG.
 func Write(w io.Writer, s *scene.Scene, opts ...Option) error {
 	var o options
 	for _, opt := range opts {
 		opt(&o)
 	}
-	wr := &writer{measure: text.NewEstimate(), families: map[string]bool{}}
+	wr := &writer{measure: text.NewEstimate(o.fallbacks...), families: map[string]bool{}}
+	wr.bundled = wr.measure
+	if len(o.fallbacks) > 0 {
+		wr.bundled = text.NewEstimate()
+	}
 	var body strings.Builder
 	wr.out = &body
 	if err := wr.mark(&s.Root); err != nil {
@@ -134,8 +150,12 @@ type writer struct {
 	ids  int
 	// images holds the id of each image in the definitions, by its
 	// attributes.
-	images  map[string]string
+	images map[string]string
+	// measure measures a line for its limit, with the fallbacks of
+	// WithFallbacks, and bundled finds the characters that IBM Plex Sans
+	// does not have.
 	measure *text.Estimate
+	bundled *text.Estimate
 	// families holds each list of font families that a text names.
 	families map[string]bool
 }
@@ -490,7 +510,7 @@ func (w *writer) text(it *scene.Item) {
 		fmt.Fprintf(w.out, ` text-anchor="%s"`, t.Anchor)
 	}
 	family := it.Font
-	if slices.ContainsFunc(t.Lines, func(l string) bool { return len(w.measure.Missing(l)) > 0 }) {
+	if slices.ContainsFunc(t.Lines, func(l string) bool { return len(w.bundled.Missing(l)) > 0 }) {
 		family = emojiFont(cmp.Or(family, DefaultFont))
 	}
 	if family != "" {

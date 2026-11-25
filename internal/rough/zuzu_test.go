@@ -5,9 +5,66 @@ package rough
 
 import (
 	"math"
+	"slices"
 	"strconv"
 	"testing"
 )
+
+// TestNonzeroFillsWhereTwoRingsOverlap checks change 3. Two squares that
+// overlap and run the same way, joined by a bridge as zuzu joins the
+// subpaths of a path, fill their overlap with the rule nonzero, and leave it
+// empty with the rule evenodd. A square inside a square that runs the other
+// way stays a hole with both rules.
+func TestNonzeroFillsWhereTwoRingsOverlap(t *testing.T) {
+	t.Parallel()
+	// bridged joins rings as the sketch of zuzu joins them: each ring closes
+	// to its start and comes back to the start of the first ring.
+	bridged := func(rings ...[]Point) []Point {
+		var out []Point
+		for _, r := range rings {
+			if len(out) > 0 {
+				out = append(out, out[0])
+			}
+			out = append(out, r...)
+			if len(out) > len(r) {
+				out = append(out, r[0])
+			}
+		}
+		return out
+	}
+	// spans returns the spans of the scan line at y, with the lines of the
+	// hachure across, from left to right.
+	spans := func(points []Point, rule string, y float64) [][2]float64 {
+		o := defaultResolvedOptions()
+		o.Roughness, o.HachureAngle, o.HachureGap, o.FillRule = 0, -90, 4, rule
+		var out [][2]float64
+		for _, l := range polygonHachureLines(points, &o) {
+			if l[0][1] == y {
+				out = append(out, [2]float64{math.Min(l[0][0], l[1][0]), math.Max(l[0][0], l[1][0])})
+			}
+		}
+		return out
+	}
+	a := []Point{{0, 0}, {40, 0}, {40, 40}, {0, 40}}
+	b := []Point{{20, 20}, {60, 20}, {60, 60}, {20, 60}}
+	hole := []Point{{10, 10}, {10, 30}, {30, 30}, {30, 10}}
+	for _, c := range []struct {
+		name   string
+		points []Point
+		rule   string
+		want   [][2]float64
+	}{
+		{"overlap, nonzero", bridged(a, b), "nonzero", [][2]float64{{0, 60}}},
+		{"overlap, evenodd", bridged(a, b), "", [][2]float64{{0, 20}, {40, 60}}},
+		{"hole, nonzero", bridged(a, hole), "nonzero", [][2]float64{{0, 10}, {30, 40}}},
+		{"hole, evenodd", bridged(a, hole), "evenodd", [][2]float64{{0, 10}, {30, 40}}},
+	} {
+		const y = 28
+		if got := spans(c.points, c.rule, y); !slices.Equal(got, c.want) {
+			t.Errorf("%s: the spans at y %d are %v, want %v", c.name, y, got, c.want)
+		}
+	}
+}
 
 // drawAll draws a line, a curve, an ellipse and a hachured rectangle with the
 // seed, each with a new generator, and returns their path data.

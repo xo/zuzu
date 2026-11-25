@@ -18,6 +18,9 @@ type hachureEdgeEntry struct {
 	ymax   float64
 	x      float64
 	islope float64
+	// zuzu: dir is 1 for an edge that runs down and -1 for one that runs
+	// up, for the rule nonzero (README.md, change 3).
+	dir int
 }
 
 type activeHachureEdgeEntry struct {
@@ -52,7 +55,8 @@ func polygonHachureLines(points []Point, o *ResolvedOptions) []Line {
 		scanPoints = append([]Point(nil), points...)
 		stabilizeCollapsedRotatedOrdinates(unrotated, scanPoints, angle)
 	}
-	lines := straightHachureLinesModern(scanPoints, gap, skipOffset)
+	// zuzu: the rule nonzero (README.md, change 3).
+	lines := straightHachureLinesModern(scanPoints, gap, skipOffset, o.FillRule == "nonzero")
 	if angle != 0 {
 		rotatePoints(points, rotationCenter, -angle)
 		rotateLines(lines, rotationCenter, -angle)
@@ -60,7 +64,7 @@ func polygonHachureLines(points []Point, o *ResolvedOptions) []Line {
 	return lines
 }
 
-func straightHachureLinesModern(points []Point, gap, stepOffset float64) []Line {
+func straightHachureLinesModern(points []Point, gap, stepOffset float64, nonzero bool) []Line {
 	vertices := append([]Point(nil), points...)
 	if len(vertices) == 0 {
 		return nil
@@ -84,6 +88,8 @@ func straightHachureLinesModern(points []Point, gap, stepOffset float64) []Line 
 			ymin: ymin, ymax: math.Max(p1[1], p2[1]),
 			x:      chooseFloat(ymin == p1[1], p1[0], p2[0]),
 			islope: (p2[0] - p1[0]) / (p2[1] - p1[1]),
+			// zuzu: README.md, change 3.
+			dir: edgeDir(p1, p2),
 		})
 	}
 	sort.SliceStable(edges, func(i, j int) bool {
@@ -126,8 +132,14 @@ func straightHachureLinesModern(points []Point, gap, stepOffset float64) []Line 
 		active = kept
 		sort.SliceStable(active, func(i, j int) bool { return active[i].edge.x < active[j].edge.x })
 		if stepOffset != 1 || math.Mod(iteration, gap) == 0 {
-			for i := 0; i+1 < len(active); i += 2 {
-				lines = append(lines, Line{{jsRound(active[i].edge.x), y}, {jsRound(active[i+1].edge.x), y}})
+			// zuzu: with the rule nonzero, a span runs where the
+			// winding number is not 0 (README.md, change 3).
+			if nonzero {
+				lines = nonzeroLines(lines, active, y)
+			} else {
+				for i := 0; i+1 < len(active); i += 2 {
+					lines = append(lines, Line{{jsRound(active[i].edge.x), y}, {jsRound(active[i+1].edge.x), y}})
+				}
 			}
 		}
 		y += stepOffset

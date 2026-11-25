@@ -27,6 +27,7 @@ const (
 	StyleArrowOpen    = theme.StyleArrowOpen
 	StyleEdgeLabel    = theme.StyleEdgeLabel
 	StyleEdgeLabelBox = theme.StyleEdgeLabelBox
+	StyleTextOnColor  = theme.StyleTextOnColor
 	StyleCluster      = theme.StyleCluster
 	StyleClusterTitle = theme.StyleClusterTitle
 	StyleIcon         = theme.StyleIcon

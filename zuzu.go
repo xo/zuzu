@@ -593,14 +593,19 @@ func (c *Chart) Render(ctx context.Context, opts ...RenderOption) (*scene.Scene,
 // SVG renders the chart and writes it as SVG. In a look drawn by hand, the
 // SVG embeds the font of the look, such as Excalifont, and else the font of
 // WithFont, so that a viewer that lacks the font draws the text in it (D43,
-// D58).
+// D58). A text with a limit measures with the fonts of WithEmoji, as the
+// layout measured it, so that it is cut at the same place (D32).
 func (c *Chart) SVG(ctx context.Context, w io.Writer, opts ...RenderOption) (Report, error) {
 	v, report, err := c.NewView(ctx, opts...)
 	if err != nil {
 		return report, err
 	}
+	var o renderOptions
+	for _, opt := range opts {
+		opt.applyRender(&o)
+	}
 	var b bytes.Buffer
-	if err := svg.Write(&b, v.scene, svg.WithFont(v.rt.font)); err != nil {
+	if err := svg.Write(&b, v.scene, svg.WithFont(v.rt.font), svg.WithFallbacks(c.fallbacks(&o)...)); err != nil {
 		return report, err
 	}
 	_, err = w.Write(b.Bytes())

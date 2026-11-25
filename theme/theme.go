@@ -412,6 +412,43 @@ func (t Theme) Tint(c string) string {
 	return mix(t.Background, c, NodeTint)
 }
 
+// TextOn returns the color of a text that sits on a colored fill, such as
+// the name of a leaf of a treemap (D59): the text of the light mode or the
+// text of the dark mode, whichever has the higher contrast ratio of WCAG
+// 2.1 with the fill. The text of the theme stands for its own mode, and
+// wins a tie. A fill with some opacity counts as drawn over the background
+// of the theme. A fill that does not parse gives the text of the theme.
+func (t Theme) TextOn(fill string) string {
+	c, ok := color.Parse(fill)
+	if !ok {
+		return t.Text
+	}
+	if c.A < 1 {
+		if bg, ok := color.Parse(t.Background); ok {
+			c = color.Mix(color.RGBA{R: bg.R, G: bg.G, B: bg.B, A: 1}, color.RGBA{R: c.R, G: c.G, B: c.B, A: 1}, c.A, "rgb")
+		}
+	}
+	other := neutrals(Dark).Text
+	if t.mode == Dark {
+		other = neutrals(Light).Text
+	}
+	if contrastRatio(c, other) > contrastRatio(c, t.Text) {
+		return other
+	}
+	return t.Text
+}
+
+// contrastRatio returns the contrast ratio of WCAG 2.1 of a color and a color
+// of CSS, or 0 when the second does not parse.
+func contrastRatio(c color.RGBA, s string) float64 {
+	d, ok := color.Parse(s)
+	if !ok {
+		return 0
+	}
+	la, lb := c.Luminance(), d.Luminance()
+	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+}
+
 // NoteHue is the hue, in degrees, of the yellow of a note on paper, which
 // the color of a note of a diagram comes nearest to.
 const NoteHue = 52.0

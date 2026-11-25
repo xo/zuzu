@@ -58,7 +58,7 @@ func (s *scope) buildMarks(path string) (out []scene.Mark, err error) {
 		}
 		out = append(out, *sm)
 		styles = append(styles, m.Style.List)
-		for _, x := range s.look(m, &out[len(out)-1]) {
+		for _, x := range s.look(m, &out[len(out)-1], out[:len(out)-1]) {
 			out = append(out, x)
 			styles = append(styles, nil)
 		}

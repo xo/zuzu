@@ -735,7 +735,8 @@ func dataURL(u string) ([]byte, bool) {
 // layout of text of okage, at the place that shape.TextOf gives, as the SVG
 // writer writes it and okage draws it. A stroke is a halo under the fill. A
 // glyph in color, such as an emoji of Noto Color Emoji, draws over the
-// outlines in its own colors (D32). A character that no font has draws
+// outlines in its own colors, and turns with the angle of the text, as
+// okage draws it in the SVG (D32). A character that no font has draws
 // nothing, and a line that no font draws draws nothing, as in SVG.
 func (d *drawer) text(it *scene.Item, ts okage.Transform) error {
 	if len(it.Text) == 0 {
@@ -840,7 +841,7 @@ type placed struct {
 }
 
 // colorGlyphs draws the glyphs in color of the runs of a text item, in
-// their own colors, with the transform of the item. An item with an
+// their own colors, with the transform of the item, which holds its turn. An item with an
 // opacity draws them in a layer with that opacity.
 func (d *drawer) colorGlyphs(colors []placed, it *scene.Item, ts okage.Transform) {
 	if len(colors) == 0 {

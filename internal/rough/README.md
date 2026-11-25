@@ -26,8 +26,9 @@ Each copied file has the same name as in upstream: `core.go`, `filler.go`,
 These files are files of zuzu, not of upstream:
 
 1. `zuzu_doc.go` holds the comment of the package.
-2. `zuzu_test.go` holds the tests of change 2.
-3. `zuzu_golden_test.go` and `testdata/golden.txt` hold the golden test of
+2. `zuzu_fillrule.go` holds the spans of the rule nonzero of change 3.
+3. `zuzu_test.go` holds the tests of changes 2 and 3.
+4. `zuzu_golden_test.go` and `testdata/golden.txt` hold the golden test of
    the copy. It draws each kind of shape with each fill style, with the
    default options and with the options that Mermaid gives for
    `look: handDrawn`, and with the seeds 1, 42 and 2147483647. It compares
@@ -55,8 +56,8 @@ The copy imports only the standard library. It builds with TinyGo for
 
 ## The changes
 
-Change 2 is marked in the code with a comment that starts with `zuzu:`,
-which names the number of the change.
+Changes 2 and 3 are marked in the code with a comment that starts with
+`zuzu:`, which names the number of the change.
 
 1. Each copied file opens with a comment that names the project, the file
    and the commit, and that starts with `Copied from`.
@@ -72,3 +73,16 @@ which names the number of the change.
    `TestRandomDefersJavaScriptInt32CoercionUntilFirstDraw` of
    `renderer_test.go` expects the seed 1 for such a seed. The look of D39
    gives each item a seed from 1 to 2^31-1, so it never meets this case.
+3. The hachure of a polygon follows the rule nonzero of SVG when the option
+   `FillRule` is `nonzero`. Rough.js fills a polygon with the rule evenodd.
+   The look drawn by hand joins the subpaths of a path into one polygon
+   with bridges, and SVG fills a path with the rule nonzero. With the rule
+   evenodd, two subpaths that overlap and run the same way leave their
+   overlap empty. With the option, each edge keeps its direction, and a
+   line of the hachure runs where the winding number is not 0. A bridge
+   goes out and comes back along the same line, so it does not change the
+   winding number. `core.go` adds the option, and
+   `filler_scan_line_hachure.go` keeps the direction of each edge and
+   calls `nonzeroLines` of `zuzu_fillrule.go`. Without the option, the
+   hachure is the hachure of upstream, byte for byte. This change stays in
+   zuzu, because Rough.js has no rule of fill for a hachure.

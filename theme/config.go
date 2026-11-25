@@ -74,6 +74,10 @@ const (
 	// arc that draws the nodes of a hierarchy: a group as a tint of its
 	// color, with its name.
 	Hierarchy = "zuzu.hierarchy"
+	// TextOnColor is the property of a style of a text that gives each
+	// item the color of Theme.TextOn for the fill under it, when the spec
+	// gives the text no fill of its own (D59).
+	TextOnColor = "zuzu.textOnColor"
 	// Total is the property of the config of an arc that writes the total
 	// of a donut in its center.
 	Total = "zuzu.total"
@@ -109,6 +113,11 @@ const (
 	StyleIconStroke   = "zuzu.icon.stroke"
 	StyleGuide        = "zuzu.guide"
 	StyleBand         = "zuzu.band"
+	// StyleTextOnColor is the style of a text that sits on a colored fill,
+	// such as the name of a leaf of a treemap. Its property TextOnColor
+	// gives it the text of the light mode or the text of the dark mode,
+	// whichever reads better on the fill, with no box behind it (D59).
+	StyleTextOnColor = "zuzu.textOnColor"
 	// StyleHalo gives a text a halo: a stroke of 3 in the color of the
 	// background, which draws under the fill. A label that sits on a busy
 	// mark takes it after the style of its fill.
@@ -208,6 +217,10 @@ func (t Theme) Config() map[string]any {
 			StyleGuide:        map[string]any{"stroke": t.Axis, "strokeWidth": 1.25, "strokeCap": "round", "strokeJoin": "round"},
 			StyleBand:         map[string]any{"fill": t.Text, "fillOpacity": BandOpacity},
 			StyleHalo:         map[string]any{"stroke": t.Background, "strokeWidth": 3.0, "strokeJoin": "round"},
+			// A text on a colored fill takes the text of the light or
+			// the dark mode by its contrast with the fill, and the text
+			// of the theme when no fill is under it (D59).
+			StyleTextOnColor: map[string]any{"fill": t.Text, TextOnColor: true},
 		},
 	}
 }

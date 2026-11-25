@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/graph"
 	"github.com/xo/zuzu/text"
 )
 
@@ -273,7 +274,7 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 		leafName["limit"] = map[string]any{"field": "labelWidth"}
 		leafName["ellipsis"] = map[string]any{"value": " "}
 	}
-	text("leafNames", "leafLabels", "zuzu.edgeLabelBox", leafName)
+	text("leafNames", "leafLabels", graph.StyleTextOnColor, leafName)
 	if showValues {
 		text("sectionValues", "sections", "zuzu.edgeLabel", map[string]any{
 			"x": map[string]any{"signal": "datum.x1 - 6"}, "y": map[string]any{"signal": "datum.y0 + 5"},
@@ -281,7 +282,7 @@ func treemapChart(c *chart) (map[string]any, bool, error) {
 			"fontSize": map[string]any{"value": valueSize},
 			"text":     map[string]any{"signal": value},
 		})
-		text("leafValues", "leafValueRows", "zuzu.edgeLabelBox", map[string]any{
+		text("leafValues", "leafValueRows", graph.StyleTextOnColor, map[string]any{
 			"x": left, "y": map[string]any{"signal": "datum.y0 + datum.valueTop"},
 			"baseline": map[string]any{"value": "top"},
 			"fontSize": map[string]any{"field": "valueSize"},

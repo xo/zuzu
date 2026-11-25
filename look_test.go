@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xo/zuzu/internal/color"
 	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/scene"
+	"github.com/xo/zuzu/theme"
 )
 
 // renderVL renders a Vega-Lite spec of rows a, b and c.
@@ -362,11 +364,28 @@ func TestHierarchyLook(t *testing.T) {
 		t.Fatalf("%d marks of names, want 1", len(names))
 	}
 	found := map[string]bool{}
+	// The name of a leaf takes the text of the light or the dark mode by
+	// its contrast with the leaf (D59), and a group its text.
+	th := theme.New(theme.Light, theme.Zuzu)
+	leaves := 0
 	for _, it := range names[0].Items {
 		found[it.Text[0]] = true
+		if it.FontSize != 10 {
+			continue
+		}
+		leaves++
+		for _, r := range rects {
+			if d, _ := r.Datum.(map[string]any); d["id"] == it.Text[0] {
+				fill, _ := color.Parse(r.Fill.Color)
+				bg, _ := color.Parse(th.Background)
+				if want := th.TextOn(color.Mix(bg, fill, *r.FillOpacity, "rgb").Hex()); it.Fill.Color != want {
+					t.Errorf("the name of the leaf %s is in %s, want %s", it.Text[0], it.Fill.Color, want)
+				}
+			}
+		}
 	}
-	if !found["groupA"] || found["root"] {
-		t.Errorf("the names are %v, want groupA and not root", found)
+	if !found["groupA"] || found["root"] || leaves == 0 {
+		t.Errorf("the names are %v, want groupA and a leaf, and not root", found)
 	}
 }
 

@@ -428,3 +428,38 @@ func TestNoteColor(t *testing.T) {
 		}
 	}
 }
+
+// TestTextOn checks that a text on a colored fill takes the text of the
+// light or the dark mode, whichever has the higher contrast ratio with the
+// fill, in either mode, that a fill with some opacity counts as drawn over
+// the background, and that the style of a text on a color names the rule
+// (D59).
+func TestTextOn(t *testing.T) {
+	t.Parallel()
+	dark, light := neutrals(Light).Text, neutrals(Dark).Text
+	for _, m := range []Mode{Light, Dark} {
+		th := New(m, Zuzu)
+		for _, c := range []struct{ fill, want string }{
+			{"#ffffff", dark}, {"#000000", light}, {"#ffd600", dark}, {"#1f3a93", light},
+			{"rgba(0, 0, 0, 0.1)", th.TextOn(th.Background)}, {"not a color", th.Text},
+		} {
+			if got := th.TextOn(c.fill); got != c.want {
+				t.Errorf("mode %d: the text on %s is %s, want %s", m, c.fill, got, c.want)
+			}
+		}
+		for _, fill := range th.Category {
+			got := th.TextOn(fill)
+			other := dark
+			if got == dark {
+				other = light
+			}
+			if contrast(got, fill) < contrast(other, fill) {
+				t.Errorf("mode %d: the text on %s is %s, which has less contrast than %s", m, fill, got, other)
+			}
+		}
+		st, _ := th.Config()["style"].(map[string]any)
+		if on, _ := st[StyleTextOnColor].(map[string]any); on[TextOnColor] != true || on["fill"] != th.Text {
+			t.Errorf("mode %d: the style %s is %v", m, StyleTextOnColor, on)
+		}
+	}
+}

@@ -175,6 +175,24 @@ function theme(mode, scheme = "zuzu") {
   return { ...m, scheme, cat, seq, div, up: cat[up], down: cat[down] };
 }
 const THEMES = { light: theme("light"), dark: theme("dark") };
+
+// textOn returns the color of a text that sits on a colored fill, such as
+// the name of a leaf of a treemap (D59): the text of the light mode or the
+// text of the dark mode, whichever has the higher contrast ratio of WCAG
+// 2.1 with the fill drawn at its opacity over the background. The text of
+// the theme stands for its own mode, and wins a tie. The text has no box
+// and no halo behind it (docs/STYLE.md).
+function textOn(t, fill, opacity = 1) {
+  const under = d3.interpolateRgb(t.bg, fill)(opacity);
+  const lum = (c) => {
+    const { r, g, b } = d3.rgb(c);
+    const lin = (v) => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  };
+  const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  const other = MODES[t.name === "dark" ? "light" : "dark"].text;
+  return ratio(other, under) > ratio(t.text, under) ? other : t.text;
+}
 const PAD = 24;
 const SIZE = { title: 16, subtitle: 12.5, label: 11, small: 10, source: 10.5 };
 // AXIS holds the sizes of an axis: its ticks, its line and the padding of
@@ -497,7 +515,7 @@ chart("streamgraph", 1, "Streamgraph with direct labels", "stocks.csv", (t) => {
       const i = d3.maxIndex(s, (d) => d[1] - d[0]);
       const d = s[i];
       if (y(d[0]) - y(d[1]) < 16) return "";
-      return txt(s.key, { x: x(d.data.d), y: (y(d[0]) + y(d[1])) / 2 + 4, "font-size": SIZE.label + 1, "font-weight": 600, fill: t.bg, "text-anchor": "middle" });
+      return txt(s.key, { x: x(d.data.d), y: (y(d[0]) + y(d[1])) / 2 + 4, "font-size": SIZE.label + 1, "font-weight": 600, fill: textOn(t, t.cat[SYMBOLS.indexOf(s.key)], 0.9), "text-anchor": "middle" });
     }),
     xAxis(t, f, x, x.ticks(d3.utcYear.every(2)), d3.utcFormat("%Y")),
   ];
@@ -848,7 +866,7 @@ chart("treemap", 1, "Treemap with group headers", "flare.json", (t) => {
         c.x1 - c.x0 > 40 && txt(c.data.name, { x: c.x0 + 6, y: c.y0 + 13, "font-size": SIZE.label, "font-weight": 600, fill: t.text }),
         (c.children || []).map((l) => [
           el("rect", { x: l.x0, y: l.y0, width: l.x1 - l.x0, height: l.y1 - l.y0, rx: 3, fill: t.cat[ci], "fill-opacity": 0.85 }),
-          l.x1 - l.x0 > est(l.data.name, SIZE.small) + 10 && l.y1 - l.y0 > 18 && txt(l.data.name, { x: l.x0 + 5, y: l.y0 + 13, "font-size": SIZE.small, fill: t.bg, "font-weight": 600 }),
+          l.x1 - l.x0 > est(l.data.name, SIZE.small) + 10 && l.y1 - l.y0 > 18 && txt(l.data.name, { x: l.x0 + 5, y: l.y0 + 13, "font-size": SIZE.small, fill: textOn(t, t.cat[ci], 0.85), "font-weight": 600 }),
         ]),
       ];
     }));
