@@ -298,3 +298,150 @@ func TestLegendSpecProps(t *testing.T) {
 			big[0].X, big[0].Y, big[1].X, big[1].Y)
 	}
 }
+
+// entryPlace is the place and the size of the group of an entry of a
+// legend.
+type entryPlace struct {
+	X, Y, W, H float64
+}
+
+// legendEntries renders a spec in the strict mode and returns the place of
+// the group of each entry of its legend, in the frame of the legend.
+func legendEntries(t *testing.T, src string) []entryPlace {
+	t.Helper()
+	var out []entryPlace
+	for _, it := range legendItems(t, src, Vega, "legend-entry") {
+		out = append(out, entryPlace{it.X, it.Y, it.Width, it.Height})
+	}
+	return out
+}
+
+// TestLegendEncodePlace checks that an encode of the place of the symbols
+// and the labels of a legend applies in the frame of the group of each
+// entry, and that the layout then places the entries from their bounds,
+// with the columns, the padding and the gridAlign of the legend (D59 part
+// 3). The places that the test wants are those that vega.js 6.4 gives for
+// the same specs. The labels have a limit, so that the width of their text
+// does not change the bounds of an entry. Before, such an encode went in
+// the report.
+func TestLegendEncodePlace(t *testing.T) {
+	t.Parallel()
+	spec := func(props, labels string) string {
+		return `{"width": 200, "height": 100,
+			"scales": [{"name": "c", "type": "ordinal", "domain": ["a", "b", "c", "d", "e"], "range": ["red", "green", "blue", "black", "gray"]}],
+			"legends": [{"fill": "c", "orient": "bottom", "direction": "horizontal", ` + props + `,
+				"columnPadding": 10, "rowPadding": 5, "labelFontSize": 11, "labelLimit": 10,
+				"encode": {
+					"symbols": {"update": {"x": {"value": 10}, "y": {"value": 10}, "size": {"signal": "datum.value === 'b' ? 400 : 100"}}},
+					"labels": {"update": {"x": {"value": 10}, "y": {"value": 0}, "align": {"value": "right"}, "baseline": {"value": "top"}` + labels + `}}}}]}`
+	}
+	for _, c := range []struct {
+		name, props, labels string
+		want                []entryPlace
+	}{
+		{
+			"a grid of two columns, each as wide as its widest entry",
+			`"columns": 2, "gridAlign": "each"`, ``,
+			[]entryPlace{{0, 2.5, 15, 15}, {25, 0, 20, 20}, {0, 25, 15, 15}, {25, 25, 20, 15}, {0, 45, 15, 15}},
+		},
+		{
+			"a grid whose entries keep their own room above",
+			`"columns": 2, "gridAlign": "none"`, ``,
+			[]entryPlace{{0, 0, 15, 15}, {25, 0, 20, 20}, {0, 25, 15, 15}, {25, 25, 20, 15}, {0, 45, 15, 15}},
+		},
+		{
+			"a row, each entry after the one before",
+			`"gridAlign": "each"`, ``,
+			[]entryPlace{{0, 2.5, 15, 15}, {25, 0, 20, 20}, {55, 2.5, 15, 15}, {80, 2.5, 15, 15}, {105, 2.5, 15, 15}},
+		},
+		{
+			"labels that reach above their entry by their dy",
+			`"columns": 2, "gridAlign": "each"`, `, "dx": {"value": 2}, "dy": {"value": -4}`,
+			[]entryPlace{{0, 2.5, 15, 15}, {25, 0, 20, 20}, {0, 29, 15, 15}, {25, 29, 20, 15}, {0, 53, 15, 15}},
+		},
+	} {
+		if got := legendEntries(t, spec(c.props, c.labels)); !slices.Equal(got, c.want) {
+			t.Errorf("%s: the entries are %v, want %v", c.name, got, c.want)
+		}
+	}
+	// gridAlign all makes each column as wide as the widest entry.
+	var xs []float64
+	for _, e := range legendEntries(t, spec(`"columns": 2, "gridAlign": "all"`, ``)) {
+		xs = append(xs, e.X)
+	}
+	if want := []float64{0, 30, 0, 30, 0}; !slices.Equal(xs, want) {
+		t.Errorf("the entries of gridAlign all are at the x %v, want %v", xs, want)
+	}
+	// The symbol and the label of an entry stand where the encode puts them
+	// in the frame of the entry.
+	for _, it := range legendItems(t, spec(`"columns": 2`, ``), Vega, "legend-entry") {
+		if len(it.Items) != 2 || len(it.Items[0].Items) != 1 || len(it.Items[1].Items) != 1 {
+			t.Fatalf("the entry holds %d marks, want a symbol and a label", len(it.Items))
+		}
+		sym, lab := it.Items[0].Items[0], it.Items[1].Items[0]
+		if sym.X != 10 || sym.Y != 10 || lab.X != 10 || lab.Y != 0 {
+			t.Errorf("the symbol is at %v, %v and the label at %v, %v, want 10, 10 and 10, 0", sym.X, sym.Y, lab.X, lab.Y)
+		}
+	}
+}
+
+// TestLegendEncodePlaceColumn checks the encode of the place of the labels
+// and the symbols of a vertical legend, against the places that vega.js
+// gives: each entry starts below the one above by the bottom of that
+// entry, the rowPadding, and the height that its label reaches above its
+// origin. It checks too that the layout places the entries and the title
+// after an encode of their place, as vega.js does, and that an encode of
+// the place of a gradient and its labels applies in the frame of their
+// group.
+func TestLegendEncodePlaceColumn(t *testing.T) {
+	t.Parallel()
+	ordinal := `"scales": [{"name": "c", "type": "ordinal", "domain": ["a", "bb", "ccc"], "range": ["red", "green", "blue"]},
+		{"name": "g", "type": "linear", "domain": [0, 100], "range": ["white", "blue"]}]`
+	src := func(legend string) string {
+		return `{"width": 200, "height": 100, ` + ordinal + `, "legends": [` + legend + `]}`
+	}
+	column := src(`{"fill": "c", "orient": "right", "symbolSize": 100, "rowPadding": 5, "labelFontSize": 10,
+		"encode": {"labels": {"update": {"x": {"value": 30}, "y": {"value": 4}}},
+			"symbols": {"update": {"x": {"value": 5}, "y": {"value": 6}}}}}`)
+	var ys []float64
+	for _, e := range legendEntries(t, column) {
+		ys = append(ys, e.Y)
+		if e.X != 0 {
+			t.Errorf("an entry of a column is at the x %v, want 0", e.X)
+		}
+	}
+	if want := []float64{0, 17, 34}; !slices.Equal(ys, want) {
+		t.Errorf("the entries of a column are at the y %v, want %v", ys, want)
+	}
+	for _, lab := range legendItems(t, column, Vega, "legend-label") {
+		if lab.X != 30 || lab.Y != 4 {
+			t.Errorf("a label is at %v, %v, want 30, 4 in the frame of its entry", lab.X, lab.Y)
+		}
+	}
+	// The layout places the entries and the title, so an encode of their x
+	// gives way to it.
+	placed := src(`{"fill": "c", "orient": "right", "title": "Kind",
+		"encode": {"entries": {"update": {"x": {"value": 50}, "fill": {"value": "#eee"}}},
+			"title": {"update": {"x": {"value": 40}}},
+			"symbols": {"update": {"xc": {"value": 20}}}}}`)
+	for _, e := range legendItems(t, placed, Vega, "legend-entry") {
+		if e.X != 0 || e.Fill.Color != "#eee" || e.Width <= 20 {
+			t.Errorf("an entry is at the x %v with the fill %q and the width %v, want 0, #eee and the width of its column", e.X, e.Fill.Color, e.Width)
+		}
+	}
+	if title := legendItems(t, placed, Vega, "legend-title"); len(title) != 1 || title[0].X != 0 {
+		t.Errorf("the title is %v, want it at the x 0, where the layout puts it", title)
+	}
+	gradient := src(`{"fill": "g", "orient": "bottom", "direction": "horizontal", "gradientLength": 100, "values": [0, 50, 100],
+		"encode": {"labels": {"update": {"y": {"value": 30}}}, "gradient": {"update": {"x": {"value": 10}}}}}`)
+	if bar := legendItems(t, gradient, Vega, "legend-gradient"); len(bar) != 1 || bar[0].X != 10 || bar[0].Y != 0 {
+		t.Errorf("the bar is %v, want it at 10, 0 in the frame of its group", bar)
+	}
+	var labels []float64
+	for _, lab := range legendItems(t, gradient, Vega, "legend-label") {
+		labels = append(labels, lab.X, lab.Y)
+	}
+	if want := []float64{0, 30, 50, 30, 100, 30}; !slices.Equal(labels, want) {
+		t.Errorf("the labels of the gradient are at %v, want %v", labels, want)
+	}
+}

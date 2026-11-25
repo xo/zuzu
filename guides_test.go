@@ -292,17 +292,16 @@ func TestAxisEncodePlace(t *testing.T) {
 }
 
 // TestGuideEncodePlaceReport checks that an encode of the place of the
-// group of an axis, or of a part of a legend, goes in the report, or is an
-// error in the strict mode. The layout of Vega places the group of an axis
-// itself, and the layout of a legend of zuzu does not place its parts as
-// Vega does.
+// group of an axis or of a legend goes in the report, or is an error in the
+// strict mode. The layout of Vega places the group of a guide itself.
 func TestGuideEncodePlaceReport(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
 		guides, want string
 	}{
 		{`"axes": [{"scale": "x", "orient": "bottom", "encode": {"axis": {"update": {"x": {"value": 5}}}}}]`, "the encode of x of the axis of an axis"},
-		{`"legends": [{"fill": "x", "encode": {"labels": {"update": {"y": {"value": 5}}}}}]`, "the encode of y of the labels of a legend"},
+		{`"legends": [{"fill": "x", "encode": {"legend": {"update": {"y": {"value": 5}}}}}]`, "the encode of y of the legend of a legend"},
+		{`"legends": [{"fill": "x", "encode": {"legend": {"update": {"x": {"value": 5}}}, "labels": {"update": {"y": {"value": 5}}}}}]`, "the encode of x of the legend of a legend"},
 	} {
 		src := `{"width": 200, "height": 100,
 			"scales": [{"name": "x", "type": "band", "domain": [1, 2, 3], "range": "width"}], ` + c.guides + `}`

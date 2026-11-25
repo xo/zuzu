@@ -460,8 +460,16 @@ the rules that Vega leaves to its renderer (D12):
   entries out in a grid, each column as wide as its widest entry. The title
   is at the left of a row and above a column or a grid.
 - The `encode` of a legend sets the properties of its `title`, `labels`,
-  `symbols`, `gradient` and `entries`, but not their places, which the
-  layout gives.
+  `symbols`, `gradient` and `entries`. An encode of the place of a part,
+  such as the `x` of the labels, applies as in vega.js (D59 part 3). Each
+  entry is then a group, with its symbol and its label in the frame of the
+  group. A gradient and its labels share one group. After the encode, the
+  layout places the entries from their bounds, then the title and the
+  frame. The layout gives the place of the entries, of the title and of
+  the legend itself, as vega.js does. So an encode of the `x` of the title
+  or of the entries gives way to the layout, and an encode of the place of
+  the legend goes in the report. A legend with no encode of a place draws
+  as the look draws it.
 - A legend of sizes draws its circles nested, sharing their lowest point,
   each with a line from its top to its label. No target draws one, so this
   is the usual design. When the largest circle is less than three labels

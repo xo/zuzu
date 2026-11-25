@@ -57,17 +57,6 @@ In Vega, a tooltip whose value is the item, such as
 `"tooltip": {"signal": "item"}`, shows each field of the item in vega.js.
 zuzu draws no such tooltip, and it goes in the report.
 
-### Do the work of D35
-
-D35 records the answers of the maintainers of 2026-11-20. Part 4 is done
-for the axes. An encode of the place of a part of a legend, such as the
-`x` of its labels, still goes in the report. vega.js places the labels and
-the symbols in a group for each entry, and then places the entries from
-their bounds after the encode. The legend of zuzu is one flat group, laid
-out before any encode, in `layout/legend.go`. To apply such an encode, the
-layout of the legend reads the encode, or gives each entry a group of its
-own. No spec of the corpus encodes the place of a part of a legend.
-
 ## Themes
 
 ### Let a scheme name a font

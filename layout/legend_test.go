@@ -2,6 +2,7 @@ package layout
 
 import (
 	"math"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -414,4 +415,72 @@ func TestLegendPathSymbolRows(t *testing.T) {
 	if len(syms) != 2 || math.Abs(syms[1].Y-syms[0].Y-(12+pad)) > 1e-9 {
 		t.Errorf("the symbols are at %v and %v, want %v apart", syms[0].Y, syms[1].Y, 12+pad)
 	}
+}
+
+// TestLegendEntryGroups checks that a legend with EntryGroups draws each
+// entry as a group with its symbol and its label in the frame of the group,
+// and that PlaceEntries places the entries again from their bounds after
+// an encode moves a label, the same way each time it runs (D59 part 3).
+func TestLegendEntryGroups(t *testing.T) {
+	t.Parallel()
+	st := style()
+	sc := newScale(t, "ordinal", []any{"a", "b", "c"}, []any{"#ff0000", "#00ff00", "#0000ff"})
+	pad := 5.0
+	l := &Legend{
+		Fill: sc, Format: expr.String, Columns: 2, RowPadding: &pad, EntryGroups: true,
+		Title: "Kind", TitleOrient: "top", Padding: 4, StrokeColor: "gray",
+	}
+	m := st.Legend(l)
+	entries := collect(m, "legend-entry")
+	if len(entries) != 3 {
+		t.Fatalf("the legend has %d entries, want 3", len(entries))
+	}
+	for _, e := range entries {
+		if len(e.Items) != 2 || e.Items[0].Role != "legend-symbol" || e.Items[1].Role != "legend-label" {
+			t.Fatalf("an entry holds %v, want a symbol and a label", e.Items)
+		}
+		sym, lab := e.Items[0].Items[0], e.Items[1].Items[0]
+		if sym.X != swatch/2 || lab.X != swatch+swatchGap || sym.Y != lab.Y {
+			t.Errorf("the symbol is at %v, %v and the label at %v, %v, want them in the frame of the entry", sym.X, sym.Y, lab.X, lab.Y)
+		}
+	}
+	before := entries[2].Y - entries[0].Y
+	// An encode moves each label 30 down, so the second row moves down by
+	// as much as the first row grows.
+	g := &m.Items[0]
+	for i := range g.Items {
+		if g.Items[i].Role != "legend-entry" {
+			continue
+		}
+		for j := range g.Items[i].Items {
+			g.Items[i].Items[j].Items[1].Items[0].Y += 30
+		}
+	}
+	st.PlaceEntries(&m, l)
+	entries = collect(m, "legend-entry")
+	if after := entries[2].Y - entries[0].Y; after <= before+20 {
+		t.Errorf("the second row is %v below the first after the encode, and %v before, want it lower by the move of the labels", after, before)
+	}
+	if frames := collect(m, "legend-frame"); len(frames) != 1 {
+		t.Errorf("the legend has %d frames, want 1", len(frames))
+	}
+	again := scene.Mark{Type: m.Type, Role: m.Role, Items: slices.Clone(m.Items)}
+	again.Items[0].Items = cloneMarks(m.Items[0].Items)
+	st.PlaceEntries(&again, l)
+	if !reflect.DeepEqual(again, m) {
+		t.Errorf("PlaceEntries placed the legend in another way the second time")
+	}
+}
+
+// cloneMarks copies marks and the items of their groups, deep enough that
+// a place set on the copy leaves the marks as they are.
+func cloneMarks(ms []scene.Mark) []scene.Mark {
+	out := slices.Clone(ms)
+	for i := range out {
+		out[i].Items = slices.Clone(out[i].Items)
+		for j := range out[i].Items {
+			out[i].Items[j].Items = cloneMarks(out[i].Items[j].Items)
+		}
+	}
+	return out
 }

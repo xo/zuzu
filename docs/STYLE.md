@@ -533,6 +533,32 @@ reaches as far down as its path, as Vega bounds an entry. A `size` or a
 `shape` that the encode of the symbols gives as a value counts, as Vega
 lays out the entries after the encode.
 
+When the encode of the symbols, the labels, the entries, the title or the
+gradient sets a place, such as `x`, `y` or `xc`, the legend draws each
+entry as a group, as Vega does (D59 part 3). The place of a symbol or a
+label is then in the frame of its entry, whose origin is the top left of
+the entry. The place of a gradient or of its labels is in the frame of
+the group that holds them. After the encode, the layout places the
+entries from their bounds, as Vega places them.
+
+With `columns`, the entries fill a grid row by row. Each column starts
+after the right edge of the column before, plus `columnPadding`, plus as
+far as an entry of the column reaches left of its origin. Each row starts
+below the bottom of the row before, plus `rowPadding`, plus as far as an
+entry of the row reaches above its origin. An entry lower than its row
+stands in the middle of the row. A `gridAlign` of `all` makes each column
+as wide as the widest entry and each row as high as the highest. A
+`gridAlign` of `none` moves each entry by its own reach, not by the reach
+of its column or its row, and does not center it in its row. With no
+`columns`, the entries stand in a row, each after the one before it, and
+the row wraps at the width of the plot.
+
+A bound is rounded up to a whole pixel, as Vega rounds it. When the spec
+sets no `columnPadding` or `rowPadding`, the padding is 16 between two
+columns and 8 between two rows, the space of rule 1. The title and the frame then stand where the look puts them,
+beside the entries. A legend with no encode of a place draws as rules 1
+to 7 say.
+
 ## Marks
 
 | Mark | Rule |

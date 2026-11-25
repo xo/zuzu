@@ -706,10 +706,24 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 		}
 		lg.Width = w
 	}
+	// An encode of the place of a part of the legend applies in the frame
+	// of an entry, and the layout places the entries after the encode, as
+	// vega.js does.
+	lg.EntryGroups = encodesLegendPlace(l.Encode)
 	m := s.rt.style().Legend(lg)
 	s.styleGuide(&m, props, legendStyleParts)
-	if err := s.guideEncode(&m, l.Encode, legendParts, nil, path, "a legend"); err != nil {
+	parts, frame := legendParts, guideFrame(nil)
+	if lg.EntryGroups {
+		frame = entryFrame
+		if lg.DrawsGradient() {
+			parts = gradientLegendParts
+		}
+	}
+	if err := s.guideEncode(&m, l.Encode, parts, frame, path, "a legend"); err != nil {
 		return nil, err
+	}
+	if lg.EntryGroups {
+		s.rt.style().PlaceEntries(&m, lg)
 	}
 	if off, ok := propNum(props, "symbolDashOffset"); ok && off != 0 {
 		shiftDashes(&m, "legend-symbol", off)
@@ -983,7 +997,43 @@ var (
 		"axis": "axis", "title": "axis-title", "labels": "axis-label", "grid": "axis-grid",
 		"domain": "axis-domain", "ticks": "axis-tick",
 	}
+	// gradientLegendParts are the parts of a legend with entry groups that
+	// draws a gradient. Its group of entries holds the bar and its labels,
+	// and the encode of the entries applies to no part of it, as in Vega.
+	gradientLegendParts = map[string]string{
+		"legend": "legend", "title": "legend-title", "labels": "legend-label", "symbols": "legend-symbol",
+		"gradient": "legend-gradient", "entries": "",
+	}
 )
+
+// encodesLegendPlace reports whether the encode of a legend sets the place
+// of a part of the legend other than the legend itself.
+func encodesLegendPlace(enc vega.GuideEncode) bool {
+	for name, el := range enc {
+		if role := legendParts[name]; role == "" || role == "legend" {
+			continue
+		}
+		for _, set := range el.Sets {
+			for k := range set {
+				if placeProps[k] {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// entryFrame is the frame of the parts of a legend with entry groups
+// (layout.Legend). The symbol and the label of an entry stand in the frame
+// of the group of the entry, and a gradient and its labels in the frame of
+// their group, as in Vega. The layout places the entries and the title
+// after the encode, so the place that it gives them wins over the encode,
+// as in Vega. The layout places the group of the legend too, so an encode
+// of its place goes in the report.
+func entryFrame(role string) (x, y float64, ok bool) {
+	return 0, 0, role != "legend"
+}
 
 // placeProps are the properties of an encode that place an item.
 var placeProps = map[string]bool{

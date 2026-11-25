@@ -74,6 +74,14 @@ type Legend struct {
 	// circles, because the spec sets a property of its entries, such as
 	// its direction.
 	Entries bool
+	// EntryGroups draws each entry in a group of its own, with its symbol
+	// and its label in the frame of that group, and a gradient in one
+	// group with its labels, as Vega draws a legend. The view sets it when
+	// the spec encodes the place of a part of the legend, so that the
+	// encode applies in the frame of the group. PlaceEntries then places
+	// the entries from their bounds. A legend of sizes with EntryGroups
+	// draws as entries, never as nested circles.
+	EntryGroups bool
 
 	// The fields below hold the properties of the spec that win over the
 	// look (docs/STYLE.md). A zero value keeps the look.
@@ -146,18 +154,16 @@ const (
 // Legend draws a legend as a group of the role legend, at the origin: its
 // title, then a row of entries that wraps, or a gradient bar.
 func (s Style) Legend(l *Legend) scene.Mark {
+	if l.EntryGroups {
+		return s.groupLegend(l)
+	}
 	group := scene.Item{}
 	x, y := 0.0, 0.0
-	columns := l.Columns
-	if columns <= 0 && l.Direction == "vertical" {
-		columns = 1
-	}
-	gradient := l.Gradient && l.color() != nil && !scale.Discrete(l.color().Type())
+	columns := l.columns()
+	gradient := l.DrawsGradient()
 	nested := !gradient && l.nested()
 	var title *scene.Item
-	// A title that the spec places goes beside the entries after they are
-	// laid out, and else at the place of the look.
-	placed := l.Title != "" && (l.TitleOrient != "" || l.TitleAnchor != "" || l.TitlePadding != nil)
+	placed := l.titlePlaced()
 	if l.Title != "" {
 		// The title is at the left of a row, as docs/STYLE.md draws a
 		// legend, and above a column or a grid.
@@ -213,6 +219,339 @@ func (s Style) Legend(l *Legend) scene.Mark {
 	}
 	s.frame(l, &group)
 	return scene.Mark{Type: scene.Group, Role: "legend", Items: []scene.Item{group}}
+}
+
+// DrawsGradient reports whether the legend draws a bar of its continuous
+// color scale, rather than entries.
+func (l *Legend) DrawsGradient() bool {
+	return l.Gradient && l.color() != nil && !scale.Discrete(l.color().Type())
+}
+
+// columns returns the number of columns of the entries: the columns of
+// the spec, or one for a vertical legend, or 0 for a row.
+func (l *Legend) columns() int {
+	if l.Columns <= 0 && l.Direction == "vertical" {
+		return 1
+	}
+	return l.Columns
+}
+
+// titlePlaced reports whether the spec places the title. Such a title goes
+// beside the entries after they are laid out, and any other title goes at
+// the place of the look.
+func (l *Legend) titlePlaced() bool {
+	return l.Title != "" && (l.TitleOrient != "" || l.TitleAnchor != "" || l.TitlePadding != nil)
+}
+
+// groupLegend draws a legend whose entries are groups, at the origin: its
+// title, then a group for each entry, or one group that holds a gradient
+// bar and its labels.
+func (s Style) groupLegend(l *Legend) scene.Mark {
+	group := scene.Item{}
+	if l.Title != "" {
+		t := s.label(0, swatch/2, l.Title, SmallSize, 400, s.Theme.Faint, "left", "middle")
+		t.Limit, t.LineHeight = l.TitleLimit, l.TitleLineHeight
+		group.Items = append(group.Items, scene.Mark{Type: scene.Text, Role: "legend-title", Items: []scene.Item{t}})
+	}
+	body := scene.Mark{Type: scene.Group, Role: "legend-entry"}
+	if l.DrawsGradient() {
+		body.Items = []scene.Item{{Items: s.gradient(l, 0, 0)}}
+	} else {
+		body.Items = s.entryGroups(l)
+	}
+	group.Items = append(group.Items, body)
+	m := scene.Mark{Type: scene.Group, Role: "legend", Items: []scene.Item{group}}
+	s.placeGroups(l, &m, false)
+	return m
+}
+
+// PlaceEntries places the parts of a legend that Legend drew with
+// EntryGroups again, after the encode of the spec changed them: the
+// entries from their bounds, then the title beside them, then the frame.
+// The title keeps the align and the baseline that the encode gave it.
+func (s Style) PlaceEntries(m *scene.Mark, l *Legend) {
+	s.placeGroups(l, m, true)
+}
+
+// placeGroups places the entries of a legend whose entries are groups,
+// then its title and its frame, as Legend places them. It places each
+// part from the start, so it can run again after an encode. keep leaves
+// the align and the baseline of the title as they are.
+func (s Style) placeGroups(l *Legend, m *scene.Mark, keep bool) {
+	if len(m.Items) == 0 {
+		return
+	}
+	group := &m.Items[0]
+	group.Items = slices.DeleteFunc(group.Items, func(k scene.Mark) bool { return k.Role == "legend-frame" })
+	var title *scene.Item
+	var body *scene.Mark
+	for i := range group.Items {
+		switch k := &group.Items[i]; k.Role {
+		case "legend-title":
+			if len(k.Items) > 0 {
+				title = &k.Items[0]
+			}
+		case "legend-entry":
+			body = k
+		}
+	}
+	if body == nil {
+		return
+	}
+	columns := l.columns()
+	gradient := l.DrawsGradient()
+	placed := title != nil && l.titlePlaced()
+	x, y := 0.0, 0.0
+	var t scene.Item
+	if title != nil {
+		// The title of the look is at the left of a row and above a
+		// column or a grid.
+		t = *title
+		t.X, t.Y, t.Align, t.Baseline = 0, swatch/2, "left", "middle"
+		switch {
+		case placed:
+		case columns > 0:
+			y = rowHeight
+		default:
+			x = s.textWidth(&t) + entryGap
+		}
+	}
+	mid := swatch / 2.0
+	if gradient {
+		for i := range body.Items {
+			body.Items[i].X, body.Items[i].Y = x, y
+		}
+		if l.Direction != "vertical" {
+			mid = l.thickness() / 2
+		}
+	} else {
+		mid = s.gridEntries(l, body.Items, x, y, columns)
+	}
+	if title != nil {
+		if !gradient && !placed && y == 0 {
+			// The title stays in the middle of the first row.
+			t.Y = mid
+		}
+		if placed {
+			s.placeTitle(l, &t, []scene.Mark{*body}, mid, columns > 0)
+		}
+		if l.TitleAlign != "" {
+			t.Align = l.TitleAlign
+		}
+		if l.TitleBaseline != "" {
+			t.Baseline = l.TitleBaseline
+		}
+		title.X, title.Y = t.X, t.Y
+		if !keep {
+			title.Align, title.Baseline = t.Align, t.Baseline
+		}
+	}
+	if placed {
+		b := s.marksBounds(group.Items)
+		shiftMarks(group.Items, -b.X1, -b.Y1)
+	}
+	s.frame(l, group)
+}
+
+// entryGroups draws each entry of a legend as a group at the origin, with
+// its symbol and its label in the frame of the group, at the places that
+// entries gives them in a row.
+func (s Style) entryGroups(l *Legend) []scene.Item {
+	es, high := s.measure(l)
+	columns := l.columns()
+	gap := l.labelGap(swatchGap)
+	var sides []float64
+	if columns > 0 && l.GridAlign != "none" {
+		// The symbols of a column share the side of the widest.
+		sides = make([]float64, columns)
+		for i, e := range es {
+			sides[i%columns] = math.Max(sides[i%columns], e.side)
+		}
+	}
+	items := make([]scene.Item, len(es))
+	for i, e := range es {
+		side := e.side
+		if sides != nil {
+			side = sides[i%columns]
+		}
+		mid := high/2 - (e.high-e.side)/2
+		sym := e.sym
+		sym.X, sym.Y = side/2+l.SymbolOffset, mid
+		symbols := scene.Mark{Type: scene.Symbol, Role: "legend-symbol", Items: []scene.Item{sym}}
+		if l.ClipHeight > 0 && e.side > l.ClipHeight {
+			// The symbol draws in a group that cuts it to the height of
+			// its row, about its middle. The group fills the entry, so
+			// that the symbol keeps the frame of the entry.
+			mid = high / 2
+			symbols.Items[0].Y = mid
+			symbols = scene.Mark{Type: scene.Group, Role: "legend-clip", Items: []scene.Item{{
+				Width: side + gap + e.width, Height: high, Clip: true, Items: []scene.Mark{symbols},
+			}}}
+		}
+		lab := s.label(side+gap, mid, e.label, LabelSize, 400, s.Theme.Muted, "left", "middle")
+		lab.Limit = l.labelLimit()
+		lab.Datum = map[string]any{"value": e.v, "label": e.label}
+		labels := scene.Mark{Type: scene.Text, Role: "legend-label", Items: []scene.Item{lab}}
+		l.finishLabels(labels.Items)
+		items[i] = scene.Item{Datum: map[string]any{"value": e.v, "label": e.label}, Items: []scene.Mark{symbols, labels}}
+	}
+	return items
+}
+
+// gridEntries places the entries of a legend, each a group, from (x0, y0)
+// by the bounds of what each draws, and returns the middle of the first
+// row. With columns, the entries fill a grid row by row. Each column
+// starts after the right edge of the column before, the padding of the
+// columns, and as far as an entry of the column reaches left of its
+// origin. The rows stack in the same way, and an entry lower than its row
+// stands in the middle of the row. gridAlign all makes each column as
+// wide as the widest and each row as high as the highest. gridAlign none
+// moves each entry right and down by its own reach, not by that of its
+// column or its row. With no columns, the entries stand in a row that
+// wraps at the width of the legend, each entry after the one before it.
+// Each entry is as wide as its column and as high as itself, measured from
+// its origin, as Vega sizes the group of an entry.
+func (s Style) gridEntries(l *Legend, items []scene.Item, x0, y0 float64, columns int) float64 {
+	n := len(items)
+	if n == 0 {
+		return swatch / 2
+	}
+	padX, padY := float64(entryGap), float64(rowHeight-swatch)
+	if l.ColumnPadding != nil {
+		padX = *l.ColumnPadding
+	}
+	if l.RowPadding != nil {
+		padY = *l.RowPadding
+	}
+	// lead is how far a box reaches left of its origin, or above it, in
+	// whole pixels.
+	lead := func(v float64) float64 {
+		if v < 0 {
+			return math.Ceil(-v)
+		}
+		return 0
+	}
+	boxes := make([]Bounds, n)
+	for i := range items {
+		boxes[i] = s.marksBounds(items[i].Items)
+		if boxes[i].IsEmpty() {
+			boxes[i] = Bounds{}
+		}
+	}
+	align := l.GridAlign
+	row, col := make([]int, n), make([]int, n)
+	xs, ys, widths := make([]float64, n), make([]float64, n), make([]float64, n)
+	if columns > 0 {
+		for i := range items {
+			row[i], col[i] = i/columns, i%columns
+		}
+		ext, reach, colWidth := make([]float64, columns), make([]float64, columns), make([]float64, columns)
+		for i, b := range boxes {
+			c := col[i]
+			ext[c] = math.Max(ext[c], math.Ceil(b.X2))
+			reach[c] = math.Max(reach[c], padX+lead(b.X1))
+			colWidth[c] = math.Max(colWidth[c], b.X2)
+		}
+		widest, reachAll := slices.Max(ext), 0.0
+		for i, b := range boxes {
+			if col[i] > 0 {
+				reachAll = math.Max(reachAll, padX+lead(b.X1))
+			}
+		}
+		for i, b := range boxes {
+			c := col[i]
+			switch {
+			case c == 0:
+			case align == "all":
+				xs[i] = xs[i-1] + widest + reachAll
+			case align == "none":
+				xs[i] = xs[i-1] + ext[c-1] + padX + lead(b.X1)
+			default:
+				xs[i] = xs[i-1] + ext[c-1] + reach[c]
+			}
+		}
+		for i := range items {
+			widths[i] = colWidth[col[i]]
+		}
+	} else {
+		// The row wraps before an entry that passes the width of the
+		// legend.
+		r, c := 0, 0
+		widest, reachAll := 0.0, 0.0
+		for i, b := range boxes {
+			widest = math.Max(widest, math.Ceil(b.X2))
+			if i > 0 {
+				reachAll = math.Max(reachAll, padX+lead(b.X1))
+			}
+		}
+		for i, b := range boxes {
+			if i > 0 {
+				x := xs[i-1] + math.Ceil(boxes[i-1].X2) + padX + lead(b.X1)
+				if align == "all" {
+					x = xs[i-1] + widest + reachAll
+				}
+				xs[i], c = x, c+1
+				if l.Width > 0 && x0+x+math.Ceil(b.X2) > l.Width {
+					xs[i], r, c = 0, r+1, 0
+				}
+			}
+			row[i], col[i] = r, c
+			widths[i] = b.X2
+		}
+	}
+	rows := row[n-1] + 1
+	ext, reach := make([]float64, rows), make([]float64, rows)
+	highest, reachAll := 0.0, 0.0
+	for i, b := range boxes {
+		r := row[i]
+		ext[r] = math.Max(ext[r], math.Ceil(b.Y2))
+		highest = math.Max(highest, ext[r])
+		if r > 0 {
+			reach[r] = math.Max(reach[r], padY+lead(b.Y1))
+			reachAll = math.Max(reachAll, reach[r])
+		}
+	}
+	for i, b := range boxes {
+		r := row[i]
+		switch {
+		case r == 0:
+		case align == "all":
+			ys[i] = float64(r) * (highest + reachAll)
+		case align == "none" && columns > 0:
+			// The entry above in the grid is columns before.
+			ys[i] = ys[i-columns] + ext[r-1] + padY + lead(b.Y1)
+		default:
+			for k := 1; k <= r; k++ {
+				ys[i] += ext[k-1] + reach[k]
+			}
+		}
+	}
+	ncols := columns
+	if ncols <= 0 {
+		ncols = n
+	}
+	if align != "none" && ncols != 1 {
+		// An entry lower than its row stands in its middle.
+		for i, b := range boxes {
+			h := ext[row[i]]
+			if align == "all" {
+				h = highest
+			}
+			if d := h - b.Y2; d > 0 {
+				ys[i] += d / 2
+			}
+		}
+	}
+	top, bottom := math.Inf(1), math.Inf(-1)
+	for i := range items {
+		it := &items[i]
+		it.X, it.Y = x0+xs[i], y0+ys[i]
+		it.Width, it.Height = math.Max(0, widths[i]), math.Max(0, boxes[i].Y2)
+		if row[i] == 0 {
+			top, bottom = math.Min(top, it.Y+boxes[i].Y1), math.Max(bottom, it.Y+boxes[i].Y2)
+		}
+	}
+	return (top + bottom) / 2
 }
 
 // legendTitleGap is the space of the look between a title above or below the
@@ -385,7 +724,7 @@ func (l *Legend) nested() bool {
 		l.Opacity != nil || l.Line {
 		return false
 	}
-	if l.Entries || l.ClipHeight > 0 || l.Columns > 0 || l.SymbolSize > 0 || l.RowPadding != nil || l.ColumnPadding != nil ||
+	if l.Entries || l.EntryGroups || l.ClipHeight > 0 || l.Columns > 0 || l.SymbolSize > 0 || l.RowPadding != nil || l.ColumnPadding != nil ||
 		(l.SymbolType != "" && l.SymbolType != "circle") {
 		return false
 	}
@@ -619,32 +958,9 @@ func (s Style) entries(l *Legend, x, y float64, columns int) (scene.Mark, float6
 	symbols := scene.Mark{Type: scene.Symbol, Role: "legend-symbol"}
 	labels := scene.Mark{Type: scene.Text, Role: "legend-label"}
 	clips := scene.Mark{Type: scene.Group, Role: "legend-clip"}
-	vals, rest := l.entryValues()
 	limit := l.labelLimit()
 	gap := l.labelGap(swatchGap)
-	es := make([]entry, len(vals))
-	high := float64(swatch)
-	for i, v := range vals {
-		e := entry{v: v, label: l.label(vals, i), sym: s.swatch(l, v, i)}
-		if rest > 0 && i == len(vals)-1 {
-			e.label = "…" + strconv.Itoa(rest) + " entries"
-		}
-		e.side, e.high = swatch, swatch
-		if e.sym.Size != nil {
-			e.side = math.Max(swatch, math.Sqrt(*e.sym.Size))
-			// The entry reaches down to the bottom of the symbol, which
-			// for a shape of a path is the bottom of the path, as Vega
-			// bounds an entry.
-			b := s.itemBounds(scene.Symbol, &e.sym)
-			e.high = math.Max(swatch, e.side/2+b.Y2)
-		}
-		e.width = math.Min(s.width(LabelSize, 400, e.label), limit)
-		high = math.Max(high, e.high)
-		es[i] = e
-	}
-	if l.ClipHeight > 0 {
-		high = l.ClipHeight
-	}
+	es, high := s.measure(l)
 	gapX, gapY := float64(entryGap), float64(rowHeight-swatch)
 	if l.ColumnPadding != nil {
 		gapX = *l.ColumnPadding
@@ -727,6 +1043,38 @@ func (s Style) entries(l *Legend, x, y float64, columns int) (scene.Mark, float6
 	}
 	entries.Items = []scene.Item{row}
 	return entries, high / 2
+}
+
+// measure returns the entries of a legend before they are placed, and the
+// height of a row: that of the highest symbol, or the clip height of the
+// legend.
+func (s Style) measure(l *Legend) ([]entry, float64) {
+	vals, rest := l.entryValues()
+	limit := l.labelLimit()
+	es := make([]entry, len(vals))
+	high := float64(swatch)
+	for i, v := range vals {
+		e := entry{v: v, label: l.label(vals, i), sym: s.swatch(l, v, i)}
+		if rest > 0 && i == len(vals)-1 {
+			e.label = "…" + strconv.Itoa(rest) + " entries"
+		}
+		e.side, e.high = swatch, swatch
+		if e.sym.Size != nil {
+			e.side = math.Max(swatch, math.Sqrt(*e.sym.Size))
+			// The entry reaches down to the bottom of the symbol, which
+			// for a shape of a path is the bottom of the path, as Vega
+			// bounds an entry.
+			b := s.itemBounds(scene.Symbol, &e.sym)
+			e.high = math.Max(swatch, e.side/2+b.Y2)
+		}
+		e.width = math.Min(s.width(LabelSize, 400, e.label), limit)
+		high = math.Max(high, e.high)
+		es[i] = e
+	}
+	if l.ClipHeight > 0 {
+		high = l.ClipHeight
+	}
+	return es, high
 }
 
 // swatch draws the symbol of one entry at the origin: a rounded square of
