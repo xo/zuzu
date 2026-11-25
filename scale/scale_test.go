@@ -69,6 +69,35 @@ func TestLinear(t *testing.T) {
 	}
 }
 
+// TestLinearRound makes sure that a rounded linear scale rounds a value
+// that lies near a half to the same side as vega.js. vega.js interpolates
+// as a*(1-t) + b*t, so 16.5 of the domain [0, 50] maps to 167.49999999999997
+// of the range [250, 0], and rounds to 167. A domain that runs down gives
+// the same.
+func TestLinearRound(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		domain, rng []any
+	}{
+		{[]any{0.0, 50.0}, []any{250.0, 0.0}},
+		{[]any{50.0, 0.0}, []any{0.0, 250.0}},
+	} {
+		o := Defaults("linear")
+		zero := false
+		o.Domain, o.Range, o.Round, o.Zero = c.domain, c.rng, true, &zero
+		s, err := New(o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := s.Map(16.5); got != 167.0 {
+			t.Errorf("domain %v, range %v: Map(16.5) = %v, want 167", c.domain, c.rng, got)
+		}
+		if got := s.Map(-1.0); got != 255.0 {
+			t.Errorf("domain %v, range %v: Map(-1) = %v, want 255", c.domain, c.rng, got)
+		}
+	}
+}
+
 // TestDivergingScheme makes sure that a scheme of many colors spreads over
 // a domain of three values, so that the middle value takes the middle
 // color and the last value the last color, not the third.

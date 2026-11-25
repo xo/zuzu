@@ -245,9 +245,22 @@ func (s *continuous) Map(v any) any {
 		return color.Mix(s.colors[j], s.colors[j+1], f, s.interp).Hex()
 	}
 	j := min(i, len(s.rng)-2)
-	r := s.rng[j] + f*(s.rng[j+1]-s.rng[j])
+	a, b := s.rng[j], s.rng[j+1]
+	if d1 < d0 {
+		// A domain that runs down maps as the same domain run up, with the
+		// range turned around, so that a value gives the same bits as in
+		// vega.js.
+		a, b, f = b, a, (t-d1)/(d0-d1)
+		if s.clamp {
+			f = math.Max(0, math.Min(1, f))
+		}
+	}
+	// The interpolation of numbers of d3 is a*(1-t) + b*t. Its rounding
+	// differs from a + t*(b-a), and decides on which side a half rounds.
+	// A half rounds up, as Math.round of JavaScript rounds it.
+	r := a*(1-f) + b*f
 	if s.round {
-		r = math.Round(r)
+		r = math.Floor(r + 0.5)
 	}
 	return r
 }

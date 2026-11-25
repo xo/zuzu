@@ -50,6 +50,9 @@ function value(v, depth = 0, seen = new WeakSet()) {
   // A typed array, such as the grid of a density, is an array.
   if (ArrayBuffer.isView(v) && !(v instanceof DataView)) v = Array.from(v);
   if (v instanceof Date) return isNaN(v) ? null : v.toISOString();
+  // A canvas, such as the image of a heatmap, becomes a PNG in a URL of
+  // data, as zuzu writes it.
+  if (v && typeof v.getContext === "function" && typeof v.toDataURL === "function") return v.toDataURL("image/png");
   if (typeof v === "number") return Number.isFinite(v) ? v : String(v);
   if (v === undefined) return null;
   if (v === null || typeof v !== "object") return v;

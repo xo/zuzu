@@ -1,9 +1,74 @@
 package conform
 
 import (
+	"bytes"
+	"encoding/base64"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
+	"maps"
+	"slices"
 	"testing"
 )
+
+// TestPNGDigest makes sure that two PNGs of the same pixels match, though
+// one hides a color under a pixel with no opacity, and that a pixel of
+// another color does not match.
+func TestPNGDigest(t *testing.T) {
+	t.Parallel()
+	url := func(img image.Image) string {
+		var b bytes.Buffer
+		if err := png.Encode(&b, img); err != nil {
+			t.Fatal(err)
+		}
+		return pngPrefix + base64.StdEncoding.EncodeToString(b.Bytes())
+	}
+	a := image.NewNRGBA(image.Rect(0, 0, 2, 1))
+	a.SetNRGBA(0, 0, color.NRGBA{R: 68, G: 1, B: 84, A: 255})
+	a.SetNRGBA(1, 0, color.NRGBA{R: 200, G: 100, B: 50, A: 0})
+	b := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	b.SetRGBA(0, 0, color.RGBA{R: 68, G: 1, B: 84, A: 255})
+	da, ok := pngDigest(url(a))
+	if !ok {
+		t.Fatal("pngDigest does not read the PNG")
+	}
+	if db, _ := pngDigest(url(b)); db != da {
+		t.Errorf("pngDigest = %s, want %s", db, da)
+	}
+	b.SetRGBA(0, 0, color.RGBA{R: 68, G: 1, B: 85, A: 255})
+	if db, _ := pngDigest(url(b)); db == da {
+		t.Errorf("pngDigest of another pixel = %s, the same", db)
+	}
+	if _, ok := pngDigest("data:text/plain,png"); ok {
+		t.Error("pngDigest reads a URL that holds no PNG")
+	}
+}
+
+// TestPaddedScales makes sure that only a linear, a time or a utc scale
+// with a padding, in a spec with the autosize fit, has a domain that
+// depends on the layout of the text.
+func TestPaddedScales(t *testing.T) {
+	t.Parallel()
+	scales := `"scales": [
+		{"name": "x", "type": "time", "padding": 24},
+		{"name": "y", "type": "linear"},
+		{"name": "b", "type": "band", "padding": 0.1}
+	]`
+	for _, c := range []struct {
+		autosize string
+		want     []string
+	}{
+		{`"fit"`, []string{"x"}},
+		{`{"type": "fit-x", "contains": "padding"}`, []string{"x"}},
+		{`"pad"`, nil},
+	} {
+		got := slices.Sorted(maps.Keys(paddedScales([]byte(`{"autosize": ` + c.autosize + `, ` + scales + `}`))))
+		if !slices.Equal(got, c.want) {
+			t.Errorf("autosize %s: paddedScales = %v, want %v", c.autosize, got, c.want)
+		}
+	}
+}
 
 // The exit of phase 3, as docs/PLAN.md states it, in percent.
 const (

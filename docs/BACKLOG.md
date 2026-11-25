@@ -76,14 +76,6 @@ its cause is not known yet.
      the items and the bounds of a group item, `item.mark` in an encoding
      of a guide or of the root group, or a tooltip that shows the item.
      Each goes in the report.
-2. The originals: `contour-plot`, `density-heatmaps`,
-   `labeled-scatter-plot` and `word-cloud` need the npm package `canvas`,
-   which `test/oracle/package.json` does not install. vega.js does not know
-   the projection `airy` of `projections`. Without `canvas`, vega.js also
-   guesses the width of a text as 0.8 of its size for each character, so
-   it cuts a text at a limit where zuzu draws it whole, as the names of
-   the tasks of `deneb/gantt-chart`, and makes the columns of
-   `deneb/pancake-spider-chart` wider.
 
 ### Do the work of D35
 

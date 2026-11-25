@@ -174,19 +174,43 @@ func originalFile(s *source, v variant) string {
 }
 
 // fresh reports whether the cached SVG or error of the original of a source
-// in a variant is newer than the source.
+// in a variant is newer than the source. The original of a spec of the
+// corpus must also be newer than the oracle that draws it.
 func fresh(cfg config, s *source, v variant) bool {
 	src, err := os.Stat(s.path)
 	if err != nil {
 		return false
 	}
+	since := src.ModTime()
+	if s.spec != "" {
+		if t := oracleTime(); t.After(since) {
+			since = t
+		}
+	}
 	file := filepath.Join(cfg.out, originalFile(s, v))
 	for _, p := range []string{file, file + ".err"} {
-		if fi, err := os.Stat(p); err == nil && fi.ModTime().After(src.ModTime()) {
+		if fi, err := os.Stat(p); err == nil && fi.ModTime().After(since) {
 			return true
 		}
 	}
 	return false
+}
+
+// oracleTime returns the time of the newest file of the oracle that draws
+// the originals of the corpus: its scripts, and the lock file that npm
+// install writes in oracle/node_modules. Thus an original is drawn again
+// after a change to a script or to the packages, such as the package
+// canvas, which vega.js needs to draw a heatmap, a label or a word cloud.
+func oracleTime() time.Time {
+	files, _ := filepath.Glob(filepath.Join("oracle", "*.mjs"))
+	files = append(files, filepath.Join("oracle", "node_modules", ".package-lock.json"))
+	var newest time.Time
+	for _, f := range files {
+		if fi, err := os.Stat(f); err == nil && fi.ModTime().After(newest) {
+			newest = fi.ModTime()
+		}
+	}
+	return newest
 }
 
 // readOriginal fills in the original of a job from the cache. The reason is

@@ -71,18 +71,44 @@ runs. To start from nothing, write a `theme/schemes.go` that holds
 
 ## Write the references
 
-The oracle needs Node.js. Run this in this folder:
+The oracle needs Node.js. It also installs the npm package `canvas` (D59).
+vega.js draws the transforms `heatmap`, `label` and `wordcloud` on a canvas,
+and measures text with it. Without a canvas, vega.js fails on these
+transforms and measures a text as 0.8 of its size for each character.
+`canvas` builds against cairo and pango, which `pkg-config` must find. On
+Ubuntu, install the packages that the README of `canvas` names:
 
 ```bash
-(cd oracle && npm install)
+sudo apt-get install build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+```
+
+npm 12 runs the install script of a package only when the field
+`allowScripts` of `package.json` allows it. The field allows the script of
+`canvas` at its pinned version. npm 10, which comes with Node.js 22, runs
+every install script and ignores the field. The script downloads a build of `canvas`
+from its releases on GitHub when one exists for the machine. To build it
+against the cairo of the machine instead, set `npm_config_build_from_source`.
+npm 12 warns that it does not know the setting, and still gives it to the
+script.
+Run this in this folder:
+
+```bash
+(cd oracle && npm_config_build_from_source=true npm install)
 TZ=UTC node oracle/oracle.mjs testdata
 ```
 
 The time zone is UTC, so that the references are the same on every machine.
-On 2026-11-10 it wrote 540 references in about 10 seconds, 174 MB in all, and
-no spec failed in vega.js. Each reference holds what D17 compares: the
+On 2026-11-26 it wrote 540 references in about 10 seconds, 169 MB in all,
+and no spec failed in vega.js. Each reference holds what D17 compares: the
 compiled Vega spec, the rows of each dataset, the type and the domain of each
-scale, and the data of each item of each mark.
+scale, and the data of each item of each mark. The oracle writes a canvas in
+a row, such as the image of a heatmap, as a PNG in a URL of data, as zuzu
+does.
+
+The canvas measures text with the fonts of the machine. So the bounds of a
+text and every place that follows from them differ from one machine to the
+next. D17 compares no layout of text, and the check does not compare those
+places.
 
 The oracle runs each spec twice, with two seeds of the random numbers. If the
 two runs differ, the spec reads random numbers, through `random()` or through
@@ -129,6 +155,18 @@ that name with the dataset of the last group, so the reference holds the
 data of one cell. The check leaves out those names, and does not count
 them.
 
+zuzu and `canvas` write another PNG for the same image. So the check
+compares a PNG in a URL of data by its size and its pixels. A pixel with
+no opacity counts as black.
+
+The padding of a linear, a time or a utc scale grows its domain by a
+number of pixels of its range. With the autosize `fit`, the range is what
+the axes and the title leave of the width or the height, so the domain
+depends on the layout of the text. D17 compares no layout of text. For
+such a scale, the check compares the type and the middle of the domain,
+which the padding does not move. On 2026-11-26 only the scale `x` of
+`flight-passengers` is one.
+
 Add `-vl` to compile each Vega-Lite spec with zuzu rather than run the Vega
 spec of vega-lite.js. It also prints the share of the specs whose compiled
 spec has the structure of the one of vega-lite.js, which phase 4 measures.
@@ -161,7 +199,10 @@ and writes a page that shows the two side by side. The sources are these:
 1. The Vega, Vega-Lite and Deneb specs of the corpus that the inventory
    puts in the first target. The original is vega.js, through
    `oracle/svg.mjs`. vega-lite.js compiles a Vega-Lite spec for the
-   original, and zuzu compiles it for the zuzu side.
+   original, and zuzu compiles it for the zuzu side. vega.js draws on the
+   canvas of the npm package `canvas`, as the oracle does, so it draws
+   `contour-plot`, `density-heatmaps`, `labeled-scatter-plot` and
+   `word-cloud` too.
 2. The fixtures of DOT in `testdata/diagrams/dot`. The original is
    `dot -Tsvg` of Graphviz.
 3. The fixtures of Mermaid in `testdata/diagrams/mermaid` and in
@@ -187,8 +228,10 @@ go run ./cmd/review
 It writes `index.html` and the SVG files to `docs/review` in the root of
 the repository, which git ignores. On 2026-11-12 it drew 863 sources in
 about 17 seconds. It keeps the SVG of each original, and draws an
-original again only when its source is newer. A second run takes about 2
-seconds. The flags are these:
+original again only when its source is newer. It also draws an original
+of the corpus again when a script in `oracle` or the file
+`oracle/node_modules/.package-lock.json`, which `npm install` writes, is
+newer. A second run takes about 2 seconds. The flags are these:
 
 | Flag | What it does |
 | --- | --- |

@@ -508,7 +508,9 @@ The corpus of `vegagoja` is the test of compatibility (D17). It holds:
 Those files came from Vega-Lite 5.18.1 and Vega 5.29.0. The oracle makes them
 again with the current releases, Vega-Lite 6.5.0 and Vega 6.4.0. The test
 module runs vega.js in Node.js, as an oracle, and the module that a user
-imports never does.
+imports never does. The oracle gives vega.js the canvas of the npm package
+`canvas` (D59). The canvas measures text with the fonts of the machine, so
+the check compares nothing that depends on the measure of text.
 
 zuzu does not reproduce the look of Vega (D12), so a comparison of SVG or
 pixels with vega.js tells nothing. D17 decides what the comparison measures
@@ -791,6 +793,34 @@ the Vega check, and only `density-heatmaps` and `flight-passengers`
 differ. The Vega-Lite check matches 464 of 470 specs, 98.7 percent, and
 every one of its 1193 scales.
 
+On 2026-11-26 the oracle installs the npm package `canvas` (D59). vega.js
+then draws the heatmap of `density-heatmaps`, the label of
+`labeled-scatter-plot` and the word cloud of `word-cloud`, and measures
+text with the canvas. 18 references change:
+
+- `density-heatmaps` now holds the 3 rows of its dataset `density` and
+  the 3 image items of the cells. The image of each row differed from
+  vega.js in some pixels. A rounded linear scale of zuzu rounded a
+  position near a half, such as 167.49999999999997 in vega.js, to the
+  other side, so the counts of the grid of `kde2d` differed. zuzu now
+  interpolates a number as `a*(1-t) + b*t`, the form that d3 documents,
+  and the pixels match.
+- `contour-plot` now holds the path mark of its contours and the entries
+  of its legend. They were missing while vega.js failed on its heatmap.
+  zuzu draws them.
+- `flight-passengers` has another domain of `x`, because the width that
+  the autosize `fit` leaves depends on the measure of text. The check now
+  compares the middle of such a domain, as `test/README.md` says.
+- The other 15 change only the bounds of a text, the places that follow
+  from them and the ids of the operators of vega.js, which the check does
+  not compare.
+
+`word-cloud` reads random numbers, so the check compares only its counts,
+and the reference does not change. With these, all 540 specs match the
+Vega check. The Vega-Lite check does not change. vega.js does not know
+the projection `airy` of `projections`, but the oracle and `svg.mjs`
+register it with the other projections of D52, so the original draws it.
+
 The dataset `source_0` of `bar_heatlane` has 11 rows in zuzu, where
 vega.js has 10. vega-lite.js moves the filter of invalid values of its two
 layers into `source_0`. zuzu keeps a filter in each layer, because merging
@@ -821,8 +851,9 @@ no offset that wiggles, and the violin estimates with the Gaussian kernel
 of `kde`.
 
 On 2026-11-11 the transform `label` exists, and phase 5 is done. vega.js
-needs a canvas for `label`, so Node.js gives no reference for the places,
-and a test of the package `dataflow` checks them instead. zuzu chose these
+needs a canvas for `label`. The oracle has one since D59, but a reference
+holds no place of an item, so a test of the package `dataflow` checks the
+places instead. zuzu chose these
 rules where the documents of Vega say nothing (D6):
 
 - A label covers no pixel that a mark to avoid or an earlier label covers.

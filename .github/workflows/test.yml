@@ -141,9 +141,21 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install cairo and pango
+        # The npm package canvas builds against them, as its README says.
+        # vega.js draws a heatmap, a label and a word cloud on its canvas,
+        # and measures text with it (D59).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+
       - name: Install the oracle
-        # vega and vega-lite are pinned in test/oracle/package.json.
+        # vega, vega-lite and canvas are pinned in test/oracle/package.json.
+        # canvas builds against the cairo of the runner, as on the machine
+        # of a maintainer, not from a build that it downloads.
         working-directory: test/oracle
+        env:
+          npm_config_build_from_source: "true"
         run: npm install --no-audit --no-fund
 
       - name: Write the references

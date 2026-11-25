@@ -85,9 +85,9 @@ async function draw(job) {
     if (errors.length > 0) {
       let msg = errors.join("\n");
       // The transforms heatmap, label and wordcloud draw on a canvas, and
-      // vega.js has none in Node.js without the package canvas.
+      // vega.js has none in Node.js when the package canvas did not build.
       if (/getContext|of null \(setting 'height'\)/.test(msg)) {
-        msg += "\nvega.js needs the npm package canvas for this spec, which oracle/package.json does not install";
+        msg += "\nvega.js needs the npm package canvas for this spec: run npm install in test/oracle, as test/README.md says";
       }
       throw new Error(msg);
     }

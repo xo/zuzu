@@ -8,11 +8,15 @@
     "@fontsource/open-sans": "5.3.0",
     "@fortawesome/fontawesome-free": "7.3.1",
     "@iconify/utils": "3.1.7",
+    "canvas": "3.2.3",
     "d3-geo-projection": "4.0.0",
     "katex": "0.18.10",
     "mermaid": "12.3.0",
     "puppeteer-core": "25.17.0",
     "vega": "6.4.0",
     "vega-lite": "6.5.0"
+  },
+  "allowScripts": {
+    "canvas@3.2.3": true
   }
 }

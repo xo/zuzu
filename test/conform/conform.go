@@ -1,14 +1,20 @@
 // Package conform compares what zuzu works out for a spec with the
 // references of vega.js (D17): the rows of each dataset, and the type and
 // the domain of each scale. It compares meaning, not look, so it never
-// compares a position or a color.
+// compares the position or the color of an item. The image of a heatmap is
+// a value of its rows, and compares by its pixels.
 package conform
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
+	"image/color"
+	"image/png"
 	"math"
 	"math/rand/v2"
 	"os"
@@ -188,6 +194,7 @@ func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Res
 		snames = append(snames, name)
 	}
 	slices.Sort(snames)
+	padded := paddedScales(vegaSrc)
 	for _, name := range snames {
 		want := ref.Scales[name]
 		s, err := view.Scale(name)
@@ -201,7 +208,11 @@ func Check(ctx context.Context, ref *Reference, corpus string, compile bool) Res
 			res.ScalesOK++
 			continue
 		}
-		if d := compareScale(s, want.Type, want.Domain); d != "" {
+		compare := compareScale
+		if padded[name] {
+			compare = compareMiddle
+		}
+		if d := compare(s, want.Type, want.Domain); d != "" {
 			res.Diffs = append(res.Diffs, fmt.Sprintf("scale %s: %s", name, d))
 			continue
 		}
@@ -395,6 +406,84 @@ func compareScale(s scale.Scale, typ string, domain jsontext.Value) string {
 	return ""
 }
 
+// paddedScales returns the names of the scales of the top level of a Vega
+// spec whose domain depends on the layout of the text (D17). The padding
+// of a linear, a time or a utc scale grows its domain by a number of
+// pixels of its range. The autosize fit makes the range what is left of
+// the width or the height after the axes and the title, so the size of
+// their text changes the domain.
+func paddedScales(src []byte) map[string]bool {
+	var spec struct {
+		Autosize jsontext.Value `json:"autosize"`
+		Scales   []struct {
+			Name    string         `json:"name"`
+			Type    string         `json:"type"`
+			Padding jsontext.Value `json:"padding"`
+		} `json:"scales"`
+	}
+	if json.Unmarshal(src, &spec) != nil {
+		return nil
+	}
+	var autosize string
+	if json.Unmarshal(spec.Autosize, &autosize) != nil {
+		var o struct {
+			Type string `json:"type"`
+		}
+		_ = json.Unmarshal(spec.Autosize, &o)
+		autosize = o.Type
+	}
+	if !strings.HasPrefix(autosize, "fit") {
+		return nil
+	}
+	out := map[string]bool{}
+	for _, s := range spec.Scales {
+		if len(s.Padding) > 0 && slices.Contains([]string{"linear", "time", "utc"}, s.Type) {
+			out[s.Name] = true
+		}
+	}
+	return out
+}
+
+// compareMiddle compares the type of a scale that paddedScales names, and
+// the middle of its domain. The padding grows both ends of the domain by
+// the same amount, so the middle does not depend on the layout.
+func compareMiddle(s scale.Scale, typ string, domain jsontext.Value) string {
+	if s.Type() != typ {
+		return fmt.Sprintf("type %s, want %s", s.Type(), typ)
+	}
+	var w []any
+	if err := json.Unmarshal(domain, &w); err != nil {
+		return err.Error()
+	}
+	g, _ := plain(s.Domain(), 1, map[uintptr]bool{}).([]any)
+	middle := func(d []any) any {
+		if len(d) != 2 {
+			return d
+		}
+		var ends [2]float64
+		for i, v := range d {
+			switch x := v.(type) {
+			case float64:
+				ends[i] = x
+			case string:
+				t, err := time.Parse(time.RFC3339Nano, x)
+				if err != nil {
+					return d
+				}
+				ends[i] = float64(t.UnixMilli())
+			default:
+				return d
+			}
+		}
+		return (ends[0] + ends[1]) / 2
+	}
+	got, want := canonical(middle(g)), canonical(middle(w))
+	if got != want {
+		return fmt.Sprintf("middle of the domain %s, want %s", clip(got), clip(want))
+	}
+	return ""
+}
+
 // plain turns a value of zuzu into the JSON that the oracle writes: a date
 // is an ISO string in UTC, a number that is not finite is a string, and
 // undefined is null. As the oracle does, an array below the second level
@@ -497,6 +586,11 @@ func write(b *strings.Builder, v any) {
 		}
 		b.WriteString(strconv.FormatFloat(x, 'g', 8, 64))
 	case string:
+		if d, ok := pngDigest(x); ok {
+			// zuzu and node-canvas write another PNG for the same image, so
+			// an image compares by its size and its pixels.
+			x = d
+		}
 		if pathString.MatchString(x) {
 			// The numbers of an SVG path compare as numbers do.
 			x = pathNumber.ReplaceAllStringFunc(x, func(n string) string {
@@ -547,6 +641,41 @@ func write(b *strings.Builder, v any) {
 	default:
 		fmt.Fprintf(b, "%v", x)
 	}
+}
+
+// pngPrefix starts a URL of data that holds a PNG, as the image of a
+// heatmap in zuzu and in the oracle.
+const pngPrefix = "data:image/png;base64,"
+
+// pngDigest returns the size of the PNG in a URL of data and a digest of
+// its pixels, without the premultiplied alpha. A pixel with no opacity
+// counts as black, since its color is not drawn. It reports false for a
+// string that is not such a URL.
+func pngDigest(s string) (string, bool) {
+	b64, ok := strings.CutPrefix(s, pngPrefix)
+	if !ok {
+		return "", false
+	}
+	b, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return "", false
+	}
+	img, err := png.Decode(bytes.NewReader(b))
+	if err != nil {
+		return "", false
+	}
+	r := img.Bounds()
+	h := sha256.New()
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			c, _ := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			if c.A == 0 {
+				c = color.NRGBA{}
+			}
+			h.Write([]byte{c.R, c.G, c.B, c.A})
+		}
+	}
+	return fmt.Sprintf("png %dx%d %x", r.Dx(), r.Dy(), h.Sum(nil)), true
 }
 
 // compareStructure compiles a Vega-Lite spec with zuzu and compares the

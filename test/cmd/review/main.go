@@ -14,7 +14,9 @@
 // each with its error of the places of the nodes (D44).
 //
 // It keeps the SVG of each original in the output folder, and draws an
-// original again only when its source is newer, or with -force.
+// original again only when its source is newer, or with -force. It also
+// draws an original of the corpus again when a script of the oracle or
+// the packages that npm installs in oracle are newer.
 package main
 
 import (
