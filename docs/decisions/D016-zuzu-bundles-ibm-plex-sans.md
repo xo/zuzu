@@ -1,6 +1,6 @@
 # D16. zuzu bundles IBM Plex Sans
 
-Status: Decided. Amended by D32, D34, D35 and D36.
+Status: Decided. Amended by D32, D34, D35, D36 and D58.
 
 The maintainers decided on 2026-11-10, answering open question 2, that zuzu
 bundles IBM Plex Sans. The targets already use it (D13).

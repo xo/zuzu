@@ -504,7 +504,7 @@ diagram and a ZenUML diagram, a `%%` after a colon, in the text of a
 label or a message, is text. A comment can follow the keyword of the kind
 with no space, as in `sequenceDiagram%% a comment`. zuzu reads
 `flowchart LR %% a comment` and `a --> b %% a comment` with a comment, and
-mmdc reads each as an error. The kinds that read their source by a
+mmdc reads each as an error. This is a known difference (D58). The kinds that read their source by a
 grammar of their own, such as the railroad diagrams, the tree view and
 the use case diagram, read their comments as their sections say.
 
@@ -1912,6 +1912,12 @@ icon in the line of a label, such as `fa:fa-gear`, is a part of the box.
 A class diagram, an entity relationship diagram and a requirement diagram
 do not read the setting, as in Mermaid. A swimlane diagram reads it in
 the section `flowchart`, and `swimlane.minNodeWidth` is an issue.
+
+zuzu measures a label in IBM Plex Sans, and Mermaid measures it in the
+font of the browser. So a label with a word that is wider than
+`minNodeWidth` in the font of Mermaid can be narrower than the least width
+in zuzu. The node then takes the least width in zuzu, and in Mermaid it is
+as wide as its label. This is a known difference (D58).
 
 The setting can be in the front matter or in a directive, as each
 setting can. 0 turns it off, and each node fits its label. A value that
@@ -3973,8 +3979,11 @@ issue. The other kinds, such as a gantt, a timeline, a pie or a C4
 diagram, draw the source in Mermaid too, and that is no issue either.
 
 The browser of Mermaid draws math in its own font of math, not in STIX Two
-Math, so the sizes differ a little. The tests compare the size of a label
-with math to mmdc within the tolerance of the diagrams (D31).
+Math, so the sizes differ. Its formulas are often wider: `x^2` by about a
+third, and a lone relation such as `\subset` more than twice. This is a
+known difference (D58), because only the font of the browser removes it.
+The tests compare the size of a label with math to mmdc within the
+tolerance of the diagrams (D31).
 
 ## Emoji and missing characters
 

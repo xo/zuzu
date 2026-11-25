@@ -29,9 +29,7 @@ zuzu did all of its parts, and drew every kind of Mermaid 12.3 that part
    rule evenodd.
 2. Only `zuzu.lookSeed` and `handDrawnSeed` set the seed. No option of
    the caller sets it.
-3. No target SVG shows the look, and `docs/targets/gen-targets.mjs` does
-   not draw it (hard rule 13).
-4. Vega-Lite turns the labels of a discrete x axis by 270 degrees, and
+3. Vega-Lite turns the labels of a discrete x axis by 270 degrees, and
    the compiler of zuzu passes it on (`axisOf` in `vegalite/view.go`), in
    the standard look and in the look like Excalidraw alike, as in
    `testdata/look/bar.vl.json`. Drawing them flat when each label fits
@@ -71,25 +69,11 @@ third, a gantt with `dateFormat ss` and a start of `0`, draws since
    `ignoreCrossLaneEdges: false`, `automaticLaneOrdering`, or the hops of
    lines. Some of its routes share a line, and the titles of its lanes do
    not turn in a layout LR, as mmdc turns them.
-3. The kinds that read a comment by the rule of the flowchart accept
-   `flowchart LR %% c`, which mmdc rejects.
-
-### Draw the math of KaTeX as Mermaid does
-
-D36. The browser of Mermaid draws MathML in its own font of math. Its
-formulas are often wider than those of STIX Two Math, which zuzu draws
-with the math layout of okage: `x^2` by about a third, and a lone
-relation such as `\subset` more than twice.
 
 ### Draw more of Mermaid
 
-1. In the mode `compact` of a gantt whose tasks all end before the first
-   start, the names of the tasks do not take the backward axis into
-   account.
-2. A label with a word that is wider than `minNodeWidth` in the font of
-   mmdc can be narrower than the least width in zuzu, because zuzu measures
-   it with IBM Plex Sans. The node then takes the least width in zuzu, and
-   in Mermaid it is as wide as its label.
+In the mode `compact` of a gantt whose tasks all end before the first
+start, the names of the tasks do not take the backward axis into account.
 
 ### Fix what the review page found
 
@@ -98,12 +82,7 @@ diagrams with its original renderer and with zuzu, side by side. On
 2026-11-12 it showed these differences. Each one is what the page shows, and
 its cause is not known yet.
 
-1. Vega-Lite:
-   - The dataset `source_0` of `bar_heatlane` has 11 rows, where vega.js
-     has 10. vega-lite.js moves the filter of invalid values of its two
-     layers into `source_0`. zuzu keeps a filter in each layer, because
-     merging such filters in every spec makes 7 other specs differ.
-2. Vega:
+1. Vega:
    - The interrupted and polyhedral projections of D52 leave the meridian
      at ±180° and a strip of 1e-6 radians along each cut out of their clip.
      d3-geo-projection draws the meridian at -180° along the west edge of
@@ -124,7 +103,7 @@ its cause is not known yet.
      the items and the bounds of a group item, `item.mark` in an encoding
      of a guide or of the root group, or a tooltip that shows the item.
      Each goes in the report.
-3. The originals: `contour-plot`, `density-heatmaps`,
+2. The originals: `contour-plot`, `density-heatmaps`,
    `labeled-scatter-plot` and `word-cloud` need the npm package `canvas`,
    which `test/oracle/package.json` does not install. vega.js does not know
    the projection `airy` of `projections`. Without `canvas`, vega.js also
@@ -185,22 +164,3 @@ image draws the same font that the layout measured. A character that IBM
 Plex Sans and the font of `WithEmoji` lack draws nothing, and the report
 names it (D32). The option `WithFonts` of API.md, which gives other fonts,
 and a fallback to the fonts of the system, are not done.
-
-## Survey
-
-### Add the libraries that the comparison page leaves out
-
-`docs/survey/compare.html` leaves out four libraries that the survey names:
-
-1. The diagram tool D2, which has a WebAssembly build for the browser and no
-   plain script.
-2. Nivo, which has no build that a page can load without a bundler.
-3. ggplot2 and Seaborn, which need R and the Python packages that Seaborn
-   brings. `gen-static.py` can draw Seaborn as it draws Matplotlib.
-4. Graphviz and Mermaid from the command line, `dot` and `mmdc`, to compare
-   with their browser builds on the same graph.
-
-### Draw the charts that the page marks as missing in Matplotlib
-
-The treemap, the sunburst, the sankey and the map have no Matplotlib image.
-Each needs another package: squarify, nested pies by hand, or geopandas.

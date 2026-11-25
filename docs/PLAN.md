@@ -782,6 +782,12 @@ the Vega check, and only `density-heatmaps` and `flight-passengers`
 differ. The Vega-Lite check matches 464 of 470 specs, 98.7 percent, and
 every one of its 1193 scales.
 
+The dataset `source_0` of `bar_heatlane` has 11 rows in zuzu, where
+vega.js has 10. vega-lite.js moves the filter of invalid values of its two
+layers into `source_0`. zuzu keeps a filter in each layer, because merging
+such filters in every spec makes 7 other specs differ. This is a known
+difference (D58).
+
 zuzu chose these rules where the documents of Vega say nothing (D6):
 
 - `kde`, `density` and `regression` read a missing value as 0, as the
@@ -1153,7 +1159,8 @@ stays true.
 3. Answered on 2026-11-10 by D12: the default theme has the look of zuzu.
 4. Does the browser component receive the scene graph from the server, or
    the spec and the data for vega.js? See "The browser" above. The maintainers
-   left this to be decided later, on 2026-11-10.
+   left this to be decided later, on 2026-11-10, and again on 2026-11-25
+   (D58), when phase 8 starts.
 5. Answered on 2026-11-10 by D7: events are not in the first release, and
    can come at a later date.
 6. Answered on 2026-11-10 by D6: zuzu follows the documented behavior and
@@ -1211,11 +1218,8 @@ stays true.
 29. Answered on 2026-11-20 by D35: the maintainers accept the parameters
     `lanes` and `laneEdges` of `zuzu.layered`, and the fields `titleWidth`
     and `titleHeight` of a row of a cluster.
-30. Which font of each kind does zuzu bundle (D35 part 11)? The candidates
-    are JetBrains Mono or IBM Plex Mono for the monospace, Inter or Source
-    Sans 3 for the humanist sans, IBM Plex Serif or Source Serif 4 for the
-    serif, and Nunito or Quicksand for the rounded sans. Each one must be
-    under the Open Font License or a license like it (D16).
+30. Answered on 2026-11-25 by D58: zuzu bundles IBM Plex Mono, Inter, IBM
+    Plex Serif and Nunito.
 31. Answered on 2026-11-20 by D36: zuzu draws the math of KaTeX in a label
     of Mermaid with the math layout of okage (okage D78), in STIX Two Math
     from an optional package that `zuzu.WithMath` adds. It draws each

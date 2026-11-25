@@ -15,7 +15,7 @@ done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
 draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
 of DOT and Mermaid of D31, and since then every other kind of Mermaid
 12.3, in the order of D32. Code follows the plan (D3).
-Every decision from D1 to D57 is decided. The open questions are at the
+Every decision from D1 to D58 is decided. The open questions are at the
 end of `docs/PLAN.md`.
 
 ## Standing rules
@@ -120,7 +120,9 @@ the end of `docs/PLAN.md` until the maintainers answer it.
 13. The look follows `docs/STYLE.md`. Change a token there first, then in
     the package `theme`, then in `docs/targets/gen-targets.mjs`, then draw
     the targets again (D12, D13).
-    A target uses only the parts of SVG that okage renders.
+    A target uses only the parts of SVG that okage renders. The look drawn
+    by hand has no targets. Its golden files in `testdata/look` show it
+    (D58).
 14. Ask at least two of Gemini, DeepSeek and Astra before you propose a
     decision that changes the architecture, and write what each one said in
     `docs/PLAN.md`, under External review. Treat every answer as a lead, and
