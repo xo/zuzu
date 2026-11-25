@@ -246,6 +246,22 @@ in the test module, is the oracle that finds each difference from
 JavaScript (D33). The browser component runs the same expressions as
 JavaScript.
 
+An expression of an encoding reads `item` as vega.js gives it (D59). zuzu
+applies the properties of each set of an encode in the order of the spec,
+enter before update, as vega.js does. So an expression reads `item.x` and
+each other property that an earlier property set. After each set, it reads
+the place and the size that `x2`, `xc`, `y2` and `yc` give. `item.mark`
+gives the kind, the name, the role, the group and the items of the mark,
+also in an encoding of a guide and of the root group. `item.items` gives
+the marks of a group item. An item of a guide gives the text and the place
+that the layout of zuzu gives it. A property that an encode of the spec
+names is undefined until the encode sets it, as in vega.js. The place is
+in the frame of Vega for the parts of an axis. zuzu does not know that
+frame for a legend or a title, so the place of their items goes in the
+report, as does the size of an item of a guide. `item.bounds` is a known
+difference and goes in the report. vega.js gives the bounds only from an
+earlier pulse, after it draws the item, and zuzu draws a chart once.
+
 ## Rendering
 
 ### SVG

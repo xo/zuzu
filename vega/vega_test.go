@@ -114,3 +114,34 @@ func TestParseCompiled(t *testing.T) {
 		}
 	}
 }
+
+// TestPropsOrder checks that the properties of a set of encodings keep the
+// order of the spec when they are read and written back, and that the
+// properties that Go code adds come after them, in the order of the names.
+func TestPropsOrder(t *testing.T) {
+	t.Parallel()
+	var enc Encode
+	if err := json.Unmarshal([]byte(`{"update": {"y": {"value": 1}, "x": {"signal": "item.y"}, "fill": {"value": "red"}}}`), &enc); err != nil {
+		t.Fatal(err)
+	}
+	props := enc["update"]
+	props["b"] = Production{{Signal: "1"}}
+	props["a"] = Production{{Signal: "2"}}
+	if got, want := strings.Join(props.Names(), " "), "y x fill a b"; got != want {
+		t.Errorf("the names = %s, want %s", got, want)
+	}
+	out, err := json.Marshal(props)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(out), `{"y":{"value":1},"x":{"signal":"item.y"},"fill":{"value":"red"},"a":{"signal":"2"},"b":{"signal":"1"}}`; got != want {
+		t.Errorf("the properties written = %s, want %s", got, want)
+	}
+	var none Props
+	if err := json.Unmarshal([]byte(`null`), &none); err != nil || none != nil {
+		t.Errorf("null = %v, %v, want nil", none, err)
+	}
+	if err := json.Unmarshal([]byte(`[1]`), &none); err == nil {
+		t.Error("an array reads with no error")
+	}
+}

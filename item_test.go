@@ -2,6 +2,7 @@ package zuzu
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +105,84 @@ func TestItemTooltip(t *testing.T) {
 		if it.Tooltip != "" {
 			t.Errorf("the tooltip = %q, want none", it.Tooltip)
 		}
+	}
+}
+
+// itemOrderSpec is a spec whose encodings read item in each way that
+// vega.js gives it: a property that an earlier property or an earlier set
+// set, the place that x2 and y2 give after each set, the items of a mark
+// before and after their encodings run, the marks of a group item, and the
+// mark of the root group.
+const itemOrderSpec = `{"$schema": "https://vega.github.io/schema/vega/v5.json", "width": 200, "height": 100,
+ "data": [{"name": "t", "values": [{"v": 1}, {"v": 2}, {"v": 3}]}],
+ "encode": {"update": {"description": {"signal": "item.mark.marktype + '|' + item.mark.role + '|' + item.mark.name + '|' + item.mark.items.length + '|' + item.mark.group + '|' + item.items.length"}}},
+ "marks": [
+  {"type": "rect", "name": "r", "from": {"data": "t"}, "encode": {
+    "enter": {"x": {"value": 50}, "x2": {"value": 10}, "y": {"signal": "item.width"}},
+    "update": {"height": {"signal": "item.width"}, "y2": {"value": 70}}}},
+  {"type": "text", "name": "a", "role": "a", "from": {"data": "t"}, "encode": {
+    "enter": {"x": {"value": 5}, "y": {"signal": "item.x + datum.v"}},
+    "update": {"text": {"signal": "item.x + '|' + item.y + '|' + item.width + '|' + item.text + '|' + item.mark.items.length + '|' + item.mark.items[0].y + '|' + item.mark.items[2].x + '|' + item.datum.v"}}}},
+  {"type": "text", "name": "b", "role": "b", "encode": {"update": {"text": {"signal": "item.mark.group.items.length + '|' + item.mark.group.items[0].marktype + '|' + item.mark.group.items[0].items[1].x + '|' + item.mark.group.items[0].items[1].x2 + '|' + item.mark.group.items[0].items[1].y + '|' + item.mark.group.items[0].items[1].width + '|' + item.mark.group.items[0].items[1].height + '|' + item.mark.group.items[1].name + '|' + item.mark.group.mark.name + '|' + item.mark.group.mark.role + '|' + item.mark.group.mark.group + '|' + item.mark.group.description"}}}},
+  {"type": "group", "name": "g", "from": {"data": "t"}, "encode": {"update": {"x": {"value": 1}, "width": {"signal": "item.items.length"}, "height": {"signal": "item.x + 7"}}},
+   "marks": [{"type": "text", "name": "gt", "role": "gt", "encode": {"update": {"text": {"signal": "item.mark.group.items.length + '|' + item.mark.group.width + '|' + item.mark.group.height + '|' + item.mark.group.mark.items.length + '|' + item.mark.group.mark.items[0].items.length + '|' + item.mark.group.datum.v + '|' + item.mark.group.mark.group.items.length"}}}}]}
+ ]}`
+
+// itemAxisSpec is a spec whose encoding of the labels of an axis reads
+// item.mark, the place that the layout gives a label, and the text that
+// the encoding sets.
+const itemAxisSpec = `{"$schema": "https://vega.github.io/schema/vega/v5.json", "width": 200, "height": 100,
+ "scales": [{"name": "x", "type": "linear", "domain": [0, 3], "range": "width"}],
+ "axes": [{"orient": "bottom", "scale": "x", "values": [0, 3], "encode": {"labels": {"name": "lab", "update": {"text": {"signal": "item.mark.marktype + '|' + item.mark.role + '|' + item.mark.name + '|' + item.mark.items.length + '|' + item.mark.group.mark.role + '|' + item.mark.group.mark.group.mark.name + '|' + item.datum.value + '|' + item.x + '|' + item.text"}}}}}]
+}`
+
+// TestItemOrder checks that an encoding reads item as vega.js 6.4.0 gives
+// it. The texts that each case wants are the texts of the scene that
+// vega.js draws for the same spec.
+func TestItemOrder(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name string
+		spec string
+		role string
+		want []string
+	}{
+		{"properties in order", itemOrderSpec, "a", []string{
+			"5|6|undefined|undefined|3|6|undefined|1",
+			"5|7|undefined|undefined|3|6|undefined|2",
+			"5|8|undefined|undefined|3|6|5|3",
+		}},
+		{"marks of the root group", itemOrderSpec, "b", []string{
+			"3|rect|10|50|30|40|40|a|root|frame|undefined|group|frame|root|1|undefined|0",
+		}},
+		{"marks of a group item", itemOrderSpec, "gt", []string{
+			"1|0|8|3|1|1|4",
+			"1|0|8|3|1|2|4",
+			"1|0|8|3|1|3|4",
+		}},
+		{"mark of a guide", itemAxisSpec, "axis-label", []string{
+			"text|axis-label|lab|2|axis|root|0|0|undefined",
+			"text|axis-label|lab|2|axis|root|3|200|undefined",
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			c, _, err := Parse([]byte(test.spec), WithStrict(true))
+			if err != nil {
+				t.Fatal(err)
+			}
+			s, _, err := c.Render(t.Context(), WithLocation(time.UTC))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, it := range roleItems(s, test.role) {
+				got = append(got, strings.Join(it.Text, ""))
+			}
+			if !slices.Equal(got, test.want) {
+				t.Errorf("the texts =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(test.want, "\n"))
+			}
+		})
 	}
 }
 

@@ -1024,6 +1024,7 @@ func axisFrame(ax *layout.Axis) guideFrame {
 // vega.js. A nil frame, or a part whose frame does not apply, puts an
 // encode of a place in the report.
 func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[string]string, frame guideFrame, path, kind string) error {
+	var top *markState
 	for _, name := range slices.Sorted(maps.Keys(enc)) {
 		el := enc[name]
 		role, ok := parts[name]
@@ -1055,29 +1056,42 @@ func (s *scope) guideEncode(m *scene.Mark, enc vega.GuideEncode, parts map[strin
 			}
 			sets[set] = kept
 		}
+		if top == nil {
+			// The marks of the guide, which an expression of an encode
+			// reads as item.mark, are made once for every part.
+			top = &markState{sm: m, s: s, group: s.group(), guide: true, frame: frame}
+		}
+		ordered := orderEncode(sets)
 		var err error
-		var walk func(m *scene.Mark)
-		walk = func(m *scene.Mark) {
-			for i := range m.Items {
-				it := &m.Items[i]
-				if m.Role == role && err == nil {
-					st := &itemState{it: it, set: map[string]bool{}}
+		var walk func(ms *markState)
+		walk = func(ms *markState) {
+			if ms.sm.Role == role {
+				ms.sets = ordered
+				if el.Name != "" {
+					ms.name = el.Name
+				}
+			}
+			for _, st := range ms.itemStates() {
+				it := st.it
+				if ms.sm.Role == role && err == nil {
 					// A rule whose default has one end across an
 					// axis, such as a line of the grid, keeps that end
 					// with the other when an encode moves the other,
 					// as a rule of Vega with no x2 or y2 does.
 					flatX, flatY := it.X2 == it.X, it.Y2 == it.Y
-					err = s.encodeItem(sets, st, it.Datum, "/encode/"+name)
+					err = s.applyEncode(ordered, st, it.Datum, "/encode/"+name)
 					if err == nil {
-						placeGuideItem(m.Type, st, ox, oy, flatX, flatY)
+						placeGuideItem(ms.sm.Type, st, ox, oy, flatX, flatY)
 					}
 				}
-				for j := range it.Items {
-					walk(&it.Items[j])
+				if l := st.marks(); l != nil {
+					for _, k := range l.marks {
+						walk(k)
+					}
 				}
 			}
 		}
-		walk(m)
+		walk(top)
 		if err != nil {
 			return err
 		}

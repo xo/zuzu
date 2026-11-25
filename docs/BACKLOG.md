@@ -67,15 +67,9 @@ diagrams with its original renderer and with zuzu, side by side. On
 2026-11-12 it showed these differences. Each one is what the page shows, and
 its cause is not known yet.
 
-1. Vega:
-   - An expression of an encoding reads `item` as the scene graph of Vega
-     gives it: `item.datum`, and `item.mark` with its marktype, name, role
-     and group. zuzu does not give the properties that the encodings of the
-     item set, such as `item.x`, because it does not apply them in the
-     order of the spec. It does not give `item.bounds`, `item.mark.items`,
-     the items and the bounds of a group item, `item.mark` in an encoding
-     of a guide or of the root group, or a tooltip that shows the item.
-     Each goes in the report.
+In Vega, a tooltip whose value is the item, such as
+`"tooltip": {"signal": "item"}`, shows each field of the item in vega.js.
+zuzu draws no such tooltip, and it goes in the report.
 
 ### Do the work of D35
 

@@ -87,8 +87,12 @@ func (rt *runtime) render() (*scene.Scene, error) {
 			}
 		}
 	}
+	// The root group has a mark of its own, named root, as in vega.js.
+	root := &markState{sm: &scene.Mark{Type: scene.Group, Role: "frame", Name: "root"}, s: s}
+	rootItem := &itemState{it: item, set: map[string]bool{}, mark: root, items: &s.marks}
+	root.states, s.mark = []*itemState{rootItem}, root
 	if len(s.spec.Encode) > 0 {
-		st := &itemState{it: item, set: map[string]bool{}}
+		st := rootItem
 		if err := s.encodeItem(s.spec.Encode, st, map[string]any{}, ""); err != nil {
 			return nil, err
 		}

@@ -1,8 +1,11 @@
 package vega
 
 import (
+	"cmp"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"slices"
+	"strings"
 )
 
 // Extra holds the properties of an object that the types do not know, so
@@ -515,8 +518,88 @@ type Sort struct {
 type Encode map[string]Props
 
 // Props holds the encodings of the properties of a mark, such as x and
-// fill.
+// fill. Vega applies them in the order of the spec, so that a property can
+// read what an earlier one set. Names gives that order.
 type Props map[string]Production
+
+// UnmarshalJSONFrom reads the properties and keeps the place of each one
+// in its rules.
+func (p *Props) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() != '{' {
+		// A map reads null, and gives the error of any other kind.
+		var m map[string]Production
+		if err := json.UnmarshalDecode(dec, &m); err != nil {
+			return err
+		}
+		*p = m
+		return nil
+	}
+	if _, err := dec.ReadToken(); err != nil {
+		return err
+	}
+	m := Props{}
+	for at := 1; dec.PeekKind() != '}'; at++ {
+		var name string
+		if err := json.UnmarshalDecode(dec, &name); err != nil {
+			return err
+		}
+		var prod Production
+		if err := json.UnmarshalDecode(dec, &prod); err != nil {
+			return err
+		}
+		for i := range prod {
+			prod[i].at = at
+		}
+		m[name] = prod
+	}
+	if _, err := dec.ReadToken(); err != nil {
+		return err
+	}
+	*p = m
+	return nil
+}
+
+// MarshalJSONTo writes the properties in the order of Names.
+func (p Props) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if p == nil {
+		return enc.WriteToken(jsontext.Null)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return err
+	}
+	for _, name := range p.Names() {
+		if err := enc.WriteToken(jsontext.String(name)); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, p[name]); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
+}
+
+// Names returns the names of the properties in the order of the spec. A
+// property that Go code adds, and not the JSON of a spec, comes after
+// them, in the order of the names.
+func (p Props) Names() []string {
+	names := make([]string, 0, len(p))
+	for name := range p {
+		names = append(names, name)
+	}
+	slices.SortFunc(names, func(a, b string) int {
+		pa, pb := p[a].at(), p[b].at()
+		switch {
+		case pa == pb:
+			return strings.Compare(a, b)
+		case pa == 0:
+			return 1
+		case pb == 0:
+			return -1
+		}
+		return cmp.Compare(pa, pb)
+	})
+	return names
+}
 
 // GuideEncode holds the encodings of the parts of an axis, a legend or a
 // title, such as labels, ticks and symbols.
@@ -541,6 +624,10 @@ type Rule struct {
 	ValueRef
 
 	Test string `json:"test,omitzero"`
+
+	// at is the place of the property of the rule in its set, from 1, as
+	// the spec gives it, or 0 for a rule that Go code makes.
+	at int
 }
 
 // ValueRef gives the value of a property: a literal, a signal, a field, or
@@ -587,4 +674,13 @@ func (p Production) MarshalJSONTo(enc *jsontext.Encoder) error {
 		return json.MarshalEncode(enc, p[0])
 	}
 	return json.MarshalEncode(enc, []Rule(p))
+}
+
+// at returns the place of the property in its set, from 1, or 0 for a
+// property that does not come from the JSON of a spec.
+func (p Production) at() int {
+	if len(p) == 0 {
+		return 0
+	}
+	return p[0].at
 }

@@ -72,6 +72,9 @@ type runtime struct {
 	// itemIssues holds the parts of item that the report has, so that
 	// each goes in it once.
 	itemIssues map[string]bool
+	// encodePath is the path of the encode that runs, where the report
+	// puts a part of item that zuzu does not give.
+	encodePath string
 	// measure measures the width of text, for the guides and the bounds.
 	measure *text.Estimate
 	// drawLook is the look of the render, and lookSeed the seed of a look
@@ -319,11 +322,14 @@ type scope struct {
 	producers map[string]string
 	funcs     map[string]expr.Func
 	// item is the group item of the scope, which a field of the group
-	// reads. values holds the properties that its encodings set, and mark
-	// is its mark, or nil for the root group.
-	item   *scene.Item
-	values map[string]any
-	mark   *scene.Mark
+	// reads. values holds the properties that its encodings set, mark is
+	// its mark, and marks holds the marks that zuzu built in it so far.
+	// groupItem is the item as an expression reads it, once one does.
+	item      *scene.Item
+	values    map[string]any
+	mark      *markState
+	marks     markList
+	groupItem *groupValue
 	// encoding is the item that an encoding of the scope fills, which an
 	// expression of the encoding reads as item, or nil.
 	encoding expr.Object

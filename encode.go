@@ -35,7 +35,10 @@ type itemState struct {
 	values map[string]any
 	// mark is the mark of the item, which an expression reads as
 	// item.mark, or nil.
-	mark *scene.Mark
+	mark *markState
+	// items holds the marks of a group item, which an expression reads as
+	// item.items, or nil before zuzu builds them.
+	items *markList
 }
 
 // newItemState starts an item for a datum.
@@ -43,40 +46,134 @@ func newItemState(datum any) *itemState {
 	return &itemState{it: &scene.Item{Datum: datum}, set: map[string]bool{}, values: map[string]any{}}
 }
 
-// encodeItem applies the encodings of a mark to an item, for a datum.
-func (s *scope) encodeItem(enc vega.Encode, st *itemState, datum any, path string) error {
-	it := st.it
-	prev := s.encoding
-	s.encoding = &itemValue{s: s, st: st, mark: st.mark, path: path + "/encode"}
-	defer func() { s.encoding = prev }()
-	for _, set := range encodeSets {
-		props, ok := enc[set]
+// encodeSet is one set of the encodings of a mark, such as enter, with its
+// properties in the order of the spec.
+type encodeSet struct {
+	name  string
+	props []encodeProp
+	// x, x2, xc, y, y2 and yc say which properties of the place the set
+	// gives.
+	x, x2, xc, y, y2, yc bool
+}
+
+// encodeProp is a property of a set of encodings.
+type encodeProp struct {
+	name string
+	prod vega.Production
+}
+
+// orderEncode returns the sets of an encode that a static chart applies,
+// in order, each with its properties in the order of the spec.
+func orderEncode(enc vega.Encode) []encodeSet {
+	var out []encodeSet
+	for _, name := range encodeSets {
+		props, ok := enc[name]
 		if !ok {
 			continue
 		}
-		for name, prod := range props {
-			v, named, ok, err := s.production(prod, datum, it)
+		set := encodeSet{name: name, props: make([]encodeProp, 0, len(props))}
+		for _, k := range props.Names() {
+			set.props = append(set.props, encodeProp{name: k, prod: props[k]})
+		}
+		_, set.x = props["x"]
+		_, set.x2 = props["x2"]
+		_, set.xc = props["xc"]
+		_, set.y = props["y"]
+		_, set.y2 = props["y2"]
+		_, set.yc = props["yc"]
+		out = append(out, set)
+	}
+	return out
+}
+
+// encodeItem applies the encodings of a mark to an item, for a datum.
+func (s *scope) encodeItem(enc vega.Encode, st *itemState, datum any, path string) error {
+	return s.applyEncode(orderEncode(enc), st, datum, path)
+}
+
+// applyEncode applies the sets of the encodings of a mark to an item, for
+// a datum. As in vega.js, it sets each property on the item in the order of
+// the spec, so that an expression reads as item each property that an
+// earlier one set, and after each set it works out the place and the size
+// that x2, xc, y2 and yc give.
+func (s *scope) applyEncode(sets []encodeSet, st *itemState, datum any, path string) error {
+	it := st.it
+	prev, prevPath := s.encoding, s.rt.encodePath
+	s.encoding, s.rt.encodePath = st, path+"/encode"
+	defer func() { s.encoding, s.rt.encodePath = prev, prevPath }()
+	for i := range sets {
+		set := &sets[i]
+		for _, p := range set.props {
+			v, named, ok, err := s.production(p.prod, datum, it)
 			if err != nil {
-				return fmt.Errorf("%s/encode/%s/%s: %w", path, set, name, err)
+				return fmt.Errorf("%s/encode/%s/%s: %w", path, set.name, p.name, err)
 			}
 			if !ok {
 				continue
 			}
-			if _, isItem := v.(expr.Object); isItem && name == "tooltip" {
+			if _, isItem := v.(expr.Object); isItem && p.name == "tooltip" {
 				// Vega shows each field of the item, which zuzu does not
 				// keep.
-				if err := s.issueOncef(path+"/encode/"+set+"/tooltip", "a tooltip that shows an item of the scene"); err != nil {
+				if err := s.issueOncef(path+"/encode/"+set.name+"/tooltip", "a tooltip that shows an item of the scene"); err != nil {
 					return err
 				}
 				continue
 			}
-			if named && (name == "fill" || name == "stroke") {
+			if named && (p.name == "fill" || p.name == "stroke") {
 				v = s.rt.specColor(v)
 			}
-			setProp(st, name, v)
+			setProp(st, p.name, v)
+		}
+		if st.mark != nil {
+			adjustValues(st.mark.sm.Type, set, st.values)
 		}
 	}
 	return nil
+}
+
+// adjustValues works out the place and the size that a set of encodings
+// gives with x2, xc, y2 or yc, in the values of an item, as vega.js does
+// after each set. A later set reads them. A rect, a group and an image
+// turn an x past its x2 around. A rule keeps its ends.
+func adjustValues(typ string, set *encodeSet, vals map[string]any) {
+	if typ == scene.Rule || vals == nil {
+		return
+	}
+	turn := typ == scene.Rect || typ == scene.Group || typ == scene.Image
+	adjustSpan(vals, set.x, set.x2, set.xc, turn, "x", "x2", "xc", "width")
+	adjustSpan(vals, set.y, set.y2, set.yc, turn, "y", "y2", "yc", "height")
+}
+
+// adjustSpan works out the start and the size of an item along one axis,
+// from the properties of the start p, the end p2, the center pc and the
+// size size, as adjustValues says.
+func adjustSpan(vals map[string]any, has, has2, hasc, turn bool, p, p2, pc, size string) {
+	num := func(k string) float64 {
+		v, ok := vals[k]
+		if !ok {
+			return math.NaN()
+		}
+		return expr.Number(v)
+	}
+	orZero := func(k string) float64 {
+		if f := num(k); !math.IsNaN(f) {
+			return f
+		}
+		return 0
+	}
+	if has2 {
+		if has {
+			if turn && num(p) > num(p2) {
+				vals[p], vals[p2] = vals[p2], vals[p]
+			}
+			vals[size] = num(p2) - num(p)
+		} else {
+			vals[p] = num(p2) - orZero(size)
+		}
+	}
+	if hasc {
+		vals[p] = num(pc) - orZero(size)/2
+	}
 }
 
 // production evaluates the value of a property: the first rule whose test
@@ -352,6 +449,9 @@ func itemField(it *scene.Item, name string) any {
 func setProp(st *itemState, name string, v any) {
 	if st.values == nil {
 		st.values = map[string]any{}
+	}
+	if st.set == nil {
+		st.set = map[string]bool{}
 	}
 	st.values[name] = v
 	it := st.it

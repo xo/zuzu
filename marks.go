@@ -40,10 +40,12 @@ func (s *scope) buildMarks(path string) (out []scene.Mark, err error) {
 	for i := range s.spec.Marks {
 		m := &s.spec.Marks[i]
 		p := fmt.Sprintf("%s/marks/%d", path, i)
+		built := len(s.marks.marks)
 		sm, err := s.buildMark(m, p)
 		if err != nil {
 			var is vega.Issue
 			if errors.As(err, &is) && errors.Is(err, vega.ErrUnsupported) {
+				s.marks.truncate(built)
 				if err := s.rt.issue(err, p, ""); err != nil {
 					return nil, err
 				}
@@ -104,17 +106,28 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 	}
 	defaults := s.rt.markDefaults(m)
 	_, configStroke := defaults["stroke"]
+	// Each item of the mark exists before the first encoding runs, as in
+	// vega.js, so that item.mark.items holds them all. An item whose
+	// encodings did not run yet has only its datum.
+	ms := &markState{sm: sm, s: s, group: s.group()}
+	s.marks.add(ms)
 	states := make([]*itemState, len(data))
-	badLink := false
 	for i, d := range data {
 		st := newItemState(d)
 		st.facet = i
-		st.mark = sm
+		st.mark = ms
+		states[i] = st
+	}
+	ms.states = states
+	sets := orderEncode(m.Encode)
+	badLink := false
+	for i, st := range states {
+		d := data[i]
 		for k, v := range defaults {
 			setProp(st, k, v)
 		}
 		ring := st.it.Stroke
-		if err := s.encodeItem(m.Encode, st, d, path); err != nil {
+		if err := s.applyEncode(sets, st, d, path); err != nil {
 			return nil, err
 		}
 		if err := s.linkIssue(st.it, path, &badLink); err != nil {
@@ -137,7 +150,6 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			scalePath(st)
 		}
 		geometry(m.Type, st)
-		states[i] = st
 	}
 	if len(m.Transform) > 0 {
 		if states, err = s.transformItems(m, states, path); err != nil {
@@ -173,6 +185,7 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 			return nil, fmt.Errorf("%s/sort: %w", path, err)
 		}
 	}
+	ms.setStates(states)
 	sm.Items = make([]scene.Item, len(states))
 	for i, st := range states {
 		sm.Items[i] = *st.it
@@ -181,7 +194,8 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 		for i := range sm.Items {
 			it := &sm.Items[i]
 			child := s.rt.newScope(s, &m.Scope, path, it.Datum)
-			child.item, child.values, child.mark = it, states[i].values, sm
+			child.item, child.values, child.mark = it, states[i].values, ms
+			states[i].items = &child.marks
 			if m.From != nil && m.From.Facet != nil && facets != nil {
 				f := m.From.Facet
 				rows := facets[keyOfItem(i, states, sm)]
@@ -202,6 +216,14 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 	return sm, nil
 }
 
+// addGuides adds the marks of guides to the marks of the scope, which an
+// expression reads as item.mark.group.items.
+func (s *scope) addGuides(marks []scene.Mark) {
+	for i := range marks {
+		s.marks.add(&markState{sm: &marks[i], s: s, group: s.group(), guide: true})
+	}
+}
+
 // keyOfItem returns the index of the facet of a group item, after a sort.
 func keyOfItem(i int, states []*itemState, _ *scene.Mark) int {
 	return states[i].facet
@@ -216,6 +238,7 @@ func (s *scope) buildScope(path string) ([]scene.Mark, error) {
 		return nil, err
 	}
 	out = append(out, axes...)
+	s.addGuides(axes)
 	marks, err := s.buildMarks(path)
 	if err != nil {
 		return nil, err
@@ -226,11 +249,13 @@ func (s *scope) buildScope(path string) ([]scene.Mark, error) {
 		return nil, err
 	}
 	out = append(out, legends...)
+	s.addGuides(legends)
 	title, err := s.buildTitle(path, out)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, title...)
+	s.addGuides(title)
 	if !s.spec.Layout.IsZero() {
 		if err := s.gridLayout(out); err != nil {
 			return nil, err
