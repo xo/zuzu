@@ -1,6 +1,6 @@
 # D59. The answers of 2026-11-26: item, canvas, legends and text on a color
 
-Status: Decided. Amends D17 and D35.
+Status: Decided. Amends D17, D35 and D55.
 
 On 2026-11-26 the maintainers chose to finish the work of phase 7 that zuzu
 can do alone, and answered four questions about it. The items that wait for
@@ -27,3 +27,8 @@ elk-go stay in the backlog until upstream answers.
    takes the light or the dark text color, whichever has the higher
    contrast with the fill by the measure of WCAG, and has no box behind
    it. `docs/STYLE.md` holds the rule.
+5. The hachure of the look drawn by hand fills a path by the rule nonzero
+   of SVG, from the winding number of each span. This replaces the filter
+   of D55 part 6 that kept each ring of a path where its fill changes, and
+   which dropped a ring that partly overlaps another ring that runs the
+   same way.

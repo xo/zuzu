@@ -1,6 +1,6 @@
 # D55. Mermaid takes the scheme of zuzu, and tints are solid
 
-Status: Decided. Amends D31, D37, D53 and D54. Amended by D56.
+Status: Decided. Amends D31, D37, D53 and D54. Amended by D56 and D59.
 
 On 2026-11-22 the maintainers saw that many colors of the diagrams of
 Mermaid were off: their default color was the pink of
