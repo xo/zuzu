@@ -618,6 +618,14 @@ func (c *Chart) Image(ctx context.Context, opts ...RenderOption) (*image.RGBA, R
 		okagesvg.WithLoadSystemFonts(false), okagesvg.WithFontFS(text.Fonts()),
 		okagesvg.WithSansSerifFamily(text.Family), okagesvg.WithFontFamily(text.Family),
 	}
+	// okage logs to the logger of the render, or else of the parse.
+	logger := o.logger
+	if logger == nil {
+		logger = c.opts.logger
+	}
+	if logger != nil {
+		fopts = append(fopts, okagesvg.WithLogger(logger))
+	}
 	fallbacks := c.fallbacks(&o)
 	if v.rt.lookFont != nil {
 		// The font of the look draws the text whose family names it.

@@ -30,6 +30,7 @@ var (
 	}
 	legendStyleParts = []guidePart{
 		{"label", "legend-label", true}, {"title", "legend-title", true}, {"symbol", "legend-symbol", false},
+		{"gradient", "legend-gradient", false},
 	}
 	titleParts = []guidePart{
 		{"subtitle", "title-subtitle", true}, {"", "title-text", true},
@@ -56,6 +57,11 @@ var (
 	symbolProps = map[string]string{
 		"FillColor": "fill", "StrokeColor": "stroke", "StrokeWidth": "strokeWidth", opacityEnd: "opacity",
 		"Dash": "strokeDash",
+	}
+	// gradientProps maps the end of a property of the bar of a gradient,
+	// such as StrokeColor in gradientStrokeColor.
+	gradientProps = map[string]string{
+		"StrokeColor": "stroke", "StrokeWidth": "strokeWidth", opacityEnd: "opacity",
 	}
 )
 
@@ -158,6 +164,8 @@ func (s *scope) styleGuide(m *scene.Mark, props map[string]any, parts []guidePar
 			switch {
 			case p.role == "legend-symbol":
 				table = symbolProps
+			case p.role == "legend-gradient":
+				table = gradientProps
 			case p.text:
 				table = textProps
 			}

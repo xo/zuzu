@@ -13,6 +13,7 @@ import (
 
 	"github.com/xo/zuzu/expr"
 	"github.com/xo/zuzu/format"
+	"github.com/xo/zuzu/internal/shape"
 	"github.com/xo/zuzu/layout"
 	"github.com/xo/zuzu/scale"
 	"github.com/xo/zuzu/scene"
@@ -85,15 +86,6 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, *layout.Axis,
 	orient, err := s.str(a.Orient, "bottom")
 	if err != nil {
 		return nil, nil, err
-	}
-	for _, k := range []string{"tickBand", "tickOffset", "tickRound", "tickExtra"} {
-		// The axis does not draw these, so the report names them (hard
-		// rule 4).
-		if _, ok := a.Extra[k]; ok {
-			if err := s.rt.issue(vega.ErrUnsupported, path+"/"+k, "the property %s of an axis", k); err != nil {
-				return nil, nil, err
-			}
-		}
 	}
 	w, h := s.size()
 	cfg := s.rt.axisConfig(orient, sc)
@@ -173,7 +165,9 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, *layout.Axis,
 	if sc.Type() == "band" || sc.Type() == scale.Trading {
 		bp = 0.5
 	}
-	if ax.BandPosition, err = s.num(a.BandPosition, bp); err != nil {
+	// The config of the axis, such as config.axisBand, can give the band
+	// position too.
+	if ax.BandPosition, err = s.num(a.BandPosition, configNum(cfg, "bandPosition", bp)); err != nil {
 		return nil, nil, err
 	}
 	// labelFlush is true for a distance of 1, or a distance, and none by
@@ -213,6 +207,9 @@ func (s *scope) buildAxis(a *vega.Axis, path string) (*scene.Mark, *layout.Axis,
 		return nil, nil, err
 	}
 	axisProps(ax, props)
+	if err := s.tickBand(ax, props, path); err != nil {
+		return nil, nil, err
+	}
 	m := s.rt.style().Axis(ax)
 	// The config and the axis style its parts, over the look of zuzu.
 	s.styleGuide(&m, props, axisParts)
@@ -251,6 +248,38 @@ func (s *scope) ticks(ax *layout.Axis, a *vega.Axis, cfg, props map[string]any) 
 			return err
 		}
 		ax.LabelPadding = &pad
+	}
+	return nil
+}
+
+// tickBand reads tickExtra, tickOffset and tickRound of an axis, and
+// tickBand, which sets the band position, the extra tick and the offset of
+// an axis of bands, as the axis of Vega documents it: center puts the
+// ticks in the middle of each band, and extent puts them at the edges of
+// the bands. The properties come from the config with the axis over it.
+func (s *scope) tickBand(ax *layout.Axis, props map[string]any, path string) error {
+	if v, ok := props["tickExtra"].(bool); ok {
+		ax.TickExtra = v
+	}
+	if v, ok := propNum(props, "tickOffset"); ok {
+		ax.TickOffset = v
+	}
+	if v, ok := props["tickRound"].(bool); ok {
+		ax.TickRound = v
+	}
+	band, ok := props["tickBand"]
+	if !ok || band == nil {
+		return nil
+	}
+	switch band {
+	case "center":
+		ax.BandPosition, ax.TickExtra, ax.TickOffset = 0.5, false, 0
+	case "extent":
+		ax.BandPosition, ax.TickExtra, ax.TickOffset = 1, true, 0
+	default:
+		// A tickBand that is not center or extent, or a signal of the
+		// datum, is not drawn, so the report names it (hard rule 4).
+		return s.rt.issue(vega.ErrUnsupported, path+"/tickBand", "the tickBand %v of an axis", band)
 	}
 	return nil
 }
@@ -491,40 +520,43 @@ func (s *scope) buildLegends(path string) ([]scene.Mark, error) {
 	return out, nil
 }
 
-// buildLegend resolves a legend and draws it.
-// legendUnread are the properties of a legend of Vega that zuzu reads and
-// does not draw.
-var legendUnread = []string{
-	"cornerRadius", "fillColor", "strokeColor", "padding", "gridAlign", "labelAlign", "labelBaseline",
-	"labelOffset", "labelSeparation", "symbolDashOffset", "symbolOffset", "symbolBaseFillColor",
-	"symbolBaseStrokeColor", "titleAnchor", "titleAlign", "titleBaseline", "titleLimit", "titleLineHeight",
-	"titlePadding", "tickCount", "tickMinStep", "gradientOpacity", "gradientStrokeColor", "gradientStrokeWidth",
+// legendValues are the values that some properties of a legend can take.
+// The report names any other value, which the legend does not draw (hard
+// rule 4).
+var legendValues = map[string][]string{
+	"titleOrient": {"top", "bottom", "left", "right"},
+	"titleAnchor": {"start", "middle", "end"},
+	"gridAlign":   {"each", "all", "none"},
 }
 
-// legendUnread reports each property of a legend that zuzu does not draw,
-// so that no property drops without a word (hard rule 4).
-func (s *scope) legendUnread(l *vega.Legend, path string) error {
-	for _, k := range legendUnread {
-		if _, ok := l.Extra[k]; !ok {
+// legendUnread reports each property of a legend whose value zuzu does not
+// draw, so that no property drops without a word (hard rule 4): a side, an
+// anchor or an align of the grid that Vega does not name, and a tickCount
+// that is not a number, such as the name of a unit of time.
+func (s *scope) legendUnread(props map[string]any, path string) error {
+	for _, k := range slices.Sorted(maps.Keys(legendValues)) {
+		v, ok := props[k]
+		if !ok || v == nil {
 			continue
 		}
-		if err := s.rt.issue(vega.ErrUnsupported, path+"/"+k, "the property %s of a legend", k); err != nil {
+		if str, ok := v.(string); ok && slices.Contains(legendValues[k], str) {
+			continue
+		}
+		if err := s.rt.issue(vega.ErrUnsupported, path+"/"+k, "the %s %v of a legend", k, v); err != nil {
 			return err
 		}
 	}
-	if !l.LabelOverlap.IsZero() {
-		if err := s.rt.issue(vega.ErrUnsupported, path+"/labelOverlap", "the property labelOverlap of a legend"); err != nil {
-			return err
-		}
-	}
-	if !l.TitleOrient.IsZero() {
-		if err := s.rt.issue(vega.ErrUnsupported, path+"/titleOrient", "the property titleOrient of a legend"); err != nil {
-			return err
+	if v, ok := props["tickCount"]; ok && v != nil {
+		if _, ok := propNum(props, "tickCount"); !ok {
+			if err := s.rt.issue(vega.ErrUnsupported, path+"/tickCount", "the tickCount %v of a legend", v); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
+// buildLegend resolves a legend and draws it.
 func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	lg := &layout.Legend{}
 	get := func(name string) (scale.Scale, error) {
@@ -632,12 +664,25 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	if lg.ClipHeight, err = s.num(l.ClipHeight, configNum(cfg, "clipHeight", 0)); err != nil {
 		return nil, err
 	}
-	if err := s.legendUnread(l, path); err != nil {
+	props := s.guideProps(cfg, l.Extra)
+	// The properties that the legend holds in fields of its own go in
+	// props too, over the config.
+	for k, v := range map[string]vega.Value{"titleOrient": l.TitleOrient, "labelOverlap": l.LabelOverlap} {
+		if v.IsZero() {
+			continue
+		}
+		x, err := s.value(v)
+		if err != nil {
+			return nil, err
+		}
+		props[k] = x
+	}
+	if err := s.legendUnread(props, path); err != nil {
 		return nil, err
 	}
-	props := s.guideProps(cfg, l.Extra)
 	legendProps(lg, props)
 	s.legendMarks(l, lg)
+	encodeSymbols(l, lg)
 	// A direction or a limit that the spec sets is a property of the
 	// entries, which nested circles cannot show (docs/STYLE.md).
 	_, limited := props["symbolLimit"]
@@ -658,6 +703,9 @@ func (s *scope) buildLegend(l *vega.Legend, path string) (*scene.Mark, error) {
 	s.styleGuide(&m, props, legendStyleParts)
 	if err := s.guideEncode(&m, l.Encode, legendParts, nil, path, "a legend"); err != nil {
 		return nil, err
+	}
+	if off, ok := propNum(props, "symbolDashOffset"); ok && off != 0 {
+		shiftDashes(&m, "legend-symbol", off)
 	}
 	if l.ZIndex != nil {
 		m.ZIndex = *l.ZIndex
@@ -692,6 +740,87 @@ func legendProps(lg *layout.Legend, props map[string]any) {
 	}
 	if f, ok := num("columnPadding"); ok {
 		lg.ColumnPadding = &f
+	}
+	str := func(name string, values ...string) string {
+		v, _ := props[name].(string)
+		if len(values) > 0 && !slices.Contains(values, v) {
+			return ""
+		}
+		return v
+	}
+	lg.TitleOrient = str("titleOrient", legendValues["titleOrient"]...)
+	lg.TitleAnchor = str("titleAnchor", legendValues["titleAnchor"]...)
+	lg.GridAlign = str("gridAlign", legendValues["gridAlign"]...)
+	lg.TitleAlign, lg.TitleBaseline = str("titleAlign"), str("titleBaseline")
+	lg.LabelAlign, lg.LabelBaseline = str("labelAlign"), str("labelBaseline")
+	lg.FillColor, lg.StrokeColor = str("fillColor"), str("strokeColor")
+	lg.SymbolBaseFill, lg.SymbolBaseStroke = str("symbolBaseFillColor"), str("symbolBaseStrokeColor")
+	if f, ok := propNum(props, "titlePadding"); ok {
+		lg.TitlePadding = &f
+	}
+	if f, ok := propNum(props, "labelOffset"); ok {
+		lg.LabelOffset = &f
+	}
+	lg.TitleLimit, _ = num("titleLimit")
+	lg.TitleLineHeight, _ = num("titleLineHeight")
+	lg.Padding, _ = num("padding")
+	lg.CornerRadius, _ = num("cornerRadius")
+	lg.LabelSeparation, _ = num("labelSeparation")
+	lg.SymbolOffset, _ = propNum(props, "symbolOffset")
+	if f, ok := num("tickCount"); ok && f >= 1 {
+		lg.TickCount = f
+	}
+	lg.TickMinStep, _ = num("tickMinStep")
+	// A labelOverlap of true, parity or greedy drops labels that overlap.
+	if v, ok := props["labelOverlap"]; ok && v != nil {
+		lg.LabelOverlap = expr.Truthy(v)
+	}
+}
+
+// encodeSymbols reads the size and the shape that the encode of the
+// symbols of a legend gives as a value, so that the layout of the entries
+// keeps room for the symbols that the encode draws, as Vega lays out the
+// entries after the encode.
+func encodeSymbols(l *vega.Legend, lg *layout.Legend) {
+	enc := l.Encode["symbols"].Sets
+	if v, ok := encodeLiteral(enc, "size").(float64); ok && v > 0 && lg.Size == nil {
+		lg.SymbolSize = v
+	}
+	if v, ok := encodeLiteral(enc, "shape").(string); ok && v != "" && lg.Shape == nil && !lg.Line {
+		lg.SymbolType = v
+	}
+}
+
+// encodeLiteral returns the value that an encode gives a property with no
+// scale, no field and no signal, or nil. The update set wins over the enter
+// set, and the last rule, which has no test, wins over the others.
+func encodeLiteral(e vega.Encode, prop string) any {
+	var out any
+	for _, set := range encodeSets {
+		for _, r := range e[set][prop] {
+			if len(r.Value) == 0 || !r.Scale.IsZero() || r.Field.Name != "" || r.Signal != "" {
+				continue
+			}
+			var v any
+			if json.Unmarshal(r.Value, &v) == nil {
+				out = v
+			}
+		}
+	}
+	return out
+}
+
+// shiftDashes starts the dash of each item of a role that far along it, as
+// a dash offset of SVG does.
+func shiftDashes(m *scene.Mark, role string, off float64) {
+	for i := range m.Items {
+		it := &m.Items[i]
+		if m.Role == role && len(it.StrokeDash) > 0 {
+			it.StrokeDash = shape.ShiftDash(it.StrokeDash, off)
+		}
+		for j := range it.Items {
+			shiftDashes(&it.Items[j], role, off)
+		}
 	}
 }
 
@@ -1010,7 +1139,13 @@ func (s *scope) buildTitle(path string, drawn []scene.Mark) ([]scene.Mark, error
 	}
 	w, h := s.size()
 	lt := &layout.Title{Text: lines, Subtitle: sub, Width: w, Height: h}
-	if lt.Orient, err = s.str(t.Orient, "top"); err != nil {
+	// The title of a group takes the config of a title and of its styles
+	// where its spec sets nothing, as in Vega.
+	var cfg map[string]any
+	if s.parent != nil {
+		cfg = s.titleConfig(t)
+	}
+	if lt.Orient, err = s.str(t.Orient, configStr(cfg, "orient", "top")); err != nil {
 		return nil, err
 	}
 	kind := "title"
@@ -1029,33 +1164,32 @@ func (s *scope) buildTitle(path string, drawn []scene.Mark) ([]scene.Mark, error
 		// only the title of the chart at the start.
 		def = "middle"
 	}
-	if lt.Anchor, err = s.str(t.Anchor, def); err != nil {
+	if lt.Anchor, err = s.str(t.Anchor, configStr(cfg, "anchor", def)); err != nil {
 		return nil, err
 	}
 	off := 4.0
 	if kind == "title" {
 		off = 10
 	}
-	if lt.Offset, err = s.num(t.Offset, off); err != nil {
+	if lt.Offset, err = s.num(t.Offset, configNum(cfg, "offset", off)); err != nil {
 		return nil, err
 	}
-	if !t.Angle.IsZero() {
-		a, err := s.num(t.Angle, 0)
-		if err != nil {
+	if a, ok := propNum(cfg, "angle"); ok || !t.Angle.IsZero() {
+		if a, err = s.num(t.Angle, a); err != nil {
 			return nil, err
 		}
 		lt.Angle = &a
 	}
-	if lt.Align, err = s.str(t.Align, ""); err != nil {
+	if lt.Align, err = s.str(t.Align, configStr(cfg, "align", "")); err != nil {
 		return nil, err
 	}
-	if lt.Baseline, err = s.str(t.Baseline, ""); err != nil {
+	if lt.Baseline, err = s.str(t.Baseline, configStr(cfg, "baseline", "")); err != nil {
 		return nil, err
 	}
 	shift := 0.0
 	if s.parent != nil {
 		b := s.contentBounds(drawn)
-		if shift, err = s.titleFrame(t, lt, b); err != nil {
+		if shift, err = s.titleFrame(t, lt, b, cfg); err != nil {
 			return nil, err
 		}
 		if !b.IsEmpty() {
@@ -1074,9 +1208,11 @@ func (s *scope) buildTitle(path string, drawn []scene.Mark) ([]scene.Mark, error
 	m := s.rt.style().Title(lt)
 	moveTitle(&m, lt.Orient, shift)
 	if s.parent != nil {
-		if err := s.styleGroupTitle(&m, t); err != nil {
+		if err := s.styleGroupTitle(&m, t, cfg); err != nil {
 			return nil, err
 		}
+	} else {
+		s.offsetTitle(&m, t)
 	}
 	// The config of the title styles only the title of the chart. The
 	// properties of the spec style every title, such as the labels of

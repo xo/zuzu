@@ -12,10 +12,13 @@ import (
 )
 
 // The title of a group follows the properties of a title of Vega that its
-// spec sets: its frame, its anchor, its orient and its offset, and the
-// color, the font, the size, the weight, the alignment, the baseline, the
-// angle, the line height, the limit and the dx and dy of its text. The look
-// of zuzu applies where the spec sets nothing. The encode of a title, of
+// spec sets, or else the config of a title, with the config of the styles
+// of the title over it: its frame, its anchor, its orient and its offset,
+// and the color, the font, the size, the weight, the alignment, the
+// baseline, the angle, the line height, the limit and the dx and dy of its
+// text. The title of the chart follows only the dx and the dy of its text.
+// The look of zuzu applies where the spec and the config set
+// nothing. The encode of a title, of
 // the title of the chart too, applies to its text, its subtitle and its
 // group.
 
@@ -43,8 +46,8 @@ func (s *scope) contentBounds(drawn []scene.Mark) layout.Bounds {
 // with the marks and the guides that it drew. The frame group is the width
 // or the height of the group. titleFrame sets the length of the edge in lt
 // and returns where the edge starts.
-func (s *scope) titleFrame(t *vega.Title, lt *layout.Title, b layout.Bounds) (float64, error) {
-	frame, err := s.str(t.Frame, "bounds")
+func (s *scope) titleFrame(t *vega.Title, lt *layout.Title, b layout.Bounds, cfg map[string]any) (float64, error) {
+	frame, err := s.str(t.Frame, configStr(cfg, "frame", "bounds"))
 	if err != nil || frame != "bounds" || b.IsEmpty() {
 		return 0, err
 	}
@@ -86,10 +89,27 @@ const titleLineHeight = 1.2
 // of its text of the same name, beyond those that styleGuide applies.
 var titleTextProps = []string{"align", "angle", "baseline", "dx", "dy", "limit", "lineHeight"}
 
-// styleGroupTitle applies the properties that the spec of the title of a
-// group sets to its text and its subtitle.
-func (s *scope) styleGroupTitle(m *scene.Mark, t *vega.Title) error {
-	props := s.guideProps(nil, t.Extra)
+// titleConfig returns the config of the title of a group: config.title,
+// with the config of each style of the title over it, such as the style
+// group-title, as Vega reads them.
+func (s *scope) titleConfig(t *vega.Title) map[string]any {
+	out := maps.Clone(s.rt.configObject("title"))
+	if out == nil {
+		out = map[string]any{}
+	}
+	styles, _ := s.rt.config["style"].(map[string]any)
+	for _, name := range t.Style.List {
+		if m, ok := styles[name].(map[string]any); ok {
+			maps.Copy(out, m)
+		}
+	}
+	return out
+}
+
+// styleGroupTitle applies the properties that the config of the title of a
+// group, cfg, and its spec over it set to its text and its subtitle.
+func (s *scope) styleGroupTitle(m *scene.Mark, t *vega.Title, cfg map[string]any) error {
+	props := s.guideProps(cfg, t.Extra)
 	for k, v := range map[string]vega.Value{
 		"color": t.Color, "font": t.Font, "fontSize": t.FontSize,
 		"align": t.Align, "baseline": t.Baseline, "angle": t.Angle,
@@ -127,6 +147,23 @@ func (s *scope) styleGroupTitle(m *scene.Mark, t *vega.Title) error {
 		}
 	}
 	return nil
+}
+
+// offsetTitle applies the dx and the dy of the title of the chart that its
+// spec sets to its text, as Vega does. The look places the title of the
+// chart, and the offsets move it from there.
+func (s *scope) offsetTitle(m *scene.Mark, t *vega.Title) {
+	props := s.guideProps(nil, t.Extra)
+	for _, tm := range titleMarks(m, "title-text") {
+		for i := range tm.Items {
+			st := &itemState{it: &tm.Items[i], set: map[string]bool{}}
+			for _, k := range []string{"dx", "dy"} {
+				if v, ok := props[k]; ok {
+					setProp(st, k, v)
+				}
+			}
+		}
+	}
 }
 
 // joinTitleLines makes the lines of the text of a title one item of text

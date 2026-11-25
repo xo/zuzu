@@ -232,7 +232,7 @@ func (s *scope) buildScope(path string) ([]scene.Mark, error) {
 	}
 	out = append(out, title...)
 	if !s.spec.Layout.IsZero() {
-		if err := s.gridLayout(out, path+"/layout"); err != nil {
+		if err := s.gridLayout(out); err != nil {
 			return nil, err
 		}
 	}

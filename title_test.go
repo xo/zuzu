@@ -50,6 +50,21 @@ func TestGroupTitleProps(t *testing.T) {
 	}
 }
 
+// TestChartTitleOffset checks that the dx and the dy of the title of the
+// chart move its text, as in Vega.
+func TestChartTitleOffset(t *testing.T) {
+	t.Parallel()
+	spec := `{"$schema": "https://vega.github.io/schema/vega/v5.json",
+		"width": 200, "height": 100, "title": {"text": "Name", "dx": -30, "dy": 4}}`
+	texts := roleItems(specScene(t, spec), "title-text")
+	if len(texts) != 1 {
+		t.Fatalf("%d items of the title, want 1", len(texts))
+	}
+	if it := texts[0]; it.Dx != -30 || it.Dy != 4 {
+		t.Errorf("the title moves by %v, %v, want -30, 4", it.Dx, it.Dy)
+	}
+}
+
 // TestGroupTitleFrame checks that the frame bounds, the default, puts the
 // anchor of the title of a group relative to the bounds of what the group
 // draws, and that the look applies where the spec sets nothing.
@@ -68,6 +83,40 @@ func TestGroupTitleFrame(t *testing.T) {
 	}
 	if it.FontSize != 16 || it.Fill.Color == "" {
 		t.Errorf("the title = %+v, want the size and a color of the look", it)
+	}
+}
+
+// TestGroupTitleConfig checks that the title of a group follows the config
+// of a title, and the config of its style over it, where its spec sets
+// nothing, as in Vega. Before, only the title of the chart read the
+// config, so the title of each view of concat_layer_voyager_result drew
+// at 16 rather than at the 12 of its config.
+func TestGroupTitleConfig(t *testing.T) {
+	t.Parallel()
+	spec := func(config, title string) string {
+		s := strings.Replace(groupTitleSpec, "%s", title, 1)
+		return strings.Replace(s, `"width": 200,`, `"config": {`+config+`}, "width": 200,`, 1)
+	}
+	for _, c := range []struct {
+		name, config, title string
+		size                float64
+		color, anchor       string
+	}{
+		{"config.title", `"title": {"fontSize": 12, "color": "#123456", "anchor": "start"}`, `{"text": "T"}`, 12, "#123456", "left"},
+		{"the style over the config", `"title": {"fontSize": 12}, "style": {"group-title": {"fontSize": 9}}`,
+			`{"text": "T", "style": "group-title"}`, 9, "", "center"},
+		{"the spec over both", `"title": {"fontSize": 12}, "style": {"group-title": {"fontSize": 9}}`,
+			`{"text": "T", "style": "group-title", "fontSize": 20}`, 20, "", "center"},
+	} {
+		texts := roleItems(specScene(t, spec(c.config, c.title)), "title-text")
+		if len(texts) != 1 {
+			t.Fatalf("%s: %d items of the title, want 1", c.name, len(texts))
+		}
+		it := texts[0]
+		if it.FontSize != c.size || (c.color != "" && it.Fill.Color != c.color) || it.Align != c.anchor {
+			t.Errorf("%s: the title is %v in %s, aligned %s, want %v in %s, aligned %s",
+				c.name, it.FontSize, it.Fill.Color, it.Align, c.size, c.color, c.anchor)
+		}
 	}
 }
 
@@ -121,36 +170,30 @@ func TestGridFlush(t *testing.T) {
 	}
 }
 
-// TestGridIssues checks that the grid reports an align and a center of a
-// layout that it does not follow, and that the align all of cells of one
-// size, as in a facet, is not an issue (hard rule 4).
-func TestGridIssues(t *testing.T) {
+// TestGridNoIssues checks that the grid reports none of the properties of
+// a layout that it follows (hard rule 4).
+func TestGridNoIssues(t *testing.T) {
 	t.Parallel()
-	for _, c := range []struct {
-		layout string
-		want   string
-	}{
-		{`"align": "all"`, ""},
-		{`"align": "each"`, ""},
-		{`"align": "none"`, "align"},
-		{`"align": "all", "center": true`, "center"},
+	for _, layout := range []string{
+		`"align": "all"`,
+		`"align": "each"`,
+		`"align": "none"`,
+		`"align": {"row": "none", "column": "all"}`,
+		`"align": "all", "center": true`,
+		`"center": {"row": true}, "offset": {"rowHeader": 4}, "headerBand": 0.5, "footerBand": {"column": 1}`,
+		`"titleBand": 0.2, "titleAnchor": {"row": "end"}, "bounds": "flush", "padding": {"row": 4, "column": 8}`,
 	} {
 		src := `{"$schema": "https://vega.github.io/schema/vega/v5.json", "width": 200, "height": 200,
-			"layout": {"columns": 2, ` + c.layout + `},
+			"layout": {"columns": 2, ` + layout + `},
 			"data": [{"name": "t", "values": [{"k": "a"}, {"k": "b"}]}],
 			"marks": [{"type": "group", "from": {"facet": {"data": "t", "name": "f", "groupby": "k"}},
 				"encode": {"update": {"width": {"value": 50}, "height": {"value": 50}}}}]}`
-		_, report, err := svgOf(t, src, false)
+		_, report, err := svgOf(t, src, true)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("%s: %v", layout, err)
 		}
-		var b strings.Builder
-		for _, is := range report {
-			b.WriteString(is.Error())
-		}
-		got := b.String()
-		if c.want == "" && got != "" || c.want != "" && !strings.Contains(got, c.want) {
-			t.Errorf("%s: the report is %q, want %q", c.layout, got, c.want)
+		if len(report) != 0 {
+			t.Errorf("%s: the report is %v, want none", layout, report)
 		}
 	}
 }

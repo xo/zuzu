@@ -592,3 +592,39 @@ func TestAxisLabelAndTitlePlace(t *testing.T) {
 		t.Errorf("the turned titles are at %v and %v, %v, want 10 apart at y 50, left of the labels at %v", near.X, far.X, near.Y, labels[0].X)
 	}
 }
+
+// TestAxisTickBand checks that the runtime draws tickBand, tickExtra,
+// tickOffset and tickRound of an axis, and reads bandPosition from the
+// config of an axis of bands, as the axis of Vega documents them. Before,
+// it reported each property and drew the ticks in the middle of each band,
+// and it did not read the config.axisBand of box-plot.
+func TestAxisTickBand(t *testing.T) {
+	t.Parallel()
+	xs := func(items []scene.Item) []float64 {
+		var out []float64
+		for _, it := range items {
+			out = append(out, math.Round(it.X*100)/100)
+		}
+		slices.Sort(out)
+		return out
+	}
+	for _, c := range []struct {
+		name, config, axis, role string
+		want                     []float64
+	}{
+		{"the ticks of the look", ``, `{"scale": "x", "orient": "bottom"}`, "axis-tick", []float64{33.33, 100, 166.67}},
+		{"tickBand extent", ``, `{"scale": "x", "orient": "bottom", "tickBand": "extent"}`, "axis-tick", []float64{0, 66.67, 133.33, 200}},
+		{"tickBand extent of the grid", ``, `{"scale": "x", "orient": "bottom", "grid": true, "tickBand": "extent"}`, "axis-grid", []float64{0, 66.67, 133.33, 200}},
+		{"tickBand center over tickExtra", ``, `{"scale": "x", "orient": "bottom", "tickBand": "center", "tickExtra": true, "bandPosition": 1}`, "axis-tick", []float64{33.33, 100, 166.67}},
+		{"the config of box-plot", `"axisBand": {"bandPosition": 1, "tickExtra": true, "tickOffset": 0}`, `{"scale": "x", "orient": "bottom"}`, "axis-tick", []float64{0, 66.67, 133.33, 200}},
+		{"bandPosition of the config", `"axisBand": {"bandPosition": 0}`, `{"scale": "x", "orient": "bottom"}`, "axis-tick", []float64{0, 66.67, 133.33}},
+		{"tickOffset", ``, `{"scale": "x", "orient": "bottom", "tickOffset": 5}`, "axis-tick", []float64{38.33, 105, 171.67}},
+		{"tickOffset moves the labels", ``, `{"scale": "x", "orient": "bottom", "tickOffset": 5}`, "axis-label", []float64{38.33, 105, 171.67}},
+		{"tickRound", ``, `{"scale": "x", "orient": "bottom", "tickRound": true}`, "axis-tick", []float64{33, 100, 167}},
+		{"tickRound of the labels", ``, `{"scale": "x", "orient": "bottom", "tickRound": true}`, "axis-label", []float64{33, 100, 167}},
+	} {
+		if got := xs(axisItems(t, c.config, c.axis, c.role)); !slices.Equal(got, c.want) {
+			t.Errorf("%s: the %s at %v, want %v", c.name, c.role, got, c.want)
+		}
+	}
+}

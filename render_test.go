@@ -722,3 +722,22 @@ func TestConditionsAloneKeepTheMarkColor(t *testing.T) {
 		}
 	}
 }
+
+// TestUnfilledPointKeepsItsColor checks that a point with "filled": false
+// draws its stroke in the color of the mark, and not in the color of the
+// background, which rings a filled point.
+func TestUnfilledPointKeepsItsColor(t *testing.T) {
+	t.Parallel()
+	src := `{"$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+		"data": {"values": [{"a": 1, "b": 2}]}, "mark": {"type": "point", "filled": false},
+		"encoding": {"x": {"field": "a", "type": "quantitative"}, "y": {"field": "b", "type": "quantitative"}}}`
+	s, report, err := svgOf(t, src, false)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	want := theme.New(theme.Light, theme.Zuzu).Category[0]
+	if !strings.Contains(s, `fill="transparent" stroke="`+want+`"`) && !strings.Contains(s, `fill="none" stroke="`+want+`"`) {
+		i := strings.Index(s, "<path")
+		t.Errorf("expected a hollow point in %s, got %.300s", want, s[max(i, 0):])
+	}
+}

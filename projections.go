@@ -235,31 +235,62 @@ func featurize(v any) []any {
 	return out
 }
 
-// geoFuncs adds the functions of expressions that measure a GeoJSON object
-// in the plane of a projection: geoArea, geoBounds and geoCentroid. With
-// no projection, Vega measures on the sphere, which zuzu does not support.
+// geoFuncs adds the functions of expressions that measure or draw a
+// GeoJSON object: geoArea, geoBounds and geoCentroid, which measure in the
+// plane of a projection, or on the sphere when the projection is null, and
+// geoShape, which draws a path with a projection. A projection is a name or
+// a copy that the function copy returns.
 func (s *scope) geoFuncs(fns map[string]expr.Func) {
-	measure := func(name string, f func(p *geo.Projection, o any) any) expr.Func {
+	projectionOf := func(v any) (*geo.Projection, error) {
+		if c, ok := v.(projectionCopy); ok {
+			return c.p, nil
+		}
+		return s.projection(expr.String(v))
+	}
+	measure := func(plane func(p *geo.Projection, o any) any, sphere func(o any) any) expr.Func {
 		return func(_ *expr.Scope, args []any) (any, error) {
-			if len(args) < 2 || !expr.Truthy(args[0]) {
-				return nil, vega.Issue{Err: vega.ErrUnsupportedFunction, Message: "the function " + name + " with no projection"}
+			o := argAt(args, 1)
+			if !expr.Truthy(argAt(args, 0)) {
+				return sphere(o), nil
 			}
-			p, err := s.projection(expr.String(args[0]))
+			p, err := projectionOf(args[0])
 			if err != nil {
 				return nil, err
 			}
-			return f(p, args[1]), nil
+			return plane(p, o), nil
 		}
 	}
-	fns["geoArea"] = measure("geoArea", func(p *geo.Projection, o any) any {
-		return geo.Area(p, o)
-	})
-	fns["geoBounds"] = measure("geoBounds", func(p *geo.Projection, o any) any {
-		b := geo.Bounds(p, o)
-		return []any{[]any{b[0][0], b[0][1]}, []any{b[1][0], b[1][1]}}
-	})
-	fns["geoCentroid"] = measure("geoCentroid", func(p *geo.Projection, o any) any {
-		x, y := geo.Centroid(p, o)
-		return []any{x, y}
-	})
+	pair := func(x, y float64) any { return []any{x, y} }
+	box := func(b [2][2]float64) any { return []any{pair(b[0][0], b[0][1]), pair(b[1][0], b[1][1])} }
+	fns["geoArea"] = measure(
+		func(p *geo.Projection, o any) any { return geo.Area(p, o) },
+		func(o any) any { return geo.SphereArea(o) },
+	)
+	fns["geoBounds"] = measure(
+		func(p *geo.Projection, o any) any { return box(geo.Bounds(p, o)) },
+		func(o any) any { return box(geo.SphereBounds(o)) },
+	)
+	fns["geoCentroid"] = measure(
+		func(p *geo.Projection, o any) any { return pair(geo.Centroid(p, o)) },
+		func(o any) any { return pair(geo.SphereCentroid(o)) },
+	)
+	fns["geoShape"] = func(_ *expr.Scope, args []any) (any, error) {
+		if !expr.Truthy(argAt(args, 0)) {
+			return geoShape{}, nil
+		}
+		p, err := projectionOf(args[0])
+		if err != nil {
+			return nil, err
+		}
+		path, _ := geo.Path(p, argAt(args, 1), p.Radius)
+		return geoShape{path: path}, nil
+	}
+}
+
+// geoShape is what the function geoShape returns: the path of a GeoJSON
+// object in a projection, which a shape mark draws as its shape. vega.js
+// returns a function that draws the path, and zuzu keeps the path. With no
+// projection, the path is empty.
+type geoShape struct {
+	path string
 }

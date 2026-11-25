@@ -10,6 +10,7 @@ import (
 	"maps"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"time"
 
 	"github.com/xo/zuzu/dataflow"
@@ -205,6 +206,14 @@ func (rt *runtime) look() error {
 			}
 		}
 	}
+	if mode == theme.Dark && !rt.opts.hasBackground && !rt.chart.diagram {
+		// A chart that paints a light background of its own draws in the
+		// light mode, so that its guides and its grays read on it, as it
+		// keeps the colors of its spec (D48).
+		if bg, ok := rt.specBackground(); ok && !theme.IsDark(bg) {
+			mode = theme.Light
+		}
+	}
 	rt.theme = theme.New(mode, scheme)
 	return nil
 }
@@ -255,7 +264,7 @@ func (rt *runtime) compile(src string) (*expr.Program, error) {
 	if p, ok := rt.progs[src]; ok {
 		return p, nil
 	}
-	p, err := expr.Compile(src)
+	p, err := expr.Compile(src, expr.Known(slices.Collect(maps.Keys(rt.chart.opts.funcs))...))
 	if err != nil {
 		if errors.Is(err, expr.ErrUnknownFunction) {
 			return nil, vega.Issue{Err: vega.ErrUnsupportedFunction, Message: err.Error()}
@@ -341,6 +350,9 @@ type dataState struct {
 	err   error
 	// facet holds the rows of a facet, which a group mark gives.
 	facet []dataflow.Row
+	// tree is the tree of a stratify transform of the dataset, which
+	// treePath and treeAncestors read, once one of them asks for it.
+	tree *treeIndex
 }
 
 type scaleState struct {

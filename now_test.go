@@ -3,6 +3,7 @@ package zuzu
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -119,6 +120,35 @@ func TestNowGantt(t *testing.T) {
 		if r.Y2-r.Y < 3*26-1 {
 			t.Errorf("%s: the marker runs from %v to %v, want it across the chart", test.name, r.Y, r.Y2)
 		}
+	}
+}
+
+// TestNowGanttMargin checks that the marker of today just past the end of
+// the time axis draws in the margin of Mermaid, at its place, and does not
+// stretch the axis.
+func TestNowGanttMargin(t *testing.T) {
+	t.Parallel()
+	// The axis runs 14 days to 2024-03-15, and the time is 10 hours and
+	// 20 minutes after its end.
+	src := "gantt\ndateFormat YYYY-MM-DD\na : 2024-03-01, 14d\n"
+	c, report, err := Parse([]byte(src), WithNow(testNow))
+	if err != nil || len(report) != 0 {
+		t.Fatalf("the report %v and the error %v", report, err)
+	}
+	s, _, err := c.Render(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs := rules(&s.Root)
+	if len(rs) == 0 {
+		t.Fatal("no marker")
+	}
+	want := 640 * (14 + (10+20.0/60+30.0/3600)/24) / 14
+	if x := rs[0].X; math.Abs(x-want) > 0.01 {
+		t.Errorf("the marker is at %v, want %v", x, want)
+	}
+	if r := rs[0]; r.Y2-r.Y < 26-1 {
+		t.Errorf("the marker runs from %v to %v, want it across the chart", r.Y, r.Y2)
 	}
 }
 

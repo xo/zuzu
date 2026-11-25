@@ -141,6 +141,24 @@ func TestDiagramLinks(t *testing.T) {
 	}
 }
 
+// TestHTMLCellLinks checks that a table and a cell of a label of HTML draw
+// their links and their tooltips, in the strict mode, with no issue (D32).
+func TestHTMLCellLinks(t *testing.T) {
+	t.Parallel()
+	src := `digraph { a [shape=none, label=<<table href="https://example.com/t"><tr><td>one</td><td href="https://example.com/c" tooltip="cell">two</td></tr></table>>] }`
+	s, report, err := svgOf(t, src, true)
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, want := range []string{
+		`<a href="https://example.com/t"><text`, `<a href="https://example.com/c"><text`, `<title>cell</title>two</text>`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the SVG has no %s:\n%s", want, s)
+		}
+	}
+}
+
 // svgOf parses a source and renders it as SVG.
 func svgOf(t *testing.T, src string, strict bool, opts ...RenderOption) (string, Report, error) {
 	t.Helper()

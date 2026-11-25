@@ -330,12 +330,13 @@ func (s *scope) dataDomain(ref *vega.DataRef, typ string) ([]any, error) {
 		}
 		return extentOf(vals), nil
 	}
-	// The distinct values, in the order they first appear.
+	// The distinct values, in the order they first appear. vega.js groups
+	// the values by their strings, so 1 and "1" are one value, the first.
 	var out []any
 	firsts := map[string]int{}
 	groups := [][]dataflow.Row{}
 	for i, v := range vals {
-		k := domainKey(v)
+		k := groupKey(v)
 		if j, ok := firsts[k]; ok {
 			groups[j] = append(groups[j], rows[i])
 			continue
@@ -383,19 +384,23 @@ func sortDomain(vals []any, groups [][]dataflow.Row, raw []byte) error {
 			}
 		}
 	}
-	cmp := func(a, b int) int {
-		var c int
-		if keys != nil {
-			c = compare(keys[a], keys[b])
-		} else {
-			c = compare(vals[a], vals[b])
-		}
+	// vega.js sorts the values in the order they first appear, with the
+	// sort of JavaScript, and two values that compare equal keep that
+	// order. The values can mix strings and numbers, which do not compare,
+	// so the sort is that of JavaScript too.
+	if keys == nil {
+		keys = vals
+	}
+	jsSort(idx, func(a, b int) int {
+		c := vegaAscending(keys[a], keys[b])
 		if desc {
 			c = -c
 		}
+		if c == 0 {
+			c = a - b
+		}
 		return c
-	}
-	slices.SortStableFunc(idx, cmp)
+	})
 	sorted := make([]any, len(vals))
 	for i, j := range idx {
 		sorted[i] = vals[j]
@@ -472,6 +477,19 @@ func compare(a, b any) int {
 		b = float64(t.UnixMilli())
 	}
 	return expr.Ascending(a, b)
+}
+
+// groupKey identifies a value of a discrete domain as vega.js groups it:
+// by its string, as String() of JavaScript writes it. A date keeps a key of
+// its own, by its time.
+func groupKey(v any) string {
+	if t, ok := v.(time.Time); ok {
+		return "\x00date" + expr.String(float64(t.UnixMilli()))
+	}
+	if expr.IsUndefined(v) {
+		return "undefined"
+	}
+	return expr.String(v)
 }
 
 // domainKey identifies a value of a discrete domain.

@@ -446,6 +446,11 @@ func setProp(st *itemState, name string, v any) {
 	case "padAngle":
 		it.PadAngle = num()
 	case "shape":
+		// The function geoShape gives the path of a shape mark.
+		if g, ok := v.(geoShape); ok {
+			it.Path = g.path
+			return
+		}
 		it.Shape = str()
 	case "size":
 		it.Size = ptr()

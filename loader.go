@@ -23,7 +23,8 @@ type Loader interface {
 type LoadRequest struct {
 	// URL is the url of the spec, as written.
 	URL string
-	// Format is csv, tsv, json or topojson, from the spec.
+	// Format is csv, tsv, json or topojson, from the spec, or image for the
+	// image of a node.
 	Format string
 	// Name is the name of the dataset.
 	Name string

@@ -154,14 +154,16 @@ func TestLegendPiecesOfRamp(t *testing.T) {
 	}
 }
 
-// TestLegendUnreadProperties checks that a property of a legend that zuzu
-// does not draw, such as titlePadding, goes in the report, and that a
-// property that it draws, such as clipHeight, does not (hard rule 4).
+// TestLegendUnreadProperties checks that a value of a property of a legend
+// that zuzu does not draw, such as a titleOrient of diagonal, goes in the
+// report, and that a property that it draws, such as clipHeight or
+// titlePadding, does not (hard rule 4).
 func TestLegendUnreadProperties(t *testing.T) {
 	t.Parallel()
 	src := `{"$schema": "https://vega.github.io/schema/vega/v6.json", "width": 100, "height": 100,
 		"scales": [{"name": "c", "type": "ordinal", "domain": ["a", "b"], "range": "category"}],
-		"legends": [{"fill": "c", "titlePadding": 4, "clipHeight": 10, "labelOverlap": true}]}`
+		"legends": [{"fill": "c", "titlePadding": 4, "clipHeight": 10, "labelOverlap": true,
+			"titleOrient": "diagonal", "gridAlign": "both", "tickCount": "month"}]}`
 	_, report, err := svgOf(t, src, false)
 	if err != nil {
 		t.Fatal(err)
@@ -171,29 +173,37 @@ func TestLegendUnreadProperties(t *testing.T) {
 		got = append(got, is.Error())
 	}
 	all := strings.Join(got, "\n")
-	for _, want := range []string{"titlePadding", "labelOverlap"} {
+	for _, want := range []string{"titleOrient diagonal", "gridAlign both", "tickCount month"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("the report has no %s: %q", want, got)
 		}
 	}
-	if strings.Contains(all, "clipHeight") {
-		t.Errorf("the report names clipHeight, which zuzu draws: %q", got)
+	for _, drawn := range []string{"clipHeight", "titlePadding", "labelOverlap"} {
+		if strings.Contains(all, drawn) {
+			t.Errorf("the report names %s, which zuzu draws: %q", drawn, got)
+		}
 	}
 }
 
-// TestAxisUnreadProperties checks that a property of an axis that zuzu does
-// not draw, such as tickBand, goes in the report (hard rule 4).
+// TestAxisUnreadProperties checks that a value of a property of an axis
+// that zuzu does not draw, such as a tickBand that Vega does not name, goes
+// in the report, and that a tickBand that it draws does not (hard rule 4).
 func TestAxisUnreadProperties(t *testing.T) {
 	t.Parallel()
-	src := `{"$schema": "https://vega.github.io/schema/vega/v6.json", "width": 100, "height": 100,
-		"scales": [{"name": "x", "type": "band", "domain": ["a", "b"], "range": "width"}],
-		"axes": [{"scale": "x", "orient": "bottom", "tickBand": "extent"}]}`
-	_, report, err := svgOf(t, src, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(report) != 1 || !strings.Contains(report[0].Error(), "tickBand") {
-		t.Errorf("the report is %v, want tickBand", report)
+	for _, c := range []struct {
+		band string
+		want int
+	}{{"extent", 0}, {"center", 0}, {"edge", 1}} {
+		src := `{"$schema": "https://vega.github.io/schema/vega/v6.json", "width": 100, "height": 100,
+			"scales": [{"name": "x", "type": "band", "domain": ["a", "b"], "range": "width"}],
+			"axes": [{"scale": "x", "orient": "bottom", "tickBand": "` + c.band + `"}]}`
+		_, report, err := svgOf(t, src, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(report) != c.want || (c.want > 0 && !strings.Contains(report[0].Error(), "tickBand")) {
+			t.Errorf("tickBand %s: the report is %v, want %d issues of tickBand", c.band, report, c.want)
+		}
 	}
 }
 
@@ -247,5 +257,44 @@ func TestClipToPathInRaster(t *testing.T) {
 	}
 	if out.R > 200 && out.G < 80 {
 		t.Errorf("the corner outside the path is %v, want no red", out)
+	}
+}
+
+// TestLegendSpecProps checks that the runtime reads the properties of a
+// legend that the legend of Vega documents, from the legend and from the
+// config, with the legend over the config, and draws them with no issue:
+// the frame, the place of the title, the paint of the gradient, the dash
+// offset of the symbols and the size that the encode of the symbols gives.
+// Before, each went in the report and drew nothing.
+func TestLegendSpecProps(t *testing.T) {
+	t.Parallel()
+	ordinal := `"scales": [{"name": "c", "type": "ordinal", "domain": ["a", "b"], "range": ["red", "blue"]},
+		{"name": "g", "type": "linear", "domain": [0, 10], "range": ["white", "black"]}]`
+	items := func(config, legend, role string) []scene.Item {
+		t.Helper()
+		src := `{"width": 100, "height": 100, "config": {` + config + `}, ` + ordinal + `, "legends": [` + legend + `]}`
+		return legendItems(t, src, Vega, role)
+	}
+	frame := items(`"legend": {"strokeColor": "gray", "cornerRadius": 2}`, `{"fill": "c", "padding": 5, "fillColor": "white"}`, "legend-frame")
+	if len(frame) != 1 || frame[0].Fill.Color != "white" || frame[0].Stroke.Color != "gray" || frame[0].CornerRadius != 2 {
+		t.Errorf("the frame is %+v, want white, gray and rounded by 2", frame)
+	}
+	title := items(`"legend": {"titleOrient": "top"}`, `{"fill": "c", "title": "T", "titleOrient": "bottom", "titleAnchor": "end"}`, "legend-title")
+	if len(title) != 1 || title[0].Baseline != "top" || title[0].Align != "right" {
+		t.Errorf("the title is %+v, want below the entries at the end", title)
+	}
+	grad := items(``, `{"fill": "g", "type": "gradient", "gradientStrokeColor": "green", "gradientStrokeWidth": 2, "gradientOpacity": 0.5}`, "legend-gradient")
+	if len(grad) != 1 || grad[0].Stroke.Color != "green" || grad[0].StrokeWidth == nil || *grad[0].StrokeWidth != 2 ||
+		grad[0].Opacity == nil || *grad[0].Opacity != 0.5 {
+		t.Errorf("the gradient is %+v, want a green stroke of 2 at the opacity 0.5", grad)
+	}
+	syms := items(``, `{"fill": "c", "symbolDash": [4, 2], "symbolDashOffset": 1}`, "legend-symbol")
+	if len(syms) == 0 || !slices.Equal(syms[0].StrokeDash, []float64{3, 2, 1, 0}) {
+		t.Errorf("the dash of the symbols is %+v, want it started 1 along", syms)
+	}
+	big := items(``, `{"fill": "c", "encode": {"symbols": {"enter": {"size": {"value": 900}}}}}`, "legend-label")
+	if len(big) != 2 || big[0].X < 30+6 || big[1].Y-big[0].Y < 30 {
+		t.Errorf("the labels are at %v, %v and %v, %v, want room for the symbols of 30 that the encode gives",
+			big[0].X, big[0].Y, big[1].X, big[1].Y)
 	}
 }

@@ -78,6 +78,38 @@ func TestALightBackgroundKeepsGrays(t *testing.T) {
 	}
 }
 
+// TestALightBackgroundDrawsInTheLightMode checks that a chart whose spec
+// paints a light background, also through a signal, draws its guides with
+// the neutrals of the light mode in the dark mode, and keeps its grays,
+// and that a dark background of a signal flips them (D48). Before, the
+// labels of the axes of point_background were light gray on orange, and a
+// background of a signal counted as the background of the mode.
+func TestALightBackgroundDrawsInTheLightMode(t *testing.T) {
+	t.Parallel()
+	light, dark := theme.New(theme.Light, theme.Zuzu), theme.New(theme.Dark, theme.Zuzu)
+	for _, c := range []struct {
+		name, background, label, text string
+	}{
+		{"a light color", `"background": "orange"`, light.Muted, "black"},
+		{"a light signal", `"signals": [{"name": "bg", "value": "white"}], "background": {"signal": "bg"}`, light.Muted, "black"},
+		{"a dark signal", `"background": {"signal": "'#202020'"}`, dark.Muted, "#ffffff"},
+		{"a light config", `"config": {"background": "#fafafa"}`, light.Muted, "black"},
+		{"no background", `"padding": 0`, dark.Muted, "#ffffff"},
+	} {
+		s := renderVegaMode(t, `"width": 100, "height": 100, `+c.background+`,
+			"scales": [{"name": "x", "type": "linear", "domain": [0, 10], "range": "width"}],
+			"axes": [{"scale": "x", "orient": "bottom"}],
+			"marks": [{"type": "text", "encode": {"enter": {"text": {"value": "a"}, "fill": {"value": "black"}}}}]`, theme.Dark)
+		label := marksOf(s, "axis-label")
+		if len(label) == 0 || label[0].Items[0].Fill.Color != c.label {
+			t.Errorf("%s: the labels of the axis are %+v, want %s", c.name, label, c.label)
+		}
+		if got := marksOf(s, "mark")[0].Items[0].Fill.Color; got != c.text {
+			t.Errorf("%s: the text is %s, want %s", c.name, got, c.text)
+		}
+	}
+}
+
 // TestEndLabelsFit checks that the look names the ends of lines only where
 // the names fit (D48 part 2): not for a faint line of context, not for
 // more than eight series, and not when the spec draws text of its own.

@@ -1,5 +1,5 @@
 // Package sketch turns a scene into the same scene drawn as if by hand,
-// with the copy of rough.js in internal/rough (D39, D40). The runtime runs
+// with the copy of rough-go in internal/rough (D39, D40). The runtime runs
 // it after the layout and before any renderer, so that the SVG writer and
 // the package raster read the same scene and draw the same look (hard
 // rule 5).
@@ -10,8 +10,10 @@
 // stroke, as rough.js draws them. A fill draws as a hachure, lines in the
 // paint of the fill, and never as a pattern of SVG, over an underlay in
 // the color of the background that hides what is under it. A gradient
-// stays a gradient. Only a text, an image and the outline of a formula keep their
-// shape. "The look like Excalidraw" in docs/STYLE.md holds the rules.
+// stays a gradient: the lines of its hachure take it, and a large shape
+// draws them over a tint of it (D47, D50). Only a text, an image and the
+// outline of a formula keep their shape. "The look like Excalidraw" in
+// docs/STYLE.md holds the rules.
 package sketch
 
 import (

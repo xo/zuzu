@@ -15,19 +15,17 @@ import (
 // for a chart of Vega or Vega-Lite, on a dark background. A diagram of DOT
 // or Mermaid keeps its colors, because its theme sets its mode (D32, D37).
 // The background is the one of the caller or of zuzu.background, or else
-// the color that the spec or its config gives, or else the one of the
-// mode. A background that is not a color, such as a signal, counts as the
-// one of the mode.
+// the color that the spec, a signal of the spec or its config gives, or
+// else the one of the mode. A light background of the spec sets the light
+// mode (look), so the dark mode flips the grays over a dark background of
+// the spec, or over the background of the mode.
 func (rt *runtime) flipsGrays() bool {
 	if rt.chart.diagram || rt.theme.Mode() != theme.Dark {
 		return false
 	}
 	bg := rt.theme.Background
 	if !rt.opts.hasBackground {
-		var s string
-		if b := rt.chart.spec.Background; b.Signal == "" && len(b.JSON) > 0 && json.Unmarshal(b.JSON, &s) == nil {
-			bg = s
-		} else if raw, ok := rt.chart.spec.Config["background"]; ok && json.Unmarshal(raw, &s) == nil {
+		if s, ok := rt.specBackground(); ok {
 			bg = s
 		}
 	}
@@ -37,6 +35,58 @@ func (rt *runtime) flipsGrays() bool {
 		return true
 	}
 	return theme.IsDark(color.RGBA{R: c.R, G: c.G, B: c.B, A: 1}.Hex())
+}
+
+// specBackground returns the opaque background that the spec paints, as
+// #rrggbb: its background, which a signal can give, or else the background
+// of its config. It returns false for a spec that paints none, or one that
+// is transparent or not a color.
+func (rt *runtime) specBackground() (string, bool) {
+	var s string
+	b := rt.chart.spec.Background
+	switch {
+	case b.Signal != "":
+		v, ok := rt.backgroundSignal()
+		if !ok {
+			return "", false
+		}
+		s = v
+	case len(b.JSON) > 0:
+		if json.Unmarshal(b.JSON, &s) != nil {
+			return "", false
+		}
+	default:
+		raw, ok := rt.chart.spec.Config["background"]
+		if !ok || json.Unmarshal(raw, &s) != nil {
+			return "", false
+		}
+	}
+	c, ok := color.Parse(s)
+	if !ok || c.A <= 0 {
+		return "", false
+	}
+	return color.RGBA{R: c.R, G: c.G, B: c.B, A: 1}.Hex(), true
+}
+
+// backgroundSignal works out the signal of the background of the spec in a
+// scope of its own, before the render sets its theme, and leaves no issue
+// in the report. It returns false when the signal gives no string.
+func (rt *runtime) backgroundSignal() (out string, ok bool) {
+	n := len(rt.report)
+	defer func() {
+		if recover() != nil {
+			out, ok = "", false
+		}
+		rt.report = rt.report[:n]
+	}()
+	s := rt.newScope(nil, &rt.chart.spec.Scope, "", nil)
+	s.builtins(rt.chart.spec)
+	v, err := s.signal("background")
+	if err != nil {
+		return "", false
+	}
+	out, ok = v.(string)
+	return out, ok
 }
 
 // specColor returns a color that the spec names as the render draws it. In
