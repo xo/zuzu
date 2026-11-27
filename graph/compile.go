@@ -782,7 +782,7 @@ func Compile(g *Graph) (*vega.Spec, error) {
 			"x": field("x"), "y": field("y"), "width": field("width"), "height": field("height"),
 		}, map[string]string{"textColor": "fill"}))
 	}
-	marks = append(marks, mathMarks(&data, mathParts(g))...)
+	marks = append(marks, mathMarks(&data, mathParts(g), g.Lanes && g.Direction == LR)...)
 	if !links {
 		links = htmlLinks(g)
 	}
@@ -1039,8 +1039,9 @@ func mathParts(g *Graph) []string {
 // its text, which a path does not draw, and which the SVG writes as its
 // label. A row sets fill when its label or its formula has a color of its
 // own, and its field _paint says so. The other rows take the color of the
-// style of their label.
-func mathMarks(data *[]any, parts []string) []any {
+// style of their label. When turned is true, a mark of the title of a
+// cluster takes the angle of its row, as the title of a lane turns.
+func mathMarks(data *[]any, parts []string, turned bool) []any {
 	field := func(f string) map[string]any { return map[string]any{"field": f} }
 	styles := map[string]string{"cluster": StyleClusterTitle, "edge": StyleEdgeLabel, "node": StyleNodeLabel}
 	var marks []any
@@ -1063,6 +1064,11 @@ func mathMarks(data *[]any, parts []string) []any {
 				}
 				if sig == "fill" {
 					enc["fill"] = field("fill")
+				}
+				if turned && part == "cluster" {
+					// The transform turns each part of the math of the
+					// title of a lane around the place of the title.
+					enc["angle"] = map[string]any{"signal": "datum.angle || 0"}
 				}
 				m := map[string]any{"type": typ, "from": map[string]any{"data": name}, "style": []string{styles[part]}, "encode": map[string]any{"update": enc}}
 				if typ == "path" {

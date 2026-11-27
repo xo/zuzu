@@ -42,8 +42,8 @@ third, a gantt with `dateFormat ss` and a start of `0`, draws since
 2026-11-22.
 
 In a swimlane diagram from the left to the right, a title of a lane that
-holds math does not turn, as "Swimlane diagram" in `docs/DIAGRAMS.md`
-says. The rows of the math take no angle.
+holds HTML does not turn, as a plain title and a title of math do. The
+rows of the HTML take no angle.
 
 ### Fix what the review page found
 

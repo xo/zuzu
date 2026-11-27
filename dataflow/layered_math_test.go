@@ -110,6 +110,27 @@ func TestMathLabelRows(t *testing.T) {
 	}
 }
 
+// TestTurnRows checks that the rows of a title of math turn around the
+// place of the title, to a place that is exact for -90 degrees, and that
+// an angle of 0 leaves them as they are.
+func TestTurnRows(t *testing.T) {
+	t.Parallel()
+	rows := []Row{{"x": 13.0, "y": 21.0}, {"x": 10.0, "y": 20.0}}
+	turnRows(rows, 10, 20, 0)
+	if rows[0]["x"] != 13.0 || rows[0]["y"] != 21.0 || rows[0]["angle"] != nil {
+		t.Errorf("an angle of 0 moved the row to %v", rows[0])
+	}
+	// A part 3 along the title and 1 across it moves 3 up and 1 to the
+	// right, as a text with the angle -90 reads from the bottom to the top.
+	turnRows(rows, 10, 20, -90)
+	if rows[0]["x"] != 11.0 || rows[0]["y"] != 17.0 || rows[0]["angle"] != -90.0 {
+		t.Errorf("expected the row at 11, 17 with the angle -90, got %v", rows[0])
+	}
+	if rows[1]["x"] != 10.0 || rows[1]["y"] != 20.0 {
+		t.Errorf("expected the row at the place of the title to stay, got %v", rows[1])
+	}
+}
+
 // abs returns the absolute value of a number.
 func abs(v float64) float64 {
 	if v < 0 {

@@ -3,11 +3,15 @@ package zuzu
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/xo/zuzu/layout"
+	"github.com/xo/zuzu/scene"
 	"github.com/xo/zuzu/text/math"
+	"github.com/xo/zuzu/theme"
 	"github.com/xo/zuzu/vega"
 )
 
@@ -198,5 +202,80 @@ func TestMathSizes(t *testing.T) {
 	}
 	if y := num(frac, "y"); y < num(a, "y") || y > num(a, "y")+num(a, "height")/2 {
 		t.Errorf("the baseline of the fraction at %v, want just below the middle %v", y, num(a, "y"))
+	}
+}
+
+// TestMathLaneTitle checks that the title of a lane that holds math turns
+// by -90 degrees when the ranks run from the left to the right, as a plain
+// title turns (D60). Each run of text and each formula takes the angle and
+// turns around the place of the title, so that the title reads from the
+// bottom to the top in the band at the left of the lane. The bounds of a
+// formula turn with it, and the look drawn by hand keeps the turn.
+func TestMathLaneTitle(t *testing.T) {
+	t.Parallel()
+	const src = "swimlane-beta LR\n  subgraph L[\"Lane $$x^2$$\"]\n    a[A]\n  end\n  subgraph M[Plain]\n    b[B]\n  end\n  a --> b\n"
+	c, report, err := Parse([]byte(src), WithStrict(true), WithMath(math.Font()))
+	if err != nil {
+		t.Fatalf("%v (%v)", err, report)
+	}
+	for _, look := range []theme.Look{theme.LookStandard, theme.LookExcalidraw} {
+		s, more, err := c.Render(t.Context(), WithLocation(time.UTC), WithLook(look), lookFont)
+		if err != nil || len(more) > 0 {
+			t.Fatalf("%s: %v (%v)", look, err, more)
+		}
+		var lane map[string]any
+		var plain *scene.Item
+		var runs, paths []*scene.Item
+		var walk func(m *scene.Mark)
+		walk = func(m *scene.Mark) {
+			for i := range m.Items {
+				it := &m.Items[i]
+				d, _ := it.Datum.(map[string]any)
+				switch {
+				case d["kind"] == "cluster" && d["key"] == "L":
+					lane = d
+				case d["kind"] == "cluster" && d["key"] == "M" && m.Type == scene.Text:
+					plain = it
+				case d["kind"] == "mathText" && d["part"] == "cluster":
+					runs = append(runs, it)
+				case d["kind"] == "mathPath" && d["part"] == "cluster":
+					paths = append(paths, it)
+				}
+				for j := range it.Items {
+					walk(&it.Items[j])
+				}
+			}
+		}
+		walk(&s.Root)
+		if lane == nil || plain == nil || len(runs) != 1 || len(paths) == 0 {
+			t.Fatalf("%s: expected the lanes, one run and a formula, got %v, %v, %d runs and %d paths", look, lane, plain, len(runs), len(paths))
+		}
+		if plain.Angle != -90 || lane["titleAngle"] != -90.0 {
+			t.Errorf("%s: expected the titles turned by -90 degrees, got %v and %v", look, plain.Angle, lane["titleAngle"])
+		}
+		num := func(k string) float64 { f, _ := lane[k].(float64); return f }
+		x, y, w, h := num("titleX"), num("titleY"), num("titleWidth"), num("titleHeight")
+		// along is the place of a part along the title, from its start at
+		// the bottom, and across is its place across the title, from its
+		// left, as the part lay before it turned.
+		along := func(it *scene.Item) float64 { return y - it.Y }
+		across := func(it *scene.Item) float64 { return it.X - x }
+		for _, it := range append(slices.Clone(runs), paths...) {
+			if it.Angle != -90 {
+				t.Errorf("%s: expected the part %q turned by -90 degrees, got %v", look, it.Text, it.Angle)
+			}
+			if a, b := along(it), across(it); a < 0 || a > w || b < 0 || b > h {
+				t.Errorf("%s: the part %q is %v along and %v across the title, want in %v by %v", look, it.Text, a, b, w, h)
+			}
+		}
+		if runs[0].Text[0] != "Lane" || along(runs[0]) >= along(paths[0]) {
+			t.Errorf("%s: expected the run Lane before the formula, at %v and %v", look, along(runs[0]), along(paths[0]))
+		}
+		for _, it := range paths {
+			b := layout.Style{}.ItemBounds(scene.Path, it)
+			if b.X1 < x-1 || b.X2 > x+h+1 || b.Y1 < y-w-1 || b.Y2 > y+1 {
+				t.Errorf("%s: the formula %q has the bounds %v, want in the band from %v,%v to %v,%v", look, it.Text, b, x, y-w, x+h, y)
+			}
+		}
 	}
 }

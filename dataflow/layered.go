@@ -778,7 +778,11 @@ func layered(p *params, rows []Row, engine graph.Engine) ([]Row, error) {
 		if ml, ok := clusterMaths[i]; ok && cp.Width > 0 {
 			// The text of the title draws nothing, and the math draws it.
 			o["label"], o["lines"] = "", []any{}
-			out = append(out, ml.rows(mathBase(r, "textColor"), "cluster", cp.TitleX, cp.TitleY, true, true)...)
+			mr := ml.rows(mathBase(r, "textColor"), "cluster", cp.TitleX, cp.TitleY, true, true)
+			// When the title turns, its math turns around the place of the
+			// title, as the text of a title does.
+			turnRows(mr, cp.TitleX, cp.TitleY, cp.TitleAngle)
+			out = append(out, mr...)
 		}
 		if h, ok := clusterHTMLs[i]; ok && cp.Width > 0 {
 			out = append(out, h.rows(linkRow(Row{"key": r["key"], "stroke": r["stroke"], "textColor": r["textColor"]}, r), cp.TitleX+h.lay.Width/2, cp.TitleY+h.lay.Height/2, "")...)

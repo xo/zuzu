@@ -2,6 +2,7 @@ package dataflow
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/xo/zuzu/expr"
@@ -199,6 +200,27 @@ func (l *mathLabel) rows(base Row, part string, x, y float64, left, top bool) []
 		}
 	}
 	return out
+}
+
+// turnRows turns the rows of a label with math by angle degrees around the
+// point x, y. Each row moves around the point and takes the field angle,
+// so that its run of text or its path turns around its own x and y. The
+// label then lies where a text at x, y with that angle lies. An angle of 0
+// leaves the rows as they are.
+func turnRows(rows []Row, x, y, angle float64) {
+	if angle == 0 {
+		return
+	}
+	sin, cos := math.Sincos(angle * math.Pi / 180)
+	if math.Mod(angle, 90) == 0 {
+		// A turn by a multiple of 90 degrees moves a row to a place that
+		// is exact.
+		sin, cos = math.Round(sin), math.Round(cos)
+	}
+	for _, r := range rows {
+		dx, dy := expr.Number(r["x"])-x, expr.Number(r["y"])-y
+		r["x"], r["y"], r["angle"] = x+dx*cos-dy*sin, y+dx*sin+dy*cos, angle
+	}
 }
 
 // mathBase returns the base of the rows of a label with math of a row: its

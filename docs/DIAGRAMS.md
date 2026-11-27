@@ -1826,7 +1826,9 @@ that it reads from the bottom to the top, in a band at the left of the
 lane, in the middle of the lane, as Mermaid 12.3 draws it. A lane is then
 at least as tall as its title. Mermaid 12.3 draws the title of a lane at
 the top when the ranks run from the right to the left, and so does zuzu.
-A title of math does not turn. A node and an edge draw as in a flowchart,
+A title of math turns in the same way. Each run of its text and each
+formula turns around the place of the title, so that the whole title lies
+where a plain title lies. A node and an edge draw as in a flowchart,
 and an edge and its arrowheads take the color `edge`.
 
 zuzu reads the settings of the section `flowchart`, as a flowchart does,
