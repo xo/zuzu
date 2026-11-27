@@ -178,7 +178,7 @@ func TestLinksAndTooltips(t *testing.T) {
 		href    string
 		tooltip scene.Tooltip
 	}{
-		{"https://example.com/1", "a: 1\nb: [1, […]]\no: {…}"},
+		{"https://example.com/1", "b: [1, […]]\na: 1\no: {…}"},
 		{"", "[2, x]"},
 		{"", ""},
 	} {
@@ -190,7 +190,7 @@ func TestLinksAndTooltips(t *testing.T) {
 	if _, err := c.SVG(t.Context(), &b); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`<a href="https://example.com/1">`, "<title>a: 1\nb: [1, […]]\no: {…}</title>", "<title>the chart</title>"} {
+	for _, want := range []string{`<a href="https://example.com/1">`, "<title>b: [1, […]]\na: 1\no: {…}</title>", "<title>the chart</title>"} {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("the SVG does not hold %s:\n%s", want, b.String())
 		}

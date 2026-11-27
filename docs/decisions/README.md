@@ -74,3 +74,4 @@ A new decision gets the next number and a file of its own. Add its row here.
 | [D58](D058-the-answers-of-2026-11-25-fonts-seeds-labels-schemes-and-known-differences.md) | The answers of 2026-11-25: fonts, seeds, labels, schemes and known differences | Decided. Amends D15, D16, D32, D35, D40 and D52 |
 | [D59](D059-the-answers-of-2026-11-26-item-canvas-legends-and-text-on-a-color.md) | The answers of 2026-11-26: item, canvas, legends and text on a color | Decided. Amends D17, D35 and D55 |
 | [D60](D060-the-parameters-laneorder-and-lanehops-and-the-field-titleangle.md) | The parameters laneOrder and laneHops, and the field titleAngle | Decided. Amends D31 |
+| [D61](D061-a-tooltip-shows-its-value-as-vega-js-shows-it.md) | A tooltip shows its value as vega.js shows it | Decided |

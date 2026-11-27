@@ -335,6 +335,19 @@ The time zone is New York, so that the cases of local time cross a change
 of the clock. `oracle/exprs.mjs` reads the expressions from
 `expr/testdata/exprs.txt`.
 
+The package `expr` writes a date as `toString()` of JavaScript does, with
+the name of its time zone, such as "Eastern Standard Time" (D61).
+`oracle/zonenames.mjs` writes those names in `expr/zonenames.json`, for
+each zone of the `zoneinfo.zip` of Go that Node.js knows. Run this in this
+folder:
+
+```bash
+node oracle/zonenames.mjs ../expr "$(go env GOROOT)/lib/time/zoneinfo.zip"
+```
+
+On 2026-11-28, with Node.js 22 and Go 1.27, it wrote 597 zones and 194
+names.
+
 The test `TestFuncsOracle` in the package `zuzu` compares the functions of
 expressions that read the view, such as `gradient`, `copy`, `geoShape`,
 `treePath` and `vlSelectionTest`, with vega.js. `oracle/funcs-cases.mjs`

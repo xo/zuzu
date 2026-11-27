@@ -3,10 +3,8 @@ package zuzu
 import (
 	"encoding/json/v2"
 	"fmt"
-	"maps"
 	"math"
 	"slices"
-	"strings"
 
 	"github.com/xo/zuzu/dataflow"
 	"github.com/xo/zuzu/expr"
@@ -33,6 +31,12 @@ type itemState struct {
 	// properties that zuzu does not draw, such as the xfocus that a
 	// force reads.
 	values map[string]any
+	// keys holds the keys of values in the order that vega.js sets them on
+	// the item, which a tooltip of the item shows. tipItem says whether the
+	// tooltip of the item is the item itself, whose text zuzu writes once
+	// the item is whole.
+	keys    []string
+	tipItem bool
 	// mark is the mark of the item, which an expression reads as
 	// item.mark, or nil.
 	mark *markState
@@ -104,28 +108,32 @@ func (s *scope) applyEncode(sets []encodeSet, st *itemState, datum any, path str
 	for i := range sets {
 		set := &sets[i]
 		for _, p := range set.props {
-			v, named, ok, err := s.production(p.prod, datum, it)
+			v, r, err := s.production(p.prod, datum, it)
 			if err != nil {
 				return fmt.Errorf("%s/encode/%s/%s: %w", path, set.name, p.name, err)
 			}
-			if !ok {
+			if r == nil {
 				continue
 			}
-			if _, isItem := v.(expr.Object); isItem && p.name == "tooltip" {
-				// Vega shows each field of the item, which zuzu does not
-				// keep.
-				if err := s.issueOncef(path+"/encode/"+set.name+"/tooltip", "a tooltip that shows an item of the scene"); err != nil {
+			if p.name == "tooltip" {
+				ok, err := s.encodeTooltip(st, v, path+"/encode/"+set.name+"/tooltip")
+				if err != nil {
 					return err
 				}
-				continue
+				if !ok {
+					continue
+				}
 			}
-			if named && (p.name == "fill" || p.name == "stroke") {
+			if named(r) && (p.name == "fill" || p.name == "stroke") {
 				v = s.rt.specColor(v)
 			}
 			setProp(st, p.name, v)
+			if p.name == "tooltip" && !st.tipItem {
+				st.it.Tooltip = scene.Tooltip(tooltipText(v, s.rt.tooltipKeys(r, v), s.rt.loc))
+			}
 		}
 		if st.mark != nil {
-			adjustValues(st.mark.sm.Type, set, st.values)
+			adjustValues(st.mark.sm.Type, set, st)
 		}
 	}
 	return nil
@@ -135,19 +143,20 @@ func (s *scope) applyEncode(sets []encodeSet, st *itemState, datum any, path str
 // gives with x2, xc, y2 or yc, in the values of an item, as vega.js does
 // after each set. A later set reads them. A rect, a group and an image
 // turn an x past its x2 around. A rule keeps its ends.
-func adjustValues(typ string, set *encodeSet, vals map[string]any) {
-	if typ == scene.Rule || vals == nil {
+func adjustValues(typ string, set *encodeSet, st *itemState) {
+	if typ == scene.Rule || st.values == nil {
 		return
 	}
 	turn := typ == scene.Rect || typ == scene.Group || typ == scene.Image
-	adjustSpan(vals, set.x, set.x2, set.xc, turn, "x", "x2", "xc", "width")
-	adjustSpan(vals, set.y, set.y2, set.yc, turn, "y", "y2", "yc", "height")
+	adjustSpan(st, set.x, set.x2, set.xc, turn, "x", "x2", "xc", "width")
+	adjustSpan(st, set.y, set.y2, set.yc, turn, "y", "y2", "yc", "height")
 }
 
 // adjustSpan works out the start and the size of an item along one axis,
 // from the properties of the start p, the end p2, the center pc and the
 // size size, as adjustValues says.
-func adjustSpan(vals map[string]any, has, has2, hasc, turn bool, p, p2, pc, size string) {
+func adjustSpan(st *itemState, has, has2, hasc, turn bool, p, p2, pc, size string) {
+	vals := st.values
 	num := func(k string) float64 {
 		v, ok := vals[k]
 		if !ok {
@@ -166,39 +175,64 @@ func adjustSpan(vals map[string]any, has, has2, hasc, turn bool, p, p2, pc, size
 			if turn && num(p) > num(p2) {
 				vals[p], vals[p2] = vals[p2], vals[p]
 			}
-			vals[size] = num(p2) - num(p)
+			st.setValue(size, num(p2)-num(p))
 		} else {
-			vals[p] = num(p2) - orZero(size)
+			st.setValue(p, num(p2)-orZero(size))
 		}
 	}
 	if hasc {
-		vals[p] = num(pc) - orZero(size)/2
+		st.setValue(p, num(pc)-orZero(size)/2)
 	}
 }
 
+// setValue sets a value of an item that an expression reads, and keeps the
+// order of its keys.
+func (st *itemState) setValue(name string, v any) {
+	if st.values == nil {
+		st.values = map[string]any{}
+	}
+	st.values[name] = v
+	st.addKey(name, v)
+}
+
+// addKey adds a key to the keys of the item when it is not there yet. As
+// in vega.js, a value of undefined adds no key, because vega.js sets a
+// property only when its value changes.
+func (st *itemState) addKey(name string, v any) {
+	if expr.IsUndefined(v) || slices.Contains(st.keys, name) {
+		return
+	}
+	st.keys = append(st.keys, name)
+}
+
 // production evaluates the value of a property: the first rule whose test
-// is true. It reports false if no rule applies. It also reports whether the
-// spec names the value itself, as a value or a field of its data, and not
-// through a scale or an expression. Such a color flips in the dark mode,
-// and a color of a scale flips with its range (D48 part 1). A color that
-// an expression computes stays, because the expression can read a scale
-// whose range already flipped, or work out its own contrast.
-func (s *scope) production(p vega.Production, datum any, it *scene.Item) (any, bool, bool, error) {
-	for _, r := range p {
+// is true, which it returns, or nil if no rule applies. A color that the
+// spec names itself, as named says, flips in the dark mode, and a color of
+// a scale flips with its range (D48 part 1). A color that an expression
+// computes stays, because the expression can read a scale whose range
+// already flipped, or work out its own contrast.
+func (s *scope) production(p vega.Production, datum any, it *scene.Item) (any, *vega.Rule, error) {
+	for i := range p {
+		r := &p[i]
 		if r.Test != "" {
 			t, err := s.evalItem(r.Test, datum)
 			if err != nil {
-				return nil, false, false, err
+				return nil, nil, err
 			}
 			if !expr.Truthy(t) {
 				continue
 			}
 		}
 		v, err := s.valueRef(&r.ValueRef, datum, it)
-		named := r.Signal == "" && r.Scale.IsZero() && (len(r.Value) > 0 || !r.Field.IsZero())
-		return v, named, true, err
+		return v, r, err
 	}
-	return nil, false, false, nil
+	return nil, nil, nil
+}
+
+// named reports whether the spec names the value of a rule itself, as a
+// value or a field of its data, and not through a scale or an expression.
+func named(r *vega.Rule) bool {
+	return r.Signal == "" && r.Scale.IsZero() && (len(r.Value) > 0 || !r.Field.IsZero())
 }
 
 // valueRef evaluates a value reference: a value, a signal or a field,
@@ -447,13 +481,10 @@ func itemField(it *scene.Item, name string) any {
 
 // setProp sets a property of an item to a value.
 func setProp(st *itemState, name string, v any) {
-	if st.values == nil {
-		st.values = map[string]any{}
-	}
 	if st.set == nil {
 		st.set = map[string]bool{}
 	}
-	st.values[name] = v
+	st.setValue(name, v)
 	it := st.it
 	num := func() float64 {
 		f := expr.Number(v)
@@ -614,7 +645,12 @@ func setProp(st *itemState, name string, v any) {
 	case "href":
 		it.Href = str()
 	case "tooltip":
-		it.Tooltip = scene.Tooltip(tooltipText(v))
+		// The text of a tooltip that is the item itself waits until the
+		// item is whole, as itemTooltip says.
+		it.Tooltip = ""
+		if !st.tipItem {
+			it.Tooltip = scene.Tooltip(tooltipText(v, nil, nil))
+		}
 	}
 	// Other properties, such as description and cursor, change nothing that
 	// zuzu draws.
@@ -637,51 +673,6 @@ func scalePath(st *itemState) {
 	if d, err := shape.ScalePath(st.it.Path, k(sx, okX), k(sy, okY)); err == nil {
 		st.it.Path = d
 	}
-}
-
-// tooltipText writes the value of a tooltip as the text that Vega shows
-// without a plugin: an object as one line "key: value" for each of its
-// fields, in the order of their keys, an array as [a, b], and any other
-// value as its text. A value in an object or an array that is itself an
-// object or an array shows as {…} or […]. null and undefined show nothing.
-func tooltipText(v any) string {
-	if v == nil || expr.IsUndefined(v) {
-		return ""
-	}
-	inner := func(v any) string {
-		switch x := v.(type) {
-		case []any:
-			return "[…]"
-		case map[string]any:
-			return "{…}"
-		case nil:
-			return "null"
-		default:
-			return expr.String(x)
-		}
-	}
-	array := func(l []any) string {
-		parts := make([]string, len(l))
-		for i, e := range l {
-			parts[i] = inner(e)
-		}
-		return "[" + strings.Join(parts, ", ") + "]"
-	}
-	switch x := v.(type) {
-	case []any:
-		return array(x)
-	case map[string]any:
-		lines := make([]string, 0, len(x))
-		for _, k := range slices.Sorted(maps.Keys(x)) {
-			if l, ok := x[k].([]any); ok {
-				lines = append(lines, k+": "+array(l))
-				continue
-			}
-			lines = append(lines, k+": "+inner(x[k]))
-		}
-		return strings.Join(lines, "\n")
-	}
-	return expr.String(v)
 }
 
 // linkIssue clears the link of an item when LinkAllowed refuses it, and

@@ -262,6 +262,12 @@ report, as does the size of an item of a guide. `item.bounds` is a known
 difference and goes in the report. vega.js gives the bounds only from an
 earlier pulse, after it draws the item, and zuzu draws a chart once.
 
+A tooltip shows its value as vega.js shows it without a plugin (D61). A
+tooltip whose value is the item itself shows the fields of the item in
+the order that vega.js sets them. The defaults of the config show the
+theme of zuzu (D12). A tooltip whose value is another part of the scene,
+or the item of a guide or of the root group, goes in the report.
+
 ## Rendering
 
 ### SVG

@@ -136,6 +136,8 @@ type markState struct {
 	guide bool
 	frame guideFrame
 	sets  []encodeSet
+	// root is true for the mark of the root group.
+	root bool
 }
 
 // Get returns a property of the mark: its group, its items, its kind, its

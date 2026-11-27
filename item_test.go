@@ -82,32 +82,6 @@ func TestItemInEncode(t *testing.T) {
 	}
 }
 
-// TestItemTooltip checks that a tooltip that shows the item goes in the
-// report once for its mark, and draws no tooltip.
-func TestItemTooltip(t *testing.T) {
-	t.Parallel()
-	c, _, err := Parse([]byte(`{"$schema": "https://vega.github.io/schema/vega/v5.json",
-		"width": 100, "height": 100,
-		"data": [{"name": "t", "values": [{"v": 1}, {"v": 2}]}],
-		"marks": [{"type": "rect", "role": "bar", "from": {"data": "t"},
-			"encode": {"update": {"width": {"value": 5}, "tooltip": {"signal": "item"}}}}]}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	s, report, err := c.Render(t.Context(), WithLocation(time.UTC))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(report) != 1 || !errors.Is(report[0], vega.ErrUnsupported) {
-		t.Errorf("the report = %v, want one tooltip of an item", report)
-	}
-	for _, it := range roleItems(s, "bar") {
-		if it.Tooltip != "" {
-			t.Errorf("the tooltip = %q, want none", it.Tooltip)
-		}
-	}
-}
-
 // itemOrderSpec is a spec whose encodings read item in each way that
 // vega.js gives it: a property that an earlier property or an earlier set
 // set, the place that x2 and y2 give after each set, the items of a mark

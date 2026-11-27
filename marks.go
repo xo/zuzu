@@ -123,8 +123,10 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 	badLink := false
 	for i, st := range states {
 		d := data[i]
-		for k, v := range defaults {
-			setProp(st, k, v)
+		// vega.js sets the defaults of the config first, which a tooltip
+		// of the item shows in this order (D61).
+		for _, k := range slices.Sorted(maps.Keys(defaults)) {
+			setProp(st, k, defaults[k])
 		}
 		ring := st.it.Stroke
 		if err := s.applyEncode(sets, st, d, path); err != nil {
@@ -186,6 +188,11 @@ func (s *scope) buildMark(m *vega.Mark, path string) (*scene.Mark, error) {
 		}
 	}
 	ms.setStates(states)
+	for _, st := range states {
+		if st.tipItem {
+			st.it.Tooltip = scene.Tooltip(itemTooltip(st, m.Type == scene.Group, childMarks(m), s.rt.loc))
+		}
+	}
 	sm.Items = make([]scene.Item, len(states))
 	for i, st := range states {
 		sm.Items[i] = *st.it
@@ -760,6 +767,7 @@ const itemKey = "zuzu:item"
 // back. A transform that zuzu does not support goes in the report.
 func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) ([]*itemState, error) {
 	rows := make([]dataflow.Row, len(states))
+	before := make([]dataflow.Row, len(states))
 	for i, st := range states {
 		r := itemRow(st.it)
 		for k, v := range st.values {
@@ -777,6 +785,7 @@ func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) (
 		}
 		r[itemKey] = i
 		rows[i] = r
+		before[i] = maps.Clone(r)
 	}
 	env := &dataEnv{s: s}
 	for i, t := range m.Transform {
@@ -808,13 +817,21 @@ func (s *scope) transformItems(m *vega.Mark, states []*itemState, path string) (
 		st := states[i]
 		setItem(st.it, r)
 		// A field that a transform adds, such as the as of a lookup, is a
-		// property of the item, which item.mark.group reads.
-		for k, v := range r {
-			if k != itemKey {
-				if st.values == nil {
-					st.values = map[string]any{}
-				}
-				st.values[k] = v
+		// property of the item, which item.mark.group reads. A field that
+		// the transform adds or changes takes a key of the item, which a
+		// tooltip of the item shows. zuzu does not know the order in which
+		// a transform sets them, so they come sorted.
+		if st.values == nil {
+			st.values = map[string]any{}
+		}
+		for _, k := range slices.Sorted(maps.Keys(r)) {
+			if k == itemKey {
+				continue
+			}
+			v := r[k]
+			st.values[k] = v
+			if old, ok := before[i][k]; k != "datum" && (!ok || !sameValue(old, v)) {
+				st.addKey(k, v)
 			}
 		}
 		if m.Type == scene.Shape {
@@ -845,6 +862,17 @@ func itemRow(it *scene.Item) dataflow.Row {
 		r["fontSize"] = it.FontSize
 	}
 	return r
+}
+
+// sameValue reports whether a transform left a value of an item as it was.
+// NaN is the same as NaN.
+func sameValue(a, b any) bool {
+	if x, ok := a.(float64); ok {
+		if y, ok := b.(float64); ok {
+			return x == y || math.IsNaN(x) && math.IsNaN(y)
+		}
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 // setItem writes the properties of a row back to its item.

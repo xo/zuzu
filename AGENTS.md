@@ -15,7 +15,7 @@ done: zuzu draws the charts of tiers 1 and 2. Phase 6 is done: `raster`
 draws a scene with okage directly. Phase 7 is done: zuzu draws the diagrams
 of DOT and Mermaid of D31, and since then every other kind of Mermaid
 12.3, in the order of D32. Code follows the plan (D3).
-Every decision from D1 to D60 is decided. The open questions are at the
+Every decision from D1 to D61 is decided. The open questions are at the
 end of `docs/PLAN.md`.
 
 ## Standing rules
@@ -173,7 +173,7 @@ The repository holds these files:
 | `*.go`, `testdata/` | the package `zuzu`: the API of D24 and the runtime that runs a spec, with its golden files, and the tests of the documents |
 | `vega/` | the Go types of a Vega spec, read from JSON and written back (D21) |
 | `vegalite/` | the Go types of a Vega-Lite spec and its compiler to Vega (D21) |
-| `expr/` | the expression language of Vega, with its oracle cases in `expr/testdata` (D9) |
+| `expr/` | the expression language of Vega, with its oracle cases in `expr/testdata` (D9), and the names of the time zones that `toString()` of JavaScript writes in `expr/zonenames.json` (D61) |
 | `format/` | the formats of numbers and times of d3, the units of time and the dates that JavaScript reads, with their oracle cases in `format/testdata` (D27) |
 | `dataflow/` | the reading of data and the transforms |
 | `geo/` | the projections, the geographic paths, the graticule, and the features and the meshes of TopoJSON |

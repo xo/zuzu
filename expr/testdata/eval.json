@@ -378,6 +378,22 @@
   "1,2,3"
  ],
  [
+  "toString(datetime(2024, 0, 15, 9, 30))",
+  "Mon Jan 15 2024 09:30:00 GMT-0500 (Eastern Standard Time)"
+ ],
+ [
+  "toString(datetime(2024, 6, 15))",
+  "Mon Jul 15 2024 00:00:00 GMT-0400 (Eastern Daylight Time)"
+ ],
+ [
+  "'' + datetime(1950, 6, 1)",
+  "Sat Jul 01 1950 00:00:00 GMT-0400 (Eastern Daylight Time)"
+ ],
+ [
+  "toString(datum.t)",
+  "1709227805007"
+ ],
+ [
   "toBoolean('false')",
   false
  ],

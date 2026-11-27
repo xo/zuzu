@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -138,6 +139,81 @@ func (p *Program) String() string {
 // as now, in any branch.
 func (p *Program) Calls(name string) bool {
 	return calls(p.root, name)
+}
+
+// Keys returns the keys of an object v that the expression gave, in the
+// order of Object.keys of JavaScript, when an object literal of the
+// expression gave it, such as {"b": 1, "a": 2}. The literal can be the
+// whole expression, or a branch of a condition or of the operators &&, ||
+// and ??. Keys finds it by its keys. It returns nil when no such literal
+// has the keys of v, as for an object of a dataset or of a function, whose
+// keys come in no order that zuzu knows.
+func (p *Program) Keys(v map[string]any) []string {
+	var found []string
+	var walk func(n node) bool
+	walk = func(n node) bool {
+		switch x := n.(type) {
+		case object:
+			keys := KeyOrder(x.keys)
+			if len(keys) != len(v) {
+				return false
+			}
+			for _, k := range keys {
+				if _, ok := v[k]; !ok {
+					return false
+				}
+			}
+			found = keys
+			return true
+		case cond:
+			return walk(x.yes) || walk(x.no)
+		case binary:
+			if x.op == "&&" || x.op == "||" || x.op == "??" {
+				return walk(x.x) || walk(x.y)
+			}
+		}
+		return false
+	}
+	walk(p.root)
+	return found
+}
+
+// KeyOrder returns the keys of an object in the order that Object.keys of
+// JavaScript lists them, when the object sets them in the order of keys. A
+// key that is an index of an array, such as "2", comes first, in the order
+// of its number. The other keys follow in the order of their first set.
+func KeyOrder(keys []string) []string {
+	out := make([]string, 0, len(keys))
+	seen := make(map[string]bool, len(keys))
+	var nums []string
+	for _, k := range keys {
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		if _, ok := arrayIndex(k); ok {
+			nums = append(nums, k)
+			continue
+		}
+		out = append(out, k)
+	}
+	slices.SortFunc(nums, func(a, b string) int {
+		x, _ := arrayIndex(a)
+		y, _ := arrayIndex(b)
+		return cmp.Compare(x, y)
+	})
+	return append(nums, out...)
+}
+
+// arrayIndex reads a key that is an index of an array in JavaScript: an
+// integer from 0 to 2^32-2 that the key writes with no sign and no leading
+// zero.
+func arrayIndex(k string) (uint64, bool) {
+	n, err := strconv.ParseUint(k, 10, 64)
+	if err != nil || n > math.MaxUint32-1 || strconv.FormatUint(n, 10) != k {
+		return 0, false
+	}
+	return n, true
 }
 
 // calls reports whether a node calls a function of the name.

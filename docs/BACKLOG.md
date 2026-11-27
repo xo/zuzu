@@ -45,17 +45,6 @@ In a swimlane diagram from the left to the right, a title of a lane that
 holds HTML does not turn, as a plain title and a title of math do. The
 rows of the HTML take no angle.
 
-### Fix what the review page found
-
-`test/cmd/review` draws each source of the corpus and each fixture of the
-diagrams with its original renderer and with zuzu, side by side. On
-2026-11-12 it showed these differences. Each one is what the page shows, and
-its cause is not known yet.
-
-In Vega, a tooltip whose value is the item, such as
-`"tooltip": {"signal": "item"}`, shows each field of the item in vega.js.
-zuzu draws no such tooltip, and it goes in the report.
-
 ## Themes
 
 ### Let a scheme name a font

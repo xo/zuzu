@@ -165,7 +165,7 @@ func String(v any) string {
 		if x.IsZero() {
 			return "Invalid Date"
 		}
-		return x.Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
+		return x.Format("Mon Jan 02 2006 15:04:05 GMT-0700") + " (" + zoneName(x) + ")"
 	case []any:
 		parts := make([]string, len(x))
 		for i, e := range x {

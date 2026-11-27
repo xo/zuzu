@@ -154,9 +154,13 @@ An item of the scene graph carries a link, `Href`, and a tooltip,
 mark (D32). `svg.Write` writes the link as an `<a href>` around the item
 and the tooltip as a `<title>` inside it. `raster.Draw` draws neither.
 
-A tooltip that is not a string shows as Vega shows it without a plugin. An
-object shows one line `key: value` for each field, in the order of the
-keys, and an array shows as `[a, b]`.
+A tooltip that is not a string shows as Vega shows it without a plugin
+(D61). An object shows one line `key: value` for each field, in the order
+of the object where zuzu knows it, and sorted where it does not. An array
+shows as `[a, b]`, with null and undefined as nothing. A date shows as
+`Date.prototype.toString()` of JavaScript in the time zone of the call. A
+tooltip whose value is the item itself shows the fields of the item, as
+D61 says.
 
 `scene.LinkAllowed` says which links a renderer writes. A link with no
 scheme, such as `page.html`, `/a/b` or `#part`, is allowed. A link with
